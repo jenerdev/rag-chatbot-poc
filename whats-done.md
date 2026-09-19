@@ -1472,6 +1472,7 @@ and where each piece of code lives.
 | **Success criterion** | **passes**, via curl and in the browser |
 | **Total spend** | under $0.01 |
 | **Blockers** | none |
+| **Git** | initialised, 32 files, `.env` excluded and verified |
 
 **All ten MVP features (F-1 – F-10) are built and verified.** Nothing on the
 out-of-scope list was built.
@@ -1630,8 +1631,6 @@ showed on one contrived case out of six.
 
 ## What is left — all optional
 
-1. **`git init` and a first commit.** `.gitignore` already covers `.env`,
-   `node_modules` and `scratch/`, so R-1 holds from the first commit.
 2. **Decide whether `gpt-4o` is worth ~16× the input cost** — 6/6 on the
    prompt battery versus 5/6 for `gpt-4o-mini` (D-017). One env var. — the most user-visible gap. One cheap model call turns
    "When did they join?" plus history into a standalone query before embedding.

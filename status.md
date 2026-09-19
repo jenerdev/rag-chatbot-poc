@@ -26,12 +26,11 @@
 
 ## ▶ Next up (do this next)
 
-**Nothing is required. The project is complete.** What is left is optional:
+**Nothing is required. The project is complete and committed.** What is left
+is optional:
 
 1. **Read [`notes.md`](./notes.md).** It is the deliverable — what each of the
    five knobs actually does, measured on this build.
-2. **`git init` and a first commit.** `.gitignore` already contains `.env`,
-   `node_modules` and `scratch/`, so R-1 holds.
 3. **Verify both post-MVP features in the browser:**
    - Ask `NL-220` → the sources panel should show `KEYWORD` or `BOTH` badges.
    - Ask "Who is the Operations Director?" then "When did they join?" → the
@@ -260,7 +259,7 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 - [x] Query rewriting so retrieval sees conversation history — D-016
 - [x] Prompt work on the generator — D-017 (4/6 → 5/6; the last one is a model limit)
 - [ ] Decide whether `gpt-4o` is worth ~16× the input cost (6/6 vs 5/6)
-- [ ] `git init` + first commit
+- [x] `git init` + first commit — 2026-09-20, 32 files, `.env` verified excluded
 - [ ] Paragraph-aware chunking
 - [ ] Streaming responses
 
