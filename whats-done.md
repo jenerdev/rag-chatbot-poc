@@ -1464,7 +1464,7 @@ and where each piece of code lives.
 
 | | |
 |---|---|
-| **Phases complete** | **0, 1, 2, 3, 4, 5**, plus D-015, D-016 and D-017 |
+| **Phases complete** | **0, 1, 2, 3, 4, 5**, plus D-015 – D-018 |
 | **Progress** | **100%** |
 | **Code** | ~1,740 lines: ~690 backend, ~870 frontend, 86 SQL |
 | **Documentation** | `notes.md` 337 lines, `whats-done.md`, the planning set |
@@ -1626,6 +1626,47 @@ works: *"You can contact the Kessler Seismograph Annex liaison at extension
 
 Model left as `gpt-4o-mini` — `gpt-4o` costs ~16× per input token and the gap
 showed on one contrived case out of six.
+
+---
+
+## Post-MVP: paragraph-aware chunking (D-018) · done
+
+Phase 5 showed chunking moves retrieval quality more than any other knob, so
+this was the change with the most left in it. `chunkText()` now packs **whole
+paragraphs** up to a `CHUNK_SIZE` ceiling rather than cutting at a fixed
+offset. Sizes unchanged (1000 / 150); the old sliding window survives as the
+fallback for oversized paragraphs and for text with no blank lines.
+
+```
+Northwind handbook, before : 3 chunks  1000 / 1000 / 907   cut mid-sentence
+                     after : 4 chunks   584 / 804 / 720 / 937   all end on a full stop
+```
+
+**Re-measured rather than assumed.** Direct-hit scores rose 0.462→0.530,
+0.457→0.577, 0.536→0.588, while the absent question stayed at 0.427 and
+off-topic stayed under 0.10 — so the band the threshold sits in got **wider**.
+`MIN_SIMILARITY` re-checked and left at 0.25. Prompt battery unchanged at 5/6.
+
+**The reason it works:** a chunk is one embedding. One complete idea embeds
+cleanly; the tail of one idea plus the head of another embeds as a blur — and a
+fixed offset guarantees the second kind at every boundary. On a test document
+where a suite's name and its price fell into different chunks, the chunk
+holding the **price** scored 0.384 against "what is the nightly rate for the
+Presidential Suite?" while the chunk merely naming the suite scored 0.498. The
+chunk with the answer ranked below the chunk without it.
+
+**Two things worth keeping:**
+
+- **It only helps where the source has paragraph breaks.** One unbroken wall of
+  text still falls back to fixed-size cuts.
+- **My first version had a real bug** — the carried overlap tail was emitted as
+  a chunk of its own, so 1001 characters with no breaks gave 3 chunks where the
+  old splitter gave 2. Caught only by diffing the new output against the old on
+  identical input. A regression check now covers it, on a function pure enough
+  that it looked obviously correct.
+
+⚠ **Documents ingested before this change keep their old chunks.** Changing the
+chunker does not touch what is already stored — delete and re-add.
 
 ---
 

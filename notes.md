@@ -532,6 +532,71 @@ extra prompt tokens.**
 
 ---
 
+## Post-MVP: paragraph-aware chunking (D-018)
+
+Phase 5.1 and 5.2 showed chunking moves retrieval quality more than any other
+knob, so this was the change with the most left in it. `chunkText()` now packs
+**whole paragraphs** up to a `CHUNK_SIZE` ceiling instead of cutting at a fixed
+offset. Sizes unchanged (1000 / 150). The old sliding window survives as the
+fallback for a paragraph bigger than the ceiling, and for text pasted with no
+blank lines at all.
+
+**Northwind handbook, before and after:**
+
+```
+before : 3 chunks  1000 / 1000 / 907   cut mid-sentence
+after  : 4 chunks   584 /  804 / 720 / 937   every one ends on a full stop
+```
+
+**The scores, re-measured with `npm run scores`:**
+
+| Question | Before | After |
+|---|---|---|
+| "What time is the Quiet Hour?" | 0.536 | **0.588** |
+| "What temperature does the Bay 3 freezer run at?" | 0.462 | **0.530** |
+| "Who approves equipment requests over 2000 credits?" | 0.462 | **0.548** |
+| "How long are chemical samples retained?" | 0.457 | **0.577** |
+| *absent* — safety goggles | 0.427 | 0.427 |
+| *off-topic* — capital of France | 0.039 | 0.068 |
+
+**The separation is the point, not the scores.** True positives rose 0.05–0.12
+while the absent and off-topic questions barely moved, so the empty band the
+threshold sits in got *wider*. `MIN_SIMILARITY` re-checked and left at 0.25 —
+still between the top off-topic score (0.092) and the weakest true positive
+(0.286). Prompt battery unchanged at 5/6.
+
+### Why a paragraph boundary beats character 1000
+
+A chunk is represented by **exactly one embedding**. A chunk holding one
+complete idea embeds cleanly; a chunk holding the tail of one idea plus the
+head of another embeds as a blur of both — and a fixed offset produces the
+second kind at every single boundary.
+
+It also stops a fact being orphaned from its subject:
+
+| Chunk | Contains | Score vs "what is the nightly rate for the Presidential Suite?" |
+|---|---|---|
+| A | the suite's name, no price | **0.498** |
+| B | the price, no mention of the suite | **0.384** |
+
+**The chunk with the answer ranked below the chunk without it.** With
+paragraph breaks present, both facts land in one chunk and the problem does not
+arise.
+
+### Two things worth keeping from building it
+
+**It only helps where the source has paragraph breaks.** The same test text
+pasted as one unbroken wall still split the suite from its price — there is
+nothing but the fallback left to use.
+
+**My first version had a real bug.** The carried overlap tail was being emitted
+as a chunk of its own, so 1001 characters with no breaks produced 3 chunks where
+the old splitter produced 2. It was caught only by checking the new output
+against the old on identical input, which is the whole argument for keeping a
+regression check on a "pure" function you think is obviously correct.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character

@@ -147,6 +147,13 @@ starting with them means never developing intuition for *why* they are better.
 Phase 5 of the roadmap is specifically about changing these two numbers and
 feeling the effect. That experiment only works if the baseline is naive.
 
+**Superseded in part by D-018 (2026-09-20).** Phase 5 was run, the effect was
+felt, and chunking moved retrieval quality more than any other knob — so the
+splitter is now paragraph-aware. The sizes (1000 / 150) are unchanged and the
+fixed-size sliding window survives as the fallback for oversized paragraphs and
+for text with no blank lines. The "start naive" reasoning above still stands as
+the reason it was done in this order.
+
 **Characters, not tokens:** counting tokens requires a tokenizer dependency
 (`tiktoken`/`gpt-tokenizer`) and buys precision the POC does not need. Roughly
 4 characters ≈ 1 token for English is close enough for sizing.
@@ -441,6 +448,76 @@ that trade ever becomes worth making.
 
 **Reverse if:** the refusals start leaking. `scratch/prompt-eval.js` exists to
 catch that — re-run it after any edit to `buildPrompt()`.
+
+---
+
+## D-018 · Paragraph-aware chunking · **Post-MVP, added 2026-09-20**
+
+**Decision:** `chunkText()` now packs whole paragraphs into a chunk until the
+next one would not fit, instead of cutting at a fixed character offset.
+`CHUNK_SIZE` becomes a **ceiling** rather than a target. A paragraph larger
+than the ceiling is the only thing still cut mid-flow, and it falls back to the
+original sliding window — which is also what handles text pasted with no blank
+lines in it at all.
+
+**This reverses the MVP half of D-007**, which chose fixed-size chunking so the
+naive version could be felt first. Phase 5 did that; this is the informed
+version. `CHUNK_SIZE` and `CHUNK_OVERLAP` are unchanged at 1000 and 150.
+
+**Why:** a chunk is represented by exactly one embedding. A chunk holding one
+complete idea embeds cleanly; a chunk holding the end of one idea plus the
+start of another embeds as a blur of both — and a fixed offset guarantees the
+second kind at every boundary.
+
+It also stops a fact being orphaned from its subject. On a test document where
+"Presidential Suite" and its nightly rate fell into different fixed-size
+chunks:
+
+| Chunk | Contains | Score vs *"what is the nightly rate for the Presidential Suite?"* |
+|---|---|---|
+| A | the suite's name, no price | **0.498** |
+| B | the price, no mention of the suite | **0.384** |
+
+**The chunk holding the answer ranked below the chunk that did not**, because
+the cut had separated it from the words that made it findable. With paragraph
+breaks present, both land in the same chunk.
+
+**Measured on the Northwind handbook** (2,607 chars, 6 sections):
+
+| | Before | After |
+|---|---|---|
+| Chunks | 3 (1000 / 1000 / 907) | 4 (584 / 804 / 720 / 937) |
+| Boundaries | mid-sentence | every chunk ends on a full stop |
+
+**Similarity scores improved, and the separation improved more:**
+
+| Question | Before | After |
+|---|---|---|
+| "What time is the Quiet Hour?" | 0.536 | **0.588** |
+| "What temperature does the Bay 3 freezer run at?" | 0.462 | **0.530** |
+| "Who approves equipment requests over 2000 credits?" | 0.462 | **0.548** |
+| "How long are chemical samples retained?" | 0.457 | **0.577** |
+| *absent* — safety goggles | 0.427 | 0.427 |
+| *off-topic* — capital of France | 0.039 | 0.068 |
+
+True positives rose by 0.05–0.12 while the absent and off-topic questions stayed
+flat, so the gap the threshold sits in got **wider**, not just higher.
+`MIN_SIMILARITY` stays at **0.25** — still comfortably between the highest
+off-topic score (0.092) and the lowest true positive (0.286).
+
+**Prompt battery: 5/6, unchanged.** No regression; the one failure is the
+`gpt-4o-mini` limit from D-017.
+
+**Cost:** no extra model calls, and prompts are the same size or slightly
+smaller. The one-off cost is that **every document must be re-ingested** —
+changing the chunker does not touch chunks already in the database.
+
+**Known limit, honestly:** this can only help where the source *has* paragraph
+breaks. The same test text pasted as one unbroken wall still split the suite
+from its price, because the sliding-window fallback is all that is left to use.
+
+**Reverse if:** never likely — but the fallback path means nothing breaks on
+input without blank lines, it simply behaves as it did before.
 
 ---
 

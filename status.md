@@ -15,9 +15,9 @@
 
 ## Snapshot
 
-- **Overall progress:** **100% — all five phases complete**, plus three post-MVP
+- **Overall progress:** **100% — all five phases complete**, plus four post-MVP
   changes: hybrid search (D-015), query rewriting (D-016), reworded grounding
-  instruction (D-017)
+  instruction (D-017), paragraph-aware chunking (D-018)
 - **Current phase:** post-MVP. Nothing is required
 - **Status:** finished. Success criterion passes via curl and in the browser
 - **Working on right now:** nothing
@@ -37,7 +37,11 @@ is optional:
      second answer should work, with an italic *searched for:* line in the
      sources panel showing the rewritten query.
 4. **Remaining post-MVP:**
-   - Paragraph-aware chunking, then streaming.
+   - Streaming responses (the last item on the original post-MVP list).
+
+⚠ **After D-018, any document already in the database was chunked by the OLD
+splitter.** Changing the chunker does not touch stored chunks. Delete and
+re-add anything ingested before 2026-09-20 or it keeps its mid-sentence cuts.
 
 ### ⚠️ If this ever goes to production — the checklist is in `README.md`
 
@@ -96,6 +100,21 @@ R-1 (the API key) and R-2 (RLS has no policies — `service_role` bypasses it).
       `alter table` statements on their own. **Verified:** all four tables now
       report `rowsecurity = true`. Lesson for any future schema change: re-copy
       the file, and verify the effect rather than trusting "run succeeded".
+- [x] **Paragraph-aware chunking (D-018)** — post-MVP, 2026-09-20.
+      `chunkText()` packs whole paragraphs up to a `CHUNK_SIZE` ceiling; the
+      old sliding window survives as the fallback for oversized paragraphs and
+      for text with no blank lines. Sizes unchanged at 1000/150.
+      **Northwind handbook: 3 chunks (1000/1000/907, cut mid-sentence) → 4
+      chunks (584/804/720/937, every one ending on a full stop).**
+      **Scores rose and separation widened:** direct hits 0.462→0.530,
+      0.457→0.577, 0.536→0.588, while the absent question stayed at 0.427 and
+      off-topic stayed under 0.10. `MIN_SIMILARITY` re-checked and left at 0.25.
+      Prompt battery **5/6, unchanged** — no regression.
+      Caught a bug in my own first version: the carried overlap tail was being
+      emitted as a spurious extra chunk (1001 chars gave 3 chunks instead of 2).
+      Fixed with a `carriedOnly` flag and covered by a regression check.
+      ⚠ Only helps where the source has paragraph breaks; one unbroken wall of
+      text still falls back to fixed-size cuts.
 - [x] **Grounding instruction reworded (D-017)** — post-MVP, 2026-09-20.
       Separates connecting stated facts (allowed) from adding absent ones
       (never) from partial answers (say what is missing). Judged with a fixed
@@ -260,7 +279,7 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 - [x] Prompt work on the generator — D-017 (4/6 → 5/6; the last one is a model limit)
 - [ ] Decide whether `gpt-4o` is worth ~16× the input cost (6/6 vs 5/6)
 - [x] `git init` + first commit — 2026-09-20, 32 files, `.env` verified excluded
-- [ ] Paragraph-aware chunking
+- [x] Paragraph-aware chunking — D-018
 - [ ] Streaming responses
 
 ---
@@ -384,7 +403,15 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
   pull to finish a sentence. Under a starved retriever both `gpt-4o-mini` and
   `gpt-4o` still invented a reason. That one is fixed by retrieving enough
   context, not by wording.
-- **Next:** nothing required.
+- **Then:** implemented paragraph-aware chunking (D-018), the last retrieval
+  improvement on the list. Re-ingested and re-measured rather than assuming:
+  true-positive scores rose by 0.05–0.12 while absent and off-topic questions
+  stayed flat, so the threshold's gap widened and 0.25 still holds.
+- **Worth noting:** my first version of the new chunker had a real bug — the
+  carried overlap tail was emitted as an extra chunk on input with no paragraph
+  breaks. Caught only because I checked the new code against the old chunker's
+  output on the same input. A regression check now covers it.
+- **Next:** nothing required. Streaming is the only original post-MVP item left.
 
 ### 2026-09-20 — session 1 (planning)
 - **Did:** Created the idea folder from a short Q&A. Wrote the full planning set:
