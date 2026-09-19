@@ -1,0 +1,17 @@
+{
+  "name": "rag-chatbot-poc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "eval": "node tools/prompt-eval.js",
+    "scores": "node tools/score-probe.js"
+  },
+  "dependencies": {
+    "express": "^4",
+    "@supabase/supabase-js": "^2",
+    "dotenv": "^16"
+  }
+}

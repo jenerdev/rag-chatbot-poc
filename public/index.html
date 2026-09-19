@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- S-1 · Chat. Ask questions, see answers grounded in the knowledge base. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Chatbot POC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="chat-layout">
+    <header>
+      <h1>RAG Chatbot POC</h1>
+      <nav>
+        <button id="new-chat" class="link" type="button">New chat</button>
+        <a class="button" href="admin.html">Knowledge base</a>
+      </nav>
+    </header>
+
+    <div id="messages">
+      <div class="messages-inner">
+        <!-- Shown until the first message. app.js also checks whether the
+             knowledge base is empty and adds a pointer to the admin page. -->
+        <div id="empty-state" class="empty-state">
+          <strong>Ask a question about your documents.</strong>
+          <span id="empty-hint">The answer will show the chunks it came from.</span>
+        </div>
+        <div id="turns"></div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <!-- A textarea rather than an input so Shift+Enter can insert a
+             newline while Enter alone sends (screens.md § S-1). -->
+        <textarea id="input" rows="1" placeholder="Ask a question…" autofocus></textarea>
+        <button id="send" class="primary" type="button">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
