@@ -107,6 +107,12 @@ change. [`notes.md`](./notes.md) records what happens when you do.
 **Changing the chunker does not touch chunks already stored.** Delete the
 document and re-add it.
 
+## How it works end to end
+
+[`flow.md`](./flow.md) has the diagrams: the big picture, the ingest pipeline,
+the query pipeline step by step, and a map of which stage to suspect when an
+answer comes out wrong.
+
 ## Where the code lives
 
 | File | Responsibility |
@@ -272,7 +278,8 @@ deliverable**, not optional polish.
 | File | What's in it |
 |---|---|
 | [`idea-intake.md`](./idea-intake.md) | The raw capture — the original Q&A, with assumptions marked |
-| [`architecture.md`](./architecture.md) | **The design.** What RAG is, both pipelines, the complete SQL schema, `match_chunks`, prompt assembly, file layout, error handling |
+| [`flow.md`](./flow.md) | **The flow as built.** Diagrams of every step from the browser to OpenAI and back, with the file and function behind each one |
+| [`architecture.md`](./architecture.md) | **The original design.** What RAG is, both pipelines, the complete SQL schema, `match_chunks`, prompt assembly, file layout, error handling |
 | [`mvp.md`](./mvp.md) | MVP scope, the explicit out-of-scope list, and the 6-phase roadmap |
 | [`screens.md`](./screens.md) | Both screens, per role, with every state; route map |
 | [`techstack.md`](./techstack.md) | Every choice and its justification; what was avoided and why |

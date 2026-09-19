@@ -74,6 +74,13 @@ key out of the page source (see `risks.md` § R-1).
 Everything the system does is one of these two flows. Learn these and you know
 the project.
 
+> ⚠️ **These diagrams are the original MVP design, and the build has moved on.**
+> The implemented flow adds query rewriting before retrieval (D-016), a second
+> keyword search fused with the vector one (D-015), and streaming delivery
+> (D-019). For the flow **as built**, with the file and function behind each
+> step, see [`flow.md`](./flow.md). The two pipelines below are still the right
+> mental model — they are just missing three steps.
+
 ### 3.1 Ingest pipeline (once per document, on the admin page)
 
 ```mermaid

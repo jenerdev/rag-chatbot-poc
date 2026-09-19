@@ -1705,6 +1705,28 @@ near-identical functions is a bug nobody finds.
 
 ---
 
+## `flow.md` · the implemented flow, diagrammed
+
+`architecture.md` § 3 has the original MVP pipelines, which by this point were
+three features out of date. [`flow.md`](./flow.md) documents the flow **as
+built**:
+
+1. **System overview** — browser, Express, OpenAI and Postgres, including the
+   dotted line showing `chunker.js` being served to the browser.
+2. **Ingest sequence** — paste → chunk → embed → store, with the R-7 rollback.
+3. **Query sequence** — rewrite → embed → two parallel searches → RRF → gate →
+   stream, with the same flow written out in eleven numbered sentences.
+4. **A where-it-goes-wrong map** — which stage to suspect for each failure
+   mode measured in Phase 5, and the rule of thumb: sources irrelevant means a
+   retrieval problem, sources correct means a generation problem.
+5. **The route table and the seven knobs.**
+
+Every box names the file and function behind it, so it can be read with the
+source open. `architecture.md` § 3 now carries a pointer saying its diagrams
+are the original design.
+
+---
+
 ## What is left — all optional
 
 2. **Decide whether `gpt-4o` is worth ~16× the input cost** — 6/6 on the

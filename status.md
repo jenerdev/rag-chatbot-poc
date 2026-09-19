@@ -102,6 +102,12 @@ R-1 (the API key) and R-2 (RLS has no policies — `service_role` bypasses it).
       `alter table` statements on their own. **Verified:** all four tables now
       report `rowsecurity = true`. Lesson for any future schema change: re-copy
       the file, and verify the effect rather than trusting "run succeeded".
+- [x] **`flow.md` written** — 2026-09-20. Mermaid diagrams of the implemented
+      flow: system overview, ingest sequence, query sequence (including
+      rewriting, hybrid search, the threshold gate and streaming), a
+      where-it-goes-wrong map, the route table and the seven knobs. Every box
+      names the file and function. `architecture.md` § 3 now carries a note
+      saying its diagrams are the original design.
 - [x] **Streaming responses (D-019)** — post-MVP, 2026-09-20. `chatStream()`
       in `src/openai.js` parsing OpenAI's SSE, `answerQuestionStream()` sharing
       `prepareAnswer()` with the blocking path, an SSE branch on
