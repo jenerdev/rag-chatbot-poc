@@ -176,6 +176,11 @@ app.post('/api/chat', route(async (req, res) => {
   res.flushHeaders();
 
   const send = (event, data) => {
+    // The socket may already be gone — a client that navigated away, or the
+    // very failure being reported. Writing to it then throws, which would
+    // escape into the error middleware and try to set a status code on a
+    // response whose headers went out long ago.
+    if (res.writableEnded) return;
     // The SSE wire format: an event name, a single-line JSON payload, and a
     // blank line to terminate. JSON.stringify guarantees the payload contains
     // no raw newline, which would otherwise split one event into two.
@@ -195,7 +200,11 @@ app.post('/api/chat', route(async (req, res) => {
     // stream as data. This is the cost of streaming, and it is why the
     // client has to treat an `error` event as seriously as a bad status.
     console.error('[error]', error.message);
-    send('error', { error: error.message });
+    try {
+      send('error', { error: error.message });
+    } catch {
+      // Nothing left to report it to.
+    }
   } finally {
     res.end();
   }

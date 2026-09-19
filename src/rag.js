@@ -594,9 +594,28 @@ export async function answerQuestionStream({ conversationId, message, onMeta, on
     return NO_ANSWER;
   }
 
-  const reply = await chatStream(buildPrompt(matches, history, message), onDelta);
-  await saveMessages(id, message, reply);
-  return reply;
+  try {
+    const reply = await chatStream(buildPrompt(matches, history, message), onDelta);
+    await saveMessages(id, message, reply);
+    return reply;
+  } catch (error) {
+    // The client was handed this conversationId in `meta` and will send it
+    // with the next question. If nothing is persisted here, that next turn
+    // loads a history with a hole in it: the user can see their question on
+    // screen while the retriever and the rewriter (D-016) cannot, so a
+    // follow-up resolves against the wrong turn.
+    //
+    // So save what actually happened, including a partial answer if the
+    // stream died mid-sentence, and mark it rather than passing a truncated
+    // reply off as the assistant's considered answer.
+    const partial = typeof error.partial === 'string' ? error.partial : '';
+    await saveMessages(
+      id,
+      message,
+      partial === '' ? '[no answer — the request failed]' : `${partial} […answer interrupted]`,
+    );
+    throw error;
+  }
 }
 
 /**

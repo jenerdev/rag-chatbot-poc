@@ -181,6 +181,11 @@ function fillError(turn, message, retry) {
   button.type = 'button';
   button.textContent = 'Retry';
   button.addEventListener('click', () => {
+    // Remove the question too, not just the error. retry() calls send(),
+    // which adds the user's message to the list again - so leaving the
+    // original in place makes the same question appear twice after one retry.
+    const question = turn.previousElementSibling;
+    if (question && question.classList.contains('user')) question.remove();
     turn.remove();
     retry();
   });
@@ -285,12 +290,19 @@ async function send(text) {
     if (!response.ok) throw new Error('request failed');
 
     let streamError = null;
+    // The server ends every successful answer with `done`. Without checking
+    // for it, ANY end of stream looks like success - including the server
+    // dying or the socket dropping mid-sentence, which would leave a
+    // truncated answer on screen indistinguishable from a complete one.
+    let sawDone = false;
     await readEventStream(response, (event, data) => {
       if (event === 'meta') {
         conversationId = data.conversationId;
         bubble = startAnswer(pending, data.sources, data.searchQuery, text);
       } else if (event === 'delta') {
         if (bubble) appendDelta(bubble, data.text);
+      } else if (event === 'done') {
+        sawDone = true;
       } else if (event === 'error') {
         // A failure that happened after the response started. The status code
         // was already committed to 200, so this is the only way it can reach
@@ -299,6 +311,7 @@ async function send(text) {
       }
     });
     if (streamError) throw new Error(streamError);
+    if (!sawDone) throw new Error('The connection closed before the answer finished.');
   } catch (error) {
     // If the answer had already started, keep what arrived and put the error
     // underneath it rather than discarding a partial answer.

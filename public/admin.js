@@ -5,11 +5,16 @@
 
 // The chunker the SERVER uses, imported straight into the browser.
 //
-// chunker.js is a pure module with no imports and no I/O, which means the exact
-// same file runs in both places. So the estimate below is not an approximation
-// of what the server will do — it is the same arithmetic with the same
-// constants. Change CHUNK_SIZE in src/chunker.js and this page updates with it.
-// That is the practical payoff for keeping that module dependency-free.
+// chunker.js is a pure module with no imports and no I/O, so the exact same
+// file runs in both places. Change CHUNK_SIZE in src/chunker.js and this page
+// follows automatically, with no duplicated constants to drift.
+//
+// ⚠️ The chunk COUNT is genuinely an estimate, though. Since D-018 chunks stop
+// at the last paragraph that fits rather than filling to exactly CHUNK_SIZE,
+// so the real number depends on where the paragraph breaks fall — which
+// estimateChunkCount cannot know from a length alone. Measured, it errs in
+// both directions. The UI says "≈" for that reason; do not present it as
+// exact.
 import { estimateChunkCount, CHUNK_SIZE, CHUNK_OVERLAP } from './chunker.js';
 
 const MAX_CONTENT_LENGTH = 100_000; // must match server.js
@@ -91,14 +96,19 @@ async function expandChunks(container, documentId) {
       container.append(wrap);
     }
 
-    // Worth pointing out explicitly: the repeated text at each boundary is the
-    // overlap, and reading it here is what makes chunking concrete.
+    // Point out what the boundaries show. Carefully worded: since D-018 the
+    // overlap is NOT always present. When the carried tail plus the next
+    // paragraph would exceed CHUNK_SIZE the tail is dropped, which happens on
+    // every boundary once paragraphs get large. Claiming the repetition is
+    // always there would have people reading their own chunks, seeing none of
+    // it, and concluding the feature is broken.
     if (chunks.length > 1) {
       const hint = document.createElement('p');
       hint.className = 'small muted';
       hint.textContent =
-        `The last ${CHUNK_OVERLAP} characters of each chunk are repeated at the ` +
-        'start of the next one — that is the overlap.';
+        'Chunks end at paragraph boundaries. Where one chunk begins by repeating ' +
+        `the end of the previous one, that is the ${CHUNK_OVERLAP}-character overlap — ` +
+        'it is skipped when a paragraph needs the whole chunk to itself.';
       container.append(hint);
     }
   } catch (error) {

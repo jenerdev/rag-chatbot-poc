@@ -37,6 +37,14 @@ export const CHUNK_SIZE = 1000;
 // Paragraph-aware splitting makes mid-sentence cuts rare, but overlap stays as
 // the safety net for the two cases it cannot help with: a paragraph longer
 // than CHUNK_SIZE, and text pasted with no blank lines in it at all.
+//
+// ⚠️ Since D-018 the overlap is NOT always applied. When the carried tail plus
+// the next paragraph would exceed CHUNK_SIZE, the tail is dropped so the
+// paragraph itself survives whole — measured, that happens on every boundary
+// once paragraphs pass roughly (CHUNK_SIZE - CHUNK_OVERLAP) characters. It is
+// the right trade (a paragraph boundary is already a safe place to cut) but it
+// does mean "every chunk repeats 150 characters of the last one" is no longer
+// true, and anything shown to a user must not claim otherwise.
 export const CHUNK_OVERLAP = 150;
 
 // What counts as a paragraph break: a blank line, however much whitespace it
@@ -140,11 +148,24 @@ export function chunkText(text, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
   };
 
   for (const paragraph of paragraphs) {
-    // Too big to ever fit: close what we have, then hard-split it. The sliding
-    // window applies its own overlap internally, so its pieces go in as-is.
+    // Too big to ever fit: hard-split it with the sliding window, which
+    // applies its own overlap internally.
+    //
+    // Whatever is already in `current` is folded into the front of the text
+    // being split rather than flushed as a chunk of its own. Without that, the
+    // extremely common shape
+    //
+    //     # Refund Policy
+    //
+    //     <1200 characters of policy>
+    //
+    // emits "# Refund Policy" as a 15-character chunk: it burns an embedding
+    // and a MATCH_COUNT slot, carries no answer, and severs the heading from
+    // the text it labels — which is the exact "fact orphaned from its subject"
+    // failure this whole function exists to prevent.
     if (paragraph.length > size) {
-      flush();
-      const pieces = splitLongParagraph(paragraph, size, overlap);
+      const combined = current === '' ? paragraph : `${current}\n\n${paragraph}`;
+      const pieces = splitLongParagraph(combined, size, overlap);
       chunks.push(...pieces);
       current = overlapTail(pieces[pieces.length - 1], overlap);
       carriedOnly = true;
@@ -179,11 +200,17 @@ export function chunkText(text, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
  * The admin page shows this live as you type, before anything is sent to the
  * server — chunking made visible *before* you commit to it (screens.md § S-2).
  *
- * It is an ESTIMATE and always was, but it is a looser one now: real chunks
- * stop at the last paragraph that fits rather than filling to exactly `size`,
- * so a document with large paragraphs produces more chunks than this predicts.
+ * It is an ESTIMATE and always was, but since D-018 it is a looser one, and it
+ * errs in BOTH directions. Real chunks stop at the last paragraph that fits
+ * rather than filling to exactly `size`, and the overlap is sometimes dropped.
+ * Measured against the real chunker:
+ *
+ *     1050-char paragraph + 100-char paragraph  ->  predicts 2, actually 3
+ *     six 300-char paragraphs                   ->  predicts 2, actually 3
+ *
  * Computing the real number needs the text itself, not just its length — which
- * is what `chunkText` is for.
+ * is what `chunkText` is for. This exists only to put a number on screen while
+ * someone is still typing, and the UI must present it as approximate.
  */
 export function estimateChunkCount(length, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
   if (length <= 0) return 0;

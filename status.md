@@ -102,6 +102,25 @@ R-1 (the API key) and R-2 (RLS has no policies — `service_role` bypasses it).
       `alter table` statements on their own. **Verified:** all four tables now
       report `rowsecurity = true`. Lesson for any future schema change: re-copy
       the file, and verify the effect rather than trusting "run succeeded".
+- [x] **Code review fixes** — 2026-09-20. A review of the D-018/D-019 commits
+      found 8 issues; all 8 verified by reproducing them, all 8 fixed.
+      **Two were real silent-truncation bugs:** `chatStream()` treated *any*
+      end of stream as success, so a dropped connection returned a half answer
+      that was saved to the database and reported as complete; and an OpenAI
+      error delivered inside a 200 response was skipped in silence. Both now
+      throw. The client likewise required nothing of the stream — it now
+      requires the `done` event.
+      **One real chunker bug:** a short heading before an oversized paragraph
+      became its own stub chunk (`"# Refund Policy"`, 15 chars), burning an
+      embedding and a retrieval slot while severing the heading from its
+      content — the exact failure D-018 exists to prevent. `current` is now
+      folded into the text being split instead of flushed.
+      The rest: a stream failure no longer loses the turn from history; the
+      SSE error-send is guarded against a dead socket; Retry no longer
+      duplicates the question; and two UI texts that D-018 had made false
+      (the "estimate is exact" comment and the overlap hint) now say what is
+      actually true. Regressions, prompt battery (5/6) and score probe all
+      unchanged.
 - [x] **`flow.md` written** — 2026-09-20. Mermaid diagrams of the implemented
       flow: system overview, ingest sequence, query sequence (including
       rewriting, hybrid search, the threshold gate and streaming), a

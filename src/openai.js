@@ -193,6 +193,14 @@ export async function chatStream(messages, onDelta, { temperature = 0.2 } = {}) 
   let buffer = '';
   let answer = '';
   let usage = null;
+  // OpenAI ends a healthy stream with the literal `data: [DONE]`. Without
+  // tracking it, ANY end of stream looks like success — including a dropped
+  // connection halfway through a sentence. The partial text would then be
+  // returned as if complete, saved to the database as the assistant's reply,
+  // and reported to the browser as a finished answer. Silent truncation, no
+  // error anywhere, and a corrupted transcript: precisely the failure shape
+  // this project keeps running into (risks.md R-3).
+  let sawDone = false;
 
   for await (const bytes of res.body) {
     // `stream: true` on decode() keeps a partial multi-byte character back
@@ -209,9 +217,25 @@ export async function chatStream(messages, onDelta, { temperature = 0.2 } = {}) 
       for (const line of event.split('\n')) {
         if (!line.startsWith('data:')) continue;
         const payload = line.slice(5).trim();
-        if (payload === '' || payload === '[DONE]') continue;
+        if (payload === '') continue;
+        if (payload === '[DONE]') {
+          sawDone = true;
+          continue;
+        }
 
         const parsed = JSON.parse(payload);
+
+        // OpenAI can report a failure INSIDE a 200 response, once streaming
+        // has started. Such a chunk has no `choices` and no `usage`, so
+        // without this it is skipped in silence: the caller gets an empty
+        // answer, an empty assistant row is written, and everything reports
+        // success.
+        if (parsed.error) {
+          const error = new Error(`OpenAI failed mid-stream: ${parsed.error.message ?? 'unknown error'}`);
+          error.status = 502;
+          throw error;
+        }
+
         if (parsed.usage) usage = parsed.usage;
 
         const text = parsed.choices?.[0]?.delta?.content;
@@ -221,6 +245,18 @@ export async function chatStream(messages, onDelta, { temperature = 0.2 } = {}) 
         }
       }
     }
+  }
+
+  if (!sawDone) {
+    // The stream ended without its terminator. Whatever arrived is incomplete,
+    // and a half-answer presented as a whole one is worse than a visible
+    // failure — the caller can decide what to do, but it must be told.
+    const error = new Error(
+      `OpenAI stream ended early after ${answer.length} characters — the answer is incomplete`,
+    );
+    error.status = 502;
+    error.partial = answer;
+    throw error;
   }
 
   if (usage) {
