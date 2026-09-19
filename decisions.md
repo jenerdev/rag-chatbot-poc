@@ -205,6 +205,12 @@ to read clearly. It is a UX improvement, not a RAG lesson.
 It is #1 on the post-MVP list precisely because it *is* worth doing — just not
 while you are still learning what the route does.
 
+**Superseded by D-019 (2026-09-20).** Streaming is now implemented, after the
+route had been read, understood and documented without it. The JSON path
+remains the default and is what `curl` still gets; the stream is opt-in via
+`Accept: text/event-stream`. The reasoning above is why it was done in this
+order rather than up front.
+
 ---
 
 ## D-011 · Conversation history capped at ~6 messages · **Settled**
@@ -518,6 +524,83 @@ from its price, because the sliding-window fallback is all that is left to use.
 
 **Reverse if:** never likely — but the fallback path means nothing breaks on
 input without blank lines, it simply behaves as it did before.
+
+---
+
+## D-019 · Streaming responses over SSE · **Post-MVP, added 2026-09-20**
+
+**Decision:** `POST /api/chat` streams the answer as Server-Sent Events when
+the client sends `Accept: text/event-stream`, and returns the original single
+JSON body otherwise. **This reverses D-010**, which kept streaming out of the
+MVP so the one route you most want to read stayed readable. It was, and this is
+the informed version.
+
+**Three events:**
+
+```
+event: meta     conversationId, searchQuery, sources   (once, before any answer)
+event: delta    one fragment of text                   (many)
+event: done     end of a successful answer
+event: error    a failure that happened mid-stream
+```
+
+**The genuinely useful part is `meta`, not the typing effect.** It fires the
+moment retrieval finishes and **before the model has written anything**, so the
+sources panel is on screen while the answer is still being generated. You can
+read what the model was given at the same time as what it makes of it, which is
+the sources panel (D-012) doing its job earlier.
+
+**Measured on one question:**
+
+| | |
+|---|---|
+| Streamed: sources on screen | **1,381 ms** |
+| Streamed: first word | 2,013 ms |
+| Streamed: complete | 2,651 ms |
+| Blocking: nothing at all until | 2,353 ms |
+
+Something useful appears at 1.4s instead of 2.4s — **1.7× sooner** — while the
+answer actually finishes slightly later. That is the whole trade: identical
+tokens, identical cost, better perceived speed.
+
+### Three things that make streaming harder than it looks
+
+**1. Buffering. A network chunk does not respect event boundaries.** TCP splits
+where it likes, so an SSE event can arrive in two pieces. Both the server
+(reading OpenAI) and the browser (reading the server) accumulate into a buffer
+and only process up to the last blank line. Assuming one chunk equals one event
+works right up until it doesn't, and then fails intermittently under load — the
+worst possible failure shape.
+
+**2. Errors after the headers are sent cannot use a status code.** Once
+streaming starts the response is committed to `200`, so `server.js`'s normal
+error-to-status mapping cannot help. The failure has to travel down the stream
+as an `error` event, and the client has to treat it as seriously as a bad
+status. Validation errors are unaffected — they happen before streaming starts
+and still return `400`.
+
+**3. `req.accepts()` is the wrong tool for this.** It honours wildcards, and
+curl sends `Accept: */*` — which matches `text/event-stream`, so every curl in
+the docs was handed a stream it never asked for and could not parse. Caught in
+testing. The check is now an explicit `Accept` header substring: only a client
+that names the type gets one.
+
+### Structure
+
+`answerQuestion()` and `answerQuestionStream()` share `prepareAnswer()`, which
+is steps 1–7 of the pipeline. Two near-identical copies would have drifted, and
+a retrieval fix applied to only one of them is a bug nobody finds. The refusal
+short-circuit is emitted as a single `delta`, so the client needs no special
+case for it.
+
+`EventSource` cannot be used in the browser: it only issues GET requests, and
+the question goes up in a POST body. So the client parses the wire format by
+hand — about fifteen lines, and the same parsing the server does to OpenAI.
+
+**Cost:** unchanged. Same tokens in, same tokens out. Prompt battery still 5/6.
+
+**Reverse if:** never needed — the JSON path is still there and still the
+default.
 
 ---
 

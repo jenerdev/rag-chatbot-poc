@@ -1464,7 +1464,7 @@ and where each piece of code lives.
 
 | | |
 |---|---|
-| **Phases complete** | **0, 1, 2, 3, 4, 5**, plus D-015 – D-018 |
+| **Phases complete** | **0, 1, 2, 3, 4, 5**, plus D-015 – D-019 |
 | **Progress** | **100%** |
 | **Code** | ~1,740 lines: ~690 backend, ~870 frontend, 86 SQL |
 | **Documentation** | `notes.md` 337 lines, `whats-done.md`, the planning set |
@@ -1667,6 +1667,41 @@ chunk with the answer ranked below the chunk without it.
 
 ⚠ **Documents ingested before this change keep their old chunks.** Changing the
 chunker does not touch what is already stored — delete and re-add.
+
+---
+
+## Post-MVP: streaming responses (D-019) · done
+
+`POST /api/chat` streams as Server-Sent Events when the client sends
+`Accept: text/event-stream`, and returns the original JSON otherwise — so every
+curl example in the docs still works. Reverses D-010, which kept streaming out
+of the MVP so the route stayed readable while being learned.
+
+```
+streamed : sources on screen 1,381ms | first word 2,013ms | done 2,651ms
+blocking : nothing at all until 2,353ms
+```
+
+**Something useful appears 1.7× sooner**, for identical tokens and identical
+cost. The best part is not the typing effect: the `meta` event fires before the
+model has written anything, so the sources panel is readable *while* the answer
+is being generated.
+
+**Three things that made it harder than it looks:**
+
+- **A network chunk does not respect event boundaries.** Both server and
+  browser buffer and process only up to the last blank line. Assuming one
+  chunk equals one event works until it doesn't, then fails intermittently.
+- **Errors after the headers are sent cannot use a status code.** The response
+  is committed to 200, so failures travel down the stream as an `error` event.
+  Validation errors still return 400, since they happen first.
+- **`req.accepts()` honours wildcards and curl sends `*/*`.** Every curl was
+  being handed a stream it could not parse. Caught in testing; now an explicit
+  header check.
+
+`answerQuestion()` and `answerQuestionStream()` share `prepareAnswer()` rather
+than keeping two copies of the pipeline — a retrieval fix applied to one of two
+near-identical functions is a bug nobody finds.
 
 ---
 

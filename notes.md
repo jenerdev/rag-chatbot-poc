@@ -597,6 +597,51 @@ regression check on a "pure" function you think is obviously correct.
 
 ---
 
+## Post-MVP: streaming responses (D-019)
+
+`POST /api/chat` now streams when the client asks for `text/event-stream`, and
+returns the original JSON body otherwise. Reverses D-010, which kept it out of
+the MVP so the route stayed readable while being learned.
+
+**What it actually bought, measured on one question:**
+
+```
+streamed : sources on screen 1,381ms | first word 2,013ms | done 2,651ms
+blocking : nothing at all until 2,353ms
+```
+
+Something useful appears **1.7× sooner**, while the answer finishes slightly
+later. Same tokens, same cost — only the delivery changed.
+
+**The best part is not the typing effect.** The `meta` event fires the instant
+retrieval finishes and *before the model has written a word*, so the sources
+panel is on screen while the answer is still being generated. You can read what
+the model was handed at the same time as what it makes of it.
+
+### Three things that make streaming harder than it looks
+
+**A network chunk does not respect event boundaries.** TCP splits wherever it
+likes, so one SSE event can arrive in two pieces. Both the server (reading
+OpenAI) and the browser (reading the server) buffer and only process up to the
+last blank line. Assuming one chunk equals one event works perfectly until it
+doesn't, and then fails intermittently under load — the worst failure shape
+there is.
+
+**An error after the headers are sent cannot use a status code.** Once
+streaming begins the response is committed to `200`, so the normal
+error-to-status mapping in `server.js` is useless. The failure has to travel
+down the stream as an `error` event, and the client has to take it as
+seriously as a bad status. Validation errors are unaffected — they happen
+before streaming starts and still return `400`.
+
+**`req.accepts()` was the wrong tool, and it failed silently.** It honours
+wildcards, and curl sends `Accept: */*` — which matches `text/event-stream`.
+Every curl example in the docs was being handed a stream it could not parse.
+The check is now an explicit `Accept` substring test. A helper that looks more
+correct than a string comparison quietly did the opposite of what was intended.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character

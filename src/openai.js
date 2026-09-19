@@ -143,3 +143,88 @@ export async function chat(messages, { maxTokens, temperature = 0.2, label = 'ch
   console.log(`[openai] ${label}: ${body.usage.prompt_tokens} in + ${body.usage.completion_tokens} out`);
   return body.choices[0].message.content;
 }
+
+/**
+ * Same call as chat(), but delivers the answer token by token (D-019).
+ *
+ * Adding `stream: true` changes the response from one JSON body into a
+ * **Server-Sent Events** stream: a sequence of `data:` lines separated by
+ * blank lines, ending with the literal `data: [DONE]`.
+ *
+ *     data: {"choices":[{"delta":{"content":"The"}}]}
+ *
+ *     data: {"choices":[{"delta":{"content":" Quiet"}}]}
+ *
+ *     data: [DONE]
+ *
+ * So this function does three things the non-streaming version does not:
+ *
+ *   1. reads the response body as a stream rather than awaiting a whole JSON
+ *   2. buffers, because a network chunk can split an event in half — the
+ *      boundary between TCP packets has nothing to do with the boundary
+ *      between SSE events, and assuming otherwise works right up until it
+ *      doesn't
+ *   3. reassembles the deltas into the complete answer, which we still need
+ *      in order to save it to the database
+ *
+ * `stream_options.include_usage` asks OpenAI for a final chunk carrying the
+ * token counts, which a streamed response would otherwise never report.
+ *
+ * @param {{role: string, content: string}[]} messages
+ * @param {(text: string) => void} onDelta called with each fragment as it lands
+ * @returns {Promise<string>} the complete answer
+ */
+export async function chatStream(messages, onDelta, { temperature = 0.2 } = {}) {
+  const res = await fetch(CHAT_URL, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      model: process.env.OPENAI_CHAT_MODEL,
+      messages,
+      temperature,
+      stream: true,
+      stream_options: { include_usage: true },
+    }),
+  });
+
+  if (!res.ok) throw await toError(res);
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let answer = '';
+  let usage = null;
+
+  for await (const bytes of res.body) {
+    // `stream: true` on decode() keeps a partial multi-byte character back
+    // until the rest of it arrives, rather than emitting a replacement char.
+    buffer += decoder.decode(bytes, { stream: true }).replace(/\r/g, '');
+
+    // Events are separated by a blank line. Anything after the last blank
+    // line is an incomplete event and stays in the buffer for the next pass.
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+      const event = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+
+      for (const line of event.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '' || payload === '[DONE]') continue;
+
+        const parsed = JSON.parse(payload);
+        if (parsed.usage) usage = parsed.usage;
+
+        const text = parsed.choices?.[0]?.delta?.content;
+        if (text) {
+          answer += text;
+          onDelta(text);
+        }
+      }
+    }
+  }
+
+  if (usage) {
+    console.log(`[openai] stream: ${usage.prompt_tokens} in + ${usage.completion_tokens} out`);
+  }
+  return answer;
+}

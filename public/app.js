@@ -133,14 +133,36 @@ function buildSources(sources, searchQuery, question) {
   return details;
 }
 
-/** Replace a pending turn with the real answer and its sources. */
-function fillAnswer(turn, reply, sources, searchQuery, question) {
+/**
+ * Swap a pending turn into a real answer bubble, ready to be written into.
+ *
+ * Called the moment retrieval finishes, before a single token of the answer
+ * exists — so the sources panel appears first and you can read what the model
+ * was given while it is still deciding what to make of it (D-019).
+ */
+function startAnswer(turn, sources, searchQuery, question) {
   turn.textContent = '';
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = reply;
   turn.append(bubble, buildSources(sources, searchQuery, question));
   scrollToBottom();
+  return bubble;
+}
+
+/**
+ * Append one fragment to the answer.
+ *
+ * `textContent +=` rather than innerHTML, same rule as everywhere else. It
+ * also means a partial answer is always valid text: there is no half-parsed
+ * markup to leave on screen if the stream stops mid-sentence.
+ */
+function appendDelta(bubble, text) {
+  bubble.textContent += text;
+  // Only follow the text down if the reader has not scrolled up to re-read
+  // something. Yanking the viewport while someone is reading is worse than
+  // making them scroll.
+  const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+  if (nearBottom) scrollToBottom();
 }
 
 /**
@@ -178,6 +200,9 @@ function fillError(turn, message, retry) {
  * cannot report: itself being down.
  */
 async function describeFailure(error, response) {
+  // An error delivered inside the stream already carries the server's own
+  // message; re-reading the body would fail, since it is consumed.
+  if (response && response.bodyUsed) return error.message;
   if (response) {
     let detail = `HTTP ${response.status}`;
     try {
@@ -194,6 +219,44 @@ async function describeFailure(error, response) {
   return `Cannot reach the server. Is \`node server.js\` running? (${error.message})`;
 }
 
+/**
+ * Read a Server-Sent Events stream from a fetch response.
+ *
+ * `EventSource` exists for exactly this and cannot be used here, because it
+ * only issues GET requests and the question has to go up in a POST body. So
+ * the wire format gets parsed by hand — which is about fifteen lines, and is
+ * the same parsing the server does to OpenAI's stream (D-019).
+ *
+ * The buffering matters: a network chunk can end halfway through an event, so
+ * only text up to the last blank line can be processed, and the remainder has
+ * to wait for more bytes.
+ */
+async function readEventStream(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r/g, '');
+
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+
+      let name = 'message';
+      let data = '';
+      for (const line of raw.split('\n')) {
+        if (line.startsWith('event:')) name = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += line.slice(5).trim();
+      }
+      if (data !== '') onEvent(name, JSON.parse(data));
+    }
+  }
+}
+
 async function send(text) {
   if (busy) return;
   busy = true;
@@ -205,20 +268,49 @@ async function send(text) {
   const pending = addPendingTurn();
 
   let response = null;
+  let bubble = null;
   try {
     response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Asking for the streamed form. Drop this header and the same route
+        // returns one JSON body instead.
+        Accept: 'text/event-stream',
+      },
       body: JSON.stringify({ conversationId, message: text }),
     });
+    // Validation errors still arrive as a normal status, because they happen
+    // before any streaming starts.
     if (!response.ok) throw new Error('request failed');
 
-    const data = await response.json();
-    // Hold onto the id so the next message continues the same conversation.
-    conversationId = data.conversationId;
-    fillAnswer(pending, data.reply, data.sources, data.searchQuery, text);
+    let streamError = null;
+    await readEventStream(response, (event, data) => {
+      if (event === 'meta') {
+        conversationId = data.conversationId;
+        bubble = startAnswer(pending, data.sources, data.searchQuery, text);
+      } else if (event === 'delta') {
+        if (bubble) appendDelta(bubble, data.text);
+      } else if (event === 'error') {
+        // A failure that happened after the response started. The status code
+        // was already committed to 200, so this is the only way it can reach
+        // us — and it has to be treated as seriously as a bad status.
+        streamError = data.error;
+      }
+    });
+    if (streamError) throw new Error(streamError);
   } catch (error) {
-    fillError(pending, await describeFailure(error, response), () => send(text));
+    // If the answer had already started, keep what arrived and put the error
+    // underneath it rather than discarding a partial answer.
+    if (bubble && bubble.textContent !== '') {
+      const notice = document.createElement('div');
+      notice.className = 'notice error';
+      notice.textContent = await describeFailure(error, response);
+      pending.append(notice);
+      scrollToBottom();
+    } else {
+      fillError(pending, await describeFailure(error, response), () => send(text));
+    }
   } finally {
     busy = false;
     sendEl.disabled = false;

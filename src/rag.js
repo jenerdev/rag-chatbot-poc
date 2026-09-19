@@ -6,7 +6,7 @@
 // to a browser.
 
 import { chunkText } from './chunker.js';
-import { embed, chat } from './openai.js';
+import { embed, chat, chatStream } from './openai.js';
 import { supabase } from './supabase.js';
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,17 @@ export async function retrieve(question, questionVector) {
  *   7. otherwise build the prompt (with the ORIGINAL question) and ask
  *   8. save both messages, return the answer and its sources
  */
-export async function answerQuestion({ conversationId, message }) {
+/**
+ * Everything both answer paths need, up to the point of calling the model.
+ *
+ * Steps 1-7 of the flow. Extracted so the streaming and non-streaming versions
+ * share one pipeline rather than drifting apart: a retrieval fix applied to
+ * only one of two near-identical copies is the kind of bug nobody finds.
+ *
+ * `matches` comes back empty when nothing cleared the threshold. Both callers
+ * handle that case themselves, because what they do about it differs.
+ */
+async function prepareAnswer({ conversationId, message }) {
   // 1. Conversation row. Created lazily on the first message of a session.
   let id = conversationId;
   if (!id) {
@@ -494,16 +504,8 @@ export async function answerQuestion({ conversationId, message }) {
     matches.map((m) => `${m.similarity.toFixed(3)}/${m.foundBy}`).join(' '),
   );
 
-  // 6. The short circuit (D-008).
-  //
-  //    Nothing cleared the threshold, so there is no context to answer from.
-  //    Return the refusal directly: it is faster, it is free, and it removes
-  //    any chance of the model ignoring its instructions and answering from
-  //    training data anyway.
-  if (matches.length === 0) {
-    await saveMessages(id, message, NO_ANSWER);
-    return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery };
-  }
+  // 6. Nothing cleared the threshold: no sources to describe.
+  if (matches.length === 0) return { id, history, searchQuery, matches, sources: [] };
 
   // 7. Attach document titles. match_chunks returns document_id but not the
   //    title, and the sources panel needs a human-readable label. One extra
@@ -528,7 +530,29 @@ export async function answerQuestion({ conversationId, message }) {
     foundBy: m.foundBy,
   }));
 
-  // 8. Ask the model, then persist the turn.
+  return { id, history, searchQuery, matches, sources };
+}
+
+/**
+ * Answer a question from the knowledge base, returning the whole reply.
+ *
+ * The flow, matching architecture.md § 3.2:
+ *   1-7. prepareAnswer() above
+ *   8.   nothing above the threshold? refuse WITHOUT calling OpenAI (D-008)
+ *   9.   otherwise build the prompt (with the ORIGINAL question) and ask
+ *   10.  save both messages, return the answer and its sources
+ */
+export async function answerQuestion({ conversationId, message }) {
+  const { id, history, searchQuery, matches, sources } =
+    await prepareAnswer({ conversationId, message });
+
+  // The short circuit (D-008). Faster, free, and it removes any chance of the
+  // model ignoring its instructions and answering from training data anyway.
+  if (matches.length === 0) {
+    await saveMessages(id, message, NO_ANSWER);
+    return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery };
+  }
+
   const reply = await chat(buildPrompt(matches, history, message));
   await saveMessages(id, message, reply);
 
@@ -537,6 +561,42 @@ export async function answerQuestion({ conversationId, message }) {
   // something other than the question is exactly the kind of thing that should
   // be visible rather than hidden (same argument as the sources panel, D-012).
   return { conversationId: id, reply, sources, searchQuery };
+}
+
+/**
+ * The same answer, delivered as it is generated (D-019).
+ *
+ * Identical pipeline; only the last step differs. `onMeta` fires once, as soon
+ * as retrieval is done and **before** any of the answer exists — which is the
+ * real win here beyond perceived speed: the sources panel can be on screen
+ * while the model is still writing, so you can read what it was given at the
+ * same time as what it made of it.
+ *
+ * Still returns the complete answer, because it has to be saved to the
+ * database either way.
+ *
+ * @param {object} args
+ * @param {(meta: object) => void} args.onMeta  conversationId, searchQuery, sources
+ * @param {(text: string) => void} args.onDelta each fragment as it arrives
+ * @returns {Promise<string>} the complete answer
+ */
+export async function answerQuestionStream({ conversationId, message, onMeta, onDelta }) {
+  const { id, history, searchQuery, matches, sources } =
+    await prepareAnswer({ conversationId, message });
+
+  onMeta({ conversationId: id, searchQuery, sources });
+
+  // The short circuit again. Emitted as a single delta so the client needs no
+  // special case: a refusal arrives down the same channel as any other answer.
+  if (matches.length === 0) {
+    onDelta(NO_ANSWER);
+    await saveMessages(id, message, NO_ANSWER);
+    return NO_ANSWER;
+  }
+
+  const reply = await chatStream(buildPrompt(matches, history, message), onDelta);
+  await saveMessages(id, message, reply);
+  return reply;
 }
 
 /**

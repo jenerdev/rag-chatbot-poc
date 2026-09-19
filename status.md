@@ -15,9 +15,10 @@
 
 ## Snapshot
 
-- **Overall progress:** **100% — all five phases complete**, plus four post-MVP
+- **Overall progress:** **100% — all five phases complete**, plus five post-MVP
   changes: hybrid search (D-015), query rewriting (D-016), reworded grounding
-  instruction (D-017), paragraph-aware chunking (D-018)
+  instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
+  **The entire original post-MVP list is now done.**
 - **Current phase:** post-MVP. Nothing is required
 - **Status:** finished. Success criterion passes via curl and in the browser
 - **Working on right now:** nothing
@@ -36,8 +37,9 @@ is optional:
    - Ask "Who is the Operations Director?" then "When did they join?" → the
      second answer should work, with an italic *searched for:* line in the
      sources panel showing the rewritten query.
-4. **Remaining post-MVP:**
-   - Streaming responses (the last item on the original post-MVP list).
+4. **Nothing left on the post-MVP list.** Everything in `mvp.md` § Post-MVP
+   has been built except auth and deployment, both of which are deliberate
+   non-goals for a learning POC (D-006, D-013).
 
 ⚠ **After D-018, any document already in the database was chunked by the OLD
 splitter.** Changing the chunker does not touch stored chunks. Delete and
@@ -100,6 +102,19 @@ R-1 (the API key) and R-2 (RLS has no policies — `service_role` bypasses it).
       `alter table` statements on their own. **Verified:** all four tables now
       report `rowsecurity = true`. Lesson for any future schema change: re-copy
       the file, and verify the effect rather than trusting "run succeeded".
+- [x] **Streaming responses (D-019)** — post-MVP, 2026-09-20. `chatStream()`
+      in `src/openai.js` parsing OpenAI's SSE, `answerQuestionStream()` sharing
+      `prepareAnswer()` with the blocking path, an SSE branch on
+      `POST /api/chat`, and hand-rolled SSE parsing in `public/app.js`
+      (EventSource cannot POST).
+      **Measured:** sources on screen at **1,381 ms** versus **2,353 ms**
+      before anything appeared at all — 1.7× sooner. Same tokens, same cost.
+      **`meta` fires before the answer exists**, so the sources panel is
+      readable while the model is still writing.
+      Caught a real bug in testing: `req.accepts('text/event-stream')` matches
+      `Accept: */*`, so every curl was being handed a stream it could not
+      parse. Now an explicit header check; plain curl still gets JSON.
+      Prompt battery **5/6, unchanged**.
 - [x] **Paragraph-aware chunking (D-018)** — post-MVP, 2026-09-20.
       `chunkText()` packs whole paragraphs up to a `CHUNK_SIZE` ceiling; the
       old sliding window survives as the fallback for oversized paragraphs and
@@ -280,7 +295,7 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 - [ ] Decide whether `gpt-4o` is worth ~16× the input cost (6/6 vs 5/6)
 - [x] `git init` + first commit — 2026-09-20, 32 files, `.env` verified excluded
 - [x] Paragraph-aware chunking — D-018
-- [ ] Streaming responses
+- [x] Streaming responses — D-019
 
 ---
 
@@ -411,7 +426,15 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
   carried overlap tail was emitted as an extra chunk on input with no paragraph
   breaks. Caught only because I checked the new code against the old chunker's
   output on the same input. A regression check now covers it.
-- **Next:** nothing required. Streaming is the only original post-MVP item left.
+- **Then:** implemented streaming (D-019), the last item on the original
+  post-MVP list. Content negotiation rather than a second route, so every curl
+  example in the docs still works unchanged.
+- **The bug worth remembering:** `req.accepts()` honours wildcards, and curl
+  sends `*/*`. The "polite" negotiation helper silently did the opposite of
+  what it looked like it did. An explicit header check is both more obvious and
+  correct.
+- **Next:** nothing. Every post-MVP item except auth and deployment is done,
+  and those two are deliberate non-goals (D-006, D-013).
 
 ### 2026-09-20 — session 1 (planning)
 - **Did:** Created the idea folder from a short Q&A. Wrote the full planning set:

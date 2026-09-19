@@ -13,6 +13,7 @@ import {
   deleteDocument,
   getChunks,
   answerQuestion,
+  answerQuestionStream,
   getMessages,
 } from './src/rag.js';
 
@@ -145,11 +146,59 @@ app.post('/api/chat', route(async (req, res) => {
     return res.status(400).json({ error: 'conversationId must be a string' });
   }
 
-  const result = await answerQuestion({
-    conversationId: conversationId || null,
-    message: message.trim(),
+  const args = { conversationId: conversationId || null, message: message.trim() };
+
+  // Content negotiation rather than a second route (D-019).
+  //
+  // The browser asks for `text/event-stream` and gets the answer as it is
+  // written. Anything else - curl, a script, the docs' own examples - gets
+  // the original single JSON body. One route, two deliveries, and nothing
+  // that already worked stops working.
+  // Note the explicit header check rather than req.accepts(). curl and most
+  // HTTP clients send `Accept: */*`, which req.accepts() happily matches
+  // against text/event-stream - so every curl would have been handed a stream
+  // it did not ask for and could not parse. Only a client that names the type
+  // gets one.
+  const wantsStream = (req.get('Accept') || '').includes('text/event-stream');
+  if (!wantsStream) {
+    return res.json(await answerQuestion(args));
+  }
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    // Without this, a proxy in front of Express may buffer the whole response
+    // and deliver it in one go - which looks exactly like streaming being
+    // broken, while every line of your code is correct.
+    'X-Accel-Buffering': 'no',
+    Connection: 'keep-alive',
   });
-  res.json(result);
+  res.flushHeaders();
+
+  const send = (event, data) => {
+    // The SSE wire format: an event name, a single-line JSON payload, and a
+    // blank line to terminate. JSON.stringify guarantees the payload contains
+    // no raw newline, which would otherwise split one event into two.
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    await answerQuestionStream({
+      ...args,
+      onMeta: (meta) => send('meta', meta),
+      onDelta: (text) => send('delta', { text }),
+    });
+    send('done', {});
+  } catch (error) {
+    // Headers are already sent, so the status code is fixed at 200 and the
+    // normal error handler cannot help. The failure has to travel down the
+    // stream as data. This is the cost of streaming, and it is why the
+    // client has to treat an `error` event as seriously as a bad status.
+    console.error('[error]', error.message);
+    send('error', { error: error.message });
+  } finally {
+    res.end();
+  }
 }));
 
 // Reload a conversation's transcript. The UI does not list past conversations
