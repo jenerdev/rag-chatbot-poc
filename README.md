@@ -1,24 +1,9 @@
 # RAG Chatbot POC
 
-> **Status:** ✅ **Built and working** — all five phases complete, 2026-09-20
-> **Type:** Learning project (not a product) · **Builder:** Solo
+> **Status:** ✅ **Built and working.** Migrated to Next.js + TypeScript on a
+> Turborepo monorepo, 2026-09-22 — see [`plan/steps.md`](./plan/steps.md).
+> **Type:** Learning project · **Builder:** Solo
 > **Findings:** [`notes.md`](./notes.md) · **Build log:** [`whats-done.md`](./whats-done.md)
-
-> ### ⚠ The paths below are one step out of date
->
-> As of 2026-09-21 this is a **pnpm + Turborepo workspace**, and the POC
-> described here now lives in **`apps/legacy-poc/`** — so `src/rag.js` is
-> `apps/legacy-poc/src/rag.js`, `schema.sql` is
-> `apps/legacy-poc/schema.sql`, and so on. Everything else in this file is
-> still accurate: the code is unchanged.
->
-> Commands run from the repo root and are the same names: `pnpm dev`,
-> `pnpm eval`, `pnpm scores`.
->
-> This file is rewritten properly at Phase 7 of
-> [`plan/steps.md`](./plan/steps.md), once the Next.js + TypeScript port
-> replaces the POC and there is one set of paths worth documenting rather than
-> two.
 
 ## Pitch
 
@@ -28,12 +13,14 @@ wrote and can explain.
 
 ```
 paste document → chunk → embed → store in pgvector
-ask question   → embed → vector search → paste chunks into prompt → answer
+ask question   → rewrite → embed → vector + keyword search → fuse (RRF)
+               → paste chunks into prompt → stream the answer
 ```
 
-Native HTML, native browser JavaScript, Node + Express, Supabase Postgres with
-`pgvector`, OpenAI for embeddings and chat. Three npm dependencies. No build
-step. Runs on `localhost:3000`.
+Next.js (App Router) and React, Supabase Postgres with `pgvector`, OpenAI for
+embeddings and chat — reached with raw `fetch`, because the two HTTP calls are
+the most instructive part and an SDK would hide them (D-002). Runs on
+`localhost:3000`.
 
 ## Setup
 
@@ -43,8 +30,8 @@ credits, and a free Supabase project.
 ⚠️ A ChatGPT Plus subscription grants **no** API access — see [`costs.md`](./costs.md).
 
 ```bash
-# 1. Install the three dependencies
-npm install
+# 1. Install (pnpm 9+; `corepack enable pnpm` if you do not have it)
+pnpm install
 
 # 2. Create your .env
 cp .env.example .env
@@ -64,7 +51,8 @@ Fill in `.env`:
 # 3. Create the schema
 ```
 
-Paste all of [`schema.sql`](./schema.sql) into the Supabase SQL editor and run
+Paste all of [`packages/db/sql/schema.sql`](./packages/db/sql/schema.sql), then
+[`schema-hybrid.sql`](./packages/db/sql/schema-hybrid.sql), into the Supabase SQL editor and run
 it. It creates the `vector` extension, four tables, three indexes, RLS on every
 table, and the `match_chunks` function in one pass.
 
@@ -84,15 +72,15 @@ select tablename, rowsecurity from pg_tables
 ## Running it
 
 ```bash
-npm start     # node server.js
-npm run dev   # node --watch server.js
+pnpm dev        # http://localhost:3000, with hot reload
+pnpm build      # then: pnpm --filter web start
 ```
 
 Then open <http://localhost:3000>.
 
 | Page | What to do |
 |---|---|
-| `/admin.html` | Paste a document. Watch the live chunk estimate, then add it. |
+| `/admin` | Paste a document. Watch the live chunk estimate, then add it. |
 | `/` | Ask a question. Expand the sources under the answer. |
 
 **To prove it works:** paste a document containing a fact no model could know,
@@ -114,11 +102,11 @@ change. [`notes.md`](./notes.md) records what happens when you do.
 
 | Constant | Value | File |
 |---|---|---|
-| `CHUNK_SIZE` | 1000 | `src/chunker.js` |
-| `CHUNK_OVERLAP` | 150 | `src/chunker.js` |
-| `MATCH_COUNT` | 5 | `src/rag.js` |
-| `MIN_SIMILARITY` | 0.25 *(measured, not guessed)* | `src/rag.js` |
-| `MAX_HISTORY` | 6 | `src/rag.js` |
+| `CHUNK_SIZE` | 1000 | `packages/chunker/src/index.ts` |
+| `CHUNK_OVERLAP` | 150 | `packages/chunker/src/index.ts` |
+| `MATCH_COUNT` | 5 | `packages/rag/src/constants.ts` |
+| `MIN_SIMILARITY` | 0.25 *(measured, not guessed)* | `packages/rag/src/constants.ts` |
+| `MAX_HISTORY` | 6 | `packages/rag/src/constants.ts` |
 
 **Changing the chunker does not touch chunks already stored.** Delete the
 document and re-add it.
@@ -133,12 +121,12 @@ answer comes out wrong.
 
 | File | Responsibility |
 |---|---|
-| `src/chunker.js` | `chunkText()` — pure, no imports. Runs in Node **and** the browser |
-| `src/openai.js` | `embed()` + `chat()` — two raw `fetch` calls, no SDK |
-| `src/supabase.js` | One configured client |
-| `src/rag.js` | Both pipelines: `ingestDocument()` and `answerQuestion()` |
-| `server.js` | Six routes, validation, error → status mapping |
-| `public/` | Two pages, native DOM, no framework, no build step |
+| `packages/chunker` | `chunkText()` — pure, **zero dependencies**. Runs in Node **and** the browser |
+| `packages/openai` | `embed()`, `chat()`, `chatStream()` — raw `fetch`, no SDK |
+| `packages/db` | One configured client, the schema, and the `server-only` guard |
+| `packages/rag` | Both pipelines: `ingestDocument()` and `answerQuestion()` |
+| `apps/web/app/api` | Six Route Handlers; `lib/route.ts` holds the one error → status map |
+| `apps/web/app` | Both screens in React — `page.tsx` (chat) and `admin/page.tsx` |
 
 ## ⚠️ Before you put this in production
 
@@ -152,18 +140,21 @@ Every tuned number in this repo was measured on one invented 2,607-character
 test document. **None of them transfer.** Load your real corpus, then:
 
 ```bash
-npm run scores     # tools/score-probe.js  - what do real questions score?
-npm run eval       # tools/prompt-eval.js  - does it answer and refuse correctly?
+pnpm scores        # what do real questions actually score?
+pnpm eval          # does it answer AND refuse correctly?
 ```
 
-- **`npm run scores`** prints similarity scores with the threshold disabled, so
-  you can see the whole range. Set `MIN_SIMILARITY` in `src/rag.js` from the gap
+- **`pnpm scores`** prints similarity scores with the threshold disabled, so
+  you can see the whole range. Set `MIN_SIMILARITY` in
+  `packages/rag/src/constants.ts` from the gap
   between your real questions and your off-topic ones. The shipped 0.25 came
   from a three-chunk corpus and is a starting point, not an answer.
-- **`npm run eval`** runs a fixed battery that checks **both** directions:
+- **`pnpm eval`** runs a fixed battery that checks **both** directions:
   questions that should be answered, and absent facts that must still be
-  refused. **Edit the cases in `tools/prompt-eval.js` to use your own
-  documents' facts** — the shipped ones are about a fictional laboratory.
+  refused. **Edit the cases in `packages/rag/tools/prompt-eval.mjs` to use your
+  own documents' facts** — the shipped ones are about a fictional laboratory,
+  and the corpus they assert against is `fixtures/northwind.json`. Load that and
+  nothing else, or the verdicts are meaningless.
 
 ### 2. Decide the chat model from that battery — do not guess
 
@@ -191,17 +182,17 @@ fine and far cheaper. See D-017.
 
 ### 4. Re-run the battery after ANY prompt edit
 
-`buildPrompt()` in `src/rag.js` is the only thing standing between a grounded
+`buildPrompt()` in `packages/rag/src/prompt.ts` is the only thing standing between a grounded
 answer and a confident invention — Phase 5.5 measured exactly that. A change
 that makes the bot more helpful can silently make it answer from training data.
 
 ```bash
-npm run eval       # must still refuse every absent-fact case
+pnpm eval          # must still refuse every absent-fact case
 ```
 
 ### 5. Also out of scope, and worth knowing you do not have it
 
-No auth, no rate limiting, no retries, no caching, no streaming, no tests, and
+No auth, no rate limiting, no retries, no caching, and
 conversations are not listed in the UI. All deliberate (`mvp.md`), all things a
 production deployment normally wants.
 
@@ -224,7 +215,7 @@ code. A version that works but cannot be explained has failed.
 
 | Page | What happens |
 |---|---|
-| **Knowledge base** (`/admin.html`) | Paste a document. The server splits it into ~1000-character chunks with overlap, gets an embedding for each from OpenAI in one batched call, and stores chunk + vector in Supabase. |
+| **Knowledge base** (`/admin`) | Paste a document. The server splits it into ~1000-character chunks with overlap, gets an embedding for each from OpenAI in one batched call, and stores chunk + vector in Supabase. |
 | **Chat** (`/`) | Ask a question. The server embeds it, finds the nearest chunks by cosine distance in Postgres, pastes them into the prompt as context, and asks OpenAI to answer **using only that context** — showing you which chunks it used and how well they matched. |
 
 ## The success criterion

@@ -1,0 +1,51 @@
+Final parity run before apps/legacy-poc was deleted — 2026-09-22, commit b97dedc.
+
+These are the evidence the port rests on. Neither calls OpenAI: the chunker is
+pure, and the pipeline check uses an embedding already stored in a chunk row.
+After this commit the old implementation is gone and they cannot be re-run.
+
+=== @rag/chunker vs apps/legacy-poc/src/chunker.js ===
+
+17 documents x 4 configurations + estimates + constants
+87 comparisons, 0 differences
+
+PARITY OK — byte-identical output.
+
+=== @rag/pipeline vs apps/legacy-poc/src/rag.js ===
+constants
+  PASS  MATCH_COUNT          5
+  PASS  CANDIDATE_COUNT      10
+  PASS  RRF_K                60
+  PASS  MIN_SIMILARITY       0.25
+  PASS  MAX_HISTORY          6
+  PASS  REWRITE_MAX_TOKENS   60
+  PASS  NO_ANSWER            "I don't know based on the documents I have."
+
+buildPrompt
+  PASS  no chunks, no history (2 messages, 745 chars of system)
+  PASS  one chunk, no history (2 messages, 800 chars of system)
+  PASS  five chunks and a conversation (4 messages, 888 chars of system)
+  PASS  content with newlines, quotes and unicode (3 messages, 796 chars of system)
+
+retrieve (live database, no OpenAI)
+  PASS   "What is the Wi-Fi password?"                    5 chunks [both both vector vector vector]
+  PASS   "extension 4417"                                 5 chunks [both both vector keyword vector]
+  PASS   "How many guests can stay?"                      5 chunks [both both both keyword vector]
+  PASS   "What is the capital of France?"                 5 chunks [vector vector vector vector vector]
+  PASS   ""                                               5 chunks [vector vector vector vector vector]
+  PASS   "pool refill time and early check-in"            5 chunks [both both both both vector]
+  PASS   "# Villa Amihan Private Resort — Overview
+
+Vi…"  5 chunks [both both both both both]
+  PASS  fusion is deterministic
+
+database reads
+  PASS  listDocuments
+  PASS  getChunks (document 34, 4 chunks)
+  PASS  getMessages
+
+22 comparisons, 0 differences
+
+PARITY OK — identical behaviour on everything reachable without an API key.
+Still unverified (needs OPENAI_API_KEY): ingestDocument, rewriteQuestion,
+answerQuestion, answerQuestionStream — and the eval battery itself.

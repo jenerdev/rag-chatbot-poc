@@ -1,5 +1,11 @@
 # Screens — RAG Chatbot POC
 
+> ### ⚠ The states are current; two routes are not
+>
+> Rebuilt in React 2026-09-22 (D-021). Every state below is still the spec and
+> still implemented. The knowledge base is now `/admin` rather than
+> `/admin.html`, and both screens are `apps/web/app/`.
+
 Every page in the product, what is on it, and what it does in each state.
 
 **A note on roles.** The POC has no authentication (`mvp.md` § Out of scope), so
@@ -85,7 +91,7 @@ visible in the finished POC.
 | **No relevant context** | Normal assistant bubble reading "I don't know based on the documents I have." Sources panel reads "No matching chunks above the similarity threshold." **This is a success state, not an error** — it is the system working correctly. |
 | **Error — OpenAI 429 / no credits** | Red inline notice: "OpenAI request failed: out of credits or rate limited." The user message stays in the list with a **Retry** button. |
 | **Error — OpenAI 401** | "OpenAI rejected the API key — check `.env`." |
-| **Error — server unreachable** | "Cannot reach the server. Is `node server.js` running?" |
+| **Error — server unreachable** | "Cannot reach the server. Is `pnpm dev` running?" |
 | **Error — Supabase** | "Database error: `<message>`." |
 | **Offline** | The server-unreachable state. No offline support; nothing is cached. |
 | **Permission denied** | **Does not exist.** No auth in the POC. |
@@ -98,7 +104,7 @@ visible in the finished POC.
 
 | | |
 |---|---|
-| **Route** | `GET /admin.html` → `public/admin.html` |
+| **Route** | `GET /admin` → `apps/web/app/admin/page.tsx` |
 | **Who** | You, managing what the bot can answer from |
 | **Purpose** | Add, inspect and delete documents; see how they were chunked |
 | **Entry** | The header link on S-1, or direct URL |

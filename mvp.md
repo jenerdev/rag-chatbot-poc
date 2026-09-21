@@ -1,5 +1,12 @@
 # MVP & Roadmap — RAG Chatbot POC
 
+> ### ⚠ Historical — this is the plan the POC was built to, and it was met
+>
+> Kept as the record of what was scoped and in what order. The code has since
+> moved to a Turborepo monorepo ([`plan/steps.md`](./plan/steps.md), 2026-09-22),
+> so the file names in the roadmap below are no longer where things live. The
+> **Out of scope** list still binds.
+
 ## What the MVP is
 
 **A chatbot that answers questions from documents you paste in, running on

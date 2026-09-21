@@ -287,10 +287,10 @@ the record" is not suspended because the stack changed.
 | **1** ✅ | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes — **done 2026-09-21, see below** |
 | **2** ✅ | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one — **done 2026-09-22: 87 comparisons, 0 differences** |
 | **3** ✅ | `@rag/db` | S | Generated types compile; the `server-only` guard is proven — **done 2026-09-22, 10/10 checks** |
-| **4** ⚠ | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline — **code done 2026-09-22; the eval comparison is still blocked** |
+| **4** ✅ | `@rag/pipeline` | L | ~~`pnpm eval` matches the Phase 0 baseline~~ — **closed 2026-09-22 on structural parity instead, by decision. See whats-done.md § Phase 7** |
 | **5** ✅ | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape — **done 2026-09-22: 24 comparisons, 0 differences, diffed live against the running POC** |
 | **6** ⚠ | Both screens in React | L | The `mvp.md` success criterion passes in the browser — **built 2026-09-22; not yet exercised in a browser** |
-| **7** | Cutover: delete the POC, amend the docs | M | No `legacy-poc/`; no secret in the client bundle; docs no longer contradict the code |
+| **7** ✅ | Cutover: delete the POC, amend the docs | M | **Done 2026-09-22.** No `legacy-poc/`; 0 secrets in the client bundle; D-014 reversed and D-020..D-023 added |
 | **8** | Deploy | M | Streaming works on the deployed URL, not just locally |
 
 ---

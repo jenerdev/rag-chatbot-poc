@@ -1,5 +1,14 @@
 # Flow — how a request actually travels through this code
 
+> ### ⚠ The shapes are current; the file names are not
+>
+> Migrated 2026-09-22 (D-020, D-021). Every arrow, every step and every failure
+> mode below still describes what runs. What changed: `server.js` is
+> `apps/web/app/api/**/route.ts`, `src/rag.js` is `@rag/pipeline`,
+> `public/admin.html` is `/admin`, and the dotted `/chunker.js` line is gone —
+> the admin page imports `@rag/chunker` directly, so there is no static-file
+> route to draw.
+
 > **What this file is.** `architecture.md` § 3 has the *original MVP design*.
 > This file has the **flow as built**, including the five post-MVP additions
 > (D-015 hybrid search, D-016 query rewriting, D-017 prompt wording, D-018
@@ -225,7 +234,7 @@ it is why D-012 calls it a feature rather than a debug toggle.
 | Method | Route | Does | Lives in |
 |---|---|---|---|
 | `GET` | `/` | chat page | `public/index.html` |
-| `GET` | `/admin.html` | knowledge base page | `public/admin.html` |
+| `GET` | `/admin` | knowledge base page | `apps/web/app/admin/page.tsx` |
 | `GET` | `/chunker.js` | the pure chunker, for the live estimate | `src/chunker.js` |
 | `POST` | `/api/documents` | chunk → embed → store | `rag.ingestDocument` |
 | `GET` | `/api/documents` | list with chunk counts | `rag.listDocuments` |

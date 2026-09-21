@@ -11,13 +11,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "eval": "node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs",
-    "scores": "node --conditions=react-server --env-file=../../.env tools/score-probe.mjs",
-    "parity": "node --conditions=react-server --env-file=../../.env tools/parity.mjs"
+    "scores": "node --conditions=react-server --env-file=../../.env tools/score-probe.mjs"
   },
   "dependencies": {
     "@rag/chunker": "workspace:*",

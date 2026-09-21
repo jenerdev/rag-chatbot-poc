@@ -20,45 +20,47 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 and 5 done; Phases 4
-  and 6 complete but NOT signed off**, as of 2026-09-22, on branch
-  `feat/nextjs-migration`
-- **Status:** the pipeline, the API and both screens are ported — `@rag/chunker` (87/0
-  byte-identical), `@rag/openai`, `@rag/db` (10/10), `@rag/pipeline` (22/0),
-  and the six routes in `apps/web` (24/0, diffed live against the running POC).
-  **Tenancy decided: single tenant.** ⚠ **The OpenAI API key is invalid**, so
-  nothing that produces a real *answer* is verified and `pnpm eval` cannot run
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–7 done** as of
+  2026-09-22, on branch `feat/nextjs-migration`. Only Phase 8 (deploy) is left
+- **Status:** the POC is deleted; the repo is one Next.js app and five packages.
+  A new API key is in place and **real grounded answers work end to end**, over
+  both the JSON and the SSE paths. Phase 4 was closed on structural parity
+  (87/0 chunker, 22/0 pipeline, 24/0 API) rather than on the eval baseline,
+  which was never captured — a deliberate, recorded choice
 - **Working on right now:** nothing
 
 ---
 
 ## ▶ Next up (do this next)
 
-**1. Replace `OPENAI_API_KEY` in `.env`.** OpenAI returned *"Your API key has
-expired"* on 2026-09-21 and *"Your API key has been invalidated."* on
-2026-09-22 — same 401 either way. Nothing that calls OpenAI runs until this is
-done: not the app, not `pnpm eval`, not `pnpm scores`, not the deferred
-baseline, not the `embed() -> 1536` check carried over from Phase 2. New key at
-<https://platform.openai.com/api-keys>; check billing is still live while there
-(`costs.md`).
+**1. Sign off Phase 6 — click the screens.** The only outstanding verification.
+Both screens are built, render and serve, but nothing interactive has been
+exercised by anyone: streaming text arriving token by token, the sources panel
+opening *before* the first token, click-to-expand on a chunk, Retry, the delete
+confirmation. Browser tooling was declined, so this needs a human.
 
-**2. Close Phase 4.** The code is written and 22/0 on everything provable
-offline, but four functions that call OpenAI — `ingestDocument`,
-`rewriteQuestion`, `answerQuestion`, `answerQuestionStream` — are unverified.
-Once the key works: capture the Phase 0 baseline, then confirm `pnpm eval` gives
-the same six verdicts and `pnpm scores` the same numbers to three decimals.
-Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
+```sh
+pnpm dev     # http://localhost:3000
+```
 
-**3. Sign off Phase 6 — click the screens.** Both are built and render, but
-nothing interactive has been exercised: streaming text, the sources panel
-opening before the first token, click-to-expand, Retry, the delete confirm.
-`pnpm --filter web dev`, then the four-step check in `whats-done.md` § Phase 6.
-Steps 2–4 of it are the `mvp.md` definition of done and need the key.
+1. `/admin` lists the documents with chunk counts; click a title, chunks appear.
+2. Paste a document with a fact the model cannot know; the estimate updates as
+   you type; add it.
+3. Ask about that fact on `/`. It should stream, sources panel up first.
+4. Delete the document and ask again — it must say it does not know.
 
-**4. Then Phase 7 — cutover** (`plan/steps.md` § Phase 7): delete
-`apps/legacy-poc`, re-run eval and scores into `plan/baseline/*-after.txt`, and
-amend the docs — D-014 reversed, D-009 and D-013 superseded, D-020..D-022 added,
-`CLAUDE.md` and `BUILD.md` rewritten and collapsed into one.
+Steps 2–4 are the `mvp.md` definition of done.
+
+**2. Then Phase 8 — deploy** (`plan/steps.md` § Phase 8). The step that catches
+a proxy buffering the stream, which cannot be caught locally. Before it, read
+`README.md` § "Before you put this in production" — R-2 in particular (RLS is
+enabled with no policies; `service_role` bypasses it) stops being a note and
+becomes a blocker the moment there is a public URL.
+
+**Optional, whenever:** run the eval battery against the corpus it was written
+for. `fixtures/northwind.json` must be the only thing loaded, or the verdicts
+are meaningless — the Villa documents describe parking, which the `absent-2`
+case exists to have refused.
 
 ℹ `pnpm eval` and `pnpm scores` now carry `--conditions=react-server`, because
 the pipeline imports `@rag/db`, which is `server-only`. Without the flag they
@@ -89,9 +91,9 @@ re-add anything ingested before 2026-09-20 or it keeps its mid-sentence cuts.
 **“Before you put this in production”**, at the top of [`README.md`](./README.md).
 The two that are easiest to forget:
 
-- **`npm run scores`** — re-measure `MIN_SIMILARITY` on YOUR documents. The
+- **`pnpm scores`** — re-measure `MIN_SIMILARITY` on YOUR documents. The
   shipped 0.25 came from a three-chunk corpus of invented facts.
-- **`npm run eval`** — run the prompt battery on YOUR documents, **and use its
+- **`pnpm eval`** — run the prompt battery on YOUR documents, **and use its
   result to decide the chat model.** `gpt-4o-mini` scored 5/6 here and `gpt-4o`
   scored 6/6 at ~16× the input cost; the case that separated them was applying
   a general rule where the document also stated an exception. If your content
@@ -101,7 +103,7 @@ The two that are easiest to forget:
 Also on that checklist: R-1 (the API key) and R-2 (RLS has no policies), both of
 which stop being notes and become blockers the moment there is a public URL.
 
-**Re-run `node scratch/prompt-eval.js` after ANY edit to `buildPrompt()`.** It
+**Re-run `pnpm eval` after ANY edit to `buildPrompt()`.** It
 checks both directions at once: that real questions get answered and that absent
 facts still get refused. Losing the second is how the sourdough recipe happened.
 
@@ -365,15 +367,20 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 
 ## 🚧 Blockers & open questions
 
-**Blocker 1 — the OpenAI API key is invalid.** Found 2026-09-21 during the
-Phase 1 end-to-end check (`HTTP 401 — "Your API key has expired. Create a new
-API key to continue."`) and still failing 2026-09-22, now with a different
-upstream sentence: `"Your API key has been invalidated."` The key is read and
-sent correctly; OpenAI is rejecting it. Blocks the app, `pnpm eval`,
-`pnpm scores`, the baseline capture, and the `embed() -> 1536` check carried
-over from Phase 2. Supabase is unaffected. Replace `OPENAI_API_KEY` in `.env`.
+**Blockers: none.** Both are resolved.
 
-**Blocker 2 — the eval/score baseline has not been captured**
+~~The OpenAI API key is invalid~~ — **replaced 2026-09-22 and working.**
+`embed(['hello'])` returns 1536, and real grounded answers come back over both
+the JSON and SSE paths. (It failed three different ways first: "expired", "has
+been invalidated", "Incorrect API key provided".)
+
+~~The eval/score baseline was never captured~~ — **closed by decision
+2026-09-22**, not by capture. Phase 4 rests on structural parity instead; the
+reasoning and what it does not cover are in `whats-done.md` § Phase 7, and the
+evidence is in `plan/baseline/parity-final.txt`. The old note follows, for the
+record.
+
+**Superseded — the eval/score baseline has not been captured**
 (`plan/steps.md`). Phase 4's definition of done is "`pnpm eval`
 gives the same six verdicts as the baseline", and there is no baseline yet,
 because capturing one means clearing the Villa Amihan corpus out of the
@@ -431,6 +438,34 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (migration Phase 7 — cutover)
+- **Decided first:** Phase 4's eval baseline was never captured, and deleting
+  the POC would make any old-versus-new comparison impossible forever. Offered
+  the choice; **closed Phase 4 on structural parity instead** (87/0 chunker,
+  22/0 pipeline, 24/0 API). Recorded as a real limitation rather than a
+  formality — retrieval and prompt assembly are proved identical, the model's
+  half is not.
+- **Captured before deleting:** `plan/baseline/parity-final.txt`, the two parity
+  runs that cost nothing. They cannot be re-run now.
+- **Deleted:** `apps/legacy-poc/`, the three parity tools that imported it, their
+  scripts and turbo task, and `BUILD.md` (byte-identical to `CLAUDE.md` since
+  the repo was created). **Kept:** the 13 vitest cases, which state what the
+  chunker should do rather than what it used to do.
+- **Verified after:** build, typecheck, 13 tests, db verify 10/10, and the
+  § 2.1 secret grep — **0 files** for all six patterns.
+- **Rewrote `CLAUDE.md`.** It said: no TypeScript, no framework creep, three
+  dependencies, `server.js` at the root. Every one of those was false. A brief
+  that lies to the next agent is worse than no brief.
+- **Amended `decisions.md`:** D-009 superseded, D-013 noted, D-014 **reversed**
+  with its original reasoning left intact, and D-020..D-023 added. D-020 records
+  honestly that the TypeScript port caught nothing already broken — both real
+  bugs were found by running things.
+- **Bannered rather than rewrote** `architecture.md`, `flow.md`, `mvp.md`,
+  `screens.md`: their content is still accurate, only file names moved, and
+  rewriting them would destroy the record of what was planned.
+- **Stopped at:** Phase 7 complete.
+- **Next:** click the screens (Phase 6 sign-off), then Phase 8 deploy.
 
 ### 2026-09-22 — session 4, continued (migration Phase 6)
 - **Did:** Both screens in React — `app/page.tsx` (S-1), `app/admin/page.tsx`

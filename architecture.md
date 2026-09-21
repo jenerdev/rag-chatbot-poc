@@ -1,5 +1,13 @@
 # Architecture — RAG Chatbot POC
 
+> ### ⚠ Paths here describe the original build; the design does not change
+>
+> Migrated 2026-09-22 to a Turborepo monorepo (D-020, D-021). The data model in
+> § 4, the two pipelines in § 3, the prompt in § 6 and the error policy in § 9
+> are all still exactly what the code does — only the files moved. The current
+> layout is in § 7 below and in [`CLAUDE.md`](./CLAUDE.md); the move itself is
+> [`plan/steps.md`](./plan/steps.md).
+
 This document is the design. It is written so that you can build the whole thing
 from it without guessing. Read `techstack.md` first for what the pieces are and
 `decisions.md` for why.
@@ -240,8 +248,8 @@ All JSON. All served from `http://localhost:3000`.
 
 | Method | Route | Body / params | Returns | Used by |
 |---|---|---|---|---|
-| `GET` | `/` | — | `public/index.html` | browser |
-| `GET` | `/admin.html` | — | `public/admin.html` | browser |
+| `GET` | `/` | — | `apps/web/app/page.tsx` | browser |
+| `GET` | `/admin` | — | `apps/web/app/admin/page.tsx` | browser |
 | `POST` | `/api/documents` | `{ title, source?, content }` | `{ id, title, chunkCount }` | admin |
 | `GET` | `/api/documents` | — | `[{ id, title, source, chunkCount, created_at }]` | admin |
 | `DELETE` | `/api/documents/:id` | — | `{ deleted: true }` (chunks cascade) | admin |
@@ -303,38 +311,40 @@ free, and removes any chance of the model ignoring its instructions.
 rag-chatbot-poc/
 ├── .env                    # secrets — gitignored, never committed
 ├── .env.example            # the same keys with empty values, committed
-├── .gitignore              # node_modules, .env
-├── package.json            # "type": "module", 3 deps
-├── schema.sql              # everything from § 4, runnable in Supabase's editor
-├── server.js               # Express app, routes, static serving
-├── src/
-│   ├── openai.js           # embed(texts) + chat(messages) — raw fetch
-│   ├── supabase.js         # the configured client
-│   ├── chunker.js          # chunkText(text) — pure function, no I/O
-│   └── rag.js              # ingestDocument() + answerQuestion()
-└── public/
-    ├── index.html          # chat page
-    ├── admin.html          # knowledge base page
-    ├── app.js              # chat page logic
-    ├── admin.js            # admin page logic
-    └── style.css           # shared, hand-written
+├── turbo.json              # task graph; globalEnv names every secret
+├── apps/web/               # Next.js — both screens and all six routes
+│   ├── app/page.tsx            # S-1 chat
+│   ├── app/admin/page.tsx      # S-2 knowledge base
+│   ├── app/api/**/route.ts     # the six endpoints
+│   └── lib/                    # route.ts, env.ts, limits.ts, schemas.ts
+└── packages/
+    ├── chunker/            # chunkText() — pure, zero dependencies
+    ├── openai/             # embed() + chat() + chatStream() — raw fetch
+    ├── db/                 # the client, the types, and sql/
+    └── rag/                # ingestDocument() + answerQuestion()
 ```
 
-Roughly 500–700 lines total. If it heads past ~1000, something is being built
-that `mvp.md` § Out of scope says not to build.
+The original build was 500–700 lines. The port did not add features, and the
+line count is dominated by the same code with types on it. If it heads a long
+way past that, something is being built that `mvp.md` § Out of scope says not
+to build.
 
 ### What each module owns
 
-| File | Responsibility | Must NOT contain |
+| Package / file | Responsibility | Must NOT contain |
 |---|---|---|
-| `src/openai.js` | Two `fetch` calls. Reads `OPENAI_API_KEY`. Throws a readable error on non-200. | Any knowledge of chunks, documents or prompts |
-| `src/supabase.js` | Creates and exports one client from env vars | Query logic |
-| `src/chunker.js` | Pure text → array of strings. No async, no imports. | Any I/O or API call |
-| `src/rag.js` | The two pipelines from § 3, orchestrating the modules above | HTTP handling, `req`/`res` |
-| `server.js` | Routes, JSON parsing, static files, error → status mapping | Business logic |
+| `@rag/openai` | Three `fetch` calls. Reads `OPENAI_API_KEY`. Throws `OpenAIError` carrying the upstream status. | Any knowledge of chunks, documents or prompts |
+| `@rag/db` | One client, the generated types, `sql/`, and the `server-only` guard | Query logic |
+| `@rag/chunker` | Pure text → array of strings. No async, **no dependencies**. | Any I/O or API call |
+| `@rag/pipeline` | The two pipelines from § 3, orchestrating the packages above | HTTP handling, `req`/`res` |
+| `apps/web/app/api` | Six Route Handlers: validation, and the response shape | Business logic |
+| `apps/web/lib/route.ts` | `withRoute()` — the ONE error → status map | Anything route-specific |
 
-The point of the split is that `chunker.js` can be read and understood with no
-network at all, and `rag.js` reads top-to-bottom as the pipeline diagram.
+The point of the split is unchanged, and is now enforced rather than agreed:
+`@rag/chunker` declares no dependencies, so it can be read with no network in
+sight; `@rag/pipeline` reads top-to-bottom as the pipeline diagram; and
+`@rag/db` is the only package that may import `server-only`, which is what
+keeps the service-role key out of the browser bundle.
 
 ---
 

@@ -2533,3 +2533,100 @@ pnpm --filter web dev      # http://localhost:3000
 
 Steps 2–4 are the `mvp.md` definition of done, and they need the key regardless
 of the UI.
+
+## Phase 7 — cutover · done
+
+`apps/legacy-poc` is gone. The repo is one Next.js app and five packages.
+
+### The decision that shaped this phase
+
+Phase 4 was never closed, because its proof — `pnpm eval` matching the Phase 0
+baseline — needed a baseline that was never captured. Deleting the old
+implementation makes any old-versus-new comparison impossible forever, so the
+choice was put explicitly: capture it now, or close Phase 4 on the structural
+evidence already gathered.
+
+**Decided 2026-09-22: close it on the structural evidence.** Recorded plainly
+because it is a real limitation, not a formality:
+
+| Proved | Not proved |
+|---|---|
+| Chunker output byte-identical, 87 comparisons | That the six eval verdicts are still what they were |
+| Pipeline identical on constants, `buildPrompt`, `retrieve`, and three DB reads, 22 comparisons | That a *generated answer* matches what the old code would have produced |
+| API identical on 24 request/response pairs, diffed against both servers running at once | — |
+
+The gap is narrower than it sounds: retrieval and prompt assembly are proved
+identical, and those are what determine what the model is asked. What is not
+proved is the model's half, which is nondeterministic anyway and which the
+battery judges by verdict rather than by text.
+
+Before deleting anything, the two parity runs that cost nothing were captured to
+**`plan/baseline/parity-final.txt`** — they cannot be re-run now, and a claim
+with no artifact behind it is worth very little.
+
+### What was deleted, and what went with it
+
+- `apps/legacy-poc/` — the whole POC.
+- `packages/chunker/tools/parity.mjs`, `packages/rag/tools/parity.mjs`,
+  `apps/web/tools/api-parity.mjs` — all three imported the old implementation,
+  so they became unrunnable the moment it went. They were migration scaffolding
+  and always had this expiry date; their results are in `plan/baseline/`.
+- The `parity` scripts and the turbo task that ran them.
+- `BUILD.md` — byte-identical to `CLAUDE.md`, a duplicate since the repo was
+  created.
+
+**What did not go:** the 13 vitest cases in `@rag/chunker`. They state what the
+chunker should do rather than what it used to do, so they outlive the thing it
+was compared against — which is exactly why they were written in Phase 2.
+
+### Verified after the cutover
+
+| Check | Result |
+|---|---|
+| `pnpm build` | 5 tasks, clean |
+| `pnpm typecheck` | 9 tasks, clean |
+| `pnpm test` | 13 passed |
+| `pnpm --filter @rag/db verify` | 10/10 |
+| Secrets in `apps/web/.next/static/` | **0 files** for all six patterns |
+
+The security grep is the one from `plan/steps.md` § 2.1, and it is the evidence
+that item asked for: `service_role`, `SUPABASE_SERVICE`, `sk-proj`, `eyJhbGci`
+and both live key prefixes all return zero files.
+
+### The docs, which were the largest part of this phase
+
+`CLAUDE.md` said, in order: no TypeScript, no framework creep, three
+dependencies, and here is the layout with `server.js` at the root. Every one of
+those was false. A brief that lies to the next person — or the next agent — is
+worse than no brief, so it was rewritten around what is now true, and `BUILD.md`
+collapsed into it.
+
+**Four decisions amended, four added:**
+
+| | |
+|---|---|
+| D-009 Express 4 | **Superseded.** Noted that the one place the 4-vs-5 choice actually mattered (async errors not caught, hence the `route()` wrapper) has an exact counterpart in `withRoute()` |
+| D-013 Local only | Still true; Phase 8 changes it |
+| D-014 No TypeScript | **Reversed** — with the original reasoning left intact, because it was right and has been served. The sentence that changed is "this is a throwaway learning POC" |
+| D-020 | Turborepo monorepo: why packages rather than folders, and the honest cost |
+| D-021 | Next.js App Router: the three things it makes easy to get wrong |
+| D-022 | zod at the boundary; what it still does *not* validate |
+| D-023 | Why the env check logs at import and throws per request |
+
+**D-020 records something worth not overselling:** the TypeScript port caught
+nothing that was already broken. The two real bugs found during the migration —
+`partial: undefined` on every error, and an env check that made the real message
+unreachable — were both found by *running* things, not by the compiler. What
+made the port safe was the parity tooling.
+
+`architecture.md`, `flow.md`, `mvp.md` and `screens.md` each carry a banner
+saying precisely which parts are still binding and which are historical, rather
+than being rewritten. Their content is still accurate — the data model, the
+pipelines, the prompt, the error policy and every UI state are unchanged. Only
+the file names moved, and pretending otherwise by rewriting them would destroy
+the record of what was planned and why.
+
+`README.md` was updated properly rather than bannered, because it is the file
+someone runs commands from: paths, the pnpm commands, `/admin` instead of
+`/admin.html`, and the pipeline diagram, which had never been updated for query
+rewriting or hybrid search.

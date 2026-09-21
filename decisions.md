@@ -181,7 +181,7 @@ things it knows; too low and it hallucinates from noise.
 
 ---
 
-## D-009 · Express 4, not Express 5 · **Settled**
+## D-009 · Express 4, not Express 5 · **SUPERSEDED 2026-09-22 by D-021**
 
 **Decision:** `"express": "^4"`.
 
@@ -190,6 +190,12 @@ answer and blog post you will hit while building matches version 4. For a
 learning project, matching the documentation you will actually read is worth
 more than being current. The API surface used here (`app.get`, `app.post`,
 `express.json`, `express.static`) is the same in both.
+
+**Superseded:** there is no Express in the repo any more. The routes are Next.js
+Route Handlers (D-021). The one place where the choice of 4 over 5 actually
+showed — Express 4 not catching async errors, hence the `route()` wrapper — has
+an exact counterpart in the new stack: `withRoute()` in `apps/web/lib/route.ts`,
+for the same reason and with the same failure mode if forgotten.
 
 ---
 
@@ -239,7 +245,7 @@ happens to be good product design — grounded answers should show their grounds
 
 ---
 
-## D-013 · Local only, no deployment · **Settled**
+## D-013 · Local only, no deployment · **Still true; Phase 8 of the migration will change it**
 
 **Decision:** Runs on `localhost:3000`. No hosting, no Docker, no CI.
 
@@ -251,7 +257,7 @@ and a place for secrets to leak. The success criterion is fully testable locally
 
 ---
 
-## D-014 · Plain JavaScript, no TypeScript · **Settled**
+## D-014 · Plain JavaScript, no TypeScript · **REVERSED 2026-09-22 by D-020**
 
 **Decision:** ES modules, no TypeScript, no build step.
 
@@ -262,6 +268,23 @@ is ~600 lines with four modules; types would catch little.
 **Note the inconsistency, deliberately:** `../shared-auth-layer` mandates strict
 TypeScript. That is a library other code depends on; this is a throwaway
 learning POC. Different jobs, different answers.
+
+**Reversed, and the original reasoning is the reason why.** The argument was
+that a compile step between the code you read and the code that runs is wrong
+for a project about understanding what runs. That argument was correct, and it
+has been served: `notes.md` exists, the pipeline was read and measured, and the
+knowledge it produced is what made the port verifiable.
+
+What changed is the sentence *"this is a throwaway learning POC"*. It is not
+throwaway any more — it has two clients (a browser and a set of tools), a
+streaming contract, and a security boundary that did not exist when the server
+was the only thing that could reach the database. Those are the conditions the
+original note said would justify the other answer.
+
+The port cost about 700 lines of retyping and caught nothing that was broken —
+which is the honest result, and worth recording rather than overselling. What it
+buys is future edits: `Source`, `MatchRow` and `StreamMeta` are now contracts
+rather than shapes an object literal happened to have.
 
 ---
 
@@ -601,6 +624,115 @@ hand — about fifteen lines, and the same parsing the server does to OpenAI.
 
 **Reverse if:** never needed — the JSON path is still there and still the
 default.
+
+---
+
+## D-020 · TypeScript in a Turborepo monorepo · **Migration, added 2026-09-22**
+
+**Decision:** pnpm workspace + Turborepo. Five packages (`@rag/chunker`,
+`@rag/openai`, `@rag/db`, `@rag/pipeline`, `@rag/tsconfig`) and one app
+(`apps/web`). Strict TypeScript throughout. Reverses D-014.
+
+**Why packages and not folders.** The split is the one `architecture.md` § 7
+already argued for; package boundaries make it enforceable rather than
+aspirational:
+
+- `@rag/chunker` declares **no dependencies**. In the POC "this file has no
+  imports" was a comment, held up by the fact that `server.js` served the file
+  to the browser. That mechanism is gone — the admin page imports the package —
+  and the rule survives as an empty `dependencies` block.
+- `@rag/db` is the only package that may import `server-only`, which is what
+  turns "do not leak the service-role key" into a build error (see D-021).
+
+**Why TypeScript now.** The POC's reason for avoiding it was sound and has been
+served; see the amendment on D-014. The condition that changed is that the code
+now has more than one consumer.
+
+**What it cost, honestly:** roughly 700 lines of retyping, and it caught nothing
+that was already broken. Two real bugs were found during the port, but by
+*running* things, not by the compiler: a stale `partial: undefined` on every
+error, and an env check that made the real message unreachable (D-022).
+
+**The verification that made the port safe was not the type system.** It was
+the parity tooling: 87 comparisons on the chunker, 22 on the pipeline, 24 on the
+API, all byte-for-byte against the implementation being replaced. Preserved in
+`plan/baseline/parity-final.txt`, because the old code is gone and they can
+never be re-run.
+
+---
+
+## D-021 · Next.js App Router, replacing Express and the static pages · **Migration, added 2026-09-22**
+
+**Decision:** one Next.js app serves both screens and all six API routes.
+Supersedes D-009.
+
+**Why:** the POC's split — an Express server plus two hand-written HTML files —
+worked because there were two pages and no shared state. It was already showing
+strain: `CHUNK_SIZE` reached the browser only because `server.js` served
+`src/chunker.js` as a static file, and `MAX_CONTENT_LENGTH` was duplicated into
+`admin.js` under a `// must match server.js` comment. Both are now ordinary
+imports.
+
+**What it costs, and the three things that are easy to get wrong:**
+
+1. **`withRoute()` must wrap every handler, by hand.** Express called its error
+   middleware for anything that threw. Route Handlers have no equivalent, so one
+   unwrapped handler answers with a generic 500 instead of the real reason. Not
+   enforceable by types — it is a review item.
+2. **The key can now reach the browser.** Express made the boundary physical; a
+   bundler does not. `import 'server-only'` in `@rag/db` makes a client import a
+   *build* error. Verified both directions: plain Node is refused,
+   `--conditions=react-server` is allowed. The cost is that every Node entry
+   point needs that flag — including `pnpm eval`, which is the gate on
+   `buildPrompt()`, so a gate that silently stopped running was a real risk.
+3. **A streaming failure cannot use a status code.** The headers went out with
+   the 200, so the error travels as an `error` event. Unchanged from D-019, but
+   the mechanism moved from `res.write()` to a `ReadableStream`.
+
+**Reverse if:** never, realistically. But note what was *kept* rather than
+adopted: no SDK (D-002), no RAG framework (D-001), the same raw `fetch` calls,
+the same SQL, the same prompt.
+
+---
+
+## D-022 · zod at the route boundary · **Migration, added 2026-09-22**
+
+**Decision:** request bodies are validated with zod schemas in
+`apps/web/lib/schemas.ts`. This retires the POC's three-dependency rule, which
+was a learning constraint rather than an architectural one.
+
+**Why:** the hand-written `typeof` ladders were right for a build whose point
+was that nothing was hidden. With two clients, a streaming route and types to
+keep honest, a schema that yields the parsed *type* as well as the check earns
+its place.
+
+**The error strings are copied character for character**, because they are part
+of the contract: both screens render `error` verbatim, and
+`"Document is 100001 characters; the limit is 100000"` tells a user how much to
+cut where a generic "invalid request" would not.
+
+**One thing it does not do:** validate what comes *back* from OpenAI or
+PostgREST. Those are still casts at the boundary (`as EmbeddingsResponse`), and
+a cast is a claim about someone else's JSON. Validating them would be a real
+improvement and a real dependency on the hot path; not taken during a port.
+
+---
+
+## D-023 · The env check logs at import and throws per request · **Migration, added 2026-09-22**
+
+**Decision:** `apps/web/lib/env.ts` logs missing variables when the module first
+loads, and `assertEnv()` throws inside `withRoute()` on every request.
+
+**Why it is not simply a throw at module scope**, which is what it was first and
+what most closely mirrors the POC's `process.exit(1)`: **a module that throws
+while loading never finishes loading**, so the handler it exports never exists,
+so `withRoute()` never runs. The client got Next's generic 500 HTML page and the
+real message reached only the server log — which is exactly the outcome
+`architecture.md` § 9 rules out.
+
+Found by testing it with an empty `OPENAI_API_KEY` rather than by reasoning
+about it. Splitting the two jobs satisfies both § 8 (fail loudly, immediately)
+and § 9 (the real message always reaches the client).
 
 ---
 
