@@ -1,0 +1,19 @@
+Captured 2026-09-21, before the Next.js/TypeScript migration (plan/steps.md Phase 0).
+
+node   : v24.19.0
+npm    : 11.17.0
+pnpm   : not installed
+git    : git version 2.38.1.windows.1
+commit : dead56e
+os     : Windows 11 Home 10.0.26200
+
+Dependencies as resolved in node_modules:
+  express                 4.22.3
+  @supabase/supabase-js   2.116.0
+  dotenv                  16.6.1
+
+Models (from .env):
+  chat      : gpt-4o-mini
+  embedding : text-embedding-3-small
+
+Supabase project ref: jkpdxolpydnenxeljmln

@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-20
+> Last updated: 2026-09-21
 
 ---
 
@@ -19,16 +19,27 @@
   changes: hybrid search (D-015), query rewriting (D-016), reworded grounding
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
-- **Current phase:** post-MVP. Nothing is required
-- **Status:** finished. Success criterion passes via curl and in the browser
+- **Current phase:** the POC is finished. A **migration to Next.js + TypeScript
+  on Turborepo** is now planned in [`plan/steps.md`](./plan/steps.md) —
+  8 phases, **Phase 0 done (bar the measurement)** as of 2026-09-21
+- **Status:** POC finished; success criterion passes via curl and in the browser
 - **Working on right now:** nothing
 
 ---
 
 ## ▶ Next up (do this next)
 
-**Nothing is required. The project is complete and committed.** What is left
-is optional:
+**The POC itself is complete and committed.** The live thread is the migration:
+
+**Migration Phase 1 — the workspace skeleton** (`plan/steps.md` § Phase 1):
+pnpm workspace + `turbo.json`, then `git mv` the POC into `apps/legacy-poc/`
+unchanged. Done when the old app still serves on `:3000` from its new home.
+
+⚠ **Before Migration Phase 4, capture the baseline** that Phase 0 deferred —
+it is the only thing the TypeScript port of `rag.js` can be verified against.
+Commands are in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
+
+What is left on the POC itself is optional:
 
 1. **Read [`notes.md`](./notes.md).** It is the deliverable — what each of the
    five knobs actually does, measured on this build.
@@ -326,7 +337,15 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 
 ## 🚧 Blockers & open questions
 
-**Blockers:** none. Nothing is waiting on anything.
+**Blockers:** none on the POC.
+
+**One open blocker on the migration** (`plan/steps.md`): the eval/score
+**baseline has not been captured**. Phase 4's definition of done is "`pnpm eval`
+gives the same six verdicts as the baseline", and there is no baseline yet,
+because capturing one means clearing the Villa Amihan corpus out of the
+database — deferred by decision on 2026-09-21. Not urgent for Phases 1–3, which
+touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
+[`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
 
 **Open questions** (full list in `decisions.md` § Open questions):
 
@@ -350,6 +369,34 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-21 — session 3 (migration planning + Phase 0)
+- **Did:** Wrote [`plan/steps.md`](./plan/steps.md) — the full migration from
+  the Express + vanilla-JS POC to a Turborepo monorepo running Next.js and
+  TypeScript. 8 phases, each with an observable "done when".
+- **Then:** implemented migration Phase 0.
+- **The finding that made Phase 0 worth doing first:** the eval battery's corpus
+  was not in version control. `tools/prompt-eval.js` asserts on Bay 3, extension
+  4417 and the violet badge ratio — facts that existed only in
+  `scratch/testdoc.json`, and `scratch/` is gitignored. The battery `CLAUDE.md`
+  names as the gate on every `buildPrompt()` change was one `git clean -fdx`
+  from being unrunnable, and no fresh clone ever had it. Now committed at
+  `fixtures/northwind.json` (2,607 chars — matches the figure in `notes.md`).
+- **Also:** moved `todo.txt` out of `sample-documents/` to `todo.md` at the
+  root. It sat among eight files whose instructions are "paste each of these
+  into the admin page"; it is not corpus.
+- **Observed, recorded in `plan/baseline/db-state.md`:** 8 documents / 30 chunks
+  / 150 conversations / 428 messages. The loaded corpus is Villa Amihan, not
+  Northwind. Also: `embedding` comes back from PostgREST as a **string** that
+  parses to 1,536 numbers — not the trap from `CLAUDE.md` § 5 (the column is a
+  real `vector`; `<=>` works), but it is what the type generator will see in
+  migration Phase 3.
+- **Decided:** do **not** capture the eval/score baseline yet, because it means
+  deleting the Villa Amihan documents. The two corpora cannot share a database
+  for this: `03-amenities` documents parking, so the eval case `absent-2` would
+  get a real answer and be scored a failure.
+- **Stopped at:** Phase 0 complete except the measurement.
+- **Next:** migration Phase 1 — the workspace skeleton.
 
 ### 2026-09-20 — session 2 (build start)
 - **Also did (later in session):** Supabase project created and `schema.sql` ran

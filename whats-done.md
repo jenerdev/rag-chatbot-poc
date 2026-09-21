@@ -1741,3 +1741,114 @@ are the original design.
 
 **If this is ever deployed, two notes become blockers:** R-1 (the API key) and
 R-2 (RLS is enabled but has no policies; `service_role` bypasses it entirely).
+
+---
+
+# Migration to Next.js + TypeScript (Turborepo)
+
+Planned in [`plan/steps.md`](./plan/steps.md) — 8 phases. The POC is finished;
+this is the port, not new features.
+
+## Migration plan written · done
+
+An 8-phase plan with one rule at the top: **port, do not improve.** Every
+constant in the pipeline — `CHUNK_SIZE` 1000, `CHUNK_OVERLAP` 150,
+`MIN_SIMILARITY` 0.25, `MATCH_COUNT` 5, `RRF_K` 60, `MAX_HISTORY` 6, the
+`buildPrompt()` wording — was set by measurement in Phase 5, and changing any of
+them *during* the port destroys the only available proof that the port worked: a
+before/after run of the same eval battery on the same corpus.
+
+**Why that rule needed to be written down.** A TypeScript port invites tidying,
+and the things most inviting to tidy here are exactly the ones that took
+measurement to get right. D-017's grounding line reads like it could be
+shortened. `req.accepts()` reads like the polite version of the explicit header
+check. Both would pass review and both would be wrong.
+
+The five traps identified, each with the mitigation in the phase where it bites:
+
+| Trap | Why it matters | Where |
+|---|---|---|
+| The `service_role` key can reach the browser | Next.js has no server/client boundary by default. A `NEXT_PUBLIC_` prefix or one import from a Client Component inlines a master key into the bundle. `import 'server-only'` makes it a build error | Phase 3 |
+| SSE is not `res.write()` | Route Handlers return a `Response`, so the stream becomes a `ReadableStream`. Four details must survive: the explicit `Accept` check, `X-Accel-Buffering: no`, the abort guard, and the two-delivery contract | Phase 5 |
+| The `chunker.js` static-serve hack | Disappears — it becomes an ordinary workspace import, which is a genuine improvement, not a loss | Phase 6 |
+| The eval corpus was gitignored | See below. Fixed first | Phase 0 |
+| Turbo caches against declared env vars only | An undeclared `SUPABASE_URL` means a cached build can silently point at the wrong project | Phase 1 |
+
+## Phase 0 — baseline · done, except the measurement
+
+### 1. The eval corpus was not in version control
+
+`tools/prompt-eval.js` asserts on six cases, and three of them name facts —
+the Bay 3 freezer temperature, extension 4417, the violet badge escort ratio —
+that exist in exactly one document: the Northwind Labs handbook. That document
+lived only in `scratch/testdoc.json`, and `.gitignore` excludes `scratch/`.
+
+**What that means in practice.** `CLAUDE.md` says *"Re-run `npm run eval` after
+any edit to `buildPrompt()`"*, and calls that prompt the only thing separating a
+grounded answer from a confident invention. The command enforcing that rule
+could not be run from a fresh clone of this repo, and was one `git clean -fdx`
+from being unrunnable here.
+
+Copied to `fixtures/northwind.json` and committed. **2,607 characters** —
+matching the figure at the top of `notes.md`, which confirms it is the same
+document every measured number in that file came from. `fixtures/README.md`
+records why it is committed and why only one corpus may be loaded at a time.
+
+### 2. `todo.txt` moved out of `sample-documents/`
+
+It sat in a folder whose own README says *"paste each one into the admin page as
+a separate document"*, next to eight files that are meant to be pasted. It is a
+list of future product ideas. Moved to `todo.md` at the repo root.
+
+### 3. The measurement — deferred, deliberately
+
+`plan/baseline/eval-before.txt` and `scores-before.txt` do not exist yet.
+
+Capturing them requires the database to hold the Northwind handbook **and
+nothing else**, and it currently holds the eight Villa Amihan documents. The two
+cannot be loaded at once for this purpose: `03-amenities-and-facilities.md`
+documents the resort's parking, so the eval case `absent-2` — *"How many parking
+spaces does the building have?"*, which exists to prove that a plausible but
+absent fact is still refused — would receive a genuine, correct answer and be
+scored a **failure**. The battery would report a regression that is not one.
+
+Clearing the corpus is fully reversible (the eight source files are in
+`sample-documents/`), but it is the user's data and the call was to leave it.
+Recorded as the one open blocker on migration Phase 4, with the exact commands,
+in `plan/baseline/db-state.md`.
+
+### 4. What was observed instead
+
+Read-only, against project `jkpdxolpydnenxeljmln`:
+
+| | |
+|---|---|
+| `documents` / `chunks` | 8 / 30 — 3.75 chunks per document at 1000/150 |
+| `conversations` / `messages` | 150 / 428 |
+| Loaded corpus | Villa Amihan, ingested 2026-09-19, ids 27–34 |
+| node / npm | v24.19.0 / 11.17.0 |
+| express / supabase-js / dotenv | 4.22.3 / 2.116.0 / 16.6.1 |
+| Models | `gpt-4o-mini`, `text-embedding-3-small` |
+
+**The one finding worth carrying forward:** selecting `embedding` from `chunks`
+returns a **string**, which parses to exactly 1,536 numbers.
+
+This is *not* the trap in `CLAUDE.md` § 5. The column is a real `vector(1536)` —
+a text column could not be ordered by `<=>`, and `match_chunks` does exactly
+that. What is a string is only PostgREST's JSON serialisation of the vector type
+on the way out, and nothing in `rag.js` ever reads a vector back: every
+comparison happens inside Postgres.
+
+It matters in migration Phase 3, because `supabase gen types typescript` will
+type that column `string`. Changing it to `number[]` to make the types look
+right would be a lie the compiler accepts and the runtime does not — which is
+precisely the failure mode TypeScript is being adopted to prevent.
+
+### What Phase 0 proves
+
+That the migration is now falsifiable in principle — the corpus exists in git,
+the versions are recorded, the database state is written down — and that it is
+not yet falsifiable in practice, because the numbers have not been taken. The
+distinction is recorded rather than glossed, because "the command succeeded" is
+not "the effect happened", and a plan that claims a baseline it does not have is
+worse than one that says plainly where the gap is.
