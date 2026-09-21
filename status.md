@@ -20,38 +20,30 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–7 done** as of
-  2026-09-22, on branch `feat/nextjs-migration`. Only Phase 8 (deploy) is left
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–7 done and signed
+  off** as of 2026-09-22, on branch `feat/nextjs-migration`. Only Phase 8
+  (deploy) is left, and it is optional — D-013 still says local-only
 - **Status:** the POC is deleted; the repo is one Next.js app and five packages.
   A new API key is in place and **real grounded answers work end to end**, over
   both the JSON and the SSE paths. Phase 4 was closed on structural parity
   (87/0 chunker, 22/0 pipeline, 24/0 API) rather than on the eval baseline,
   which was never captured — a deliberate, recorded choice
-- **Working on right now:** nothing
+- **Working on right now:** nothing. **The migration is functionally complete**
+  — the `mvp.md` definition of done passes in the browser on the new stack
 
 ---
 
 ## ▶ Next up (do this next)
 
-**1. Sign off Phase 6 — click the screens.** The only outstanding verification.
-Both screens are built, render and serve, but nothing interactive has been
-exercised by anyone: streaming text arriving token by token, the sources panel
-opening *before* the first token, click-to-expand on a chunk, Retry, the delete
-confirmation. Browser tooling was declined, so this needs a human.
+~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
+steps pass in the browser: the document list and its chunks, the live estimate,
+a streamed answer with its sources panel arriving first, and the refusal after
+the document is deleted. That is the `mvp.md` definition of done, on the new
+stack.
 
-```sh
-pnpm dev     # http://localhost:3000
-```
+**Nothing is required.** What is left is optional:
 
-1. `/admin` lists the documents with chunk counts; click a title, chunks appear.
-2. Paste a document with a fact the model cannot know; the estimate updates as
-   you type; add it.
-3. Ask about that fact on `/`. It should stream, sources panel up first.
-4. Delete the document and ask again — it must say it does not know.
-
-Steps 2–4 are the `mvp.md` definition of done.
-
-**2. Then Phase 8 — deploy** (`plan/steps.md` § Phase 8). The step that catches
+**1. Phase 8 — deploy** (`plan/steps.md` § Phase 8). The step that catches
 a proxy buffering the stream, which cannot be caught locally. Before it, read
 `README.md` § "Before you put this in production" — R-2 in particular (RLS is
 enabled with no policies; `service_role` bypasses it) stops being a note and
@@ -438,6 +430,19 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (Phase 6 signed off)
+- **Did:** Ran `pnpm dev` and checked both screens by hand. All four steps of
+  the `mvp.md` definition of done pass on the new stack — the document list and
+  its chunks, the live estimate, a streamed answer with its sources panel
+  arriving before the text, and the refusal after the document is deleted.
+- **Why it mattered:** every other part of the migration was proved by diffing
+  against the old implementation. The screens had no counterpart to diff once
+  they became React, so using them was the only way to know.
+- **Stopped at:** Phases 0–7 done and signed off. The migration is functionally
+  complete.
+- **Next:** nothing required. Phase 8 (deploy) is optional and D-013 still says
+  local-only until someone decides otherwise.
 
 ### 2026-09-22 — session 4, continued (migration Phase 7 — cutover)
 - **Decided first:** Phase 4's eval baseline was never captured, and deleting

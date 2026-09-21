@@ -2630,3 +2630,38 @@ the record of what was planned and why.
 someone runs commands from: paths, the pnpm commands, `/admin` instead of
 `/admin.html`, and the pipeline diagram, which had never been updated for query
 rewriting or hybrid search.
+
+## Phase 6 — signed off
+
+Checked by hand in the browser, 2026-09-22. All four steps of the `mvp.md`
+definition of done pass on the new stack:
+
+1. `/admin` lists the documents with chunk counts; a title expands to its chunks.
+2. The live estimate updates while typing, and a pasted document embeds.
+3. A question about a fact the model cannot know is answered, streamed, with the
+   sources panel on screen before the text.
+4. Deleting the document makes the same question return the refusal.
+
+**What that closes.** Phase 6 was the last piece carrying an unverified claim,
+and it was the one that mattered most: everything else in the migration was
+proved by comparison against the old implementation, but the screens had no
+counterpart to diff against once they became React. The only way to know was to
+use them.
+
+**The migration is functionally complete.** Phases 0–7 are done; Phase 8
+(deploy) remains and is optional — D-013's local-only decision still stands
+until someone decides otherwise, and `risks.md` R-2 becomes a blocker rather
+than a note on the day that changes.
+
+### The honest summary of what this migration proved, and did not
+
+| | |
+|---|---|
+| **Proved by measurement** | Chunking byte-identical (87 comparisons). Retrieval, prompt assembly, constants and DB reads identical (22). The six API endpoints identical in status and body (24, both servers running at once). No secret in the client bundle (0 files, six patterns). |
+| **Proved by use** | The pipeline end to end, on the new stack: real grounded answers over both the JSON and SSE paths, and both screens by hand. |
+| **Never proved** | That the eval battery's six verdicts survived the port. The baseline was never captured, and after Phase 7 it cannot be — a deliberate, recorded choice. |
+
+The last row is the one to remember. It is also cheap to fix whenever it
+matters: load `fixtures/northwind.json` as the only corpus and run `pnpm eval`.
+That will not be a before/after any more, but it will answer whether the battery
+passes today, which is the question that actually governs future prompt edits.

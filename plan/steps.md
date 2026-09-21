@@ -289,7 +289,7 @@ the record" is not suspended because the stack changed.
 | **3** ✅ | `@rag/db` | S | Generated types compile; the `server-only` guard is proven — **done 2026-09-22, 10/10 checks** |
 | **4** ✅ | `@rag/pipeline` | L | ~~`pnpm eval` matches the Phase 0 baseline~~ — **closed 2026-09-22 on structural parity instead, by decision. See whats-done.md § Phase 7** |
 | **5** ✅ | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape — **done 2026-09-22: 24 comparisons, 0 differences, diffed live against the running POC** |
-| **6** ⚠ | Both screens in React | L | The `mvp.md` success criterion passes in the browser — **built 2026-09-22; not yet exercised in a browser** |
+| **6** ✅ | Both screens in React | L | The `mvp.md` success criterion passes in the browser — **signed off 2026-09-22, checked by hand** |
 | **7** ✅ | Cutover: delete the POC, amend the docs | M | **Done 2026-09-22.** No `legacy-poc/`; 0 secrets in the client bundle; D-014 reversed and D-020..D-023 added |
 | **8** | Deploy | M | Streaming works on the deployed URL, not just locally |
 
@@ -601,7 +601,10 @@ a stream**.
 
 ### Phase 6 — The screens
 
-> **Built 2026-09-22. Not signed off — nobody has clicked it yet.**
+> **Done 2026-09-22.** Built, then **checked by hand** — all four steps of the
+> `mvp.md` definition of done pass in the browser, including the streaming
+> answer with its sources panel arriving first, and the refusal after the
+> document is deleted.
 >
 > Both screens compile, render and serve; `pnpm build` and `pnpm typecheck` are
 > clean. Verified server-side: the markup and every class name the stylesheet
@@ -615,11 +618,9 @@ a stream**.
 > in **0 files** under `.next/static/`, and the variable name appears only in a
 > server chunk.
 >
-> **What has NOT been checked:** anything requiring a browser — streaming text
-> appearing token by token, the sources panel opening, click-to-expand on a
-> chunk, Retry, the delete confirmation. Browser tooling was declined this
-> session, and the `mvp.md` success criterion needs a working API key anyway.
-> The checklist is in `whats-done.md`.
+> Everything that needed a browser — streaming text, the sources panel opening
+> before the first token, click-to-expand, Retry, the delete confirmation — was
+> verified by hand rather than by me; browser tooling was declined this session.
 
 **Goal:** `screens.md` S-1 and S-2 in React, every state included.
 
