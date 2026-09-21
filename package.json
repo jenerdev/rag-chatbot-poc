@@ -1,17 +1,21 @@
 {
-  "name": "rag-chatbot-poc",
+  "name": "rag-chatbot",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "eval": "node tools/prompt-eval.js",
-    "scores": "node tools/score-probe.js"
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=20.9"
   },
-  "dependencies": {
-    "express": "^4",
-    "@supabase/supabase-js": "^2",
-    "dotenv": "^16"
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "eval": "turbo eval",
+    "scores": "turbo scores"
+  },
+  "devDependencies": {
+    "turbo": "^2"
   }
 }

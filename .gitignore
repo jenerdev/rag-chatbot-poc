@@ -1,3 +1,11 @@
 node_modules/
 .env
+.env.local
 scratch/
+
+# build output
+.next/
+dist/
+
+# turborepo local cache
+.turbo/

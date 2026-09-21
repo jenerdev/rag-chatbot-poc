@@ -4,6 +4,22 @@
 > **Type:** Learning project (not a product) · **Builder:** Solo
 > **Findings:** [`notes.md`](./notes.md) · **Build log:** [`whats-done.md`](./whats-done.md)
 
+> ### ⚠ The paths below are one step out of date
+>
+> As of 2026-09-21 this is a **pnpm + Turborepo workspace**, and the POC
+> described here now lives in **`apps/legacy-poc/`** — so `src/rag.js` is
+> `apps/legacy-poc/src/rag.js`, `schema.sql` is
+> `apps/legacy-poc/schema.sql`, and so on. Everything else in this file is
+> still accurate: the code is unchanged.
+>
+> Commands run from the repo root and are the same names: `pnpm dev`,
+> `pnpm eval`, `pnpm scores`.
+>
+> This file is rewritten properly at Phase 7 of
+> [`plan/steps.md`](./plan/steps.md), once the Next.js + TypeScript port
+> replaces the POC and there is one set of paths worth documenting rather than
+> two.
+
 ## Pitch
 
 A **chatbot that answers from your own documents**, built from scratch with no

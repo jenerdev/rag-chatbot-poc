@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+
+  "globalEnv": [
+    "OPENAI_API_KEY",
+    "OPENAI_CHAT_MODEL",
+    "OPENAI_EMBEDDING_MODEL",
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "PORT"
+  ],
+
+  "globalDependencies": [".env", ".env.local"],
+
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "eval": {
+      "cache": false
+    },
+    "scores": {
+      "cache": false
+    }
+  }
+}

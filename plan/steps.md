@@ -284,7 +284,7 @@ the record" is not suspended because the stack changed.
 | Phase | Deliverable | Size | Done when |
 |---|---|---|---|
 | **0** ✅ | Baseline measurement, corpus rescued | S | `plan/baseline/` holds real eval + score output — **partly done 2026-09-21, see below** |
-| **1** | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes |
+| **1** ✅ | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes — **done 2026-09-21, see below** |
 | **2** | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one |
 | **3** | `@rag/db` | S | Generated types compile; the `server-only` guard is proven |
 | **4** | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline |
@@ -333,6 +333,18 @@ comparable to one against Northwind — the six assertions are Northwind facts.
 ---
 
 ### Phase 1 — Workspace skeleton
+
+> **Done 2026-09-21.** pnpm 12.5.1 via corepack, turbo 2.11.2, POC at
+> `apps/legacy-poc/` via `git mv` (all 15 files detected as 100% renames).
+> Serving verified on every route; the three dependency versions are unchanged
+> from the Phase 0 baseline. **Three deviations from the steps below, each with
+> its reasoning, are recorded in `whats-done.md`** — pnpm 12 not 9, the fixture
+> left at the repo root, and `--env-file` instead of moving `.env`.
+>
+> **New blocker found here, unrelated to the move: the OpenAI API key has
+> expired** (`"Your API key has expired. Create a new API key to continue."`).
+> Nothing that calls OpenAI can run until it is replaced — including the
+> deferred Phase 0 baseline.
 
 **Goal:** a monorepo containing the POC, unchanged and still working. No
 TypeScript yet. This phase is deliberately boring, because it is what gives

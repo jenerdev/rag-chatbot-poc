@@ -1852,3 +1852,94 @@ not yet falsifiable in practice, because the numbers have not been taken. The
 distinction is recorded rather than glossed, because "the command succeeded" is
 not "the effect happened", and a plan that claims a baseline it does not have is
 worse than one that says plainly where the gap is.
+
+## Phase 1 — workspace skeleton · done
+
+The POC now lives at `apps/legacy-poc/` inside a pnpm + Turborepo workspace, and
+runs there unchanged.
+
+### What was built
+
+| | |
+|---|---|
+| `pnpm-workspace.yaml` | `apps/*`, `packages/*` |
+| `turbo.json` | seven tasks; `globalEnv` naming all five secrets plus `PORT` |
+| `package.json` (root) | workspace scripts only — `dev`, `build`, `lint`, `typecheck`, `test`, `eval`, `scores` |
+| `packages/tsconfig` | `@rag/tsconfig` — `base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, `noUncheckedIndexedAccess`) and `node-library.json` |
+| `apps/legacy-poc/` | `server.js`, `src/`, `public/`, `tools/`, both `.sql` files |
+
+Every file moved with `git mv`; git recorded all 15 as 100% renames, so
+`git log --follow` on `rag.js` still reaches the commit that wrote it.
+
+### Verified, not assumed
+
+Server started from its new home with `pnpm --filter legacy-poc start`:
+
+| Check | Result |
+|---|---|
+| `GET /` , `/admin.html`, `/style.css` | 200 |
+| `GET /chunker.js` | 200 — the `express.static` hack still works from the new path |
+| `GET /api/documents` | the eight Villa Amihan documents, with chunk counts |
+| Boot banner | both model names printed, so env loading works from the new cwd |
+| `express` / `@supabase/supabase-js` / `dotenv` | 4.22.3 / 2.116.0 / 16.6.1 — **identical to the Phase 0 baseline**, so switching package manager did not move the dependency graph |
+| `node --check` on both tools | clean |
+| All nine frozen constants, read out of the moved modules | `CHUNK_SIZE` 1000, `CHUNK_OVERLAP` 150, `MATCH_COUNT` 5, `CANDIDATE_COUNT` 10, `RRF_K` 60, `MIN_SIMILARITY` 0.25, `MAX_HISTORY` 6, `REWRITE_MAX_TOKENS` 60, `NO_ANSWER` exact — all match § 0 of `plan/steps.md` |
+
+### The blocker this turned up: the OpenAI key has expired
+
+The end-to-end check — one real question against the loaded corpus — returned:
+
+```
+HTTP/1.1 401 Unauthorized
+{"error":"OpenAI rejected the API key — check OPENAI_API_KEY in .env (HTTP 401):
+ Your API key has expired. Create a new API key to continue."}
+```
+
+**This is not caused by the move.** The opposite: it is proof the move worked.
+The key was read from `.env` at the new path, sent to OpenAI, and rejected *as
+expired* rather than as missing — which means env loading, the route, the
+pipeline and `openai.js` all functioned. It also exercised the error map end to
+end: an upstream 401 arrived at the client as a 401 carrying the real upstream
+sentence, exactly as `architecture.md` § 9 specifies and with no swallowing.
+
+Supabase is unaffected — `/api/documents` returns real rows.
+
+**What it blocks:** everything that calls OpenAI. That includes the Phase 0
+baseline, which was already deferred, and Phase 4's verification, which depends
+on it. Replacing `OPENAI_API_KEY` in `.env` is now on the critical path for the
+migration, not just for using the app.
+
+### Three deviations from the plan, with reasoning
+
+**1. pnpm 12.5.1, not pnpm 9.** `corepack enable pnpm` installs what corepack
+ships, which is 12.5.1. No reason to pin backwards; `packageManager` in the root
+`package.json` now pins it so every machine gets the same one.
+
+**2. The fixture stays at `fixtures/` in the repo root.** The plan said to move
+it next to `legacy-poc`. It is a data file that *no code reads* — the corpus is
+loaded by a human running `curl -d @fixtures/northwind.json`, and
+`prompt-eval.js` only assumes the result is in the database. Moving it now means
+moving it again at Phase 4 and editing the path in three documents twice, for no
+gain. It moves once, to `packages/rag/fixtures/`, when there is a package that
+actually reads it.
+
+**3. `--env-file=../../.env`, rather than moving or copying `.env`.** The POC
+calls `import 'dotenv/config'`, which resolves `.env` relative to the working
+directory — and pnpm runs each package's scripts from the package directory, so
+the POC would have found nothing. The options were: edit `server.js` (breaks
+"moved unchanged"), copy `.env` into the app (two files holding the same secrets,
+free to drift), or load it from the launcher. The launcher wins: every source
+file is byte-identical to what it was, the secret exists once, and Node's
+`--env-file` takes precedence because dotenv does not override variables that are
+already set. It is also a preview of Phase 4, where `--env-file` removes the
+`dotenv` dependency outright.
+
+### Also updated, so the docs stop lying
+
+`README.md`, `CLAUDE.md` and `BUILD.md` all describe `src/rag.js` and
+`schema.sql` at the repo root, and `CLAUDE.md` forbids TypeScript and
+frameworks. Rather than rewrite them now — Phase 7's job, when there is one
+stack to describe — each carries a banner saying which parts are now historical
+and which still bind. The two rules called out as binding *harder* during a port
+are the ones a port is most likely to erode: the key never reaches the browser,
+and `pnpm eval` is re-run after any change to `buildPrompt()`.

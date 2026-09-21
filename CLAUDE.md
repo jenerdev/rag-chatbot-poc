@@ -1,5 +1,23 @@
 # BUILD — RAG Chatbot POC
 
+> ### ⚠ Read `plan/steps.md` first — this brief describes the POC, which is now `apps/legacy-poc/`
+>
+> As of 2026-09-21 the repo is a **pnpm + Turborepo workspace**, mid-migration to
+> **Next.js + TypeScript** ([`plan/steps.md`](./plan/steps.md), 8 phases, Phase 1
+> done). Two things below are now **historical rather than binding**: the
+> "Repo layout to create" section (the POC moved to `apps/legacy-poc/` unchanged)
+> and the rules against TypeScript and frameworks (D-014, D-009 — deliberately
+> reversed for the port, and to be logged as D-020+ at Phase 7).
+>
+> **Everything else still holds**, and two rules matter *more* during a port than
+> they did during the build: the key never reaches the browser, and
+> `pnpm eval` is re-run after any change to `buildPrompt()`. The migration's own
+> first rule is "port, do not improve" — the constants in this file were measured,
+> not chosen.
+>
+> This file is rewritten at Phase 7, when there is one stack to describe.
+
+
 > **You are the Claude in the new repo.** This is your brief. Read this file
 > first, then [`architecture.md`](./architecture.md) for the design,
 > [`mvp.md`](./mvp.md) for scope and build order, [`screens.md`](./screens.md)

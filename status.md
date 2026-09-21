@@ -19,25 +19,36 @@
   changes: hybrid search (D-015), query rewriting (D-016), reworded grounding
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
-- **Current phase:** the POC is finished. A **migration to Next.js + TypeScript
-  on Turborepo** is now planned in [`plan/steps.md`](./plan/steps.md) —
-  8 phases, **Phase 0 done (bar the measurement)** as of 2026-09-21
-- **Status:** POC finished; success criterion passes via curl and in the browser
+- **Current phase:** **migration** to Next.js + TypeScript on Turborepo
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0 and 1 done** as of
+  2026-09-21, on branch `feat/nextjs-migration`
+- **Status:** the POC runs unchanged from `apps/legacy-poc/` in a pnpm +
+  Turborepo workspace. ⚠ **The OpenAI API key has expired** — nothing that calls
+  OpenAI can run until it is replaced
 - **Working on right now:** nothing
 
 ---
 
 ## ▶ Next up (do this next)
 
-**The POC itself is complete and committed.** The live thread is the migration:
+**1. Replace `OPENAI_API_KEY` in `.env`.** It has expired — OpenAI returns
+*"Your API key has expired. Create a new API key to continue."* Nothing that
+calls OpenAI runs until this is done: not the app, not `pnpm eval`, not
+`pnpm scores`, not the deferred baseline. New key at
+<https://platform.openai.com/api-keys>; check billing is still live while there
+(`costs.md`).
 
-**Migration Phase 1 — the workspace skeleton** (`plan/steps.md` § Phase 1):
-pnpm workspace + `turbo.json`, then `git mv` the POC into `apps/legacy-poc/`
-unchanged. Done when the old app still serves on `:3000` from its new home.
+**2. Migration Phase 2 — `@rag/chunker` and `@rag/openai` in TypeScript**
+(`plan/steps.md` § Phase 2). The chunker goes first because it is pure, and the
+phase's proof is a parity script: old chunker vs new over all nine documents,
+asserting byte-identical output. **That part needs no API key**, so Phase 2 can
+start before the key is replaced — only the `embed(['hello'])` check at the end
+is blocked.
 
-⚠ **Before Migration Phase 4, capture the baseline** that Phase 0 deferred —
-it is the only thing the TypeScript port of `rag.js` can be verified against.
-Commands are in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
+⚠ **Before Migration Phase 4, capture the baseline** that Phase 0 deferred — it
+is the only thing the TypeScript port of `rag.js` can be verified against.
+Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md). Needs
+the new key.
 
 What is left on the POC itself is optional:
 
@@ -337,10 +348,14 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 
 ## 🚧 Blockers & open questions
 
-**Blockers:** none on the POC.
+**Blocker 1 — the OpenAI API key has expired.** Found 2026-09-21 during the
+Phase 1 end-to-end check: `HTTP 401 — "Your API key has expired. Create a new
+API key to continue."` The key is read and sent correctly; OpenAI is rejecting
+it. Blocks the app, `pnpm eval`, `pnpm scores` and the baseline capture.
+Supabase is unaffected. Replace `OPENAI_API_KEY` in `.env`.
 
-**One open blocker on the migration** (`plan/steps.md`): the eval/score
-**baseline has not been captured**. Phase 4's definition of done is "`pnpm eval`
+**Blocker 2 — the eval/score baseline has not been captured**
+(`plan/steps.md`). Phase 4's definition of done is "`pnpm eval`
 gives the same six verdicts as the baseline", and there is no baseline yet,
 because capturing one means clearing the Villa Amihan corpus out of the
 database — deferred by decision on 2026-09-21. Not urgent for Phases 1–3, which
@@ -397,6 +412,32 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-21 — session 3, continued (migration Phase 1)
+- **Did:** Branched `feat/nextjs-migration`. Built the workspace — pnpm 12.5.1
+  via corepack, turbo 2.11.2, `pnpm-workspace.yaml`, `turbo.json`,
+  `packages/tsconfig`. `git mv`'d the POC into `apps/legacy-poc/`; all 15 files
+  recorded as 100% renames, so `git log --follow` still works.
+- **Verified:** every route and static asset serves from the new home;
+  `/api/documents` returns real rows; all nine frozen constants read back
+  correct; both tools pass `node --check`; express/supabase-js/dotenv resolve to
+  **the same versions as the Phase 0 baseline**, so changing package manager did
+  not move the dependency graph.
+- **Found — the blocker:** the **OpenAI API key has expired**. The end-to-end
+  question returned a 401 carrying OpenAI's own sentence. This is not fallout
+  from the move; it is evidence the move worked, since the key was read from
+  `.env` at the new path and rejected as *expired* rather than missing. It also
+  proved the error map end to end: upstream 401 → client 401, real message
+  intact.
+- **Deviations, all recorded in `whats-done.md` with reasoning:** pnpm 12 not 9;
+  the fixture stays at `fixtures/` until a package actually reads it;
+  `--env-file=../../.env` in the launcher rather than moving `.env`, which keeps
+  every source file byte-identical.
+- **Also:** banners on `README.md`, `CLAUDE.md` and `BUILD.md` — they described
+  root-level paths and forbade TypeScript. Rewritten properly at Phase 7.
+- **Stopped at:** Phase 1 complete.
+- **Next:** replace the API key; then Phase 2 (`@rag/chunker` first — its parity
+  check needs no key).
 
 ### 2026-09-20 — session 2 (build start)
 - **Also did (later in session):** Supabase project created and `schema.sql` ran
