@@ -287,7 +287,7 @@ the record" is not suspended because the stack changed.
 | **1** ✅ | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes — **done 2026-09-21, see below** |
 | **2** ✅ | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one — **done 2026-09-22: 87 comparisons, 0 differences** |
 | **3** ✅ | `@rag/db` | S | Generated types compile; the `server-only` guard is proven — **done 2026-09-22, 10/10 checks** |
-| **4** | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline |
+| **4** ⚠ | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline — **code done 2026-09-22; the eval comparison is still blocked** |
 | **5** | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape |
 | **6** | Both screens in React | L | The `mvp.md` success criterion passes in the browser |
 | **7** | Cutover: delete the POC, amend the docs | M | No `legacy-poc/`; no secret in the client bundle; docs no longer contradict the code |
@@ -473,6 +473,27 @@ the `server-only` error, and `match_chunks` returns typed rows.
 ---
 
 ### Phase 4 — `@rag/pipeline`
+
+> **Code complete 2026-09-22. Verification is PARTIAL — this phase is not
+> closed.**
+>
+> `tools/parity.mjs` proves **22 comparisons, 0 differences** against the
+> original `rag.js`: all seven constants, `buildPrompt` on four inputs, and
+> `retrieve` on seven queries against the live database — including
+> keyword-only, vector-only and mixed `foundBy` outcomes. None of that needed
+> an API key, because the query vector is an embedding already stored in a
+> chunk row.
+>
+> **What is still unverified, and why the phase stays open:** `ingestDocument`,
+> `rewriteQuestion`, `answerQuestion` and `answerQuestionStream` all call
+> OpenAI, and the key is invalid (a third distinct message today: *"Incorrect
+> API key provided"*). `pnpm eval` and `pnpm scores` resolve every module, load
+> the `server-only` package correctly and die exactly at the first OpenAI call
+> — which proves the wiring and nothing about the behaviour.
+>
+> **To close this phase:** replace the key, capture the Phase 0 baseline, then
+> confirm `pnpm eval` gives the same six verdicts and `pnpm scores` the same
+> numbers to three decimal places.
 
 **Goal:** the 645 lines of `rag.js` in TypeScript, behaving identically. This is
 where the migration is won or lost.

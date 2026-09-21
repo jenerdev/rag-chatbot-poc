@@ -40,8 +40,17 @@ export interface ChatOptions {
  */
 export class OpenAIError extends Error {
   readonly status: number;
-  /** Set only by chatStream, when a stream ends before its terminator. */
-  readonly partial?: string;
+  /**
+   * Set only by chatStream, when a stream ends before its terminator.
+   *
+   * `declare`, not a plain field. Under `target: ES2022` TypeScript compiles a
+   * declared field to a `defineProperty` in the constructor, so every error
+   * would carry `partial: undefined` — harmless to the code that reads it
+   * (`typeof x === 'string'` either way) but visible in every stack dump, and
+   * a difference from the JS this was ported from. `declare` emits nothing, so
+   * the property is absent unless it is actually set.
+   */
+  declare readonly partial?: string;
 
   constructor(message: string, status: number, partial?: string) {
     super(message);

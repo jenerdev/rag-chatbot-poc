@@ -1,0 +1,82 @@
+// The shapes the web app codes against.
+//
+// In the POC these existed only as the properties an object literal happened to
+// have, documented in a JSDoc block and enforced by nothing. They are the API
+// between the pipeline and the two screens, so they get names.
+
+import type { MatchRow } from '@rag/db';
+
+/** Which search found a chunk. Rendered as a badge in the sources panel (D-015). */
+export type FoundBy = 'vector' | 'keyword' | 'both';
+
+/** One turn of stored conversation. The database `check` constrains role to these two. */
+export interface HistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** A chunk that survived fusion: a database row plus how it got here. */
+export interface RetrievedChunk extends MatchRow {
+  /** The Reciprocal Rank Fusion score. Internal — never shown to a user. */
+  score: number;
+  foundBy: FoundBy;
+}
+
+/**
+ * A retrieved chunk as the UI receives it.
+ *
+ * Deliberately a product feature, not debug output (D-012): showing the exact
+ * text an answer was built from is what makes the answer checkable, and
+ * `foundBy` is what makes "an exact keyword match the vector search would have
+ * missed" visible rather than mysterious.
+ */
+export interface Source {
+  id: number;
+  documentId: number;
+  documentTitle: string;
+  content: string;
+  similarity: number;
+  foundBy: FoundBy;
+}
+
+/** The non-streaming reply. */
+export interface Answer {
+  conversationId: string;
+  reply: string;
+  sources: Source[];
+  /**
+   * What retrieval actually searched for, which is not always what was typed
+   * (D-016). Returned so the UI can show it — a retriever silently searching
+   * for something else is exactly what should be visible rather than hidden.
+   */
+  searchQuery: string;
+}
+
+/** The `meta` event, sent once as soon as retrieval is done and before any answer exists. */
+export interface StreamMeta {
+  conversationId: string;
+  searchQuery: string;
+  sources: Source[];
+}
+
+/** One document in the admin list. `chunkCount` of 0 is the R-7 orphan the UI flags. */
+export interface DocumentSummary {
+  id: number;
+  title: string;
+  source: string | null;
+  created_at: string;
+  chunkCount: number;
+}
+
+/** One chunk as the admin page's expandable row shows it — without the embedding. */
+export interface ChunkSummary {
+  id: number;
+  chunk_index: number;
+  content: string;
+}
+
+export interface IngestResult {
+  id: number;
+  title: string;
+  chunkCount: number;
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@rag/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "eval": "node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs",
+    "scores": "node --conditions=react-server --env-file=../../.env tools/score-probe.mjs",
+    "parity": "node --conditions=react-server --env-file=../../.env tools/parity.mjs"
+  },
+  "dependencies": {
+    "@rag/chunker": "workspace:*",
+    "@rag/db": "workspace:*",
+    "@rag/openai": "workspace:*"
+  },
+  "devDependencies": {
+    "@rag/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

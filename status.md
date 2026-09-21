@@ -20,13 +20,14 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 done** as of
-  2026-09-22, on branch `feat/nextjs-migration`
-- **Status:** the POC runs unchanged from `apps/legacy-poc/`; `@rag/chunker`,
-  `@rag/openai` and `@rag/db` are ported (chunker byte-identical, 87/0; db
-  verified 10/10 including self-similarity 1.000000). **Tenancy decided:
-  single tenant.** ⚠ **The OpenAI API key is invalid** — nothing that calls
-  OpenAI can run until it is replaced
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 done, Phase 4
+  code complete but NOT closed**, as of 2026-09-22, on branch
+  `feat/nextjs-migration`
+- **Status:** the whole pipeline is ported — `@rag/chunker` (87/0 byte-identical),
+  `@rag/openai`, `@rag/db` (10/10), `@rag/pipeline` (22/0 on everything
+  reachable without an API key). **Tenancy decided: single tenant.**
+  ⚠ **The OpenAI API key is invalid**, so the four functions that call OpenAI
+  are unverified and `pnpm eval` cannot run
 - **Working on right now:** nothing
 
 ---
@@ -41,20 +42,20 @@ baseline, not the `embed() -> 1536` check carried over from Phase 2. New key at
 <https://platform.openai.com/api-keys>; check billing is still live while there
 (`costs.md`).
 
-**2. Migration Phase 4 — `@rag/pipeline`** (`plan/steps.md` § Phase 4): the 645
-lines of `rag.js` split into `constants` / `ingest` / `prompt` / `retrieve` /
-`answer`, plus porting both tools. **This is the phase the migration is won or
-lost in**, and it is the first one that genuinely needs the API key.
+**2. Close Phase 4.** The code is written and 22/0 on everything provable
+offline, but four functions that call OpenAI — `ingestDocument`,
+`rewriteQuestion`, `answerQuestion`, `answerQuestionStream` — are unverified.
+Once the key works: capture the Phase 0 baseline, then confirm `pnpm eval` gives
+the same six verdicts and `pnpm scores` the same numbers to three decimals.
+Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
 
-⚠ **Capture the baseline before starting it.** Phase 4's definition of done is
-"`pnpm eval` gives the same six verdicts and the same scores as the baseline",
-and there is no baseline yet. Commands in
-[`plan/baseline/db-state.md`](./plan/baseline/db-state.md). Needs the new key.
+**3. Then Phase 5 — API routes in `apps/web`** (`plan/steps.md` § Phase 5). The
+six endpoints as Route Handlers, the SSE one being the hard part, with the error
+map in a single `withRoute()` wrapper.
 
-⚠ **`pnpm eval` and `pnpm scores` will need `--conditions=react-server`** once
-the tools import `@rag/db` (via `@rag/pipeline`). Without it the `server-only`
-guard throws and the battery cannot run — and a gate that does not run is not a
-gate. See `packages/db/README.md`.
+ℹ `pnpm eval` and `pnpm scores` now carry `--conditions=react-server`, because
+the pipeline imports `@rag/db`, which is `server-only`. Without the flag they
+cannot run at all. See `packages/db/README.md`.
 
 ~~Decide tenancy~~ — **decided 2026-09-22: single tenant.** No `tenant_id`.
 Multi-tenancy is its own plan after Phase 7, and now carries a backfill.
@@ -423,6 +424,36 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (migration Phase 4)
+- **Did:** Ported all 645 lines of `rag.js` into `@rag/pipeline`, split five
+  ways — `constants`, `types`, `ingest`, `prompt`, `retrieve`, `answer`. Ported
+  both tools by changing **only their import lines**; the six eval cases and the
+  scoring loop are byte-identical, because a gate rewritten alongside the thing
+  it guards is not a gate.
+- **Proved, with no API key — 22 comparisons, 0 differences:** all seven
+  constants, `buildPrompt` on four inputs, `retrieve` on seven live queries, and
+  `listDocuments` / `getChunks` / `getMessages`. The query vector is an
+  embedding already stored in a chunk row, so the whole run is free.
+- **Why that retrieve coverage matters:** the seven queries produce different
+  shapes — `keyword:0` (pure vector), `keyword:4` with a chunk rescued by
+  keyword alone, and `keyword:10` with heavy overlap. That exercises RRF fusion
+  in every mode, which is where a porting mistake would have stayed invisible
+  until someone asked about an identifier.
+- **NOT proved, and why Phase 4 stays open:** `ingestDocument`,
+  `rewriteQuestion`, `answerQuestion`, `answerQuestionStream` all call OpenAI.
+  `pnpm eval` resolves every module, loads `server-only`, runs the pipeline and
+  dies at the first `embed()` — which proves the wiring and nothing about the
+  behaviour.
+- **The key failed a third way today:** *"Incorrect API key provided"*, after
+  *"expired"* and *"has been invalidated"*.
+- **One fidelity slip, caught by reading an error dump:** every `OpenAIError`
+  carried `partial: undefined`, because TS compiles a declared class field to a
+  `defineProperty` under `target: ES2022`, where the JS left the property
+  absent. Fixed with `declare`; verified the own properties are now `status,
+  name` only.
+- **Stopped at:** Phase 4 code complete, verification partial.
+- **Next:** new key → baseline → close Phase 4 → Phase 5 (API routes).
 
 ### 2026-09-22 — session 4, continued (migration Phase 3)
 - **Decided:** **single tenant.** The plan called Phase 3 the last cheap moment

@@ -2183,3 +2183,121 @@ pipeline reads an embedding back today — every comparison happens inside
 Postgres, which is the point of `match_chunks` — so it earns its place by being
 what the verification script uses, and by existing before the first piece of
 code that needs one has to invent it in a hurry.
+
+## Phase 4 — `@rag/pipeline` · code complete, verification partial
+
+The 645 lines of `rag.js` are TypeScript, split five ways. **This phase is not
+closed**: the check that defines it — `pnpm eval` matching the baseline — cannot
+run while the API key is invalid.
+
+### The split
+
+| File | From `rag.js` | Holds |
+|---|---|---|
+| `constants.ts` | 152–203 | the seven knobs, collected rather than scattered |
+| `types.ts` | (new) | `Source`, `Answer`, `StreamMeta`, `FoundBy`, `HistoryMessage`, `RetrievedChunk` |
+| `ingest.ts` | 28–143 | `ingestDocument`, `listDocuments`, `deleteDocument`, `getChunks` |
+| `prompt.ts` | 213–263 | `buildPrompt` |
+| `retrieve.ts` | 301–436 | `rewriteQuestion`, `retrieve` |
+| `answer.ts` | 461–645 | `prepareAnswer`, `answerQuestion`, `answerQuestionStream`, `saveMessages`, `getMessages` |
+
+`constants.ts` exists because the convention in `CLAUDE.md` — every knob at the
+top of its module, in SCREAMING_SNAKE_CASE, so the dials are findable — would
+have been destroyed by splitting one file into five. Collecting them preserves
+the property that made the convention worth having.
+
+The types in `types.ts` existed before as whatever properties an object literal
+happened to carry, described in a JSDoc block and enforced by nothing. They are
+the contract between the pipeline and both screens, so they now have names.
+
+### What was proved, without an API key
+
+`pnpm --filter @rag/pipeline parity` — **22 comparisons, 0 differences**,
+running the old `rag.js` and the new package against identical inputs:
+
+| Covered | How |
+|---|---|
+| All seven constants | compared by value, because a drifted constant changes retrieval without changing any logic |
+| `buildPrompt` | 4 inputs: no chunks, one chunk, five chunks with history, and content full of newlines, quotes and unicode |
+| `retrieve` | 7 queries against the live database |
+| `listDocuments`, `getChunks`, `getMessages` | live reads, compared exactly |
+
+**The `retrieve` coverage is the part worth having.** The query vector is an
+embedding already stored in a chunk row, so the whole run is free and needs no
+OpenAI. The seven queries deliberately produce different shapes, and the two
+implementations agreed on every one:
+
+```
+"What is the Wi-Fi password?"        vector:10 keyword:3  -> both both vector vector vector
+"extension 4417"                     vector:10 keyword:4  -> both both vector keyword vector
+"What is the capital of France?"     vector:10 keyword:0  -> vector vector vector vector vector
+"pool refill time and early check-in" vector:10 keyword:10 -> both both both both vector
+```
+
+That exercises RRF fusion with both lists populated, with one list empty, and
+with a chunk rescued by keyword search alone — which is D-015's entire reason
+for existing, and the part of the port where a subtle mistake would have been
+invisible until a user asked about an identifier.
+
+### What is NOT proved, stated plainly
+
+`ingestDocument`, `rewriteQuestion`, `answerQuestion` and `answerQuestionStream`
+call OpenAI. The key is still invalid — a **third** distinct message today:
+
+```
+2026-09-21  Your API key has expired. Create a new API key to continue.
+2026-09-22  Your API key has been invalidated.
+2026-09-22  Incorrect API key provided: sk-proj-****6DwA
+```
+
+`pnpm eval` and `pnpm scores` were run anyway, and the result is worth recording
+because of *where* they fail:
+
+```
+at embed          (packages/openai/dist/index.js)
+at prepareAnswer  (packages/rag/dist/answer.js:53)
+at answerQuestion (packages/rag/dist/answer.js:94)
+at                (packages/rag/tools/prompt-eval.mjs:73)
+```
+
+Every module resolved, `server-only` loaded, the pipeline ran, and the first
+thing to fail was the OpenAI call. **That proves the wiring and nothing about
+the behaviour** — which is exactly the distinction this project keeps insisting
+on, and the reason the phase stays open rather than being marked done.
+
+### The tools were ported by changing only their imports
+
+`diff` between the old `prompt-eval.js` and the new `prompt-eval.mjs` is two
+hunks: the header comment and the import block. The six cases, the multi-turn
+loop and the scoring are byte-identical. That is deliberate — the battery is the
+gate on `buildPrompt`, and a gate that was rewritten at the same time as the
+thing it guards is not a gate.
+
+They are `.mjs`, not `.ts`. The plan said `.ts`; they are scripts rather than
+library code, `packages/db` and `packages/chunker` already carry `.mjs` tools,
+and making them TypeScript would have meant contorting `rootDir` to emit
+`dist/tools/` alongside `dist/index.js` for no benefit.
+
+**Both carry `--conditions=react-server`**, the cost recorded in Phase 3.
+Without it `@rag/db` refuses to load and the battery cannot run at all.
+
+### One fidelity slip, caught by reading an error dump
+
+The first run printed `partial: undefined` on every `OpenAIError`. Under
+`target: ES2022` TypeScript compiles a declared class field into a
+`defineProperty` in the constructor, so `readonly partial?: string` gave every
+error an own property set to `undefined` — where the JS original left it absent
+entirely.
+
+Harmless to the code that reads it (`typeof x === 'string'` is false either
+way), but it is a difference from the original, and it would appear in every
+logged stack trace. Changed to `declare readonly partial?: string`, which emits
+nothing. Verified:
+
+```
+own properties: status, name
+has partial   : false
+```
+
+Small, but it is the kind of thing that makes "identical behaviour" either true
+or nearly true, and nearly true is what this whole phase is trying to avoid.
