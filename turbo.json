@@ -34,6 +34,10 @@
     "scores": {
       "cache": false
     },
+    "verify": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
     "parity": {
       "dependsOn": ["build"],
       "cache": false

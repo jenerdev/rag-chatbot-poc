@@ -2058,3 +2058,128 @@ absolute path reads `C:` as a URL scheme — the parity script uses
 | `pnpm test` | 13 passed |
 | `pnpm --filter @rag/chunker parity` | 87 comparisons, 0 differences |
 | `embed(['hello'])` → 1536 | **blocked** — invalid API key |
+
+## Phase 3 — `@rag/db` · done
+
+One typed client, the schema moved into the package that owns it, and the
+service-role key made structurally unable to reach a browser.
+
+### Tenancy: decided, single tenant
+
+`plan/steps.md` § Phase 3 called this the last cheap moment to add `tenant_id`.
+Asked and answered on 2026-09-22: **no**. The port stays a port, which keeps the
+Phase 4 eval comparison meaningful. Multi-tenancy becomes its own plan after
+Phase 7 — and it now carries a known, accepted cost: a backfill plus a rewrite of
+every query and both SQL functions, with the filter pushed *inside*
+`match_chunks` so it stays indexable.
+
+### The guard is real, and it has a price that was measured
+
+`src/client.ts` opens with `import 'server-only'`. Verified both directions
+rather than assumed:
+
+```
+node                             -> This module cannot be imported from a Client
+                                    Component module.
+node --conditions=react-server   -> imports fine; exports supabase,
+                                    parseStoredVector, VECTOR_DIMENSIONS
+```
+
+So a Client Component importing `@rag/db` fails **at build time** instead of
+inlining a key that bypasses RLS entirely into a bundle served to every visitor.
+
+**The cost, found by testing rather than by reading about it:** a plain Node
+process has no `react-server` condition either, so `import 'server-only'` throws
+there too. Any script importing this package must run with
+`node --conditions=react-server`.
+
+That matters more than it first looks. `CLAUDE.md` names `npm run eval` as the
+gate on every `buildPrompt()` change, and from Phase 4 those tools import the
+pipeline, which imports this package. **So `pnpm eval` and `pnpm scores` will
+need that flag**, or the battery stops running — and a gate that does not run is
+not a gate. Recorded here, in `packages/db/README.md`, and in the plan, because
+the failure mode is a confusing module error in a tool nobody expected to break.
+
+The alternative — dropping `server-only` and relying on discipline — was
+rejected. Discipline is what the POC had, and it worked only because Express
+made the boundary physical.
+
+### The types are hand-written, and why that is not laziness
+
+The plan called for `supabase gen types typescript`. It needs either a personal
+access token (`supabase login`, interactive) or a database URL, and the direct
+host is gone:
+
+```
+getaddrinfo ENOTFOUND db.jkpdxolpydnenxeljmln.supabase.co
+```
+
+Supabase serves direct connections over IPv6 only now; reaching the database
+from a script means the connection pooler, whose hostname carries a region this
+repo never recorded.
+
+So `src/database.types.ts` is written from `sql/schema.sql` and
+`sql/schema-hybrid.sql` — which are committed, are what actually ran, and are
+already the source of truth this project treats as authoritative. The file's
+header carries the regeneration command and says to **diff** the result rather
+than trust either copy blindly.
+
+Writing them by hand forced two things a generator would have decided silently:
+
+**1. The vector column is typed `string`.** Phase 0 observed that a
+`vector(1536)` comes back from PostgREST as a string that parses to 1,536
+numbers. The type now says `StoredVector = string` for reads and
+`VectorInput = number[] | string` for writes. Typing it `number[]` because that
+is what it "should" be would be a lie the compiler accepts and the runtime does
+not — exactly the failure mode TypeScript is here to prevent.
+
+**2. `id` on the three identity tables is `id?: never` in Insert.** They are
+`generated always as identity`; Postgres rejects a supplied value. A generator
+would have written `id?: number` and left a foot-gun typed as legal.
+
+### The verification does not need an OpenAI key
+
+`pnpm --filter @rag/db verify` — **10 checks, all passing**:
+
+| Check | Observed |
+|---|---|
+| `documents` / `chunks` / `conversations` / `messages` readable | 8 / 30 / 153 / 428 rows |
+| Embedding arrives as a string | `typeof string` |
+| Parses to finite numbers | 1536 dims |
+| `match_chunks` rows match `MatchRow` | shape ok |
+| A chunk is its own nearest neighbour | chunk 106, top 106 |
+| **Self-similarity is 1** | **1.000000** |
+| Ordered most-similar first | 1.000 > 0.757 > 0.655 |
+
+The query vector is an embedding **already in the database**, so the whole run
+costs nothing and needs no API key — which is why Phase 3 could proceed while
+the OpenAI key is still invalid.
+
+**The sharpest check is the cheapest one.** A chunk searched against its own
+embedding must return itself at similarity exactly 1. If the vector had been
+stored into a text column by accident — `CLAUDE.md` § 5, the failure that
+produces no error at all — that number would not be 1, and nothing else in the
+system would have complained. `1.000000` is the proof that the column is a real
+vector and that `<=>` is doing vector arithmetic on it.
+
+Note `conversations` is now 153, up from 150 at Phase 0: the three chat attempts
+made during Phases 1 and 2 each created a conversation row before the OpenAI
+call failed. Harmless, and a small reminder that the conversation row is created
+before anything can fail (`rag.js` step 1).
+
+### What is in the package
+
+| Path | |
+|---|---|
+| `sql/schema.sql`, `sql/schema-hybrid.sql` | moved with `git mv`, unchanged |
+| `src/client.ts` | the POC's `supabase.js` verbatim, plus the guard and `createClient<Database>` |
+| `src/database.types.ts` | hand-written; 4 tables, 3 functions |
+| `src/index.ts` | `MatchRow`, `FtsRow`, `parseStoredVector`, `VECTOR_DIMENSIONS` |
+| `tools/verify.mjs` | the 10 checks |
+| `README.md` | the guard's cost, and the two schema facts that are expensive to get wrong |
+
+`parseStoredVector()` is the runtime guard the plan asked for. Nothing in the
+pipeline reads an embedding back today — every comparison happens inside
+Postgres, which is the point of `match_chunks` — so it earns its place by being
+what the verification script uses, and by existing before the first piece of
+code that needs one has to invent it in a hurry.

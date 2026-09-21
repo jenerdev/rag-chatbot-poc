@@ -20,12 +20,13 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0, 1 and 2 done** as
-  of 2026-09-22, on branch `feat/nextjs-migration`
-- **Status:** the POC runs unchanged from `apps/legacy-poc/`; `@rag/chunker` and
-  `@rag/openai` are ported to TypeScript, with the chunker proven byte-identical
-  (87 comparisons, 0 differences). ⚠ **The OpenAI API key is invalid** —
-  nothing that calls OpenAI can run until it is replaced
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 done** as of
+  2026-09-22, on branch `feat/nextjs-migration`
+- **Status:** the POC runs unchanged from `apps/legacy-poc/`; `@rag/chunker`,
+  `@rag/openai` and `@rag/db` are ported (chunker byte-identical, 87/0; db
+  verified 10/10 including self-similarity 1.000000). **Tenancy decided:
+  single tenant.** ⚠ **The OpenAI API key is invalid** — nothing that calls
+  OpenAI can run until it is replaced
 - **Working on right now:** nothing
 
 ---
@@ -40,20 +41,23 @@ baseline, not the `embed() -> 1536` check carried over from Phase 2. New key at
 <https://platform.openai.com/api-keys>; check billing is still live while there
 (`costs.md`).
 
-**2. Migration Phase 3 — `@rag/db`** (`plan/steps.md` § Phase 3): move both
-`.sql` files, generate `database.types.ts`, add the `import 'server-only'` guard
-that makes leaking the service-role key a build error, and hand-type the two RPC
-return rows. **Needs no API key.** It does need the Supabase project ref
-(`jkpdxolpydnenxeljmln`) for type generation.
+**2. Migration Phase 4 — `@rag/pipeline`** (`plan/steps.md` § Phase 4): the 645
+lines of `rag.js` split into `constants` / `ingest` / `prompt` / `retrieve` /
+`answer`, plus porting both tools. **This is the phase the migration is won or
+lost in**, and it is the first one that genuinely needs the API key.
 
-⚠ **Decide tenancy before Phase 4 writes the queries** — the callout in
-`plan/steps.md` § Phase 3. Adding `tenant_id` costs one migration now; later it
-is a backfill plus a rewrite of every query and both SQL functions.
+⚠ **Capture the baseline before starting it.** Phase 4's definition of done is
+"`pnpm eval` gives the same six verdicts and the same scores as the baseline",
+and there is no baseline yet. Commands in
+[`plan/baseline/db-state.md`](./plan/baseline/db-state.md). Needs the new key.
 
-⚠ **Before Migration Phase 4, capture the baseline** that Phase 0 deferred — it
-is the only thing the TypeScript port of `rag.js` can be verified against.
-Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md). Needs
-the new key.
+⚠ **`pnpm eval` and `pnpm scores` will need `--conditions=react-server`** once
+the tools import `@rag/db` (via `@rag/pipeline`). Without it the `server-only`
+guard throws and the battery cannot run — and a gate that does not run is not a
+gate. See `packages/db/README.md`.
+
+~~Decide tenancy~~ — **decided 2026-09-22: single tenant.** No `tenant_id`.
+Multi-tenancy is its own plan after Phase 7, and now carries a backfill.
 
 What is left on the POC itself is optional:
 
@@ -419,6 +423,36 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (migration Phase 3)
+- **Decided:** **single tenant.** The plan called Phase 3 the last cheap moment
+  to add `tenant_id`; the answer was no, so the port stays a port and the
+  Phase 4 eval comparison stays meaningful.
+- **Did:** `@rag/db` — both `.sql` files moved in with `git mv`, the POC's
+  `supabase.js` ported verbatim plus `createClient<Database>`, hand-written
+  `database.types.ts`, `MatchRow` / `FtsRow` / `parseStoredVector`, a 10-check
+  verification script, and a README.
+- **Verified, 10/10, with no API key:** all four tables readable (8 / 30 / 153 /
+  428 rows), embedding parses to 1536 finite numbers, `match_chunks` rows match
+  `MatchRow`, and **a chunk searched against its own embedding returns itself at
+  similarity 1.000000** — the cheapest possible proof that the column is a real
+  vector rather than text that merely round-trips.
+- **The guard, proven both ways:** plain `node` importing `@rag/db` throws
+  *"This module cannot be imported from a Client Component module"*;
+  `node --conditions=react-server` imports fine. So a Client Component leaking
+  the service-role key is a build error, not a code review.
+- **The cost of that, found by testing:** plain Node has no `react-server`
+  condition either. **From Phase 4, `pnpm eval` and `pnpm scores` need
+  `--conditions=react-server`** or they cannot run at all.
+- **Deviation:** types are hand-written from the committed `.sql` files. The
+  generator needs credentials this repo does not carry, and the direct database
+  host no longer resolves (`getaddrinfo ENOTFOUND db.<ref>.supabase.co` —
+  Supabase is IPv6-only for direct connections now). Writing them by hand forced
+  two decisions a generator would have made silently: the vector column is typed
+  `string` (what PostgREST actually returns), and `id` is `never` in Insert on
+  the `generated always as identity` tables.
+- **Stopped at:** Phase 3 complete.
+- **Next:** replace the API key, capture the baseline, then Phase 4.
 
 ### 2026-09-22 — session 4 (migration Phase 2)
 - **Did:** Ported `src/chunker.js` and `src/openai.js` to TypeScript as

@@ -286,7 +286,7 @@ the record" is not suspended because the stack changed.
 | **0** ✅ | Baseline measurement, corpus rescued | S | `plan/baseline/` holds real eval + score output — **partly done 2026-09-21, see below** |
 | **1** ✅ | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes — **done 2026-09-21, see below** |
 | **2** ✅ | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one — **done 2026-09-22: 87 comparisons, 0 differences** |
-| **3** | `@rag/db` | S | Generated types compile; the `server-only` guard is proven |
+| **3** ✅ | `@rag/db` | S | Generated types compile; the `server-only` guard is proven — **done 2026-09-22, 10/10 checks** |
 | **4** | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline |
 | **5** | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape |
 | **6** | Both screens in React | L | The `mvp.md` success criterion passes in the browser |
@@ -424,6 +424,22 @@ the original build, and it should survive as a runtime guard.
 ---
 
 ### Phase 3 — `@rag/db`
+
+> **Done 2026-09-22.** `pnpm --filter @rag/db verify` passes **10 checks**, none
+> of which need an OpenAI key — including a chunk searched against its own
+> embedding returning itself at similarity **1.000000**, which is what proves
+> the column is behaving as a vector. The guard is proven in both directions:
+> plain Node is blocked, `--conditions=react-server` is allowed.
+>
+> **Tenancy: single tenant**, decided 2026-09-22. No `tenant_id`. Tenancy
+> becomes its own plan after Phase 7, with its own migration.
+>
+> **Two deviations, detailed in `whats-done.md`:** the types are hand-written
+> from the committed `.sql` files rather than generated (the direct database
+> host no longer resolves and the generator needs credentials this repo does not
+> carry), and the `server-only` guard forces `--conditions=react-server` on
+> every Node entry point — which from Phase 4 means `pnpm eval` and
+> `pnpm scores` too.
 
 **Goal:** one typed client, and the service-role key structurally unable to
 reach the browser.
