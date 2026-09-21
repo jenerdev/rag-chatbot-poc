@@ -20,10 +20,10 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 and 5 done,
-  Phase 4 code complete but NOT closed**, as of 2026-09-22, on branch
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 and 5 done; Phases 4
+  and 6 complete but NOT signed off**, as of 2026-09-22, on branch
   `feat/nextjs-migration`
-- **Status:** the pipeline and the API are ported — `@rag/chunker` (87/0
+- **Status:** the pipeline, the API and both screens are ported — `@rag/chunker` (87/0
   byte-identical), `@rag/openai`, `@rag/db` (10/10), `@rag/pipeline` (22/0),
   and the six routes in `apps/web` (24/0, diffed live against the running POC).
   **Tenancy decided: single tenant.** ⚠ **The OpenAI API key is invalid**, so
@@ -49,10 +49,16 @@ Once the key works: capture the Phase 0 baseline, then confirm `pnpm eval` gives
 the same six verdicts and `pnpm scores` the same numbers to three decimals.
 Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
 
-**3. Then Phase 6 — the two screens** (`plan/steps.md` § Phase 6). `screens.md`
-S-1 and S-2 in React, every state included. The SSE reader at
-`public/app.js:239` moves almost verbatim into a hook — including the comment
-explaining why `EventSource` cannot be used (it cannot POST).
+**3. Sign off Phase 6 — click the screens.** Both are built and render, but
+nothing interactive has been exercised: streaming text, the sources panel
+opening before the first token, click-to-expand, Retry, the delete confirm.
+`pnpm --filter web dev`, then the four-step check in `whats-done.md` § Phase 6.
+Steps 2–4 of it are the `mvp.md` definition of done and need the key.
+
+**4. Then Phase 7 — cutover** (`plan/steps.md` § Phase 7): delete
+`apps/legacy-poc`, re-run eval and scores into `plan/baseline/*-after.txt`, and
+amend the docs — D-014 reversed, D-009 and D-013 superseded, D-020..D-022 added,
+`CLAUDE.md` and `BUILD.md` rewritten and collapsed into one.
 
 ℹ `pnpm eval` and `pnpm scores` now carry `--conditions=react-server`, because
 the pipeline imports `@rag/db`, which is `server-only`. Without the flag they
@@ -425,6 +431,34 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (migration Phase 6)
+- **Did:** Both screens in React — `app/page.tsx` (S-1), `app/admin/page.tsx`
+  (S-2), `components/sources-panel.tsx`, `lib/chat-stream.ts`, and
+  `style.css` copied verbatim to `app/globals.css`.
+- **The `chunker.js` static-serve hack is gone.** The admin page imports
+  `@rag/chunker` directly, and the rendered HTML says **"0 characters · ≈ 0
+  chunks (1000 chars, 150 overlap)"** — those numbers come from the package the
+  server chunks with. One definition, no static route, no drift.
+- **The § 2.1 grep finally means something,** because client components did not
+  exist before this phase: `service_role`, `SUPABASE_SERVICE`, `sk-proj`,
+  `eyJhbGci` and both live key prefixes all appear in **0 files** under
+  `.next/static/`. `SUPABASE_SERVICE_ROLE_KEY` appears only in a server chunk.
+- **The state distinction that had to survive the rewrite:** a failure arriving
+  *after* the answer started keeps the partial text and puts the error beneath
+  it; a failure before it replaces the turn with Retry. Throwing away text the
+  model already produced is worse than showing it with a warning.
+- **One React-specific fix:** scrolling belongs in `useLayoutEffect`, not
+  `useEffect` — after paint means a visible jump on every delta.
+- **`textContent` vs `innerHTML` is now free** (React escapes children) but the
+  comment stays, because the rule returns the moment anyone adds markdown via
+  `dangerouslySetInnerHTML`.
+- **NOT verified:** anything needing a browser. Browser tooling was declined
+  this session, so streaming render, click-to-expand, Retry and the delete
+  confirm are compiled and reasoned about but unclicked. Checklist in
+  `whats-done.md` § Phase 6.
+- **Stopped at:** Phase 6 built, not signed off.
+- **Next:** click the screens; then Phase 7 cutover.
 
 ### 2026-09-22 — session 4, continued (migration Phase 5)
 - **Did:** The six endpoints as Route Handlers in `apps/web`, with `withRoute()`

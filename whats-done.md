@@ -2409,3 +2409,127 @@ revoke when one leaks.
 Everything that needs a working key: a real ingest, a real grounded answer, a
 real stream of deltas. The routes are proven to carry a failure correctly; they
 are not yet proven to carry an answer.
+
+## Phase 6 — the two screens · built, not signed off
+
+`screens.md` S-1 and S-2 are React. They compile, render and serve. **Nobody has
+clicked them yet**, so this phase is marked built rather than done.
+
+### What was ported
+
+| From | To | Lines |
+|---|---|---|
+| `public/index.html` + `app.js` | `app/page.tsx` | 439 → ~330 |
+| `public/admin.html` + `admin.js` | `app/admin/page.tsx` | 319 → ~300 |
+| the sources panel, inline in `app.js` | `components/sources-panel.tsx` | — |
+| `readEventStream` + `describeFailure` | `lib/chat-stream.ts` | logic unchanged |
+| `public/style.css` | `app/globals.css` | 275, verbatim |
+
+The SSE reader moved almost word for word, including the comment explaining why
+`EventSource` cannot be used: it only issues GET requests, and the question has
+to go up in a POST body. That constraint has not changed, so neither has the
+hand-written parser or its buffering across network chunk boundaries.
+
+### Two rules, one of which is now free
+
+`CLAUDE.md` demands `textContent`, never `innerHTML`, for anything from the
+server or the model. React escapes children by default, so the rule costs
+nothing here — and it comes back the instant anyone reaches for
+`dangerouslySetInnerHTML`, which is exactly what adding markdown rendering would
+require. The comment at the top of `app/page.tsx` says so, because the rule
+being free is not the same as the rule being gone.
+
+The second rule — no markdown in the MVP, newlines handled by CSS
+`white-space: pre-wrap` — is unchanged and needed no work.
+
+### The state model, and the one thing it had to get right
+
+The POC built DOM nodes imperatively and held a reference to the current bubble.
+React needs the turns as data, so a turn is now one of four shapes: `user`,
+`pending`, `answer` (with optional `error`), `failed` (with Retry).
+
+The distinction that had to survive is the one the POC drew with
+`if (bubble && bubble.textContent !== '')`: **a failure arriving after the
+answer has started keeps the partial text and puts the error underneath it**,
+while a failure before it replaces the whole turn with a Retry button. Throwing
+away text the model already produced, because something broke afterwards, is a
+worse outcome than showing it with a warning.
+
+Retry still removes the question as well as the error, for the reason the POC
+recorded: `send()` re-adds the user's message, so leaving the original would
+show the same question twice after one retry.
+
+### Scrolling: `useLayoutEffect`, not `useEffect`
+
+The POC scrolled synchronously inside its DOM writes. In React, scrolling in a
+`useEffect` runs after the browser has painted, which produces a visible jump on
+every delta. `useLayoutEffect` runs before paint.
+
+The "only follow the text if the reader is already at the bottom" rule survives
+as a ref updated by `onScroll` — yanking the viewport while someone is re-reading
+an earlier answer is worse than making them scroll.
+
+### The `chunker.js` hack is gone, and the proof is in the HTML
+
+`server.js:62` served `src/chunker.js` to the browser so the admin page's live
+estimate used the server's `CHUNK_SIZE`. The admin page now does
+`import { CHUNK_SIZE, CHUNK_OVERLAP, estimateChunkCount } from '@rag/chunker'`,
+and the rendered page says:
+
+```
+0 characters · ≈ 0 chunks (1000 chars, 150 overlap)
+```
+
+Those two numbers came from the package the server chunks with. One definition,
+no static-file route, no chance of drift. The discipline that made it possible —
+pure, no I/O, no dependencies — is kept anyway, because that is what makes the
+file readable on its own.
+
+`lib/limits.ts` does the same job for `MAX_CONTENT_LENGTH`, which is why it had
+to be split out of the `server-only` `lib/env.ts` back in Phase 5.
+
+### The service-role grep finally means something
+
+Client components did not exist until this phase, so `plan/steps.md` § 2.1's
+check had nothing to catch. Run against the built client bundle now:
+
+| Pattern | Files in `.next/static/` |
+|---|---|
+| `service_role` | 0 |
+| `SUPABASE_SERVICE` | 0 |
+| the live service-role key's first 24 chars | 0 |
+| the live OpenAI key's first 24 chars | 0 |
+| `sk-proj` | 0 |
+| `eyJhbGci` | 0 |
+
+`SUPABASE_SERVICE_ROLE_KEY` appears in exactly one place: a **server** chunk.
+That is the evidence; "I was careful" is not.
+
+### What has not been verified, precisely
+
+Browser tooling was declined this session, so everything below was reasoned
+about and compiled but not clicked:
+
+- text appearing token by token, and the sources panel being on screen *before*
+  the first token (the whole point of D-019);
+- click-to-expand on a source chunk, and on a document row;
+- Retry after a failure;
+- the delete confirmation and the list refreshing after it;
+- the textarea growing with its content, and Enter vs Shift+Enter;
+- the empty-knowledge-base hint, which needs a database with no documents.
+
+**A five-minute check, once there is a working API key:**
+
+```sh
+pnpm --filter web dev      # http://localhost:3000
+```
+
+1. `/admin` lists 8 documents with chunk counts; click a title, chunks appear.
+2. Paste a document with a fact the model cannot know; the estimate updates as
+   you type; add it.
+3. Ask about that fact on `/`. The answer should stream, with the sources panel
+   visible before the text finishes.
+4. Delete the document and ask again — it must say it does not know.
+
+Steps 2–4 are the `mvp.md` definition of done, and they need the key regardless
+of the UI.

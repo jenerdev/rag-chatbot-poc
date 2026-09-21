@@ -9,4 +9,3 @@ dist/
 
 # turborepo local cache
 .turbo/
-next-env.d.ts
