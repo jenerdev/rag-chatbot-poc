@@ -33,6 +33,10 @@
     },
     "scores": {
       "cache": false
+    },
+    "parity": {
+      "dependsOn": ["build"],
+      "cache": false
     }
   }
 }

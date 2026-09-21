@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-21
+> Last updated: 2026-09-22
 
 ---
 
@@ -20,30 +20,35 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0 and 1 done** as of
-  2026-09-21, on branch `feat/nextjs-migration`
-- **Status:** the POC runs unchanged from `apps/legacy-poc/` in a pnpm +
-  Turborepo workspace. ⚠ **The OpenAI API key has expired** — nothing that calls
-  OpenAI can run until it is replaced
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0, 1 and 2 done** as
+  of 2026-09-22, on branch `feat/nextjs-migration`
+- **Status:** the POC runs unchanged from `apps/legacy-poc/`; `@rag/chunker` and
+  `@rag/openai` are ported to TypeScript, with the chunker proven byte-identical
+  (87 comparisons, 0 differences). ⚠ **The OpenAI API key is invalid** —
+  nothing that calls OpenAI can run until it is replaced
 - **Working on right now:** nothing
 
 ---
 
 ## ▶ Next up (do this next)
 
-**1. Replace `OPENAI_API_KEY` in `.env`.** It has expired — OpenAI returns
-*"Your API key has expired. Create a new API key to continue."* Nothing that
-calls OpenAI runs until this is done: not the app, not `pnpm eval`, not
-`pnpm scores`, not the deferred baseline. New key at
+**1. Replace `OPENAI_API_KEY` in `.env`.** OpenAI returned *"Your API key has
+expired"* on 2026-09-21 and *"Your API key has been invalidated."* on
+2026-09-22 — same 401 either way. Nothing that calls OpenAI runs until this is
+done: not the app, not `pnpm eval`, not `pnpm scores`, not the deferred
+baseline, not the `embed() -> 1536` check carried over from Phase 2. New key at
 <https://platform.openai.com/api-keys>; check billing is still live while there
 (`costs.md`).
 
-**2. Migration Phase 2 — `@rag/chunker` and `@rag/openai` in TypeScript**
-(`plan/steps.md` § Phase 2). The chunker goes first because it is pure, and the
-phase's proof is a parity script: old chunker vs new over all nine documents,
-asserting byte-identical output. **That part needs no API key**, so Phase 2 can
-start before the key is replaced — only the `embed(['hello'])` check at the end
-is blocked.
+**2. Migration Phase 3 — `@rag/db`** (`plan/steps.md` § Phase 3): move both
+`.sql` files, generate `database.types.ts`, add the `import 'server-only'` guard
+that makes leaking the service-role key a build error, and hand-type the two RPC
+return rows. **Needs no API key.** It does need the Supabase project ref
+(`jkpdxolpydnenxeljmln`) for type generation.
+
+⚠ **Decide tenancy before Phase 4 writes the queries** — the callout in
+`plan/steps.md` § Phase 3. Adding `tenant_id` costs one migration now; later it
+is a backfill plus a rewrite of every query and both SQL functions.
 
 ⚠ **Before Migration Phase 4, capture the baseline** that Phase 0 deferred — it
 is the only thing the TypeScript port of `rag.js` can be verified against.
@@ -348,11 +353,13 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 
 ## 🚧 Blockers & open questions
 
-**Blocker 1 — the OpenAI API key has expired.** Found 2026-09-21 during the
-Phase 1 end-to-end check: `HTTP 401 — "Your API key has expired. Create a new
-API key to continue."` The key is read and sent correctly; OpenAI is rejecting
-it. Blocks the app, `pnpm eval`, `pnpm scores` and the baseline capture.
-Supabase is unaffected. Replace `OPENAI_API_KEY` in `.env`.
+**Blocker 1 — the OpenAI API key is invalid.** Found 2026-09-21 during the
+Phase 1 end-to-end check (`HTTP 401 — "Your API key has expired. Create a new
+API key to continue."`) and still failing 2026-09-22, now with a different
+upstream sentence: `"Your API key has been invalidated."` The key is read and
+sent correctly; OpenAI is rejecting it. Blocks the app, `pnpm eval`,
+`pnpm scores`, the baseline capture, and the `embed() -> 1536` check carried
+over from Phase 2. Supabase is unaffected. Replace `OPENAI_API_KEY` in `.env`.
 
 **Blocker 2 — the eval/score baseline has not been captured**
 (`plan/steps.md`). Phase 4's definition of done is "`pnpm eval`
@@ -412,6 +419,30 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4 (migration Phase 2)
+- **Did:** Ported `src/chunker.js` and `src/openai.js` to TypeScript as
+  `@rag/chunker` and `@rag/openai`. Built `tools/parity.mjs`, 13 vitest cases,
+  and wired `build` / `typecheck` / `test` / `parity` through turbo.
+- **The number that matters:** parity is **87 comparisons, 0 differences** — 17
+  documents (8 sample docs, the Northwind fixture, 8 synthetic shapes) across 4
+  chunk configurations, plus `estimateChunkCount` and both constants. The
+  synthetic shapes exist because no real document exercises the branches most
+  likely to break: whitespace-only input, a 3,500-char wall with no blank lines,
+  heading-plus-oversized-paragraph, CRLF, multi-byte characters.
+- **One real change, deliberate:** `OpenAIError extends Error` with
+  `readonly status: number`, replacing a property bolted onto a plain Error.
+  Same behaviour; the route layer's whole error map is built on that property.
+- **Still blocked:** `embed(['hello'])` → 1536. The key now reports *"Your API
+  key has been invalidated."* rather than *"expired"* — same 401, different
+  upstream sentence, both recorded. The failure did verify the error contract:
+  `OpenAIError`, `status` the number 401, message formatted as before.
+- **Build lesson worth keeping:** `rootDir`/`outDir` in a shared tsconfig
+  resolve against **that file's** directory, not the package extending it
+  (TS6059). The shared config now holds only path-independent options.
+- **Stopped at:** Phase 2 complete.
+- **Next:** Phase 3 (`@rag/db`) — needs no API key, but does need a tenancy
+  decision before Phase 4 writes the queries.
 
 ### 2026-09-21 — session 3, continued (migration Phase 1)
 - **Did:** Branched `feat/nextjs-migration`. Built the workspace — pnpm 12.5.1

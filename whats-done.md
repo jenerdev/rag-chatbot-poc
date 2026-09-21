@@ -1943,3 +1943,118 @@ stack to describe — each carries a banner saying which parts are now historica
 and which still bind. The two rules called out as binding *harder* during a port
 are the ones a port is most likely to erode: the key never reaches the browser,
 and `pnpm eval` is re-run after any change to `buildPrompt()`.
+
+## Phase 2 — `@rag/chunker` and `@rag/openai` · done
+
+The two leaf modules are TypeScript. The chunker is proven byte-identical to the
+JavaScript it was ported from; the OpenAI client typechecks and its error
+contract is verified against the live API.
+
+### `@rag/chunker` — proven, not reviewed
+
+`tools/parity.mjs` runs the old chunker and the new one over the same inputs and
+compares with `JSON.stringify`:
+
+| | |
+|---|---|
+| Documents | **17** — the 8 `sample-documents/*.md`, the Northwind fixture, and 8 synthetic shapes |
+| Configurations | **4** — defaults (1000/150), 300/50 and 4000/150 (the two Phase 5 measured), and 1000/0 |
+| Also compared | `estimateChunkCount` on every document, plus `CHUNK_SIZE` and `CHUNK_OVERLAP` themselves |
+| Result | **87 comparisons, 0 differences** |
+
+The synthetic shapes exist because no real document in the repo exercises the
+branches most likely to break: empty and whitespace-only input, a 3,500-character
+wall with no blank lines (the D-018 sliding-window fallback), a heading followed
+by an oversized paragraph (the special case that stops `# Refund Policy` being
+emitted as its own 15-character chunk), six 300-character paragraphs (where the
+overlap gets dropped), CRLF line endings, and multi-byte characters.
+
+**Why this was worth building rather than reading the diff.** A chunk boundary
+that moves by one character changes what gets embedded, which changes every
+similarity score downstream. That would surface in Phase 4 as a drifted eval
+number with no obvious cause, days after the change that caused it. The constants
+are compared for the same reason: a chunker that behaves identically but exports
+`CHUNK_SIZE = 900` passes every behavioural test and silently re-chunks the next
+document differently from the 30 chunks already in the database.
+
+Also added: **13 vitest cases** stating what the chunker is *supposed* to do.
+The parity script dies with `apps/legacy-poc` at Phase 7; these outlive it.
+
+### `@rag/chunker` has no dependencies, and now cannot have any
+
+In the POC, "this file has no imports" was a convention held up by a comment and
+by `server.js` serving the file straight to the browser. It is now an empty
+`dependencies` block in a package manifest. The rule became checkable at exactly
+the moment the mechanism enforcing it was removed.
+
+### `@rag/openai` — one real change, and it is the typed error
+
+The JS attached `status` to a plain `Error` after construction. It is now an
+`OpenAIError` class with `readonly status: number`. Behaviour is identical —
+same message text, same property — but the error map in the web app
+(`401 and 429 pass through, >= 500 becomes 502`) is built entirely on that
+property, and leaving it untyped would leave the one part of the contract that
+matters unchecked.
+
+Everything else is the same code: raw `fetch`, no SDK (D-002), the sort by
+`index` rather than trusting response order, the SSE buffering across network
+chunk boundaries, and the `sawDone` guard that refuses to present a truncated
+stream as a complete answer.
+
+Response bodies are cast at the boundary (`as EmbeddingsResponse`) rather than
+validated. That is honest about what is happening — a cast is a claim about
+someone else's JSON, and pretending otherwise would need a schema validator this
+package has no business depending on.
+
+### The 1536 check is still blocked, but the failure verified something
+
+`embed(['hello'])` against the live API:
+
+```
+threw       : OpenAIError
+instanceof OpenAIError: true
+status      : 401 (typeof number)
+message     : OpenAI rejected the API key — check OPENAI_API_KEY in .env
+              (HTTP 401): Your API key has been invalidated.
+```
+
+Note the upstream sentence **changed** — 2026-09-21 it read *"Your API key has
+expired. Create a new API key to continue."*, today *"Your API key has been
+invalidated."* Same 401; OpenAI's own wording differs. Recording both, because
+the next person to read this will otherwise wonder which one they should expect.
+
+The success path — an embedding of length 1536 — remains unverified and is
+carried forward. What the failure *did* prove is the contract the entire route
+layer depends on: the thrown value is an `OpenAIError`, `status` is the number
+`401` rather than a string, and the message is formatted exactly as the JS
+version formatted it.
+
+### One build-system fix worth remembering
+
+`rootDir` and `outDir` in `@rag/tsconfig/node-library.json` resolved relative to
+**that file's** directory, not the package extending it:
+
+```
+error TS6059: File '.../packages/chunker/src/index.ts' is not under
+rootDir '.../packages/tsconfig/src'
+```
+
+Relative paths in an extended tsconfig always resolve against the config that
+declares them. So the shared config now holds only path-independent options, and
+each package declares its own `outDir`/`rootDir`. Same rule applies to `include`.
+
+Two smaller ones: pnpm 12 refuses to run a dependency's install scripts until
+explicitly allowed, so `esbuild` (vitest's compiler) is approved in
+`pnpm-workspace.yaml` with a note on why. And on Windows, `import()` of an
+absolute path reads `C:` as a URL scheme — the parity script uses
+`pathToFileURL`.
+
+### Verification summary
+
+| Command | Result |
+|---|---|
+| `pnpm build` | 2 packages, clean |
+| `pnpm typecheck` | 2 packages, clean |
+| `pnpm test` | 13 passed |
+| `pnpm --filter @rag/chunker parity` | 87 comparisons, 0 differences |
+| `embed(['hello'])` → 1536 | **blocked** — invalid API key |

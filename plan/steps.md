@@ -285,7 +285,7 @@ the record" is not suspended because the stack changed.
 |---|---|---|---|
 | **0** ✅ | Baseline measurement, corpus rescued | S | `plan/baseline/` holds real eval + score output — **partly done 2026-09-21, see below** |
 | **1** ✅ | Workspace skeleton, POC moved intact | S | The old app still serves; eval still passes — **done 2026-09-21, see below** |
-| **2** | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one |
+| **2** ✅ | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one — **done 2026-09-22: 87 comparisons, 0 differences** |
 | **3** | `@rag/db` | S | Generated types compile; the `server-only` guard is proven |
 | **4** | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline |
 | **5** | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape |
@@ -369,6 +369,18 @@ you answer "why is this line here" in six months.
 ---
 
 ### Phase 2 — `@rag/chunker` and `@rag/openai`
+
+> **Done 2026-09-22.** Parity: **87 comparisons, 0 differences** — 17 documents
+> (the 8 sample docs, the Northwind fixture, 8 synthetic shapes) across 4
+> chunk-size configurations, plus `estimateChunkCount` and both exported
+> constants. 13 vitest cases pass; `pnpm build` and `pnpm typecheck` are clean.
+>
+> **The `embed(['hello']) === 1536` check is still blocked** — the API key now
+> returns *"Your API key has been invalidated."* (it said *"expired"* on
+> 2026-09-21; same 401, different upstream sentence). What that failure did
+> verify is the error contract the whole route layer is built on: the thrown
+> value is an `OpenAIError` with `status: 401` as a **number**, and its message
+> is formatted identically to the JS original.
 
 **Goal:** the two leaf modules in TypeScript, with the chunker verified
 character-for-character against the original.

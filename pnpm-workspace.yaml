@@ -1,3 +1,12 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# pnpm 12 refuses to run a dependency's install scripts until you say so, which
+# is the right default: a postinstall script runs arbitrary code on your machine
+# at install time. esbuild is the one package here that genuinely needs its own —
+# it unpacks the platform-native binary that vitest compiles TypeScript with, and
+# without it `pnpm test` cannot start. It is a build-time devDependency; nothing
+# it does reaches the running app.
+allowBuilds:
+  esbuild: true
