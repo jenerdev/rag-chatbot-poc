@@ -9,3 +9,4 @@ dist/
 
 # turborepo local cache
 .turbo/
+*.tsbuildinfo
