@@ -736,6 +736,50 @@ and § 9 (the real message always reaches the client).
 
 ---
 
+## D-024 · Greetings answered in code, not from a document · **Added 2026-09-22**
+
+**Decision:** a pure matcher in `packages/rag/src/greeting.ts` recognises a
+message that is *entirely* a greeting and returns a canned reply, before any
+rewrite, embedding or search happens. Everything else goes down the normal
+pipeline untouched.
+
+**Why not a greetings document**, which is the obvious fix and the one that gets
+suggested first: it works, and it taxes every other question. That document
+competes for the `MATCH_COUNT` slots on every single search, so a chunk of
+small talk occupying one of five slots is a chunk of the real answer that did
+not reach the prompt. Retrieval is also the wrong instrument — a greeting has no
+facts to look up, so the search returns whatever happens to be nearest in a
+corpus with nothing to say about it, which is the exact case `MIN_SIMILARITY`
+exists to reject (D-008).
+
+**Why before retrieval rather than after zero matches:** there is nothing to
+retrieve. Doing it first makes a greeting free — no embedding call, no chat
+call, no database round trip beyond the conversation row — and instant.
+
+**The failure mode that shaped the design.** Two things can go wrong, and they
+are not equally bad:
+
+| | |
+|---|---|
+| A greeting is missed | The user gets the refusal. Mildly rude. |
+| **A question is taken for a greeting** | The user asked something real and got a canned hello, with no sources and nothing to explain why. |
+
+So the match is anchored at both ends, rejects anything containing `?`, and
+rejects anything longer than 24 characters after normalisation. *"hi, what is
+the Wi-Fi password?"* is a question that opens politely, and it is answered as
+one — verified live, with its three sources intact.
+
+**Verified:** 40 unit cases on the matcher, most of them things it must NOT
+claim, plus a live six-case check: greetings greeted, real questions answered,
+absent and off-topic facts still refused. 6/6.
+
+**Reverse if:** you want the model to handle small talk conversationally rather
+than with one fixed line. That means removing the short circuit for these
+messages and paying a chat call for every "hi" — and re-running `pnpm eval`,
+because it would mean editing the grounding prompt.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

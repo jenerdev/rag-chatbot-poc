@@ -2665,3 +2665,64 @@ The last row is the one to remember. It is also cheap to fix whenever it
 matters: load `fixtures/northwind.json` as the only corpus and run `pnpm eval`.
 That will not be a before/after any more, but it will answer whether the battery
 passes today, which is the question that actually governs future prompt edits.
+
+---
+
+# Post-migration
+
+## Greeting handling (D-024) · done
+
+"hi" used to return *"I don't know based on the documents I have."* It now gets
+a greeting, and nothing else changed.
+
+### Where it went, and where it deliberately did not
+
+**Not in the knowledge base.** That is the obvious fix — paste a greetings
+document — and it quietly taxes every other question. That document would
+compete for the `MATCH_COUNT` slots on every search, so a chunk of small talk
+filling one of five slots is a chunk of the real answer that never reached the
+prompt. Retrieval is the wrong instrument anyway: a greeting has no facts to
+look up, so the search returns whatever is merely nearest in a corpus with
+nothing to say about it — the exact case `MIN_SIMILARITY` exists to reject.
+
+`packages/rag/src/greeting.ts` is pure: no I/O, no model call, no imports. Same
+discipline as the chunker, for the same reason — it can be read and tested on
+its own. It runs **before** the rewrite, the embedding and the search, so a
+greeting costs nothing but the conversation row and returns instantly.
+
+### The failure mode that shaped it
+
+Two things can go wrong here and they are not equally bad:
+
+| | |
+|---|---|
+| A greeting is missed | The user gets the refusal. Mildly rude. |
+| **A question is taken for a greeting** | The user asked something real and got a canned hello, with no sources and nothing explaining why |
+
+Almost all the design guards against the second. The pattern is anchored at both
+ends, anything containing `?` is rejected before normalisation strips the
+punctuation that reveals it, and anything longer than 24 normalised characters
+is rejected as a second line of defence. Most of the 40 unit cases are things it
+must **not** claim.
+
+### Verified
+
+| | |
+|---|---|
+| Unit | **40 cases**, the majority of them negative: `high chair availability`, `hello kitty themed party`, `hi i need the wifi password` |
+| Live | **6/6** — greetings greeted, real questions answered, absent and off-topic facts still refused |
+
+The live case that mattered: **`hi, what is the Wi-Fi password?`** is answered
+with its three sources intact, not swallowed by the matcher. A greeting that
+opens a real question is still a real question.
+
+Both refusal cases still refuse, which is the thing worth checking whenever the
+answer path changes — `buildPrompt()` was not touched, so `CLAUDE.md` rule 1 did
+not strictly apply, but the refusal is the behaviour most easily broken by
+accident and it costs three API calls to confirm.
+
+### What it does not do
+
+Only English, and only greetings. `thanks` and `bye` hit the same wall and are
+not handled; adding them is a line in the same file. Greetings in another
+language are one line too — the regex is the whole surface.

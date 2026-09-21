@@ -3,9 +3,25 @@
 import { chat, chatStream, embed } from '@rag/openai';
 import { supabase } from '@rag/db';
 import { MAX_HISTORY, NO_ANSWER } from './constants.js';
+import { greetingReply } from './greeting.js';
 import { buildPrompt } from './prompt.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import type { Answer, HistoryMessage, RetrievedChunk, Source, StreamMeta } from './types.js';
+
+/**
+ * Find or create the conversation row.
+ *
+ * Created lazily on the first message of a session. Extracted from
+ * prepareAnswer() because the greeting path needs an id too — it still saves
+ * the turn, so the transcript has no gap in it, but it never retrieves.
+ */
+async function ensureConversation(conversationId: string | null): Promise<string> {
+  if (conversationId) return conversationId;
+
+  const { data, error } = await supabase.from('conversations').insert({}).select('id').single();
+  if (error) throw new Error(`Could not start a conversation: ${error.message}`);
+  return data.id;
+}
 
 interface Prepared {
   id: string;
@@ -33,16 +49,7 @@ async function prepareAnswer({
   message: string;
 }): Promise<Prepared> {
   // 1. Conversation row. Created lazily on the first message of a session.
-  let id = conversationId;
-  if (!id) {
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert({})
-      .select('id')
-      .single();
-    if (error) throw new Error(`Could not start a conversation: ${error.message}`);
-    id = data.id;
-  }
+  const id = await ensureConversation(conversationId);
 
   // 2. Recent history: newest-first from the database, then reversed, because
   //    "the last 6" needs a descending query but the model needs chronological
@@ -122,6 +129,16 @@ export async function answerQuestion({
   conversationId: string | null;
   message: string;
 }): Promise<Answer> {
+  // Small talk, answered before anything is retrieved or embedded. A greeting
+  // has nothing to look up, so running it through the pipeline can only end in
+  // the refusal — see greeting.ts for why this is not a document.
+  const greeting = greetingReply(message);
+  if (greeting !== null) {
+    const id = await ensureConversation(conversationId);
+    await saveMessages(id, message, greeting);
+    return { conversationId: id, reply: greeting, sources: [], searchQuery: message };
+  }
+
   const { id, history, searchQuery, matches, sources } = await prepareAnswer({
     conversationId,
     message,
@@ -167,6 +184,18 @@ export async function answerQuestionStream({
   onMeta: (meta: StreamMeta) => void;
   onDelta: (text: string) => void;
 }): Promise<string> {
+  // Same short circuit as the non-streaming path. `meta` still fires, with no
+  // sources, so the client's state machine needs no special case: a greeting
+  // arrives down exactly the same channel as an answer.
+  const greeting = greetingReply(message);
+  if (greeting !== null) {
+    const id = await ensureConversation(conversationId);
+    onMeta({ conversationId: id, searchQuery: message, sources: [] });
+    onDelta(greeting);
+    await saveMessages(id, message, greeting);
+    return greeting;
+  }
+
   const { id, history, searchQuery, matches, sources } = await prepareAnswer({
     conversationId,
     message,

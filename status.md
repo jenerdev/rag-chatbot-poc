@@ -431,6 +431,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
 
+### 2026-09-22 — session 4, continued (greeting handling, D-024)
+- **Did:** `hi` returned the refusal; it now returns a greeting.
+  `packages/rag/src/greeting.ts` — pure, no I/O — runs before the rewrite,
+  embedding and search, so a greeting costs nothing and returns instantly.
+- **Where it deliberately did NOT go:** the knowledge base. A greetings
+  document would compete for the MATCH_COUNT slots on every search, so small
+  talk in one of five slots is a chunk of the real answer that never reaches
+  the prompt.
+- **Designed around the worse failure:** a question mistaken for a greeting
+  gets a canned hello with no sources and no explanation. The pattern is
+  anchored at both ends, rejects anything with a question mark, and rejects
+  anything over 24 normalised characters.
+- **Verified:** 40 unit cases (most of them negative) and a live 6/6 check.
+  The one that mattered: `hi, what is the Wi-Fi password?` still answers with
+  three sources. Both refusal cases still refuse.
+- **Next:** nothing required.
+
 ### 2026-09-22 — session 4, continued (Phase 6 signed off)
 - **Did:** Ran `pnpm dev` and checked both screens by hand. All four steps of
   the `mvp.md` definition of done pass on the new stack — the document list and
