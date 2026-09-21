@@ -288,7 +288,7 @@ the record" is not suspended because the stack changed.
 | **2** ✅ | `@rag/chunker`, `@rag/openai` in TS | M | New chunker produces byte-identical chunks to the old one — **done 2026-09-22: 87 comparisons, 0 differences** |
 | **3** ✅ | `@rag/db` | S | Generated types compile; the `server-only` guard is proven — **done 2026-09-22, 10/10 checks** |
 | **4** ⚠ | `@rag/pipeline` | L | `pnpm eval` matches the Phase 0 baseline — **code done 2026-09-22; the eval comparison is still blocked** |
-| **5** | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape |
+| **5** ✅ | API routes in `apps/web` | M | Every curl in `README.md` returns the same shape — **done 2026-09-22: 24 comparisons, 0 differences, diffed live against the running POC** |
 | **6** | Both screens in React | L | The `mvp.md` success criterion passes in the browser |
 | **7** | Cutover: delete the POC, amend the docs | M | No `legacy-poc/`; no secret in the client bundle; docs no longer contradict the code |
 | **8** | Deploy | M | Streaming works on the deployed URL, not just locally |
@@ -547,6 +547,22 @@ do not adjust the threshold to compensate.
 ---
 
 ### Phase 5 — API routes
+
+> **Done 2026-09-22.** All six endpoints as Route Handlers. Verified by running
+> the Express POC on :3099 and Next on :3000 **at the same time** and diffing
+> every response: **24 comparisons, 0 differences**, including the exact error
+> strings, content negotiation, and the SSE failure-as-data path.
+>
+> Two things the invalid API key made testable rather than blocked: an upstream
+> 401 reaching the client as a 401 with the real message, and a mid-stream
+> failure arriving as an `error` event inside a 200.
+>
+> **One regression found and fixed during the phase**: the env check started as
+> a module-scope throw, which meant the handler never existed, so `withRoute`
+> never ran and the client got Next's generic 500 HTML. See `whats-done.md`.
+>
+> The comparison lives on as `pnpm --filter web parity`, and it works only
+> while `apps/legacy-poc` still exists — so it is a Phase 7 casualty by design.
 
 **Goal:** the six endpoints as Route Handlers, with the error map still in one
 place.

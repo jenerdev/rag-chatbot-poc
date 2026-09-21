@@ -20,14 +20,14 @@
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
 - **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 done, Phase 4
-  code complete but NOT closed**, as of 2026-09-22, on branch
+  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–3 and 5 done,
+  Phase 4 code complete but NOT closed**, as of 2026-09-22, on branch
   `feat/nextjs-migration`
-- **Status:** the whole pipeline is ported — `@rag/chunker` (87/0 byte-identical),
-  `@rag/openai`, `@rag/db` (10/10), `@rag/pipeline` (22/0 on everything
-  reachable without an API key). **Tenancy decided: single tenant.**
-  ⚠ **The OpenAI API key is invalid**, so the four functions that call OpenAI
-  are unverified and `pnpm eval` cannot run
+- **Status:** the pipeline and the API are ported — `@rag/chunker` (87/0
+  byte-identical), `@rag/openai`, `@rag/db` (10/10), `@rag/pipeline` (22/0),
+  and the six routes in `apps/web` (24/0, diffed live against the running POC).
+  **Tenancy decided: single tenant.** ⚠ **The OpenAI API key is invalid**, so
+  nothing that produces a real *answer* is verified and `pnpm eval` cannot run
 - **Working on right now:** nothing
 
 ---
@@ -49,9 +49,10 @@ Once the key works: capture the Phase 0 baseline, then confirm `pnpm eval` gives
 the same six verdicts and `pnpm scores` the same numbers to three decimals.
 Commands in [`plan/baseline/db-state.md`](./plan/baseline/db-state.md).
 
-**3. Then Phase 5 — API routes in `apps/web`** (`plan/steps.md` § Phase 5). The
-six endpoints as Route Handlers, the SSE one being the hard part, with the error
-map in a single `withRoute()` wrapper.
+**3. Then Phase 6 — the two screens** (`plan/steps.md` § Phase 6). `screens.md`
+S-1 and S-2 in React, every state included. The SSE reader at
+`public/app.js:239` moves almost verbatim into a hook — including the comment
+explaining why `EventSource` cannot be used (it cannot POST).
 
 ℹ `pnpm eval` and `pnpm scores` now carry `--conditions=react-server`, because
 the pipeline imports `@rag/db`, which is `server-only`. Without the flag they
@@ -424,6 +425,33 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   get a real answer and be scored a failure.
 - **Stopped at:** Phase 0 complete except the measurement.
 - **Next:** migration Phase 1 — the workspace skeleton.
+
+### 2026-09-22 — session 4, continued (migration Phase 5)
+- **Did:** The six endpoints as Route Handlers in `apps/web`, with `withRoute()`
+  holding the error map, zod at the boundary, and the chat route doing both
+  deliveries from one handler.
+- **Verified properly:** ran the Express POC on **:3099** and Next on **:3000**
+  at the same time and diffed every response — **24 comparisons, 0
+  differences**, bodies as well as status codes, because the screens render the
+  `error` string verbatim.
+- **The dead key was useful here.** It is the cheapest way to exercise the two
+  hardest paths: an upstream 401 reaching the client *as* a 401 with OpenAI's
+  own sentence, and a failure after the headers have gone out arriving as an
+  `error` event inside a 200. Both servers behaved identically.
+- **Regression I introduced and fixed:** the env check began as a module-scope
+  throw. A module that throws while loading never finishes loading, so the
+  handler never exists, so `withRoute` never runs — the client got Next's
+  generic 500 HTML and the real message went only to the log, which is exactly
+  what `architecture.md` § 9 forbids. Now logged at import *and* thrown per
+  request via `assertEnv()`.
+- **Also:** `lib/limits.ts` split from `lib/env.ts`, because the admin page
+  needs `MAX_CONTENT_LENGTH` in the browser and `env.ts` is `server-only`. That
+  removes the POC's `// must match server.js` duplication.
+- **Housekeeping:** killed an orphaned Express server still holding port 3000
+  from the Phase 1 check — `TaskStop` had killed the pnpm wrapper, not the node
+  child. The note about this in "Next up" is there for a reason.
+- **Stopped at:** Phase 5 complete.
+- **Next:** Phase 6, the two screens.
 
 ### 2026-09-22 — session 4, continued (migration Phase 4)
 - **Did:** Ported all 645 lines of `rag.js` into `@rag/pipeline`, split five

@@ -2301,3 +2301,111 @@ has partial   : false
 
 Small, but it is the kind of thing that makes "identical behaviour" either true
 or nearly true, and nearly true is what this whole phase is trying to avoid.
+
+## Phase 5 — API routes · done
+
+The six endpoints are Next.js Route Handlers, and the proof is not a reading of
+the diff: the Express POC ran on **:3099** and the Next app on **:3000** at the
+same time, and every response was compared.
+
+### 24 comparisons, 0 differences
+
+`pnpm --filter web parity` hits both servers with identical requests:
+
+| Group | Cases |
+|---|---|
+| Reads | `GET /api/documents`, `GET /api/documents/34/chunks` — full body equality, not shape |
+| Document validation | missing body, missing title, blank title, missing content, blank content, over-length content, non-string title |
+| Id handling | `abc`, `0`, `-5`, a valid-but-absent id, on both DELETE and chunks |
+| Chat validation | missing message, blank message, over-length message, non-string conversationId |
+| The error map | a valid question → upstream 401 reaching the client as a 401 |
+| Content negotiation | `Accept: */*` and `application/json` both get JSON |
+| Streaming | `Accept: text/event-stream` → 200, `X-Accel-Buffering: no`, failure as an `error` event |
+
+Body equality matters as much as status equality, because the screens render
+the `error` string verbatim. `"Document is 100001 characters; the limit is
+100000"` still tells a user exactly how much to cut.
+
+### The dead API key turned out to be a test fixture
+
+Two of the hardest parts of this phase are normally awkward to test, and an
+invalid key exercises both for free:
+
+- **An upstream 401 must reach the client as a 401**, not as a 500, carrying
+  OpenAI's own sentence. That is the error map working end to end.
+- **A failure after the headers have gone out cannot use a status code.** The
+  SSE response is already a 200, so the failure has to travel down the stream
+  as data. Both servers produced exactly that:
+
+```
+legacy   200 text/event-stream  events=[error]
+next     200 text/event-stream  events=[error]
+   OpenAI rejected the API key — check OPENAI_API_KEY in .env (HTTP 401): ...
+```
+
+Identical wording, identical delivery. A client that ignores `error` events
+would show a half-answer as a whole one — which is why the client must treat
+one as seriously as a bad status.
+
+### The regression I introduced, and how it surfaced
+
+The env check started as a throw at module scope, mirroring the POC's
+`process.exit(1)` as closely as Next allows. Testing it with an empty
+`OPENAI_API_KEY` showed the problem:
+
+```
+HTTP 500
+<!DOCTYPE html>…<h1>500</h1><h2>Internal Server Error.</h2>…
+```
+
+**A module that throws while loading never finishes loading**, so the handler
+it exports never exists, so `withRoute` never runs. The real message reached
+the server log and nothing else — precisely the generic "something went wrong"
+that `architecture.md` § 9 forbids.
+
+Fixed by splitting the two jobs the POC's single check was doing: the missing
+variables are logged **at import** (one line, immediately, as § 8 wants) and
+`assertEnv()` throws **per request** inside `withRoute`, so the message reaches
+the client (as § 9 wants). Now:
+
+```
+HTTP 500
+{"error":"Missing required environment variable(s): OPENAI_API_KEY. Copy .env.example to .env and fill it in."}
+```
+
+Worth recording because it is a failure mode the POC could not have: Express
+had one boot moment, and Next has none.
+
+### Decisions this phase forced
+
+**`withRoute` must wrap every handler, by hand.** Express called its error
+middleware for anything that threw; Route Handlers have no equivalent. One
+unwrapped handler and that route answers with Next's generic 500 instead of the
+real reason. There is no way to enforce this in the type system — it is a
+review item, and it is in `apps/web/README.md`.
+
+**`lib/limits.ts` is separate from `lib/env.ts`.** The admin page renders a live
+character count against `MAX_CONTENT_LENGTH`, so a Client Component has to
+import it — and importing anything from a `server-only` module fails the build,
+correctly. This is the line the monorepo makes explicit: values the browser may
+know, apart from values it may not. It also removes the POC's
+`// must match server.js` duplication, the second of the two warts this
+migration deletes.
+
+**zod at the boundary (D-022).** The hand-written `typeof` ladder was right for
+a three-dependency learning build. With two clients, a streaming route and types
+to keep honest, a schema that produces the parsed *type* as well as the check is
+worth one dependency. The error strings are copied character for character,
+because they are part of the contract.
+
+**The root `.env` is loaded by `next.config.mjs`.** Next reads `.env` from the
+Next project root, which is `apps/web`; the secrets live at the repo root where
+the POC, the eval tools and the db verification all read them. Copying them
+would mean two files holding the same key, free to drift, and two places to
+revoke when one leaks.
+
+### Still unverified
+
+Everything that needs a working key: a real ingest, a real grounded answer, a
+real stream of deltas. The routes are proven to carry a failure correctly; they
+are not yet proven to carry an answer.
