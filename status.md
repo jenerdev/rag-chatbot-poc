@@ -31,7 +31,7 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) was captured 2026-09-23 but is not yet committed; Phase 1
+  eval baseline) is done and committed (`78d243f`); Phase 1
   (schema) is next
 
 ---
@@ -49,10 +49,10 @@ planned:** multi-tenancy, in [`plan.md`](./plan.md) (8 phases, written
 2026-09-22).
 
 ~~**1. Tenancy Phase 0 — capture the eval baseline.**~~ **Done 2026-09-23**
-(uncommitted). Northwind only (document 37, chunks 137–140); eval **5/6**, the
+(commit `78d243f`). Northwind only (document 37, chunks 137–140); eval **5/6**, the
 D-017 `antecedent` failure; pgvector **0.8.2**. Files are in `plan/baseline/`:
 `eval-pre-tenancy.txt`, `scores-pre-tenancy.txt`, `match-ids-pre-tenancy.md`.
-Commit them to close the phase.
+Phase 0 is closed.
 
 **2. Tenancy Phases 1–8** (`plan.md`). Phases 0–2 touch no application code.
 The one thing to internalise before starting is `plan.md` § 0 Rule 2:
@@ -429,7 +429,7 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   pgvector 0.8.2.
 - **Deviation:** `plan.md` asks for five chunk ids per question, but the corpus
   has four chunks, so four were recorded.
-- **Next:** commit `plan/baseline/*-pre-tenancy.*`, then Phase 1 (schema).
+- **Next:** Phase 1 (schema). Baseline committed as `78d243f`.
 
 ### 2026-09-22 — session 5 (tenancy planning)
 - **Did:** Wrote [`plan.md`](./plan.md) — multi-tenancy, 8 phases, each with an
