@@ -17,16 +17,26 @@
 // So: a pure function, no I/O, no model call. Same discipline as the chunker,
 // for the same reason — it can be read and tested on its own.
 
+import type { TenantContext } from './types.js';
+
 /**
  * What the bot says back.
  *
  * Deliberately says what it is FOR. A bare "Hello!" is friendly and useless;
  * the greeting is the one moment a first-time user is definitely reading, and
  * the useful thing to tell them is what kind of question this thing can answer.
+ *
+ * Per tenant (plan.md Phase 4): it names the assistant and the business, so a
+ * visitor to one tenant's page never sees another tenant's name. Still a pure
+ * function of its arguments, with no I/O.
  */
-export const GREETING_REPLY =
-  'Hello! Ask me anything about the documents in the knowledge base, and I will ' +
-  'answer from them and show you the exact passages I used.';
+export function greetingText(tenant: Pick<TenantContext, 'assistantName' | 'businessName'>): string {
+  return (
+    `Hello! I'm ${tenant.assistantName}, the assistant for ${tenant.businessName}. ` +
+    `Ask me anything about ${tenant.businessName}'s documents, and I will answer ` +
+    'from them and show you the exact passages I used.'
+  );
+}
 
 /**
  * Greetings recognised as a WHOLE message.
@@ -53,7 +63,10 @@ const MAX_GREETING_LENGTH = 24;
  * Null means "carry on with retrieval" — the caller decides what to do, and the
  * normal pipeline is unchanged for every message this does not claim.
  */
-export function greetingReply(message: string): string | null {
+export function greetingReply(
+  message: string,
+  tenant: Pick<TenantContext, 'assistantName' | 'businessName'>,
+): string | null {
   // A question mark means the user wants something, however they opened. This
   // catches the whole "hi, can you tell me X?" family before normalising
   // strips the punctuation that reveals it.
@@ -71,5 +84,5 @@ export function greetingReply(message: string): string | null {
   // long message that happens to begin with a greeting word.
   if (normalized.length > MAX_GREETING_LENGTH) return null;
 
-  return GREETING.test(normalized) ? GREETING_REPLY : null;
+  return GREETING.test(normalized) ? greetingText(tenant) : null;
 }

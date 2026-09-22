@@ -2,7 +2,7 @@
 
 import type { ChatMessage } from '@rag/openai';
 import { NO_ANSWER } from './constants.js';
-import type { HistoryMessage } from './types.js';
+import type { HistoryMessage, TenantContext } from './types.js';
 
 /**
  * Assemble the messages array sent to the chat model.
@@ -16,8 +16,16 @@ import type { HistoryMessage } from './types.js';
  * Phase 5.5 measured that this wording, not the similarity threshold, is what
  * prevents invention — and a change that makes the bot more helpful can quietly
  * make it answer from training data instead.
+ *
+ * TENANCY (D-029): the persona is ONE line ABOVE the grounding block, and the
+ * grounding block below it is byte-identical to D-017's measured wording. A
+ * persona is an invitation to be helpful, and helpfulness is how refusals erode
+ * (plan.md § 2.6). So it names who is speaking and nothing else. It says
+ * nothing about tone, eagerness or expertise. Phase 4 measured it against the
+ * six Northwind verdicts before it was kept.
  */
 export function buildPrompt(
+  tenant: Pick<TenantContext, 'assistantName' | 'businessName'>,
   chunks: { content: string }[],
   history: HistoryMessage[],
   question: string,
@@ -46,6 +54,10 @@ export function buildPrompt(
       // missing rather than invent it). D-017.
       role: 'system',
       content: [
+        // The persona. Everything after the blank line is the D-017 block,
+        // unchanged. If a future edit makes this line longer, re-run the eval.
+        `You are ${tenant.assistantName}, the assistant for ${tenant.businessName}.`,
+        '',
         'You answer questions using ONLY the context below.',
         '',
         'You may connect facts that the context states. If the context says a',

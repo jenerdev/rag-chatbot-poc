@@ -166,7 +166,7 @@ export async function answerQuestion({
   // Small talk, answered before anything is retrieved or embedded. A greeting
   // has nothing to look up, so running it through the pipeline can only end in
   // the refusal — see greeting.ts for why this is not a document.
-  const greeting = greetingReply(message);
+  const greeting = greetingReply(message, tenant);
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     await saveMessages(tenant, id, message, greeting);
@@ -186,7 +186,7 @@ export async function answerQuestion({
     return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery };
   }
 
-  const reply = await chat(buildPrompt(matches, history, message));
+  const reply = await chat(buildPrompt(tenant, matches, history, message));
   await saveMessages(tenant, id, message, reply);
 
   // searchQuery is returned so the UI can show what was actually searched for
@@ -224,7 +224,7 @@ export async function answerQuestionStream({
   // Same short circuit as the non-streaming path. `meta` still fires, with no
   // sources, so the client's state machine needs no special case: a greeting
   // arrives down exactly the same channel as an answer.
-  const greeting = greetingReply(message);
+  const greeting = greetingReply(message, tenant);
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     onMeta({ conversationId: id, searchQuery: message, sources: [] });
@@ -250,7 +250,7 @@ export async function answerQuestionStream({
   }
 
   try {
-    const reply = await chatStream(buildPrompt(matches, history, message), onDelta);
+    const reply = await chatStream(buildPrompt(tenant, matches, history, message), onDelta);
     await saveMessages(tenant, id, message, reply);
     return reply;
   } catch (error) {

@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phases 1–3 are done (schema, index measurement, pipeline threaded; the D-031
-  database bridge is removed). Phase 4 (persona) is next
+  eval baseline) Phases 1–4 are done (schema, index, pipeline, persona; the eval is 9/10 with
+  the six original verdicts unchanged). Phase 5 (routes) is next
 
 ---
 
@@ -87,8 +87,21 @@ Phase 0. **D-031's database bridge is removed:** the old functions give
 northwind by `bridgeTenant()` until Phase 5. Also fixed: `listDocuments()` had
 been failing since Phase 1 ("more than one relationship was found").
 
-**5. Tenancy Phase 4 — persona, then measure** (`plan.md` § Phase 4), then
-Phases 5–8. Phase 5 must delete `bridgeTenant()` and the old routes.
+~~**5. Tenancy Phase 4 — persona, then measure.**~~ **Done 2026-09-23.** A
+persona line was added above the unchanged D-017 block; the optional sentence
+was not needed. `greetingReply(message, tenant)` names the tenant. The battery
+now has 10 cases and scores **9/10, twice**. The six original verdicts are
+identical to Phase 0, and leak-1, leak-2 (with a villa control), leak-3 and
+persona all pass. Villa's assistant was renamed from "Amihan" to **"Lia"**,
+because "Amihan" is also in the business name, which made the persona check
+meaningless. Output: `plan/baseline/eval-post-persona.txt`. Details:
+`notes.md` § "Tenancy Phase 4".
+
+**6. Tenancy Phase 5 — routes under `/api/t/<slug>/`.** Delete `bridgeTenant()`
+and the old routes (`/api/chat` becomes a 404). Update the README's curl
+examples. Then Phases 6–8. ⚠ CLAUDE.md rule 1 ("northwind and nothing else")
+is now wrong: the battery needs BOTH tenants. That gets amended in Phase 8, as
+planned.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -96,7 +109,7 @@ Phases 5–8. Phase 5 must delete `bridgeTenant()` and the old routes.
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**6. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**7. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -451,6 +464,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 4)
+- **Did:** `buildPrompt(tenant, …)` gets one persona line, and the grounding
+  block is untouched. `greetingReply(message, tenant)` and
+  `greetingText(tenant)` replace `GREETING_REPLY`. The battery gained a tenant
+  per case plus leak-1, leak-2 (with a villa control), leak-3 and persona.
+  Greeting tests: 41 (was 40). Renamed villa's assistant to "Lia".
+- **Observed:** 9/10 twice. The six original verdicts are identical to Phase 0,
+  with antecedent still giving the auditor 1:1 answer. leak-2: northwind
+  `keyword:0`, villa `keyword:1`. leak-3: `null` against the owner's 2
+  messages.
+- **Decided:** the optional persona sentence was left out, because the
+  verdicts were identical without it.
+- **Next:** Phase 5, the routes.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 3)
 - **Did:** Added `TenantContext` and `loadTenant()` (which selects four explicit

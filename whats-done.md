@@ -3019,3 +3019,46 @@ forgotten one a compile error or a database error, not a silent read.
 - **`parity.mjs` could not be re-run**, because the legacy POC it compared
   against is deleted. That was replaced by measurements that can still be
   taken, and recorded as a deviation rather than claimed.
+
+---
+
+## Tenancy Phase 4 — persona, then measure · done 2026-09-23
+
+**What was done:** `buildPrompt()` takes the tenant and opens with *"You are
+{assistantName}, the assistant for {businessName}."* Everything below that line
+is D-017's block, byte for byte. The greeting names the tenant's assistant and
+business, and it is still pure and still says what the bot is for. The eval
+battery now names a tenant for every case and has four new cases, all of which
+need both tenants loaded.
+
+**Why it mattered:** a persona is an invitation to be helpful, and being
+helpful is how refusals erode (§ 2.6, R-12). Phase 0's baseline existed so this
+could be measured rather than assumed.
+
+**What each observed value proves:**
+- **Six verdicts identical to Phase 0, on two runs.** The persona line cost no
+  refusal and fixed no failure. `antecedent` still gives the auditor 1:1 ratio:
+  the same model limit, and the same wrong words.
+- **leak-1 refused.** The fact exists in this database (villa's parking), and
+  northwind cannot reach it. `absent-2` has been promoted from "absent" to
+  "isolated".
+- **leak-2: northwind `keyword:0`, villa `keyword:1`.** The exact-token path,
+  `match_chunks_fts`, is filtered too, and the control proves the token is
+  findable, so the refusal means something.
+- **leak-3: 2 messages for the owner, `null` for northwind.** § 2.2's
+  transcript read is closed, and asserted in the same battery as the prompt
+  cases.
+- **persona: "Hello! I'm Lia, the assistant for Villa Amihan Private
+  Resort…"**, with no Nora or Northwind. Each tenant has its own identity.
+
+**Traps avoided:**
+- **A persona check that could not fail.** Villa's assistant was first named
+  "Amihan", which is also part of "Villa Amihan Private Resort". So "the reply
+  mentions Amihan" was true however the greeting was written. The assistant was
+  renamed to "Lia", and the check asserts the assistant name AND the business
+  name, and neither of the other tenant's.
+- **A leak case that could not fail.** Without leak-2's villa control, a
+  northwind refusal would be consistent with an identifier nobody can find.
+- **Adding the optional "answer only from context" sentence by default.** It
+  was measured as unnecessary, so it stays out. Every extra line in that prompt
+  is something the next edit has to re-measure.

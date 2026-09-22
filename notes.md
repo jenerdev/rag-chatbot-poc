@@ -711,6 +711,52 @@ watch the logs for `[retrieve] vector:0` on a question that should hit.
 
 ---
 
+## Tenancy Phase 4: the persona, before and after (2026-09-23)
+
+**The change:** one line above the grounding block. The block itself is
+byte-identical to D-017:
+
+```
+You are {assistantName}, the assistant for {businessName}.
+```
+
+The optional second sentence the plan offered ("Answer only from the context
+below, even when a more helpful answer seems obvious") was **left out**,
+because the verdicts were identical without it.
+
+**The gate:** the six original cases against northwind, compared verdict by
+verdict with `plan/baseline/eval-pre-tenancy.txt`:
+
+| Case | Phase 0 (no persona) | Phase 4 (persona) | Phase 4, run 2 |
+|---|---|---|---|
+| direct | PASS | PASS | PASS |
+| inference | PASS | PASS | PASS |
+| antecedent | FAIL (auditor 1:1) | FAIL (auditor 1:1) | FAIL |
+| absent | PASS (refused) | PASS (refused) | PASS |
+| offtopic | PASS (short circuit) | PASS (short circuit) | PASS |
+| absent-2 | PASS (refused) | PASS (refused) | PASS |
+
+No verdict flipped, and the one FAIL is the same model limit with the same
+wrong answer. The persona cost no refusal.
+
+**The four new cases**, with villa (8 documents, 30 chunks) in the same tables:
+
+| Case | What it asserts | Observed |
+|---|---|---|
+| leak-1 | northwind refuses "parking spaces", a fact villa has | refused |
+| leak-2 | northwind refuses `amihanpansol2019`, villa's Wi-Fi password | northwind `vector:0 keyword:0`, refused. Control: villa `keyword:1`, "amihanpansol2019 is the Wi-Fi password for Villa Amihan Private Resort." |
+| leak-3 | a villa transcript, read as northwind, does not exist | owner sees 2 messages; northwind gets `null` |
+| persona | greeting villa names Lia and Villa Amihan, and never Nora or Northwind | "Hello! I'm Lia, the assistant for Villa Amihan Private Resort. …" |
+
+**leak-2's control is what makes it a real test.** Without it, a northwind
+refusal could just mean the identifier is unfindable. The villa run shows
+keyword search does find it (`keyword:1`, fused as `both`), so the northwind
+refusal is the tenant filter inside `match_chunks_fts` at work.
+
+**10 cases: 9/10, twice.** The full output is `plan/baseline/eval-post-persona.txt`.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character

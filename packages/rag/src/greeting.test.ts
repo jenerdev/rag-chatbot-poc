@@ -9,7 +9,11 @@
 // So most of what is below is case 2.
 
 import { describe, expect, it } from 'vitest';
-import { GREETING_REPLY, greetingReply } from './greeting.js';
+import { greetingReply, greetingText } from './greeting.js';
+
+// Two tenants, so the reply can be checked for naming the right one.
+const NORTHWIND = { assistantName: 'Nora', businessName: 'Northwind Labs' };
+const VILLA = { assistantName: 'Lia', businessName: 'Villa Amihan Private Resort' };
 
 describe('greetings it must recognise', () => {
   const greetings = [
@@ -42,7 +46,7 @@ describe('greetings it must recognise', () => {
 
   for (const message of greetings) {
     it(`${JSON.stringify(message)}`, () => {
-      expect(greetingReply(message)).toBe(GREETING_REPLY);
+      expect(greetingReply(message, NORTHWIND)).toBe(greetingText(NORTHWIND));
     });
   }
 });
@@ -72,7 +76,7 @@ describe('what it must NOT claim', () => {
 
   for (const message of questions) {
     it(`${JSON.stringify(message)}`, () => {
-      expect(greetingReply(message)).toBeNull();
+      expect(greetingReply(message, NORTHWIND)).toBeNull();
     });
   }
 });
@@ -81,7 +85,20 @@ describe('the reply itself', () => {
   it('says what the bot is for, not just hello', () => {
     // A bare "Hello!" would be friendly and useless. The greeting is the one
     // moment a first-time user is definitely reading.
-    expect(GREETING_REPLY).toMatch(/knowledge base/i);
-    expect(GREETING_REPLY.length).toBeGreaterThan(40);
+    const reply = greetingText(NORTHWIND);
+    expect(reply).toMatch(/documents/i);
+    expect(reply).toMatch(/passages I used/i);
+  });
+
+  it("names this tenant's assistant and business, and never the other's", () => {
+    const villa = greetingReply('hi', VILLA);
+    expect(villa).toContain('Lia');
+    expect(villa).toContain('Villa Amihan Private Resort');
+    expect(villa).not.toContain('Nora');
+    expect(villa).not.toContain('Northwind');
+
+    const northwind = greetingReply('hi', NORTHWIND);
+    expect(northwind).toContain('Nora');
+    expect(northwind).not.toContain('Lia');
   });
 });

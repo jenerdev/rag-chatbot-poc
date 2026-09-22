@@ -25,7 +25,7 @@ export {
 
 export { ingestDocument, listDocuments, deleteDocument, getChunks } from './ingest.js';
 export { buildPrompt } from './prompt.js';
-export { greetingReply, GREETING_REPLY } from './greeting.js';
+export { greetingReply, greetingText } from './greeting.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';
