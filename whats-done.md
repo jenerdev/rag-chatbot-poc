@@ -3184,3 +3184,40 @@ that becomes markup.
 - **The chat page's empty-knowledge-base check** used `GET /documents`, which
   Phase 6 made admin-only. It now comes from a server-side count, which also
   removes a request made on page load.
+
+---
+
+## Tenancy Phase 8 — cutover and the record · done 2026-09-23
+
+**What was done:** the repo stopped describing a single-tenant app.
+- **Decisions and risks:** decisions.md D-025 to D-030 (plus the D-006
+  amendment) and risks.md R-10 to R-13 (plus the R-2 amendment) were written
+  from the values observed in Phases 0–7.
+- **Architecture and flow:** architecture.md and flow.md now draw the tenant
+  step first.
+- **CLAUDE.md:** the battery rule now asks for both tenants, and a new rule
+  names the `tenant_id` filter as the only isolation there is.
+- **README.md:** takes a fresh reader from clone to two working tenants.
+
+**Why it mattered:** the next reader, human or model, starts from these files.
+A CLAUDE.md that still said "load northwind and nothing else" would have sent
+them to delete villa, and with it the leak cases that protect isolation.
+
+**What each observed value proves:**
+- **The README loader, run verbatim, gave 9 documents and 34 chunks, with the
+  same per-document counts as the real tenants.** The done-when ("a fresh
+  reader can go from `git clone` to two working tenants using only README.md")
+  was checked by running the instructions, not by reading them. The tenant
+  used was a throwaway, deleted afterwards (0 documents left), so the fixtures
+  the battery depends on were never touched.
+- **Every number in the new doc sections was checked against this session's
+  observations**: 50 ms, 0 → 5 rows, 11/11, 15 of 15, 9/10, the theme
+  colours, and the error codes. None were predicted.
+
+**Traps avoided:**
+- **Stale architecture and flow diagrams.** architecture.md §2 and §3 still
+  drew `server.js` and `public/index.html` after the migration. They were found
+  in review and redrawn, not left for "later".
+- **Testing the loader against the real tenants** would have given each of
+  them duplicate documents and shifted the eval verdicts. A throwaway tenant
+  gave the same proof without that cost.

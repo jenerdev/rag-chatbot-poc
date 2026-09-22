@@ -9,15 +9,22 @@
 > server and forbade both TypeScript and frameworks. That brief did its job and
 > is in git history (`BUILD.md`, removed 2026-09-22). The migration that
 > replaced it is `plan/steps.md`.
+>
+> **It is multi-tenant** since 2026-09-23 ([`plan.md`](./plan.md), Phases 0–8,
+> all done): one database, many businesses, each at `/t/<slug>` with its own
+> documents, assistant name, theme and admin key. Read `plan.md` § 0 before
+> touching any query.
 
 ## What this is
 
 A **retrieval-augmented chatbot** that answers questions from documents you
-paste in. Hybrid retrieval (vector + full-text, fused with RRF), a grounding
-prompt that refuses rather than invents, and a sources panel that shows the
-exact chunks every answer was built from.
+paste in — per tenant: each business sees only its own documents. Hybrid
+retrieval (vector + full-text, fused with RRF), a grounding prompt that refuses
+rather than invents, and a sources panel that shows the exact chunks every
+answer was built from.
 
 ```
+resolve tenant → (every step below is scoped to it)
 paste document → chunk → embed → store in pgvector
 ask question   → rewrite → embed → vector + keyword search → fuse → prompt → stream
 ```
@@ -40,22 +47,34 @@ are in `notes.md`.
 ## Layout
 
 ```
-apps/web/              Next.js 15, App Router — both screens and all six routes
-  app/page.tsx           S-1 chat
-  app/admin/page.tsx     S-2 knowledge base
-  app/api/**/route.ts    the six endpoints; chat/ does JSON and SSE
+apps/web/              Next.js 15, App Router
+  app/page.tsx                   static root — no tenant list, no redirect
+  app/t/[tenant]/layout.tsx      tenant theme (style prop) + tab title
+  app/t/[tenant]/page.tsx        S-1 chat — Server Component, resolves the tenant
+  app/t/[tenant]/admin/page.tsx  S-2 knowledge base — same
+  app/t/[tenant]/not-found.tsx   "No such workspace"
+  app/api/t/[tenant]/**/route.ts the endpoints + admin/session; chat/ does JSON and SSE
+  components/                    chat-screen, admin-screen (Client), brand-header, sources-panel
   lib/route.ts           withRoute(): validation + the ONE error→status map
+  lib/tenant.ts          getTenant() + withTenantRoute(): slug → TenantContext, 404 on a miss
+  lib/admin-auth.ts      signed session cookie, requireAdmin()
+  lib/branding.ts        the five-key theme allowlist, https-only image URLs
   lib/env.ts             fail-fast config (D-023)
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch
-  db/                  @rag/db — the client, the types, sql/, and server-only
-  rag/                 @rag/pipeline — ingest, retrieve, prompt, answer
+  db/                  @rag/db — the client, the types, sql/ (3 files), and server-only
+    src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
+    tools/verify.mjs     14 checks, no API key
+    tools/tenant.mjs     tenant:add / tenant:key — prints a key once
+  rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant
+    tools/prompt-eval.mjs  the battery, 10 cases, both tenants
+    tools/isolation.mjs    11 cross-tenant checks through the pipeline
   tsconfig/            shared base config
-fixtures/northwind.json  the corpus the eval battery asserts against
-sample-documents/        a second corpus, for testing by hand
-plan/                    the migration plan and its evidence
+fixtures/northwind.json  tenant northwind's corpus, for the eval battery
+sample-documents/        tenant villa's corpus (01–08 only), for the battery too
+plan/                    the migration plan and its evidence; plan.md is tenancy
 ```
 
 ## Commands
@@ -63,9 +82,12 @@ plan/                    the migration plan and its evidence
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test
-pnpm --filter @rag/db verify    # 10 checks, no API key needed
-pnpm eval                       # the prompt battery  ⚠ see below
-pnpm scores                     # real similarity scores, threshold off
+pnpm --filter @rag/db verify    # 14 checks, no API key needed
+pnpm eval                       # the prompt battery, 10 cases  ⚠ see below
+pnpm scores                     # real similarity scores for northwind, threshold off
+pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6
+pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # key printed ONCE
+pnpm --filter @rag/db tenant:key -- <slug>                              # new key; old one dies
 ```
 
 ## The rules you will be tempted to break
@@ -75,19 +97,36 @@ pnpm scores                     # real similarity scores, threshold off
    inventing answers. A change that makes the bot more helpful can quietly make
    it answer from training data instead. The battery checks both directions at
    once: real questions answered, absent facts still refused.
-   **It needs `fixtures/northwind.json` loaded and nothing else** — a second
-   corpus changes the verdicts (the Villa documents describe parking, which the
-   `absent-2` case exists to have refused).
+   **It needs BOTH tenants loaded:** `northwind` holding `fixtures/northwind.json`
+   and nothing else, `villa` holding `sample-documents/01–08`. It used to demand
+   northwind *alone*, because Villa describes parking and `absent-2` must refuse
+   parking. Tenancy turned that fragile precondition into the feature (plan.md
+   § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
+   but in the other tenant, is unreachable. Expect 9/10 — `antecedent` is the
+   known model limit (D-017). A different number means something moved.
 2. **The service-role key never reaches the browser.** `@rag/db` imports
    `server-only`, so a Client Component importing it is a build error. Before
    shipping: `grep -ri "service_role" apps/web/.next/static/` must return
    nothing.
-3. **Every Route Handler is wrapped in `withRoute()`.** Nothing enforces it. An
-   unwrapped handler answers with a generic 500 instead of the real reason.
+3. **Every Route Handler is wrapped in `withTenantRoute()`**, which resolves the
+   slug (404 on a miss, never a fallback) and wraps `withRoute()`. Nothing
+   enforces it. An unwrapped handler answers with a generic 500 instead of the
+   real reason — or, worse, runs without knowing its tenant.
 4. **Any Node script that touches `@rag/db` needs `--conditions=react-server`.**
-   That is the cost of rule 2. `pnpm eval` and `pnpm scores` carry it already.
+   That is the cost of rule 2. Every script in `package.json` carries it already.
 5. **`@rag/chunker` has no dependencies and no I/O.** That is what lets the same
    code run in Node and the browser, and what keeps the file readable alone.
+6. **The only thing between two tenants is a `tenant_id` filter.** `service_role`
+   bypasses RLS (D-006, R-2, R-11), so isolation is application code. Every
+   query on `documents`, `chunks`, `conversations` or `messages` filters on
+   `tenant_id`, every insert sets it, every search `.rpc()` sends `p_tenant_id`.
+   `tenant` is a **required** parameter with **no default** — no ambient
+   "current tenant", no fallback slug (D-027); a forgotten one should be a
+   compile error, not a silent read. The composite FKs stop cross-tenant
+   *writes*; nothing but your filter stops a cross-tenant *read*. After any
+   change to a query, run `pnpm --filter @rag/pipeline isolation` and
+   `pnpm eval` — the `leak-*` cases must stay green — and re-run plan.md
+   Phase 3's grep: every line it prints must carry a tenant.
 
 ## Traps that will actually cost you time
 
@@ -119,11 +158,22 @@ All are expanded in `risks.md`.
 - Tunable constants in `packages/rag/src/constants.ts`, SCREAMING_SNAKE_CASE.
 - Validate at the route boundary, throw in the pipeline, map errors to status
   codes in exactly one place (`apps/web/lib/route.ts`).
+- Every Route Handler lives under `app/api/t/[tenant]/` and is wrapped in
+  `withTenantRoute()` (which wraps `withRoute()`). Admin-only handlers call
+  `requireAdmin(request, tenant)` first. The chat route stays open.
+- Every tenant-owned query carries `.eq('tenant_id', tenant.id)` — rule 6.
+  "Not yours" and "not there" must look identical (`[]`, `null`, 404), or ids
+  can be enumerated across tenants.
+- Select `tenants` columns **explicitly**, never `select('*')`: that is how
+  `admin_key_hash` ends up in a `TenantContext`, a prop, or a response.
+  `TenantContext` has no hash field on purpose.
 - Errors surface the real message. No swallowing, no generic "something went
   wrong", no retry loops (`architecture.md` § 9).
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
-  markdown rendering is what would take it away.
+  markdown rendering is what would take it away. Tenant branding follows the
+  same rule: theme colours reach the page as CSS custom properties through the
+  `style` prop, from the allowlist in `lib/branding.ts` (D-030).
 - `console.log` in the pipeline is deliberate: `[ingest]`, `[retrieve]`,
   `[query]` and `[openai]` are how you see chunks, scores and cost. Leave them.
 

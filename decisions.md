@@ -132,6 +132,17 @@ is unaffected. This costs the POC nothing and retires the "the shortcut travels"
 half of R-2 immediately rather than at first deploy. Writing actual policies is
 still out of scope and still arrives with auth.
 
+**Amended 2026-09-23, tenancy.** The reasoning above was "the server is the only
+client of the database, and it is trusted". That is still true. What changed is
+who the server serves: several tenants who do not trust each other (D-025). The
+`service_role` key bypasses RLS for every one of their reads, so the thing that
+keeps tenant A out of tenant B's rows is no longer the network. It is a
+`tenant_id` filter in application code and inside two SQL functions. The weak
+point of this posture has moved from "is the database reachable" to "did every
+query remember its filter". The composite foreign keys cover writes; reads are
+covered only by the leak cases and `tools/isolation.mjs`. See `risks.md` § R-11.
+Writing real policies is still the fix, and it is now more urgent, not less.
+
 ---
 
 ## D-007 · Fixed-size chunking with overlap · **Settled for the MVP**
@@ -777,6 +788,239 @@ absent and off-topic facts still refused. 6/6.
 than with one fixed line. That means removing the short circuit for these
 messages and paying a chat call for every "hi" — and re-running `pnpm eval`,
 because it would mean editing the grounding prompt.
+
+---
+
+## D-025 · Shared tables with `tenant_id`, the filter inside both SQL functions · **Added 2026-09-23 (tenancy Phases 1–2)**
+
+**Decision:** every tenant lives in the same five tables. `tenants` is new, and
+`documents`, `chunks`, `conversations` and `messages` each carry a NOT NULL
+`tenant_id`. The tenant filter is written **inside** `match_chunks` and
+`match_chunks_fts`, as a required `p_tenant_id` argument, not applied to their
+results afterwards. One HNSW graph serves every tenant.
+
+**Why not a schema or a database per tenant:** that is N migrations and N index
+builds for a product whose point is "add a business in a minute". It also puts
+every schema change on a loop. One schema, one migration file
+(`packages/db/sql/schema-tenancy.sql`), one index.
+
+**Why the filter goes inside the functions:** filtering after the `limit` is too
+late. Ten candidate slots full of another tenant's chunks would fuse into zero
+results. Inside the function, another tenant's chunk never takes a slot.
+
+**Why `chunks` carries `tenant_id` when it could join to `documents`:** both
+searches scan `chunks` alone, which is why they are fast. The duplicate is
+guarded, not trusted. The composite foreign keys `(document_id, tenant_id)` and
+`(conversation_id, tenant_id)` make a chunk or message whose tenant disagrees
+with its parent's impossible to insert. Observed in `verify.mjs`: the
+cross-tenant insert fails with `23503 ... violates foreign key constraint
+"chunks_document_tenant_fk"`.
+
+**What Phase 2 measured about the shared index** (pgvector **0.8.2**,
+northwind 4 chunks, villa 30):
+
+- At this size the planner does not use HNSW for a tenant-scoped search. It
+  reads the tenant's rows through `chunks_tenant_idx` and sorts them exactly,
+  which gives perfect recall. The ids matched the Phase 0 baseline exactly.
+- With HNSW forced (`tenant_id + 0`) and `hnsw.ef_search = 2`, villa got
+  **0 rows**. The walk visited two chunks, both northwind's, and stopped. That
+  is the silent false refusal of `plan.md` § 2.1.
+- With `hnsw.iterative_scan = 'strict_order'`, the same query returned **5**.
+  `relaxed_order` also fixed it, but can return rows slightly out of distance
+  order, and the pipeline assumes most-similar-first.
+
+So `match_chunks` carries `set hnsw.iterative_scan = 'strict_order'` (confirmed
+in `pg_proc.proconfig`). It costs nothing today, and is insurance for the day a
+tenant is large enough for HNSW to win. No composite GIN index was built:
+full-text search also goes through `chunks_tenant_idx`.
+
+**What it costs:** isolation is enforced by code, not by the database, for every
+read (R-11). And recall under a shared graph has to be re-measured as tenants
+grow (R-10).
+
+**Reverse if:** one tenant grows large enough to deserve its own index, or a
+customer requires physical separation. A partial HNSW index per tenant is the
+next step before a separate database.
+
+---
+
+## D-026 · A tenant is a path segment, `/t/<slug>`, not a subdomain · **Added 2026-09-23 (tenancy Phases 5, 7)**
+
+**Decision:** screens live at `/t/<slug>` and `/t/<slug>/admin`, and every API
+route lives at `/api/t/<slug>/…`. The old un-prefixed paths are gone, with no
+redirect: `POST /api/chat` and `GET /api/documents` return **404**, as observed.
+
+**Why a path and not a subdomain:** it is identical on localhost and hosted. It
+needs no wildcard DNS and no wildcard certificate, and the slug is visible in
+every URL and every log line.
+
+**The one resolution point:** `withTenantRoute()` in `apps/web/lib/tenant.ts`
+turns the `[tenant]` segment into a `TenantContext` or answers
+`404 {"error":"No workspace named \"<slug>\""}`. It never falls back and never
+lists real slugs. The pages do the same through the cached `getTenant()`, and
+`/t/nope` renders "No such workspace". Moving to subdomains later means
+changing that one lookup.
+
+**What it costs:** a slug is part of every URL, so renaming a tenant breaks its
+links. Slugs are therefore constrained in SQL (`tenants_slug_shape`,
+`tenants_slug_reserved`) and should be treated as permanent.
+
+**Reverse if:** tenants want their own domains. The resolution function then
+reads the `Host` header instead of the path. Nothing downstream changes,
+because everything downstream takes a `TenantContext`.
+
+---
+
+## D-027 · `tenant` is a required argument everywhere, with no default and no ambient context · **Added 2026-09-23 (tenancy Phase 3)**
+
+**Decision:** every pipeline function that touches the database takes a
+`TenantContext { id, slug, businessName, assistantName }` as a required
+argument: `ingestDocument`, `listDocuments`, `countDocuments`, `deleteDocument`,
+`getChunks`, `retrieve`, `answerQuestion`, `answerQuestionStream` and
+`getMessages`. There is no `AsyncLocalStorage`, no module-level "current tenant"
+and no `tenantId = 1` default. `p_tenant_id` has no default in SQL either.
+
+**Why:** a default tenant is a silent cross-tenant read. It looks like working
+code and answers from the wrong documents. Required means a forgotten call site
+is a compile error, and a forgotten database argument is a database error. It
+is the same move `server-only` made for the service-role key. Observed after the
+change: the old unscoped `match_chunks` call returns `PGRST202 Could not find
+the function`, and an insert without `tenant_id` fails with `23502`.
+
+**`TenantContext` is a value object, not a row.** `loadTenant()` selects four
+named columns. It never uses `select('*')`, so `admin_key_hash` cannot end up in
+an object that gets passed around and, eventually, serialised. The plan's grep
+of every `from(...)` and `rpc(...)` line in `packages/rag/src` showed a tenant
+filter on **15 of 15**.
+
+**The one exception was temporary and is gone.** D-031's bridge was a default
+tenant in the database plus the old unscoped functions, and later a
+northwind-only route pin. It existed between Phases 1 and 5 so the app kept
+working, and it has been removed in full.
+
+**What it costs:** every signature is one argument longer, and every test has to
+construct a tenant.
+
+**Reverse if:** never, while the service-role key is on the read path. If RLS
+policies ever carry the tenant instead (R-2), the argument becomes redundant
+rather than wrong.
+
+---
+
+## D-028 · Per-tenant admin key, scrypt-hashed, behind a path-scoped signed cookie, hand-rolled · **Added 2026-09-23 (tenancy Phase 6)**
+
+**Decision:** each tenant has one admin key.
+- `tools/tenant.mjs` generates 32 random bytes, prints the key **once**, and
+  stores only an scrypt hash, as `scrypt$N$salt$hash` (N = 2^15, a 16-byte
+  salt). Measured at **50 ms** per hash.
+- Logging in (`POST /api/t/<slug>/admin/session`) sets an httpOnly,
+  SameSite=lax cookie `<slug>.<expiry>.<hmac-sha256>` signed with
+  `ADMIN_COOKIE_SECRET`. It is `Secure` everywhere except `next dev`.
+- `requireAdmin()` guards the list, add and delete document routes and the
+  chunks route with a 401. Chat stays open, because it is the product.
+
+**Why hand-rolled:** D-001/D-002 still hold. It is `node:crypto` in two short
+files (`packages/db/src/admin-key.ts`, `apps/web/lib/admin-auth.ts`), against an
+auth framework's worth of concepts.
+
+**Three deviations from `plan.md`, each for a reason found while building it:**
+
+1. **The cookie path is `/api/t/<slug>`, not `/t/<slug>`.** A browser sends a
+   cookie only to URLs under its path. The routes this cookie guards live under
+   `/api/t/<slug>/…`, so with `/t/<slug>` the cookie would be set and then
+   never sent: logging in would do nothing. `/api/t/villa` does not path-match
+   `/api/t/villa2`, so the isolation the plan wanted is kept. `readSession()`
+   also checks that the slug in the cookie is the tenant in the URL, because
+   curl sends whatever it is given.
+2. **The hashing lives in `@rag/db` (`admin-key.ts`), not `apps/web/lib`.**
+   Two callers need it: the login route verifies, and `tools/tenant.mjs`
+   hashes. `@rag/db` is beside the column it protects, and both can import it.
+3. **`tenant:key` was added next to `tenant:add`.** northwind and villa were
+   created in Phases 1 and 2 without a key, and a key-less tenant can never be
+   administered, since NULL means deny. Rotating a key is the same command.
+
+**Verified (16 curl cases, against throwaway tenants since deleted):**
+- **401:** no cookie; a wrong key; another tenant's cookie sent by hand; a
+  swapped slug; a tampered signature; a correctly signed but expired cookie;
+  after logout; and a tenant with no key.
+- **200:** the right key, with `Path=/api/t/authprobe; HttpOnly; SameSite=lax`;
+  and chat with no cookie.
+- **400:** an empty login body.
+- **Leaks:** the key appeared 0 times in the server log. 0 static files contain
+  `admin_key`, `ADMIN_COOKIE_SECRET`, `rag_admin` or `scrypt`.
+
+**What it is not:** a replacement for RLS. It decides who may edit a knowledge
+base through this app. It does nothing about the service-role key reading
+every tenant's rows (R-2, R-11). There is no rate limit on login attempts
+(R-13).
+
+**Reverse when:** real users arrive. The cookie is the thing to delete, replaced
+by a users table, tenant membership, and RLS policies that carry the tenant.
+
+---
+
+## D-029 · Persona above the grounding block, which stays byte-identical, gated on the battery · **Added 2026-09-23 (tenancy Phase 4)**
+
+**Decision:** `buildPrompt(tenant, …)` opens with one line, *"You are
+{assistantName}, the assistant for {businessName}."* Everything below it is
+D-017's block, byte for byte. `greetingReply(message, tenant)` names the
+tenant's assistant and business.
+
+**Why so little:** a persona is an invitation to be helpful, and being helpful
+is how refusals erode (`plan.md` § 2.6). The line says who is speaking and
+nothing about tone, eagerness or expertise. The plan offered a second sentence
+("answer only from the context below, even when a more helpful answer seems
+obvious"). It was **measured as unnecessary** and left out, because every extra
+line in that prompt is something the next edit has to re-measure.
+
+**The gate, observed:** the six original Northwind verdicts matched
+`plan/baseline/eval-pre-tenancy.txt` exactly, **on two runs**. That is 5 PASS
+and the same `antecedent` FAIL, with the same wrong "auditor 1:1" answer. With
+the four new cases the battery reads **9/10**: leak-1, leak-2 (plus a villa
+control), leak-3 and persona all pass.
+
+**A test that could not fail, fixed.** villa's assistant was first named
+"Amihan", which is also in "Villa Amihan Private Resort". So "the greeting
+mentions Amihan" was true however the greeting was written. It was renamed to
+**"Lia"**, and the persona case asserts this tenant's assistant name AND
+business name, and neither of the other tenant's.
+
+**What it costs:** every future prompt edit re-opens the question (R-12).
+
+**Reverse if:** a tenant needs more than a name, such as a tone or a language.
+Add it as another line above the block, and do not keep it until the six
+verdicts match.
+
+---
+
+## D-030 · Branding as CSS custom properties through React's `style` prop, from an allowlist · **Added 2026-09-23 (tenancy Phase 7)**
+
+**Decision:** a tenant's `theme` jsonb becomes CSS custom properties on a
+wrapper `<div>` through React's ordinary `style` prop. `themeVars()` in
+`apps/web/lib/branding.ts` reads an **allowlist of five keys**: `accent`,
+`accentSoft`, `bg`, `panel` and `ink`. It keeps a value only if it matches
+`^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`, and silently drops everything else.
+`logo_url` and `banner_url` are kept only if they parse as absolute `https:`
+URLs.
+
+**Why:** the obvious implementation, `<style dangerouslySetInnerHTML=…>`, is
+CSS injection from a database column, and exactly what CLAUDE.md § Conventions
+forbids. The `style` prop needs no exception to that rule, React escapes it,
+and the regex means a string that is not a colour never reaches the page.
+`globals.css` already reads every colour from a custom property, which is why
+five keys are enough.
+
+**Verified with a hostile theme:** `ink: "red;}body{display:none"`,
+`panel: "url(javascript:alert(1))"`, an unknown key `evil`, a `javascript:`
+banner and an `http:` logo. The rendered HTML contained **0** occurrences of
+any of them. The wrapper carried exactly
+`--accent:#0f766e;--accent-soft:#e7f5f2;--bg:#faf7f2`.
+
+**What it costs:** a tenant cannot have a gradient, a font, or any colour
+format other than hex. That is the point.
+
+**Reverse if:** tenants need richer branding. Add keys to the allowlist, each
+with its own strict validator. Never pass the jsonb through.
 
 ---
 

@@ -307,7 +307,7 @@ refusal, the persona line moves or shrinks — the grounding block does not.
 
 ## 3. The phases
 
-Eight phases. Phases 0–2 touch no application code; if you stop after Phase 2
+Nine phases, numbered 0–8. Phases 0–2 touch no application code; if you stop after Phase 2
 you have lost nothing and learned whether the index survives.
 
 ### Phase 0 — Capture the baseline that was never captured

@@ -1,13 +1,12 @@
 # Flow — how a request actually travels through this code
 
-> ### ⚠ The shapes are current; the file names are not
+> ### Current as of tenancy (2026-09-23)
 >
-> Migrated 2026-09-22 (D-020, D-021). Every arrow, every step and every failure
-> mode below still describes what runs. What changed: `server.js` is
-> `apps/web/app/api/**/route.ts`, `src/rag.js` is `@rag/pipeline`,
-> `public/admin.html` is `/admin`, and the dotted `/chunker.js` line is gone —
-> the admin page imports `@rag/chunker` directly, so there is no static-file
-> route to draw.
+> The Express POC became a Next.js app on a Turborepo monorepo (D-020, D-021),
+> and then became multi-tenant (`plan.md`, D-025…D-030). Every request now
+> starts by **resolving a tenant**, and every step after that is scoped to it.
+> The pipeline itself (rewrite, embed, two searches, fuse, prompt, stream) is
+> unchanged.
 
 > **What this file is.** `architecture.md` § 3 has the *original MVP design*.
 > This file has the **flow as built**, including the five post-MVP additions
@@ -17,7 +16,7 @@
 > Every box names the file and function that does the work, so you can read the
 > diagram with the source open beside it.
 >
-> Last updated: 2026-09-20
+> Last updated: 2026-09-23
 
 ---
 
@@ -25,74 +24,88 @@
 
 Three processes. The browser never talks to OpenAI or Supabase — that is the
 only thing keeping your API key out of the page source (`risks.md` § R-1).
+`@rag/db` imports `server-only`, so a Client Component that tried to import it
+would fail the build.
 
 ```mermaid
 flowchart LR
-    subgraph B["Browser · no framework, no build step"]
-        IDX["index.html + app.js<br/>chat"]
-        ADM["admin.html + admin.js<br/>knowledge base"]
+    subgraph B["Browser · React Client Components"]
+        IDX["components/chat-screen.tsx<br/>at /t/&lt;slug&gt;"]
+        ADM["components/admin-screen.tsx<br/>at /t/&lt;slug&gt;/admin"]
+        CHKB["@rag/chunker<br/>live chunk estimate"]
     end
 
-    subgraph S["Express · server.js · owns every secret"]
-        RT["routes + validation"]
-        RAG["src/rag.js<br/>both pipelines"]
-        CHK["src/chunker.js<br/>pure, no imports"]
-        AI["src/openai.js<br/>raw fetch"]
-        DB["src/supabase.js<br/>one client"]
+    subgraph S["Next.js server · apps/web · owns every secret"]
+        PAGE["app/t/[tenant]/*.tsx<br/>Server Components: tenant + branding as props"]
+        RT["app/api/t/[tenant]/**/route.ts<br/>withTenantRoute → withRoute"]
+        TEN["lib/tenant.ts<br/>slug → TenantContext, 404 on miss"]
+        AUTH["lib/admin-auth.ts<br/>requireAdmin"]
+        RAG["@rag/pipeline<br/>both pipelines, tenant first"]
+        CHK["@rag/chunker<br/>pure, no imports"]
+        AI["@rag/openai<br/>raw fetch"]
+        DB["@rag/db<br/>one client, server-only"]
     end
 
     subgraph X["External"]
         OAI["OpenAI<br/>/embeddings<br/>/chat/completions"]
-        PG["Supabase Postgres<br/>pgvector + full-text"]
+        PG["Supabase Postgres<br/>pgvector + full-text<br/>tenant_id on every row"]
     end
 
-    IDX -- "POST /api/chat" --> RT
-    ADM -- "POST/GET/DELETE /api/documents" --> RT
+    IDX -- "POST /api/t/&lt;slug&gt;/chat" --> RT
+    ADM -- "admin/session, documents" --> RT
+    PAGE --> TEN
+    RT --> TEN
+    RT --> AUTH
     RT --> RAG
     RAG --> CHK
     RAG --> AI
     RAG --> DB
+    TEN --> DB
     AI -- HTTPS --> OAI
     DB -- HTTPS --> PG
-    CHK -. "served to the browser<br/>for the live chunk estimate" .-> ADM
+    ADM --> CHKB
 ```
 
-**That dotted line is not a mistake.** `chunker.js` is pure — no imports, no
-I/O — so the identical file runs in Node *and* in the browser. The admin page's
+**`@rag/chunker` appears twice on purpose.** It is pure (no imports, no I/O),
+so the identical package runs in Node *and* in the browser. The admin page's
 live "≈ 3 chunks" estimate uses the server's own constants rather than a copy
-that would drift (D-018, `server.js` serves it at `/chunker.js`).
+that would drift (D-018). It is an ordinary workspace import on both sides.
 
 ---
 
 ## 2. Adding a document — the ingest pipeline
 
-**You paste text into `/admin.html` and press Add.**
+**You paste text into `/t/<slug>/admin` (logged in as that tenant's admin) and press Add.**
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as You
-    participant A as admin.js
-    participant E as server.js
-    participant R as rag.ingestDocument
-    participant C as chunker.chunkText
+    participant A as admin-screen.tsx
+    participant E as documents/route.ts
+    participant R as ingestDocument
+    participant C as chunkText
     participant O as OpenAI
     participant P as Postgres
 
     U->>A: paste title + content
     A->>A: estimateChunkCount() — live "≈ N chunks"
     U->>A: click Add
-    A->>E: POST /api/documents {title, source, content}
+    A->>E: POST /api/t/:slug/documents {title, source, content}
+    E->>P: resolve tenant — withTenantRoute → getTenant(slug)
+    Note over E: unknown slug → 404 "No workspace named …"
+    E->>E: requireAdmin — this tenant's session cookie, or 401
     E->>E: validate — title, content, ≤100k chars
-    E->>R: ingestDocument()
+    E->>R: ingestDocument({ tenant, … })
     R->>C: chunkText(content)
     C-->>R: string[] — whole paragraphs, ≤1000 chars each
     Note over R: nothing to store? throw before touching the database
-    R->>P: INSERT documents → id
+    R->>P: INSERT documents (tenant_id) → id
     Note over R,P: the row now EXISTS — everything below is in a try/catch
     R->>O: POST /v1/embeddings — ALL chunks in ONE call
     O-->>R: number[1536][]
-    R->>P: INSERT chunks — content + chunk_index + vector
+    R->>P: INSERT chunks — tenant_id + content + chunk_index + vector
+    Note over P: composite FK: a chunk's tenant must equal its document's
     R-->>E: {id, title, chunkCount}
     E-->>A: 201
     A->>A: green notice, refresh the list
@@ -108,35 +121,37 @@ there is no `BEGIN`/`COMMIT` to wrap it in (`risks.md` § R-7).
 
 ## 3. Asking a question — the query pipeline
 
-**You type a question on `/` and press Enter.** This is the one to understand.
+**You type a question on `/t/<slug>` and press Enter.** This is the one to understand.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as You
-    participant A as app.js
-    participant E as server.js
-    participant R as rag.answerQuestionStream
+    participant A as chat-screen.tsx
+    participant E as chat/route.ts
+    participant R as answerQuestionStream
     participant O as OpenAI
     participant P as Postgres
 
     U->>A: type + Enter
-    A->>E: POST /api/chat<br/>Accept: text/event-stream
+    A->>E: POST /api/t/:slug/chat<br/>Accept: text/event-stream
+    E->>P: resolve tenant — withTenantRoute → getTenant(slug)
+    Note over E: unknown slug → 404. There is no default tenant.
     E->>E: validate, then choose stream vs JSON
-    E->>R: answerQuestionStream()
+    E->>R: answerQuestionStream({ tenant, … })
 
     rect rgb(245, 247, 250)
-    Note over R,P: prepareAnswer() — shared by both delivery modes
-    R->>P: find or create the conversation row
+    Note over R,P: prepareAnswer() — shared by both delivery modes; every query filters tenant_id
+    R->>P: find the conversation IF this tenant owns it, else create one
     R->>P: SELECT last 6 messages (by id, not timestamp)
     R->>O: rewriteQuestion() — resolve "when did they join?"<br/>into a standalone query  (skipped on turn 1)
     O-->>R: "When did Marisol Venn join?"
     R->>O: POST /v1/embeddings — embed the REWRITTEN query
     O-->>R: number[1536]
     par two searches at once
-        R->>P: rpc match_chunks — cosine, ordered by distance ASC
+        R->>P: rpc match_chunks(p_tenant_id) — cosine, distance ASC
     and
-        R->>P: rpc match_chunks_fts — keyword, ranked by ts_rank
+        R->>P: rpc match_chunks_fts(p_tenant_id) — keyword, ts_rank
     end
     R->>R: Reciprocal Rank Fusion, trim to MATCH_COUNT
     R->>P: SELECT document titles for the sources panel
@@ -151,7 +166,7 @@ sequenceDiagram
         loop each fragment
             O-->>R: delta
             R-->>A: event: delta
-            A->>A: bubble.textContent += text
+            A->>A: append to the answer (React escapes it)
         end
     end
     R->>P: INSERT user + assistant messages
@@ -160,36 +175,46 @@ sequenceDiagram
 
 ### The same thing in words
 
-1. **You press Enter.** `app.js` posts your question with
-   `Accept: text/event-stream`. Without that header the same route returns one
-   JSON body instead — which is what `curl` gets (D-019).
-2. **Express validates** the message and picks a delivery mode. Everything
-   after this is `src/rag.js`; the route has no business logic in it.
-3. **The conversation row** is found, or created on your first message.
-4. **The last 6 messages** are loaded. The model is stateless, so this array is
+1. **You press Enter.** `chat-screen.tsx` posts your question to
+   `/api/t/<slug>/chat` with `Accept: text/event-stream`. The slug came from the
+   server as a prop; it is never parsed out of the URL bar. Without that header
+   the same route returns one JSON body instead, which is what `curl` gets
+   (D-019).
+2. **The tenant is resolved.** `withTenantRoute()` turns the slug into a
+   `TenantContext`, or answers 404. Nothing ever picks a tenant on a request's
+   behalf (D-027).
+3. **The route validates** the message and picks a delivery mode. Everything
+   after this is `@rag/pipeline`, which takes the tenant as its first argument;
+   the route has no business logic in it.
+4. **The conversation row** is found, but only if *this tenant* owns the id
+   the browser sent. Otherwise, including an id from another tenant, a new one
+   is created.
+5. **The last 6 messages** are loaded. The model is stateless, so this array is
    re-sent and re-billed every single turn — which is why it is capped (D-011).
-5. **Your question is rewritten into a standalone query** if there is history
+6. **Your question is rewritten into a standalone query** if there is history
    to resolve it against. "When did they join?" becomes "When did Marisol Venn
    join?" — because *retrieval never sees the conversation*, only the generator
    does (D-016). Skipped entirely on the first message.
-6. **The rewritten query is embedded** — by the same function, reading the same
+7. **The rewritten query is embedded** — by the same function, reading the same
    env var, that embedded your documents. Different models produce vectors in
    unrelated coordinate spaces, and comparing them yields plausible numbers
    that mean nothing while erroring not at all (D-004, `risks.md` § R-3).
-7. **Two searches run in parallel.** Cosine similarity finds things that *mean*
+8. **Two searches run in parallel, both inside this tenant.** Cosine similarity finds things that *mean*
    the same; Postgres full-text finds exact tokens like `NL-220` that
    embeddings are bad at. Results are merged by **rank**, not score — the two
-   numbers have no common scale (D-015).
-8. **Document titles are fetched** so each source reads *"Northwind Labs
+   numbers have no common scale (D-015). The tenant filter is inside both SQL
+   functions, before their `limit`, so another tenant's chunk never takes a
+   candidate slot.
+9. **Document titles are fetched** so each source reads *"Northwind Labs
    Operations Handbook · 0.588"* rather than *"document 25"*.
-9. **`meta` is sent.** The sources panel appears here, **before the model has
+10. **`meta` is sent.** The sources panel appears here, **before the model has
    written anything.** You can read what it was given while it decides what to
    make of it.
-10. **Either** nothing cleared the threshold — the refusal is returned and
+11. **Either** nothing cleared the threshold — the refusal is returned and
     **OpenAI is never called** (D-008) — **or** the prompt is assembled and
     streamed. Note the prompt carries your *original* words, not the rewrite;
     an answer addressing a silently reworded question reads wrong.
-11. **Both messages are saved**, including refusals, so a later "what about the
+12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 
 ---
@@ -229,19 +254,26 @@ it is why D-012 calls it a feature rather than a debug toggle.
 
 ---
 
-## 5. The seven routes
+## 5. The routes
 
-| Method | Route | Does | Lives in |
-|---|---|---|---|
-| `GET` | `/` | chat page | `public/index.html` |
-| `GET` | `/admin` | knowledge base page | `apps/web/app/admin/page.tsx` |
-| `GET` | `/chunker.js` | the pure chunker, for the live estimate | `src/chunker.js` |
-| `POST` | `/api/documents` | chunk → embed → store | `rag.ingestDocument` |
-| `GET` | `/api/documents` | list with chunk counts | `rag.listDocuments` |
-| `GET` | `/api/documents/:id/chunks` | expand a row to show its chunks | `rag.getChunks` |
-| `DELETE` | `/api/documents/:id` | delete; chunks cascade | `rag.deleteDocument` |
-| `POST` | `/api/chat` | ask — SSE or JSON | `rag.answerQuestionStream` / `answerQuestion` |
-| `GET` | `/api/conversations/:id/messages` | reload a transcript | `rag.getMessages` |
+Every one is under a tenant. The old un-prefixed paths (`/admin`, `/api/chat`)
+return 404, with no redirect.
+
+| Method | Route | Does | Lives in | Access |
+|---|---|---|---|---|
+| `GET` | `/` | static page, no tenant list | `app/page.tsx` | public |
+| `GET` | `/t/<slug>` | chat page | `app/t/[tenant]/page.tsx` → `ChatScreen` | public |
+| `GET` | `/t/<slug>/admin` | knowledge base page | `app/t/[tenant]/admin/page.tsx` → `AdminScreen` | public page, admin data |
+| `POST` | `/api/t/<slug>/chat` | ask — SSE or JSON | `answerQuestionStream` / `answerQuestion` | open |
+| `GET` | `/api/t/<slug>/conversations/:id/messages` | reload a transcript (404 if not this tenant's) | `getMessages` | open |
+| `POST` / `GET` / `DELETE` | `/api/t/<slug>/admin/session` | log in / status / log out | `lib/admin-auth.ts` | open |
+| `POST` | `/api/t/<slug>/documents` | chunk → embed → store | `ingestDocument` | admin |
+| `GET` | `/api/t/<slug>/documents` | list with chunk counts | `listDocuments` | admin |
+| `GET` | `/api/t/<slug>/documents/:id/chunks` | expand a row to show its chunks | `getChunks` | admin |
+| `DELETE` | `/api/t/<slug>/documents/:id` | delete; chunks cascade | `deleteDocument` | admin |
+
+"Admin" means `requireAdmin()`: the request must carry this tenant's signed
+session cookie, or it gets a 401.
 
 ---
 
@@ -251,13 +283,13 @@ All named constants at the top of their module, so Phase 5 could find them.
 
 | Constant | Value | File | Moves |
 |---|---|---|---|
-| `CHUNK_SIZE` | 1000 | `chunker.js` | retrieval quality, more than anything else |
-| `CHUNK_OVERLAP` | 150 | `chunker.js` | whether a split fact survives somewhere |
-| `MATCH_COUNT` | 5 | `rag.js` | cost per question, and whether a whole answer is present |
-| `MIN_SIMILARITY` | 0.25 | `rag.js` | cost — **not** correctness. Measured, not guessed |
-| `MAX_HISTORY` | 6 | `rag.js` | cost growth over a long conversation |
-| `CANDIDATE_COUNT` | 10 | `rag.js` | how much each search contributes before fusion |
-| `RRF_K` | 60 | `rag.js` | how sharply rank 1 dominates in the fusion |
+| `CHUNK_SIZE` | 1000 | `packages/chunker/src/index.ts` | retrieval quality, more than anything else |
+| `CHUNK_OVERLAP` | 150 | `packages/chunker/src/index.ts` | whether a split fact survives somewhere |
+| `MATCH_COUNT` | 5 | `packages/rag/src/constants.ts` | cost per question, and whether a whole answer is present |
+| `MIN_SIMILARITY` | 0.25 | `packages/rag/src/constants.ts` | cost — **not** correctness. Measured, not guessed |
+| `MAX_HISTORY` | 6 | `packages/rag/src/constants.ts` | cost growth over a long conversation |
+| `CANDIDATE_COUNT` | 10 | `packages/rag/src/constants.ts` | how much each search contributes before fusion |
+| `RRF_K` | 60 | `packages/rag/src/constants.ts` | how sharply rank 1 dominates in the fusion |
 
 **Changing either chunker constant requires re-ingesting every document.**
 Stored chunks are not touched by a code change.

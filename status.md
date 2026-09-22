@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phases 1–7 are done and signed off in the browser. Phase 8 (the record) is
-  next
+  eval baseline) **Tenancy is complete** (plan.md Phases 0–8, 2026-09-23). Nothing is in
+  progress. The next pieces of work are the optional plans in plan.md § 7
 
 ---
 
@@ -167,13 +167,32 @@ the user in a real browser** (all seven walk steps passed).
   appears only in comments. Tests pass (41 + 13), isolation is 11/11, eval is
   9/10, and verify is 14/14.
 
-**9. Tenancy Phase 8 — cutover and the record** (`plan.md` § Phase 8). Its
-to-do list:
-- D-025…D-030 go into `decisions.md`. D-028 must record the three Phase 6
-  deviations, and D-006 needs amending.
-- Amend CLAUDE.md rule 1: the battery now needs BOTH tenants.
-- Clean up the architecture and flow docs, which still show un-prefixed
-  `/api/…` paths.
+~~**9. Tenancy Phase 8 — cutover and the record.**~~ **Done 2026-09-23.
+Tenancy is complete: Phases 0–8.**
+- **`decisions.md`:** D-025 to D-030 added. D-028 records the three Phase 6
+  deviations, and D-006 was amended.
+- **`risks.md`:** R-10 to R-13 added, plus "still missing after tenancy", and
+  R-2 amended.
+- **`architecture.md`:** §2 system overview, §3 diagrams, §4 the five tables
+  and three SQL files, §5 routes, §7 layout and §8 env vars.
+- **`flow.md`:** redrawn for Next.js, with "resolve tenant" as step 1.
+- **`CLAUDE.md`:** rule 1 amended for two tenants; new rule 6 on the
+  `tenant_id` filter; Conventions, Layout and Commands updated.
+- **`README.md`:** three-file SQL setup, `ADMIN_COOKIE_SECRET`,
+  `tenant:add`/`tenant:key`, the `/t/<slug>` pages, and a loader for both
+  eval corpora.
+- **The README's loader script was run verbatim** against a throwaway tenant,
+  with only the slug and key substituted. It gave 9 documents and 34 chunks,
+  with the same per-document counts as the real tenants, and the tenant was
+  then deleted.
+
+**What is left is optional, and each item is its own plan** (`plan.md` § 7):
+- Messenger;
+- recording unanswered questions;
+- Tagalog greetings;
+- analytics;
+- tool calls;
+- real auth plus RLS, which is due before any public URL (R-2, R-11, R-13).
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -536,6 +555,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 8)
+- **Did:** the record. decisions.md got D-025 to D-030 and the D-006
+  amendment. risks.md got R-10 to R-13 and the R-2 amendment. architecture.md
+  and flow.md were redrawn for the tenant-aware Next.js app; the §2 overview
+  and §3 diagrams still showed the Express POC and were fixed too. CLAUDE.md
+  got rule 1 amended and a new rule 6. README.md got the setup and fixture
+  loading. plan.md's "Eight phases" became "Nine phases, numbered 0–8".
+- **Observed:** the README loader, run verbatim against a throwaway
+  `loadprobe` tenant, gave 9 documents and 34 chunks (northwind 4, villa
+  3/4/5/4/4/3/3/4). The tenant was deleted and 0 of its documents remain.
+- **Next:** nothing required. See plan.md § 7 for the optional follow-ups.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 7)
 - **Did:** Moved the screens into components, driven by Server Component

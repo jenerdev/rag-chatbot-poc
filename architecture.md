@@ -46,34 +46,45 @@ computes exactly that distance inside the database.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Browser  (native HTML + JS, no build step)             │
+│  Browser  (React Client Components)                      │
 │                                                          │
-│   public/index.html  ── chat UI                          │
-│   public/admin.html  ── knowledge base manager           │
+│   /t/<slug>        chat-screen.tsx   — S-1 chat          │
+│   /t/<slug>/admin  admin-screen.tsx  — S-2 knowledge base│
+│   (the slug arrives as a prop from the server)           │
 └───────────────────────────┬─────────────────────────────┘
-                            │  fetch()  JSON over http://localhost:3000
+                            │  fetch()  JSON / SSE to /api/t/<slug>/…
                             ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Express server  (Node 20, server.js + src/*.js)         │
+│  Next.js server  (App Router, apps/web)                  │
 │                                                          │
-│   • serves the two static pages                          │
-│   • owns ALL secrets (OpenAI key, Supabase keys)         │
-│   • runs the ingest pipeline and the query pipeline      │
+│   • Server Component pages resolve the tenant (404 miss) │
+│   • Route Handlers: withTenantRoute → withRoute          │
+│   • owns ALL secrets (OpenAI key, service_role key,      │
+│     ADMIN_COOKIE_SECRET); @rag/db is server-only         │
+│   • @rag/pipeline runs ingest and query, per tenant      │
 └──────────┬──────────────────────────────┬───────────────┘
            │                              │
            │ HTTPS                        │ HTTPS
            ▼                              ▼
 ┌────────────────────────┐   ┌────────────────────────────┐
 │  OpenAI API            │   │  Supabase (Postgres)       │
-│  /v1/embeddings        │   │  documents                 │
-│  /v1/chat/completions  │   │  chunks (+ vector column)  │
-└────────────────────────┘   │  match_chunks() SQL fn     │
+│  /v1/embeddings        │   │  tenants                   │
+│  /v1/chat/completions  │   │  documents · chunks        │
+└────────────────────────┘   │  conversations · messages  │
+                             │  match_chunks[_fts]() —    │
+                             │  tenant-scoped SQL fns     │
                              └────────────────────────────┘
 ```
 
 **The browser never talks to OpenAI or Supabase directly.** Everything goes
-through Express. That is not ceremony — it is the only thing keeping your API
-key out of the page source (see `risks.md` § R-1).
+through the Next.js server. That is not ceremony: it is the only thing keeping
+the API key and the `service_role` key out of the page source (see `risks.md`
+§ R-1, R-2). `@rag/db` imports `server-only`, so a Client Component that tried
+to import it would fail the build.
+
+**Every request names its tenant in the URL**, and nothing picks one for it.
+The slug is resolved once, on the server, into a `TenantContext` that every
+pipeline function requires (D-026, D-027).
 
 ---
 
@@ -88,16 +99,20 @@ the project.
 > (D-019). For the flow **as built**, with the file and function behind each
 > step, see [`flow.md`](./flow.md). The two pipelines below are still the right
 > mental model — they are just missing three steps.
+>
+> **Tenancy (2026-09-23)** adds one step in front of both: resolve the slug to a
+> tenant, or 404. Every step after it is scoped to that tenant.
 
 ### 3.1 Ingest pipeline (once per document, on the admin page)
 
 ```mermaid
 flowchart TD
-    A["Paste text into admin.html"] --> B["POST /api/documents"]
-    B --> C["Insert row into documents"]
+    A["Paste text on /t/:slug/admin"] --> B["POST /api/t/:slug/documents"]
+    B --> T["Resolve tenant (404 on miss)<br/>requireAdmin: 401 without this tenant's session"]
+    T --> C["Insert row into documents<br/>(with tenant_id)"]
     C --> D["chunkText: split into ~1000-char pieces<br/>with 150-char overlap"]
     D --> E["POST api.openai.com/v1/embeddings<br/>all chunks in ONE batched call"]
-    E --> F["Insert chunks rows:<br/>content + embedding vector(1536)"]
+    E --> F["Insert chunks rows:<br/>content + embedding vector(1536) + tenant_id"]
     F --> G["Return: document id + chunk count"]
 ```
 
@@ -117,9 +132,10 @@ watching retrieval change is one of the more instructive things you can do here.
 
 ```mermaid
 flowchart TD
-    A["User types a question"] --> B["POST /api/chat"]
-    B --> C["Embed the QUESTION<br/>(same model as ingest — mandatory)"]
-    C --> D["supabase.rpc match_chunks<br/>cosine search over pgvector"]
+    A["User types a question on /t/:slug"] --> B["POST /api/t/:slug/chat"]
+    B --> T["Resolve tenant (404 on miss)"]
+    T --> C["Embed the QUESTION<br/>(same model as ingest — mandatory)"]
+    C --> D["supabase.rpc match_chunks<br/>cosine search over pgvector,<br/>filtered to p_tenant_id"]
     D --> E{"Any chunk above<br/>the similarity threshold?"}
     E -- no --> F["Skip OpenAI.<br/>Return the I-dont-know answer"]
     E -- yes --> G["Build the prompt:<br/>system rules + context + history + question"]
@@ -138,7 +154,17 @@ returns confident garbage and nothing errors.
 
 ## 4. Data model
 
-Run this in the Supabase SQL editor. It is the complete schema.
+The schema is **three files, run in order** in the Supabase SQL editor, all in
+`packages/db/sql/`:
+
+1. `schema.sql` — the four original tables and the first `match_chunks` (below).
+2. `schema-hybrid.sql` — the full-text index and `match_chunks_fts` (D-015).
+3. `schema-tenancy.sql` — the `tenants` table, `tenant_id` everywhere, and the
+   tenant-scoped versions of both search functions. It is idempotent and
+   describes the FINAL state: its last step drops the pre-tenancy function
+   signatures that files 1 and 2 create. See "Tenancy" below.
+
+The block below is `schema.sql`, the shape everything else builds on:
 
 ```sql
 -- 1. Enable pgvector. Supabase ships it; this just turns it on.
@@ -198,14 +224,72 @@ create index chunks_embedding_idx
 > so this will not block you — but it means the tables are unprotected if the
 > anon key is ever exposed. See `risks.md` § R-2.
 
+### Tenancy: five tables, one `tenant_id` filter
+
+`schema-tenancy.sql` turns one knowledge base into many. It uses shared tables
+with a `tenant_id` column, not schema-per-tenant (D-025).
+
+```sql
+create table if not exists tenants (
+  id              bigint generated always as identity primary key,
+  slug            text        not null unique,   -- the /t/<slug> segment
+  business_name   text        not null,          -- "Northwind Labs"
+  assistant_name  text        not null,          -- "Nora"
+  logo_url        text,                          -- https only, validated on write
+  banner_url      text,
+  theme           jsonb       not null default '{}'::jsonb,
+  admin_key_hash  text,                          -- scrypt; null = nobody can admin it
+  created_at      timestamptz not null default now(),
+  constraint tenants_slug_shape check (slug ~ '^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$'),
+  constraint tenants_slug_reserved check (
+    slug not in ('api','admin','t','_next','static','new','login','health')
+  )
+);
+
+-- On documents, chunks, conversations and messages. Backfilled, then NOT NULL,
+-- with NO default: an insert that does not name its tenant fails.
+alter table documents add column if not exists tenant_id bigint references tenants(id) on delete cascade;
+alter table documents alter column tenant_id set not null;
+-- …likewise for chunks, conversations, messages.
+
+-- The composite foreign keys. chunks.tenant_id duplicates documents.tenant_id on
+-- purpose (the search functions scan chunks alone), and this makes the copy
+-- impossible to get wrong: a chunk whose tenant disagrees with its document's
+-- fails to insert. The same holds for a message and its conversation.
+alter table documents     add constraint documents_id_tenant_key     unique (id, tenant_id);
+alter table conversations add constraint conversations_id_tenant_key unique (id, tenant_id);
+alter table chunks   add constraint chunks_document_tenant_fk
+  foreign key (document_id, tenant_id) references documents (id, tenant_id) on delete cascade;
+alter table messages add constraint messages_conversation_tenant_fk
+  foreign key (conversation_id, tenant_id) references conversations (id, tenant_id) on delete cascade;
+
+create index if not exists documents_tenant_idx     on documents (tenant_id, created_at desc);
+create index if not exists chunks_tenant_idx        on chunks (tenant_id);
+create index if not exists messages_tenant_conv_idx on messages (tenant_id, conversation_id, id);
+```
+
+(The real file wraps each constraint in an `if not exists` check so it can be
+re-run safely.) The HNSW index is unchanged: one global graph over every tenant.
+
+⚠️ **The server uses `service_role`, which bypasses RLS.** After tenancy, the
+only thing between two tenants on a READ is a `tenant_id = …` filter, in
+application code and inside the two functions below. The composite FKs guard
+writes; reads are guarded only by filters someone remembered to write (R-11).
+
+A side effect worth knowing about: with two foreign keys from `chunks` to
+`documents`, PostgREST will not pick one for an embedded select. So
+`listDocuments()` names it, as `chunks!chunks_document_tenant_fk(count)`.
+
 ### The similarity search function
 
 Vector search needs SQL, so it lives in a Postgres function and is called from
-Node with `.rpc()`.
+Node with `.rpc()`. This is the tenant-scoped version from `schema-tenancy.sql`,
+the only one that still exists:
 
 ```sql
 create or replace function match_chunks (
   query_embedding vector(1536),
+  p_tenant_id     bigint,                    -- NO default (D-027)
   match_count     int   default 5,
   min_similarity  float default 0.3
 )
@@ -216,6 +300,7 @@ returns table (
   similarity  float
 )
 language sql stable
+set hnsw.iterative_scan = 'strict_order'
 as $$
   select
     c.id,
@@ -223,11 +308,34 @@ as $$
     c.content,
     1 - (c.embedding <=> query_embedding) as similarity
   from chunks c
-  where 1 - (c.embedding <=> query_embedding) >= min_similarity
+  where c.tenant_id = p_tenant_id
+    and 1 - (c.embedding <=> query_embedding) >= min_similarity
   order by c.embedding <=> query_embedding   -- ascending distance = most similar first
   limit match_count;
 $$;
 ```
+
+Its keyword twin, `match_chunks_fts(query_text, query_embedding, p_tenant_id,
+match_count)`, carries the same `c.tenant_id = p_tenant_id` filter.
+
+**Why the tenant filter is inside the function and not in the caller.** Here
+the filter runs BEFORE the `limit`, so another tenant's chunk never takes up
+one of the candidate slots. Filtering afterwards, in TypeScript, would let ten
+slots fill up with the wrong tenant and fuse down to zero results.
+
+**Why `p_tenant_id` has no default.** A defaulted tenant parameter is a
+function that quietly searches the wrong tenant when a caller forgets an
+argument. Without a default, a forgotten tenant is an error.
+
+**Why `iterative_scan`.** HNSW has no idea what a tenant is: it walks the graph
+and the tenant filter is applied afterwards. For a tenant large enough that the
+planner picks HNSW, a short walk can find only other tenants' chunks and
+return zero rows, which is a silent false refusal. Tenancy Phase 2 reproduced
+exactly that: villa got 0 rows at `ef_search` 2, and 5 rows with iterative
+scan. `strict_order` keeps most-similar-first ordering, which `relaxed_order`
+does not promise. At today's size the planner instead reads the tenant through
+`chunks_tenant_idx` and sorts exactly. See `notes.md` § "Tenancy Phase 2" and
+`risks.md` R-10.
 
 Reading the operators:
 
@@ -244,20 +352,41 @@ Reading the operators:
 
 ## 5. API surface
 
-All JSON. All served from `http://localhost:3000`.
+All JSON. All served from `http://localhost:3000`. **Every route names its
+tenant in the path**, as `/t/<slug>` for pages and `/api/t/<slug>/…` for the API
+(D-026). There is no default tenant and no redirect: the old un-prefixed
+`/api/chat` and `/admin` are 404s. An unknown slug is a 404, `No workspace
+named "<slug>"`.
 
-| Method | Route | Body / params | Returns | Used by |
+| Method | Route | Body / params | Returns | Access |
 |---|---|---|---|---|
-| `GET` | `/` | — | `apps/web/app/page.tsx` | browser |
-| `GET` | `/admin` | — | `apps/web/app/admin/page.tsx` | browser |
-| `POST` | `/api/documents` | `{ title, source?, content }` | `{ id, title, chunkCount }` | admin |
-| `GET` | `/api/documents` | — | `[{ id, title, source, chunkCount, created_at }]` | admin |
-| `DELETE` | `/api/documents/:id` | — | `{ deleted: true }` (chunks cascade) | admin |
-| `POST` | `/api/chat` | `{ conversationId?, message }` | `{ conversationId, reply, sources[] }` | chat |
-| `GET` | `/api/conversations/:id/messages` | — | `[{ role, content, created_at }]` | chat |
+| `GET` | `/` | — | a static page; no tenant list, no redirect | public |
+| `GET` | `/t/<slug>` | — | S-1 chat | public |
+| `GET` | `/t/<slug>/admin` | — | S-2 knowledge base; a login form until a session exists | public page, admin data |
+| `POST` | `/api/t/<slug>/chat` | `{ conversationId?, message }` | `{ conversationId, reply, sources[], searchQuery }`, or SSE with `Accept: text/event-stream` | **open** |
+| `GET` | `/api/t/<slug>/conversations/:id/messages` | — | `[{ role, content, created_at }]`, or 404 if not this tenant's | **open** |
+| `POST` | `/api/t/<slug>/admin/session` | `{ key }` | `{ admin: true }` and the session cookie | open (it is the login) |
+| `GET` | `/api/t/<slug>/admin/session` | — | `{ admin: boolean }` | open |
+| `DELETE` | `/api/t/<slug>/admin/session` | — | `{ admin: false }`; the cookie is cleared | open |
+| `POST` | `/api/t/<slug>/documents` | `{ title, source?, content }` | `{ id, title, chunkCount }` | **admin** |
+| `GET` | `/api/t/<slug>/documents` | — | `[{ id, title, source, chunkCount, created_at }]` | **admin** |
+| `DELETE` | `/api/t/<slug>/documents/:id` | — | `{ deleted: true }` (chunks cascade) | **admin** |
+| `GET` | `/api/t/<slug>/documents/:id/chunks` | — | `[{ id, chunk_index, content }]` | **admin** |
 
-`sources[]` is `[{ id, documentId, documentTitle, content, similarity }]` — the
-exact chunks that were pasted into the prompt. **Showing these in the UI is a
+**Admin** means `requireAdmin()` in `apps/web/lib/admin-auth.ts`: the request
+must carry this tenant's session cookie. That is an HMAC-signed
+`<slug>.<expiry>.<mac>`, httpOnly, SameSite=lax, with its path set to
+`/api/t/<slug>`. Without one, the route answers `401 Admin login required`
+(D-028). The chat stays open, because it is the product.
+
+**Another tenant's id behaves exactly like a missing one.** A document id from
+another tenant gives `[]` for its chunks and `404` on delete. A conversation id
+from another tenant gives `404` for its transcript, and is ignored by chat,
+which starts a new conversation. That way ids cannot be enumerated across
+tenants.
+
+`sources[]` is `[{ id, documentId, documentTitle, content, similarity, foundBy }]`,
+the exact chunks that were pasted into the prompt. **Showing these in the UI is a
 required feature, not a debug nicety:** it is the only way to see whether an
 answer came from your data or from the model's imagination.
 
@@ -312,16 +441,20 @@ rag-chatbot-poc/
 ├── .env                    # secrets — gitignored, never committed
 ├── .env.example            # the same keys with empty values, committed
 ├── turbo.json              # task graph; globalEnv names every secret
-├── apps/web/               # Next.js — both screens and all six routes
-│   ├── app/page.tsx            # S-1 chat
-│   ├── app/admin/page.tsx      # S-2 knowledge base
-│   ├── app/api/**/route.ts     # the six endpoints
-│   └── lib/                    # route.ts, env.ts, limits.ts, schemas.ts
+├── apps/web/               # Next.js — both screens, every route
+│   ├── app/page.tsx                    # static root: no tenant list, no redirect
+│   ├── app/t/[tenant]/layout.tsx       # tenant theme (style prop) + tab title
+│   ├── app/t/[tenant]/page.tsx         # S-1 chat (Server Component → ChatScreen)
+│   ├── app/t/[tenant]/admin/page.tsx   # S-2 knowledge base (→ AdminScreen)
+│   ├── app/t/[tenant]/not-found.tsx    # "No such workspace"
+│   ├── app/api/t/[tenant]/**/route.ts  # the endpoints, incl. admin/session
+│   ├── components/                     # chat-screen, admin-screen, brand-header, sources-panel
+│   └── lib/                            # route, tenant, admin-auth, branding, env, limits, schemas, chat-stream
 └── packages/
     ├── chunker/            # chunkText() — pure, zero dependencies
     ├── openai/             # embed() + chat() + chatStream() — raw fetch
-    ├── db/                 # the client, the types, and sql/
-    └── rag/                # ingestDocument() + answerQuestion()
+    ├── db/                 # the client, the types, sql/, admin-key.ts; tools/verify.mjs, tools/tenant.mjs
+    └── rag/                # the pipelines + tenant.ts; tools/prompt-eval, score-probe, isolation
 ```
 
 The original build was 500–700 lines. The port did not add features, and the
@@ -334,11 +467,18 @@ to build.
 | Package / file | Responsibility | Must NOT contain |
 |---|---|---|
 | `@rag/openai` | Three `fetch` calls. Reads `OPENAI_API_KEY`. Throws `OpenAIError` carrying the upstream status. | Any knowledge of chunks, documents or prompts |
-| `@rag/db` | One client, the generated types, `sql/`, and the `server-only` guard | Query logic |
+| `@rag/db` | One client, the hand-written types, `sql/`, the `server-only` guard, and `admin-key.ts` (scrypt hash and verify for `tenants.admin_key_hash`) | Query logic |
+| `@rag/db` `tools/tenant.mjs` | `tenant:add` / `tenant:key`: print a new admin key once, store only its hash | Any way to read a key back |
 | `@rag/chunker` | Pure text → array of strings. No async, **no dependencies**. | Any I/O or API call |
-| `@rag/pipeline` | The two pipelines from § 3, orchestrating the packages above | HTTP handling, `req`/`res` |
-| `apps/web/app/api` | Six Route Handlers: validation, and the response shape | Business logic |
-| `apps/web/lib/route.ts` | `withRoute()` — the ONE error → status map | Anything route-specific |
+| `@rag/pipeline` | The two pipelines from § 3, orchestrating the packages above. Every function that touches the database takes a required `TenantContext` first (D-027). | HTTP handling, `req`/`res`; any default tenant |
+| `@rag/pipeline` `src/tenant.ts` | `loadTenant(slug)`: the one place a `tenants` row becomes a `TenantContext`, selecting four named columns | `admin_key_hash` |
+| `@rag/pipeline` `tools/isolation.mjs` | 11 cross-tenant checks run through the pipeline (`pnpm --filter @rag/pipeline isolation`) | — |
+| `apps/web/app/api/t/[tenant]` | Route Handlers: validation, and the response shape | Business logic |
+| `apps/web/lib/route.ts` | `withRoute()`, the ONE error → status map | Anything route-specific |
+| `apps/web/lib/tenant.ts` | `getTenant()` (cached) and `withTenantRoute()`: slug → `TenantContext`, 404 on a miss | A fallback tenant |
+| `apps/web/lib/admin-auth.ts` | The session cookie (sign, read), `requireAdmin()`, `checkAdminKey()` | Plaintext keys, logging of keys |
+| `apps/web/lib/branding.ts` | `loadBranding()` and `themeVars()`: a five-key colour allowlist, https-only image URLs | `dangerouslySetInnerHTML`, free-form CSS |
+| `apps/web/components/*-screen.tsx` | The two Client Components. They get the tenant as props from a Server Component page, never from `window.location` | `@rag/db`, secrets |
 
 The point of the split is unchanged, and is now enforced rather than agreed:
 `@rag/chunker` declares no dependencies, so it can be read with no network in
@@ -359,16 +499,24 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 SUPABASE_URL=https://xxxxxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
+# Signs the per-tenant admin session cookie. ≥ 32 random characters.
+# Rotating it logs every admin out. It is NOT an admin key.
+ADMIN_COOKIE_SECRET=...
+
 PORT=3000
 ```
+
+Admin keys are not environment variables. There is one per tenant, issued by
+`pnpm --filter @rag/db tenant:key -- <slug>` and stored only as a hash.
 
 Where to find the Supabase values: Supabase dashboard → your project →
 **Project Settings → API**. Use the **`service_role`** key, not the `anon` key —
 the server needs to write and RLS is not configured in the POC (D-006).
 
-**Fail fast:** on startup, check every variable is present and `process.exit(1)`
-with a clear message naming the missing one. A missing key should be a one-line
-error at boot, not a confusing 401 twenty minutes later.
+**Fail fast:** `apps/web/lib/env.ts` checks every required variable (including
+`ADMIN_COOKIE_SECRET`). It logs one line naming the missing ones at import, and
+throws that same message on every request (D-023). A missing key should be a
+one-line error, not a confusing 401 twenty minutes later.
 
 ---
 

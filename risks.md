@@ -55,6 +55,13 @@ five-minute action, and nothing in the code will complain.
 - If you deploy without doing that, the tables are readable and writable by
   anyone who finds the URL.
 
+**Amended 2026-09-23, tenancy: this risk is now larger, not smaller.** The server
+serves several tenants that do not trust each other, through a key that
+bypasses RLS for all of them. A missing policy used to mean "a stranger could
+read the one knowledge base". Now it also means "one tenant's reads are held
+apart from another's only by application code". See R-11 and the D-006
+amendment.
+
 ---
 
 ## R-3 · Silent retrieval failure — the answer looks right and isn't · **Most likely to actually happen**
@@ -191,6 +198,104 @@ general rule where the document also stated an exception — so whether it matte
 depends entirely on whether your documents have carve-outs.
 
 Full list in `README.md` § "Before you put this in production".
+
+---
+
+## R-10 · HNSW post-filtering loses recall as tenants multiply · **Low now, grows with every tenant**
+
+**The risk:** one HNSW graph holds every tenant's chunks (D-025). When the
+planner uses that index for a tenant-scoped search, it walks the graph in
+distance order and throws away other tenants' rows *after* the walk. If the
+walk ends before enough of this tenant's rows have passed, the search returns
+short, or empty.
+
+**Measured in tenancy Phase 2** (northwind 4 chunks, villa 30, pgvector
+0.8.2). With HNSW forced and `hnsw.ef_search = 2`, villa got **0 rows**: both
+chunks the walk visited were northwind's. The pipeline then logs
+`[retrieve] villa vector:0`, the D-008 short circuit fires, and the bot refuses
+a question its documents answer. Nothing errors.
+
+**Why it is low today:** at this size the planner does not use HNSW for a
+tenant-scoped search at all. It reads `chunks_tenant_idx` and sorts exactly.
+
+**Mitigation:** `match_chunks` sets `hnsw.iterative_scan = 'strict_order'`, and
+with that the same forced query returned **5**. The walk keeps going instead of
+giving up. It is still bounded by `hnsw.max_scan_tuples` (default 20,000).
+**Re-measure at ten tenants and at fifty**, the way `notes.md` § "Tenancy
+Phase 2" did. The symptom to watch for in the logs is `[retrieve] <slug>
+vector:0` on a question that should hit.
+
+---
+
+## R-11 · Isolation is enforced by application code, not by the database · **The one that would be a breach**
+
+**The risk:** `service_role` bypasses RLS (D-006). The composite foreign keys
+protect *writes*: a chunk or message cannot be filed under the wrong tenant.
+But every *read* is a `tenant_id` filter that someone remembered to write. One
+missed filter is a cross-tenant read that throws no error, logs nothing, and
+returns plausible answers.
+
+**Why it can happen:** the next feature adds a query, and the query works,
+because it returns rows.
+
+**Mitigation, all observed passing 2026-09-23:**
+
+- The pipeline cannot be called without a tenant (D-027). The grep of every
+  `from(...)`/`rpc(...)` line in `packages/rag/src` shows a tenant on 15 of 15.
+  Re-run it and read it after any change there.
+- **`pnpm --filter @rag/pipeline isolation`: 11/11.** It covers cross-tenant
+  list, chunks, delete, answer, conversation reuse, transcript read and ingest.
+- **The eval battery's leak cases:**
+  - leak-1: northwind refuses villa's parking fact;
+  - leak-2: northwind refuses villa's Wi-Fi password, and a control proves it
+    is findable from villa;
+  - leak-3: a villa transcript read as northwind is `null`.
+- `verify.mjs` check 14: a search as another tenant returns 0 rows.
+
+The real fix is RLS policies that carry the tenant (R-2). Until then, those
+suites are the only things that will catch a regression.
+
+---
+
+## R-12 · A persona erodes refusals over time · **Re-opened by every prompt edit**
+
+**The risk:** the per-tenant persona (D-029) is a line that invites the model to
+be helpful. A later edit that makes it friendlier, more confident or more
+"expert" can quietly turn a refusal into an answer from training data.
+
+**Measured so far:** adding the persona changed **none** of the six Northwind
+verdicts, on two runs. The battery reads 9/10.
+
+**Mitigation:** tenancy Phase 4's gate is the mechanism. Diff the six verdicts
+against `plan/baseline/eval-pre-tenancy.txt`, and treat a single flipped verdict
+as the persona being wrong, not the battery being strict. CLAUDE.md rule 1 is
+what keeps that gate applied.
+
+---
+
+## R-13 · No rate limit on the admin key · **Low while local; the first thing to add if public**
+
+**The risk:** `POST /api/t/<slug>/admin/session` accepts as many attempts as it
+is sent. Nothing throttles them, and failed attempts are not logged anywhere
+beyond the normal request log.
+
+**Why it is low:** the key is 32 random bytes (43 characters, base64url), so
+guessing it is not a real attack. Each attempt also costs the server an scrypt
+hash, about 50 ms measured.
+
+**Why nothing was added:** it was deliberate. A rate limit needs state that
+outlives a request, and `architecture.md` § 9 rules out retry loops and hidden
+in-memory state. **Add it before a public URL**, together with audit logging of
+admin actions.
+
+---
+
+## Explicitly still missing after tenancy
+
+Not risks of the build as it stands, but things a real multi-tenant product
+needs and this one does not have: RLS policies, tenant self-signup, per-tenant
+OpenAI keys or spend caps, usage metering, audit logging of admin actions, and
+any way for a tenant to export or delete everything it owns (`plan.md` § 6).
 
 ---
 
