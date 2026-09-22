@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-22
+> Last updated: 2026-09-23
 
 ---
 
@@ -28,8 +28,11 @@
   both the JSON and the SSE paths. Phase 4 was closed on structural parity
   (87/0 chunker, 22/0 pipeline, 24/0 API) rather than on the eval baseline,
   which was never captured — a deliberate, recorded choice
-- **Working on right now:** nothing. **The migration is functionally complete**
-  — the `mvp.md` definition of done passes in the browser on the new stack
+- **Working on right now:** nothing implemented. **The migration is functionally
+  complete** — the `mvp.md` definition of done passes in the browser on the new
+  stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
+  eval baseline) was captured 2026-09-23 but is not yet committed; Phase 1
+  (schema) is next
 
 ---
 
@@ -41,18 +44,29 @@ a streamed answer with its sources panel arriving first, and the refusal after
 the document is deleted. That is the `mvp.md` definition of done, on the new
 stack.
 
-**Nothing is required.** What is left is optional:
+The migration needs nothing more. **The next piece of work is chosen and
+planned:** multi-tenancy, in [`plan.md`](./plan.md) (8 phases, written
+2026-09-22).
 
-**1. Phase 8 — deploy** (`plan/steps.md` § Phase 8). The step that catches
-a proxy buffering the stream, which cannot be caught locally. Before it, read
-`README.md` § "Before you put this in production" — R-2 in particular (RLS is
-enabled with no policies; `service_role` bypasses it) stops being a note and
-becomes a blocker the moment there is a public URL.
+~~**1. Tenancy Phase 0 — capture the eval baseline.**~~ **Done 2026-09-23**
+(uncommitted). Northwind only (document 37, chunks 137–140); eval **5/6**, the
+D-017 `antecedent` failure; pgvector **0.8.2**. Files are in `plan/baseline/`:
+`eval-pre-tenancy.txt`, `scores-pre-tenancy.txt`, `match-ids-pre-tenancy.md`.
+Commit them to close the phase.
 
-**Optional, whenever:** run the eval battery against the corpus it was written
-for. `fixtures/northwind.json` must be the only thing loaded, or the verdicts
-are meaningless — the Villa documents describe parking, which the `absent-2`
-case exists to have refused.
+**2. Tenancy Phases 1–8** (`plan.md`). Phases 0–2 touch no application code.
+The one thing to internalise before starting is `plan.md` § 0 Rule 2:
+**after this, the only thing between tenant A and tenant B is a
+`where tenant_id = …` in application code** — `service_role` still bypasses
+RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
+having read the queries.
+
+**3. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+that catches a proxy buffering the stream, which cannot be caught locally.
+Before it, read `README.md` § "Before you put this in production" — R-2 in
+particular (RLS is enabled with no policies; `service_role` bypasses it) stops
+being a note and becomes a blocker the moment there is a public URL, and
+`plan.md` R-11 makes it larger rather than smaller.
 
 ℹ `pnpm eval` and `pnpm scores` now carry `--conditions=react-server`, because
 the pipeline imports `@rag/db`, which is `server-only`. Without the flag they
@@ -402,6 +416,53 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6 (tenancy Phase 0)
+- **Did:** Deleted the 8 Villa Amihan documents (ids 27–34, with the user's
+  go-ahead). The first Northwind ingest failed with `HTTP 401: Your API key has
+  been invalidated`, and the R-7 cleanup removed the half-made document 36
+  (DB checked: 0 documents, 0 chunks). The user put in a new key, and Northwind
+  loaded as document 37 → 4 chunks (137–140).
+- **Observed:** eval `5/6 as intended`, where the only FAIL is `antecedent`
+  ("auditor groups ... one per one"), matching D-017. Scores: top 0.588 (Quiet
+  Hour), 0.530 (freezer), 0.286 (`extension 4417`), off-topic ≤ 0.092.
+  pgvector 0.8.2.
+- **Deviation:** `plan.md` asks for five chunk ids per question, but the corpus
+  has four chunks, so four were recorded.
+- **Next:** commit `plan/baseline/*-pre-tenancy.*`, then Phase 1 (schema).
+
+### 2026-09-22 — session 5 (tenancy planning)
+- **Did:** Wrote [`plan.md`](./plan.md) — multi-tenancy, 8 phases, each with an
+  observable "done when". This is the plan `plan/steps.md` § 7 deferred and the
+  Phase 3 callout warned would be expensive if decided late. It was decided
+  late; the plan says what that costs.
+- **Three decisions taken before writing, because they are the expensive ones:**
+  a tenant is a path segment `/t/<slug>` rather than a subdomain (D-026);
+  admin is a per-tenant scrypt-hashed key behind a path-scoped signed cookie,
+  hand-rolled on `node:crypto` (D-028); and per-tenant persona **is** in scope,
+  which is what makes the eval baseline mandatory (D-029).
+- **The finding that changed the plan's shape:** `ensureConversation()`
+  (`packages/rag/src/answer.ts:18`) returns a client-supplied `conversationId`
+  unverified, and `getMessages()` (`:259`) has no tenant filter at all. Harmless
+  in a single-tenant app; with tenants it is two holes — post tenant A's uuid to
+  tenant B's chat endpoint and A's history is pasted into B's prompt, and any
+  uuid reads its own full transcript. Written up as `plan.md` § 2.2 with the fix
+  in Phase 3 and three `leak-*` eval cases to catch a regression.
+- **The trap that is genuinely new:** an HNSW index does not know what a tenant
+  is, so `where tenant_id = …` is a **post**-filter — Postgres walks the graph
+  in distance order and discards non-matching rows, giving up after
+  `hnsw.ef_search` (40) candidates. At two tenants that is free; at fifty a
+  small tenant can get **zero rows** back and the bot refuses a question it
+  could answer, with `[retrieve] vector:0` in the log as the only sign. Phase 2
+  exists solely to measure it (`explain analyze` must still say
+  `Index Scan using chunks_embedding_idx`), and it is logged as R-10.
+- **One liability turned into an asset:** `CLAUDE.md` rule 1's "load
+  `fixtures/northwind.json` and nothing else" exists because the Villa corpus
+  describes parking and `absent-2` needs parking refused. Under tenancy the two
+  corpora become two tenants and that same case asserts something stronger —
+  parking **is** in this database and still unreachable from this tenant. Rule 1
+  gets amended in Phase 8.
+- **Next:** `plan.md` Phase 0. Nothing in the plan is implemented.
 
 ### 2026-09-21 — session 3 (migration planning + Phase 0)
 - **Did:** Wrote [`plan/steps.md`](./plan/steps.md) — the full migration from

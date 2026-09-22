@@ -9,3 +9,5 @@
     - logo/image banner
 
 - google analytics
+- record all questions that are not answered
+- fix greetings, should understand tagalog

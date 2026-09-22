@@ -1,0 +1,18 @@
+$ node --conditions=react-server --env-file=../../.env tools/score-probe.mjs
+kind          question                                             top  scores
+----------------------------------------------------------------------------------------------------
+direct hit    What time is the Quiet Hour?                         0.588  0.588  0.346  0.218  0.197
+direct hit    What temperature does the Bay 3 freezer run at?      0.530  0.530  0.364  0.316  0.289
+direct hit    Who approves equipment requests over 2000 credits?   0.548  0.548  0.396  0.340  0.306
+direct hit    How long are chemical samples retained?              0.577  0.577  0.373  0.272  0.203
+paraphrased   Why cannot I use the centrifuge in the early afternoon? 0.501  0.501  0.320  0.299  0.247
+paraphrased   Can a candidate on a tour walk into Bay 7?           0.397  0.397  0.254  0.253  0.243
+exact token   extension 4417                                       0.286  0.286  0.228  0.227  0.165
+same domain   What is the policy on laboratory safety goggles?     0.427  0.427  0.365  0.358  0.352
+off topic     What is the capital of France?                       0.068  0.068  0.029  0.010  0.001
+off topic     How do I bake sourdough bread?                       0.077  0.077  0.071  0.063  0.027
+off topic     Explain the offside rule in football.                0.092  0.092  0.072  0.039  0.020
+
+Reminder: every question returns match_count rows when the threshold is 0.
+The off-topic rows below are not a bug — they are the nearest chunks in a
+corpus of 3. That is exactly what MIN_SIMILARITY exists to reject (D-008).

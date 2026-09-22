@@ -10,7 +10,7 @@
 > **Phase 5 (Experiments)** — the whole project, complete.
 > The measured findings from Phase 5 live in their own file,
 > [`notes.md`](./notes.md); this file records what was built and why.
-> Last updated: 2026-09-20.
+> Last updated: 2026-09-22.
 
 ---
 
@@ -2726,3 +2726,156 @@ accident and it costs three API calls to confirm.
 Only English, and only greetings. `thanks` and `bye` hit the same wall and are
 not handled; adding them is a line in the same file. Greetings in another
 language are one line too — the regex is the whole surface.
+
+## Tenancy plan written · done
+
+[`plan.md`](./plan.md) — 8 phases, the plan `plan/steps.md` § 7 deferred and its
+Phase 3 callout warned would be expensive if decided late. It *was* decided
+late, and the plan is explicit about what that costs: a backfill, and a rewrite
+of every query in `@rag/pipeline` plus both SQL functions, rather than one
+migration taken at the right moment.
+
+### What was decided before writing, and why those three
+
+Three questions change the shape of the work rather than its details, so they
+were answered first:
+
+| Decision | Why this one, not the alternative |
+|---|---|
+| A tenant is a path segment `/t/<slug>` (**D-026**) | Identical on localhost and hosted. A subdomain needs wildcard DNS and a wildcard cert before the first tenant works at all, and local dev needs a hosts-file trick. Resolution is one function, so subdomains later are one file |
+| Per-tenant admin key, scrypt, path-scoped signed cookie, hand-rolled (**D-028**) | ~80 readable lines of `node:crypto` against an auth framework's worth of concepts. D-001/D-002 — "no library does a step" — is still a functional requirement of this repo |
+| Persona **is** in scope (**D-029**) | It is what "tenant base" means in `todo.md`: business name and assistant name. It also means `buildPrompt()` changes, which is what makes the missing eval baseline a blocker rather than a note |
+
+### The two rules at the top, and why there are two
+
+`plan/steps.md` needed one rule (*port, do not improve*). This plan needs that
+one **plus** a second, because tenancy introduces a failure mode the migration
+did not have:
+
+> **Isolation is proven by a test, not by reading the code.**
+
+`service_role` bypasses RLS. After this plan the only thing between tenant A and
+tenant B is a `where tenant_id = …` in application code and inside two SQL
+functions. A missing filter throws nothing, logs nothing, and returns plausible
+answers — the R-3 pattern, aimed at other people's documents. So the acceptance
+test is two tenants loaded and each one refusing the other's question
+(`leak-1`, `leak-2`, `leak-3`), not a careful reading of thirteen queries.
+
+### The finding that changed the plan
+
+`ensureConversation()` (`packages/rag/src/answer.ts:18`) trusts a
+client-supplied `conversationId` without verifying it exists or belongs to
+anyone, and `getMessages()` (`:259`) has no tenant filter at all. In a
+single-tenant app both are harmless. With tenants they are two distinct holes:
+
+- **History injection** — post tenant A's conversation uuid to tenant B's chat
+  endpoint and A's last six messages are loaded as history and pasted into B's
+  prompt. The retrieved chunks are correctly B's, which is what makes it hard to
+  notice.
+- **Transcript read** — any uuid returns its own full transcript, unauthenticated.
+
+This is why Phase 3 is not simply "add `.eq('tenant_id', …)` everywhere", and
+why `leak-3` asserts on `getMessages` rather than on an answer.
+
+### The trap that is genuinely new: HNSW post-filtering
+
+An HNSW index does not know what a tenant is. Postgres walks the graph in
+distance order, pulls candidates, and *then* discards the ones failing the
+tenant filter — giving up after `hnsw.ef_search` candidates (default **40**).
+
+At two tenants this is free. At fifty, a question from a small tenant can walk
+40 neighbours that all belong to other tenants and come back with **zero rows**;
+the D-008 short circuit fires, and the bot refuses a question it could have
+answered. The only sign is `[retrieve] vector:0` in a log nobody is reading.
+
+That is why Phase 2 exists as a phase of its own, before any application code:
+`explain analyze` must still report `Index Scan using chunks_embedding_idx`, and
+the five chunk ids returned must match the five Phase 0 recorded. Options, in
+order: `hnsw.iterative_scan = 'relaxed_order'` set on the function (needs
+pgvector ≥ 0.8.0 — check `pg_extension` first), a raised `ef_search`, or a
+partial index per tenant, which is correct and unmanageable. Logged as R-10.
+
+### The guard that does not depend on remembering
+
+`chunks` carries `tenant_id` denormalised, because both SQL functions scan
+`chunks` alone and joining to `documents` to discover each candidate's tenant
+defeats the index before the filter can help. Denormalisation invites drift — a
+document under tenant A with chunks under tenant B — so it is enforced by
+Postgres rather than by discipline: `unique (id, tenant_id)` on `documents`,
+then a **composite foreign key** from `chunks (document_id, tenant_id)`. A
+mismatched insert now fails. Same treatment for `messages` → `conversations`.
+
+Every other isolation guarantee in the plan is a filter someone has to remember
+to write. This one is four lines that make the mistake impossible, and Phase 1's
+verify script asserts it by attempting the bad insert and requiring it to fail.
+
+### One liability turned into the strongest test in the battery
+
+`CLAUDE.md` rule 1 currently says: load `fixtures/northwind.json` **and nothing
+else**, because the Villa corpus describes parking and the `absent-2` case
+exists to have parking refused. That makes the one test protecting the prompt
+unrunnable against a database with real content in it.
+
+Under tenancy the two corpora become two tenants, and `absent-2` stops asserting
+"the fact is absent" and starts asserting **"the fact is in this database and
+still unreachable from this tenant."** The precondition becomes the feature.
+Rule 1 gets amended in Phase 8.
+
+### Also worth writing down
+
+- **`tenant` is a required parameter, never ambient** (D-027). No
+  `AsyncLocalStorage`, no module-level current tenant, no `tenantId = 1`
+  default. Required means every forgotten call site is a compile error — the
+  same move `server-only` made for the service-role key, applied to the tenant.
+- **Branding sets CSS custom properties through React's `style` prop** (D-030),
+  from a five-key allowlist validated with zod. The obvious implementation is
+  `<style dangerouslySetInnerHTML=…>`, which is CSS injection from a database
+  column and is precisely what `CLAUDE.md` § Conventions forbids. The `style`
+  prop needs no exception to the rule.
+- **`admin_key_hash is null` means nobody can administer that tenant**, not
+  everybody. Default-deny, because the other default is one forgotten column
+  away from an open admin panel.
+- **Phase 0 finally pays the baseline debt.** Migration Phase 4 closed on
+  structural parity (22/0) and recorded that the eval baseline was never
+  captured. A prompt change with no baseline is unmeasurable, so it is the first
+  step and the plan says to stop if the battery does not read 5/6.
+
+### Status
+
+**Nothing is implemented.** This entry records a plan, and the next observable
+value in this file should be the Phase 0 baseline — real verdicts, real scores,
+real chunk ids.
+
+---
+
+## Tenancy Phase 0 — the baseline, captured · done 2026-09-23
+
+**What was done:** Cleared the database down to `fixtures/northwind.json`
+alone, which meant deleting the 8 Villa Amihan documents. Then ran the eval
+battery and the score probe into `plan/baseline/`, and recorded the raw
+`match_chunks` ids plus the pgvector version.
+
+**Why it mattered:** tenancy changes `buildPrompt()`, and until now there was
+nothing to compare a prompt change against. Every later phase is now measured
+against these files.
+
+**What each observed value proves:**
+- **`5/6 as intended`, with only `antecedent` failing.** This is exactly the
+  D-017 result, so nothing drifted through the TypeScript/Next.js migration.
+  Migration Phase 4 closed on structural parity. This run is the behavioural
+  parity that phase never measured.
+- **`[retrieve] vector:0 keyword:0 -> fused:0` for "capital of France".** The
+  D-008 short circuit still fires before any OpenAI call; the log shows no
+  `[openai] chat` line for that case.
+- **Chunk ids 139/138/140/137 (freezer) and 140/137/138[/139] (extension
+  4417).** Phase 2 re-runs these after the tenant filter goes in. Same ids in
+  the same order means the filter did not change what HNSW returns.
+- **pgvector 0.8.2.** `hnsw.iterative_scan` exists, so § 2.1's first-choice fix
+  for post-filter recall loss is available without an upgrade.
+
+**Traps it hit and avoided:**
+- **A dead API key mid-ingest (401).** The `catch` in `ingestDocument()`
+  deleted document 36. Without it, a zero-chunk document would have sat in the
+  "Northwind only" database. That is R-7 working exactly as designed.
+- **Only four ids, not five.** `match_count: 5` against a 4-chunk corpus
+  returns four. This is recorded as it is rather than padded.
