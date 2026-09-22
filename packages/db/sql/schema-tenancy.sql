@@ -133,12 +133,20 @@ create index if not exists documents_tenant_idx     on documents (tenant_id, cre
 create index if not exists chunks_tenant_idx        on chunks (tenant_id);
 create index if not exists messages_tenant_conv_idx on messages (tenant_id, conversation_id, id);
 
--- The vector index is UNCHANGED: one global HNSW graph over every tenant. The
--- tenant filter is applied AFTER the graph walk, which can lose recall silently
--- as tenants multiply (plan.md § 2.1, R-10). Phase 2 measures that, and decides
--- whether these functions need `set hnsw.iterative_scan` (pgvector is 0.8.2).
--- The composite GIN index for full-text search is also a Phase 2 measurement,
--- so neither is decided here.
+-- The vector index is UNCHANGED: one global HNSW graph over every tenant.
+-- Phase 2 measured what that costs (notes.md, "Tenancy and the index"):
+--
+--   * Today the planner does not use HNSW for a tenant-scoped search at all.
+--     It reads the tenant's rows through chunks_tenant_idx and sorts them
+--     exactly, which gives perfect recall at this size.
+--   * Once a tenant is big enough for HNSW to win, the tenant filter is
+--     applied AFTER the graph walk. With the walk cut short, villa got 0 rows
+--     because every candidate belonged to northwind. That is the silent false
+--     refusal of plan.md § 2.1. The fix is iterative scan, set on
+--     match_chunks below.
+--   * The composite (tenant_id, tsvector) GIN index is NOT built. Full-text
+--     search also goes through chunks_tenant_idx. Revisit when one tenant
+--     holds thousands of chunks.
 
 -- 8. The tenant-scoped search functions.
 --
@@ -162,6 +170,15 @@ returns table (
   similarity  float
 )
 language sql stable
+-- Iterative index scan (pgvector ≥ 0.8.0; this database has 0.8.2). When the
+-- HNSW walk runs out of candidates before `match_count` rows have passed the
+-- tenant filter, the scan keeps walking instead of returning short. It is
+-- `strict_order`, not `relaxed_order`: relaxed can hand back rows slightly out
+-- of distance order, and the pipeline and verify.mjs both rely on
+-- most-similar-first. Measured in Phase 2: with ef_search 2, villa went from
+-- 0 rows to 5. The scan is still bounded by hnsw.max_scan_tuples (default
+-- 20,000). Set on the function itself, so no caller can forget it.
+set hnsw.iterative_scan = 'strict_order'
 as $$
   select
     c.id,

@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) and Phase 1 (schema, 14/14 verify) are done; Phase 2 (index
-  measurement) is next
+  eval baseline) Phase 1 (schema, 14/14 verify) and Phase 2 (index measurement,
+  iterative scan chosen) are done; Phase 3 (pipeline) is next
 
 ---
 
@@ -64,14 +64,20 @@ with `23503 ... chunks_document_tenant_fk`. `pnpm eval` still gives **5/6**.
 the old unfiltered search functions are kept as overloads, so the app keeps
 working.
 
-**3. Tenancy Phase 2 — measure the index.** ⚠ Because of the D-031 bridge,
-`ingestDocument()` still writes everything to **northwind**. The `villa` tenant's
-documents must be inserted with an explicit `tenant_id`, by a script that
-writes rows directly, not through the app. From this point, the app must not be
-used against a two-tenant database until Phase 3: its questions search every
-tenant.
+~~**3. Tenancy Phase 2 — measure the index.**~~ **Done 2026-09-23.** Tenant `villa` (id 3) was
+seeded with an explicit `tenant_id`: documents 38–45, 30 chunks. The
+tenant-scoped ids match Phase 0 exactly. The planner uses `chunks_tenant_idx`
+plus an exact sort, not HNSW. With HNSW forced and ef_search 2, villa got
+**0 rows**, and iterative scan brought back 5. **Chosen:**
+`set hnsw.iterative_scan = 'strict_order'` on `match_chunks`, confirmed in
+`pg_proc`. No composite GIN index. Details are in `notes.md` § "Tenancy
+Phase 2". Verify is still 14/14.
+✓ `tenancy_explain` dropped (the RPC now returns `PGRST202`).
+⚠ **Two tenants now exist, so the D-031 bridge is live.**
+Don't use the app until Phase 3: "parking spaces" pulls villa chunks at 0.362
+through the old unfiltered function.
 
-**4. Tenancy Phases 3–8** (`plan.md`). Phase 3 must also run the bridge-removal
+**4. Tenancy Phase 3 — thread the tenant through `@rag/pipeline`, then Phases 4–8** (`plan.md`). Phase 3 must also run the bridge-removal
 block at the bottom of `schema-tenancy.sql`.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
@@ -435,6 +441,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 2)
+- **Did:** Seeded tenant `villa` (id 3; id 2 was the deleted verify probe) with
+  the 8 sample documents, using a direct-insert script, because the bridge
+  would have written them to northwind. Added the temporary, locked-down
+  `plan/tenancy-phase2-explain.sql` helper; the anon key gets
+  `42501 permission denied`. Ran 15 explain scenarios. Added iterative scan to
+  `match_chunks`, and the user re-ran `schema-tenancy.sql`.
+- **Observed:** the tenant filter plans as `Index Scan using chunks_tenant_idx`
+  plus a sort, which is exact. With HNSW forced and ef_search 2, villa went
+  from 0 rows to 5 with `strict_order`. The Phase 0 ids are unchanged. Verify
+  is 14/14. The bridge leak was confirmed: the old function returns villa
+  chunks 153/151/152 for the parking question.
+- **Deviation:** the plan expected an HNSW Index Scan. The planner picked the
+  B-tree instead. Recorded in `notes.md`, with the forced-HNSW runs as the
+  substitute measurement.
+- **Next:** Phase 3. (`tenancy_explain` was dropped afterwards and now returns `PGRST202`.)
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 1)
 - **Did:** Wrote `packages/db/sql/schema-tenancy.sql`, which the user ran in the

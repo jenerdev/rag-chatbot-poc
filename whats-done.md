@@ -2926,3 +2926,45 @@ done until the bridge-removal block has run.
 not replace anything. Postgres creates a second overload, and the old signature
 stays. It was used deliberately here, and it is also why the removal block has
 to name the old signatures explicitly.
+
+---
+
+## Tenancy Phase 2 — the index, measured · done 2026-09-23
+
+**What was done:** Loaded a second tenant, `villa` (id 3, 30 chunks), next to
+`northwind` (id 1, 4 chunks). Measured the tenant-scoped searches with
+`explain analyze` through a temporary `tenancy_explain()` RPC. Then added
+`set hnsw.iterative_scan = 'strict_order'` to `match_chunks`. The full write-up
+is in `notes.md` § "Tenancy Phase 2", and the raw plans are in
+`plan/baseline/explain-phase2.txt`.
+
+**Why it mattered:** the tenant filter is a post-filter on a global HNSW graph.
+That shape can lose recall with no error (§ 2.1, R-10), and this phase is the
+only place that is looked at before real tenants depend on it.
+
+**What each observed value proves:**
+- **`Index Scan using chunks_tenant_idx` plus a `Sort`.** At this size a
+  tenant-scoped search is exact, not approximate, so the § 2.1 failure cannot
+  happen today. It is also not the HNSW scan the plan expected. That is
+  recorded as a deviation, not hidden.
+- **Ids 139 · 138 · 140 · 137 and 140 · 137 · 138, the same as Phase 0.** The
+  filter changed nothing about what northwind retrieves, even with 30 villa
+  chunks in the same table.
+- **Run N: 0 rows. Run O: 5 rows.** With HNSW forced and a short walk, a tenant
+  can get nothing back, and iterative scan fixes it. This is the
+  before-and-after the plan demanded.
+- **`pg_proc` lookup, 0 rows then 1 row.** The setting really is on the
+  function, not just in the file.
+- **Anon → `42501 permission denied for function tenancy_explain`.** The helper
+  that runs arbitrary SELECTs is not reachable with the publishable key.
+
+**Traps avoided:**
+- **Seeding villa through `ingestDocument()`** would have filed all 30 chunks
+  under northwind, because of the D-031 default. The seed wrote `tenant_id`
+  explicitly instead.
+- **`relaxed_order`** fixed recall just as well, but can return rows out of
+  distance order, which quietly breaks most-similar-first. `strict_order` was
+  chosen for that reason.
+- **Measuring the function call itself** showed only `Function Scan on
+  match_chunks`, because the function is not inlined. The query body was
+  explained directly instead, and the setting was proven from the catalog.

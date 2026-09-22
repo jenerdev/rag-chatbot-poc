@@ -1,0 +1,277 @@
+
+### A  vector, tenant 1, planner default
+Limit (actual rows=4 loops=1)
+  Buffers: shared hit=86
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=4 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=86
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0.25'::double precision)
+              Buffers: shared hit=83
+Planning:
+  Buffers: shared hit=117
+Planning Time: 1.117 ms
+Execution Time: 0.315 ms
+
+### B  vector, tenant 1, seqscan off
+Limit (actual rows=4 loops=1)
+  Buffers: shared hit=57
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=4 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=57
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0.25'::double precision)
+              Buffers: shared hit=57
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.162 ms
+Execution Time: 0.189 ms
+
+### C  vector, UNFILTERED, seqscan off
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=184
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=5 loops=1)
+        Order By: (embedding <=> (InitPlan 2).col1)
+        Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0.25'::double precision)
+        Buffers: shared hit=184
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.163 ms
+Execution Time: 0.509 ms
+
+### D  vector, tenant 1, seqscan off, ef_search 2
+Limit (actual rows=4 loops=1)
+  Buffers: shared hit=57
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=4 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=57
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0'::double precision)
+              Buffers: shared hit=57
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.169 ms
+Execution Time: 0.166 ms
+
+### E  vector, tenant 1, seqscan off, ef_search 2, strict_order
+Limit (actual rows=4 loops=1)
+  Buffers: shared hit=57
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=4 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=57
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0'::double precision)
+              Buffers: shared hit=57
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.160 ms
+Execution Time: 0.182 ms
+
+### F  vector, tenant 1, seqscan off, ef_search 2, relaxed_order
+Limit (actual rows=4 loops=1)
+  Buffers: shared hit=57
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=4 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=57
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0'::double precision)
+              Buffers: shared hit=57
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.162 ms
+Execution Time: 0.163 ms
+
+### G  vector, tenant 3, seqscan off, ef_search 2
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=372
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  InitPlan 3
+    ->  Index Scan using chunks_pkey on chunks chunks_2 (actual rows=1 loops=1)
+          Index Cond: (id = 139)
+          Buffers: shared hit=2
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 2).col1))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=372
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=30 loops=1)
+              Index Cond: (tenant_id = 3)
+              Filter: (('1'::double precision - (embedding <=> (InitPlan 3).col1)) >= '0'::double precision)
+              Buffers: shared hit=372
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.157 ms
+Execution Time: 0.760 ms
+
+### H  fts, tenant 1, planner default
+Limit (actual rows=1 loops=1)
+  Buffers: shared hit=3
+  ->  Sort (actual rows=1 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, content), '''4417'' | ''extens'''::tsquery)) DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=3
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=1 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (to_tsvector('english'::regconfig, content) @@ '''4417'' | ''extens'''::tsquery)
+              Rows Removed by Filter: 3
+              Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=68
+Planning Time: 20.673 ms
+Execution Time: 2.484 ms
+
+### I  fts, tenant 1, seqscan off
+Limit (actual rows=1 loops=1)
+  Buffers: shared hit=3
+  ->  Sort (actual rows=1 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, content), '''4417'' | ''extens'''::tsquery)) DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=3
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=1 loops=1)
+              Index Cond: (tenant_id = 1)
+              Filter: (to_tsvector('english'::regconfig, content) @@ '''4417'' | ''extens'''::tsquery)
+              Rows Removed by Filter: 3
+              Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.281 ms
+Execution Time: 0.892 ms
+
+### J  tenant 1, HNSW forced, ef_search 40 (default)
+Limit (actual rows=4 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=4 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 1)
+        Rows Removed by Filter: 19
+Execution Time: 1.070 ms
+
+### K  tenant 1, HNSW forced, ef_search 2
+Limit (actual rows=2 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=2 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 1)
+Execution Time: 0.230 ms
+
+### L  tenant 1, HNSW forced, ef_search 2, strict_order
+Limit (actual rows=4 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=4 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 1)
+        Rows Removed by Filter: 30
+Execution Time: 0.318 ms
+
+### M  tenant 1, HNSW forced, ef_search 2, relaxed_order
+Limit (actual rows=4 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=4 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 1)
+        Rows Removed by Filter: 30
+Execution Time: 0.320 ms
+
+### N  tenant 3, HNSW forced, ef_search 2
+Limit (actual rows=0 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=0 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 3)
+        Rows Removed by Filter: 2
+Execution Time: 0.140 ms
+
+### O  tenant 3, HNSW forced, ef_search 2, strict_order
+Limit (actual rows=5 loops=1)
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=5 loops=1)
+        Order By: (embedding <=> (InitPlan 1).col1)
+        Filter: ((tenant_id + 0) = 3)
+        Rows Removed by Filter: 4
+Execution Time: 0.248 ms
+Function Scan on match_chunks (actual rows=4 loops=1)
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+Execution Time: 1.408 ms
+Index Scan using pg_proc_proname_args_nsp_index on pg_proc (actual rows=0 loops=1)

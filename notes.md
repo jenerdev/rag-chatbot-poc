@@ -642,6 +642,75 @@ correct than a string comparison quietly did the opposite of what was intended.
 
 ---
 
+## Tenancy Phase 2: the index under a tenant filter (2026-09-23)
+
+**Setup:** two tenants in one `chunks` table. `northwind` (id 1) has 4 chunks
+and `villa` (id 3) has 30. pgvector is **0.8.2**. The query vector is chunk
+139's stored embedding. Plans come from `explain (analyze, buffers)` through a
+temporary `tenancy_explain()` helper, and the full output is in
+`plan/baseline/explain-phase2.txt`.
+
+**1. At this size the planner does not use HNSW for a tenant-scoped search.**
+The plan says to look for `Index Scan using chunks_embedding_idx` rather than
+`Seq Scan`. It found neither:
+
+```
+Limit (actual rows=4)
+  ->  Sort   Sort Key: (c.embedding <=> ...)
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=4)
+              Index Cond: (tenant_id = 1)
+```
+
+The planner reads the tenant's rows through the B-tree and sorts all of them
+exactly. That is an **exact** search with perfect recall, and it costs
+O(tenant size), not O(table size). Unfiltered, the same query does use HNSW
+(`Index Scan using chunks_embedding_idx`, `Order By: embedding <=> ...`).
+
+**2. The ids did not change.** Tenant-scoped `match_chunks` returns exactly the
+Phase 0 ids, before and after the change below:
+
+| Question | Phase 0 | Phase 2, tenant 1, both tenants loaded |
+|---|---|---|
+| Bay 3 freezer | 139 · 138 · 140 · 137 | 139 · 138 · 140 · 137 |
+| extension 4417 (≥ 0.25) | 140 · 137 · 138 | 140 · 137 · 138 |
+
+**3. The § 2.1 failure is real, reproduced by forcing the shape a large tenant
+gets.** `tenant_id + 0 = N` is not indexable, so the planner has to walk HNSW
+and post-filter. `hnsw.ef_search = 2` stands in for "the walk is short compared
+with how many other-tenant chunks surround the query":
+
+| Run | Tenant | ef_search | iterative_scan | Rows (want 4 / 5) |
+|---|---|---|---|---|
+| J | 1 | 40 | off | 4, with 19 removed by filter |
+| K | 1 | 2 | off | **2** |
+| N | 3 | 2 | off | **0**, a silent false refusal |
+| L | 1 | 2 | strict_order | 4, with 30 removed by filter |
+| M | 1 | 2 | relaxed_order | 4 |
+| O | 3 | 2 | strict_order | 5 |
+
+In run N the walk visited two chunks, both northwind's, and stopped. In the
+pipeline that becomes `[retrieve] vector:0`, then the D-008 short circuit, then
+a refusal of a question villa's documents answer. Nothing errors.
+
+**Chosen: `set hnsw.iterative_scan = 'strict_order'` on the tenant-scoped
+`match_chunks`.** Both iterative modes fixed the loss. `strict_order` was chosen
+because `relaxed_order` may return rows slightly out of distance order, and the
+pipeline and `verify.mjs` check 10 both assume most-similar-first. It costs
+nothing today, because the planner is not using HNSW for these queries anyway.
+It is insurance for the day it does. Confirmed in `pg_proc.proconfig` (a lookup
+went from 0 rows to 1). The bound that remains is `hnsw.max_scan_tuples`
+(default 20,000).
+
+**4. Full-text search: no composite GIN index.** `match_chunks_fts` with the
+tenant filter goes through `chunks_tenant_idx` plus a tsvector recheck (runs H
+and I, 1 row found, 3 removed by filter), even with seqscan off. There is no
+case for `btree_gin` yet. Revisit when one tenant holds thousands of chunks.
+
+**Re-measure at ten tenants and at fifty (R-10).** Run it the same way, and
+watch the logs for `[retrieve] vector:0` on a question that should hit.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character
