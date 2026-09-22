@@ -780,6 +780,42 @@ because it would mean editing the grounding prompt.
 
 ---
 
+## D-031 · A temporary tenancy bridge between Phase 1 and Phase 3 · **Added 2026-09-23, expires in tenancy Phase 3**
+
+**Context:** `plan.md` says Phases 0–2 touch no application code. Phase 1 as
+written contradicts that. With `tenant_id` NOT NULL and no default, today's
+un-threaded inserts all fail, which breaks ingest, conversations and messages.
+Replacing `match_chunks` with a version that requires `p_tenant_id` breaks
+retrieval and `pnpm eval`. The app would stay broken until Phase 3.
+
+**Decision:** `packages/db/sql/schema-tenancy.sql` adds a bridge that is
+explicitly temporary:
+
+1. The `tenant_id` columns default to `tenancy_bridge_default_tenant()`, which
+   returns northwind's id.
+2. The old, unfiltered `match_chunks(vector, int, float)` and
+   `match_chunks_fts(text, vector, int)` stay as overloads next to the new
+   tenant-scoped signatures. PostgREST picks by argument name: a call with
+   `p_tenant_id` reaches the new function, and a call without it reaches the old
+   one.
+
+**Why:** it keeps every phase runnable and measurable. Phase 1 verified
+`pnpm eval` at 5/6 through the bridge, the same result as the Phase 0 baseline.
+
+**What it costs:** both halves are exactly what D-027 forbids, which is a
+default tenant and an unscoped search. They are harmless while northwind is the
+only tenant. **They become a cross-tenant leak the moment a second tenant
+exists**, and tenancy Phase 2 creates `villa`. Until Phase 3 lands, anything the
+app ingests goes to northwind, and any question it answers searches every
+tenant.
+
+**Reverse:** in Phase 3, once every insert and `.rpc()` sends the tenant. The
+drop statements are at the bottom of `schema-tenancy.sql`. Phase 3 is not done
+until they have run. Its grep for tenant filters should then also find no call
+that reaches the old overloads.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

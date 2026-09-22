@@ -2879,3 +2879,50 @@ against these files.
   "Northwind only" database. That is R-7 working exactly as designed.
 - **Only four ids, not five.** `match_count: 5` against a 4-chunk corpus
   returns four. This is recorded as it is rather than padded.
+
+---
+
+## Tenancy Phase 1 — schema and migration · done 2026-09-23
+
+**What was done:** `packages/db/sql/schema-tenancy.sql` adds:
+- a `tenants` table, seeded with `northwind` (id 1, "Northwind Labs", assistant
+  "Nora", no admin key);
+- `tenant_id` on all four tables, backfilled and then NOT NULL;
+- the `(id, tenant_id)` unique keys and the two composite foreign keys;
+- three tenant indexes;
+- tenant-scoped overloads of `match_chunks` and `match_chunks_fts`.
+
+`schema.sql` was left untouched, as the plan requires. `verify.mjs` gained
+checks 11–14. They create and then delete a throwaway `verify-probe` tenant.
+
+**Why it mattered:** this is the data model every later phase stands on. The
+composite FK is the one isolation guarantee that does not depend on a filter
+being remembered.
+
+**What each observed value proves:**
+- **NULL counts 0 · 0 · 0 · 0.** The backfill reached every row, including the
+  191 conversations and 494 messages. A missed row would have been invisible to
+  `where tenant_id = …`, not an error.
+- **`23503 ... violates foreign key constraint "chunks_document_tenant_fk"`.**
+  Postgres itself refuses a chunk that claims a different tenant from its
+  document. The check passes *because* the insert failed.
+- **`match_chunks(own tenant)`: chunk 137 at 1.000000.** The filtered function
+  is still a real vector search. It is the old self-similarity check (chunk
+  137, 1.000000) run through the new signature.
+- **`match_chunks(another tenant)`: 0 rows.** Leakage is caught in SQL, with no
+  API key.
+- **Eval 5/6, the same verdicts as Phase 0.** The bridge works: chat, rewrite,
+  retrieval and message inserts all still function on the un-threaded pipeline.
+
+**The deviation, and why (D-031):** following the plan literally would have
+broken ingest, chat and `pnpm eval` until Phase 3, despite the plan saying
+Phases 0–2 touch no app code. So the bridge was added: a default of northwind,
+plus the old unfiltered functions kept as overloads. It is safe with one
+tenant, and it becomes a leak with two, which Phase 2 creates. That is why the
+Phase 2 villa ingest must set `tenant_id` explicitly, and why Phase 3 is not
+done until the bridge-removal block has run.
+
+**Trap avoided:** `create or replace function` with a new parameter list does
+not replace anything. Postgres creates a second overload, and the old signature
+stays. It was used deliberately here, and it is also why the removal block has
+to name the old signatures explicitly.

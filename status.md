@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) is done and committed (`78d243f`); Phase 1
-  (schema) is next
+  eval baseline) and Phase 1 (schema, 14/14 verify) are done; Phase 2 (index
+  measurement) is next
 
 ---
 
@@ -54,14 +54,33 @@ D-017 `antecedent` failure; pgvector **0.8.2**. Files are in `plan/baseline/`:
 `eval-pre-tenancy.txt`, `scores-pre-tenancy.txt`, `match-ids-pre-tenancy.md`.
 Phase 0 is closed.
 
-**2. Tenancy Phases 1–8** (`plan.md`). Phases 0–2 touch no application code.
-The one thing to internalise before starting is `plan.md` § 0 Rule 2:
+~~**2. Tenancy Phase 1 — schema and migration.**~~ **Done 2026-09-23.**
+`packages/db/sql/schema-tenancy.sql` was run in the Supabase SQL editor by the
+user. It created tenant `northwind` (id 1, assistant "Nora") and backfilled every
+row to it. `pnpm --filter @rag/db verify` gives **14/14**, with zero NULL
+`tenant_id` in all four tables. The composite FK rejects a cross-tenant chunk
+with `23503 ... chunks_document_tenant_fk`. `pnpm eval` still gives **5/6**.
+**Deviation:** a temporary bridge, D-031. `tenant_id` defaults to northwind, and
+the old unfiltered search functions are kept as overloads, so the app keeps
+working.
+
+**3. Tenancy Phase 2 — measure the index.** ⚠ Because of the D-031 bridge,
+`ingestDocument()` still writes everything to **northwind**. The `villa` tenant's
+documents must be inserted with an explicit `tenant_id`, by a script that
+writes rows directly, not through the app. From this point, the app must not be
+used against a two-tenant database until Phase 3: its questions search every
+tenant.
+
+**4. Tenancy Phases 3–8** (`plan.md`). Phase 3 must also run the bridge-removal
+block at the bottom of `schema-tenancy.sql`.
+
+**Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
 `where tenant_id = …` in application code** — `service_role` still bypasses
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**3. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**5. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -416,6 +435,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 1)
+- **Did:** Wrote `packages/db/sql/schema-tenancy.sql`, which the user ran in the
+  SQL editor successfully. Extended `packages/db/tools/verify.mjs` from 10 checks
+  to 14.
+- **Observed:** verify **14/14**. NULL `tenant_id` counts are 0 · 0 · 0 · 0.
+  The cross-tenant chunk insert was refused with `23503` on
+  `chunks_document_tenant_fk`. `match_chunks(own)` returns chunk 137 at
+  1.000000, and `match_chunks(probe tenant)` returns 0 rows. `tenants` holds
+  only `northwind` (id 1), because the probe tenant was cleaned up. Eval:
+  **5/6**, the same verdicts as Phase 0.
+- **Decided:** D-031, the temporary bridge, chosen by the user over following
+  the plan literally or merging Phases 1 and 3.
+- **Not exercised:** a new ingest through the bridge default. The eval covers
+  conversation and message inserts, but not document or chunk inserts.
+- **Next:** Phase 2. The villa corpus must be written with an explicit
+  `tenant_id`.
 
 ### 2026-09-23 — session 6 (tenancy Phase 0)
 - **Did:** Deleted the 8 Villa Amihan documents (ids 27–34, with the user's
