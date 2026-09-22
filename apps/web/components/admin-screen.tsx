@@ -3,6 +3,12 @@
 // S-2 · Knowledge base. Add, inspect and delete the documents the bot knows.
 //
 // Ported from public/admin.html + public/admin.js. Same rules as the chat page.
+//
+// TENANCY (Phases 6-7): rendered by app/t/[tenant]/admin/page.tsx with the
+// tenant resolved on the server. Every route this screen calls is admin-only,
+// so it starts by asking whether this browser holds a session for THIS tenant.
+// If not, it shows a login form. A 401 at any later point, such as an expired
+// session, drops back to that form instead of showing an error per row.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -23,6 +29,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { CHUNK_OVERLAP, CHUNK_SIZE, estimateChunkCount } from '@rag/chunker';
 import type { ChunkSummary, DocumentSummary } from '@rag/pipeline';
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
+import { BrandHeader } from '@/components/brand-header';
+
+/** What the server resolved about the tenant. No ids, no admin hash. */
+export interface AdminScreenProps {
+  slug: string;
+  businessName: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+}
+
+type Auth = 'checking' | 'out' | 'in';
 
 type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
@@ -45,13 +62,17 @@ async function describeFailure(error: Error, response: Response | null): Promise
  * Expanding is lazy: the chunks are only fetched the first time you ask.
  */
 function DocumentRow({
+  api,
   doc,
   onChanged,
   onError,
   onClearNotice,
+  onUnauthorized,
 }: {
+  api: string;
   doc: DocumentSummary;
   onChanged: () => void;
+  onUnauthorized: () => void;
   onError: (message: string) => void;
   onClearNotice: () => void;
 }) {
@@ -67,20 +88,22 @@ function DocumentRow({
 
     let response: Response | null = null;
     try {
-      response = await fetch(`/api/documents/${doc.id}/chunks`);
+      response = await fetch(`${api}/documents/${doc.id}/chunks`);
+      if (response.status === 401) return onUnauthorized();
       if (!response.ok) throw new Error('failed');
       setChunks(await response.json());
     } catch (error) {
       setChunksMessage(await describeFailure(error as Error, response));
     }
-  }, [chunks, doc.id, open]);
+  }, [api, chunks, doc.id, onUnauthorized, open]);
 
   const remove = useCallback(async () => {
     if (!confirm(`Delete "${doc.title}" and all ${doc.chunkCount} of its chunks?`)) return;
     setDeleting(true);
     let response: Response | null = null;
     try {
-      response = await fetch(`/api/documents/${doc.id}`, { method: 'DELETE' });
+      response = await fetch(`${api}/documents/${doc.id}`, { method: 'DELETE' });
+      if (response.status === 401) return onUnauthorized();
       if (!response.ok) throw new Error('failed');
       onClearNotice();
       onChanged();
@@ -88,7 +111,7 @@ function DocumentRow({
       setDeleting(false);
       onError(`Could not delete: ${await describeFailure(error as Error, response)}`);
     }
-  }, [doc.chunkCount, doc.id, doc.title, onChanged, onClearNotice, onError]);
+  }, [api, doc.chunkCount, doc.id, doc.title, onChanged, onClearNotice, onError, onUnauthorized]);
 
   return (
     <div className="doc">
@@ -145,7 +168,77 @@ function DocumentRow({
   );
 }
 
-export default function AdminPage() {
+/**
+ * Exchange the tenant's admin key for a session cookie.
+ *
+ * The key goes up once, in a POST body, and is never kept in state after that.
+ * The cookie that comes back is httpOnly: this code cannot read it, and does
+ * not need to.
+ */
+function LoginForm({ api, slug, onLoggedIn }: { api: string; slug: string; onLoggedIn: () => void }) {
+  const [key, setKey] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      setBusy(true);
+      setError(null);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/admin/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        });
+        if (!response.ok) throw new Error('failed');
+        setKey('');
+        onLoggedIn();
+      } catch (caught) {
+        setError(await describeFailure(caught as Error, response));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [api, key, onLoggedIn],
+  );
+
+  return (
+    <section className="card">
+      <h2>Admin login</h2>
+      <p className="small muted">
+        Editing this knowledge base needs the admin key for <strong>{slug}</strong>. It was printed
+        once, when the key was issued with <code>pnpm --filter @rag/db tenant:key</code>.
+      </p>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="admin-key">Admin key</label>
+          <input
+            type="password"
+            id="admin-key"
+            autoComplete="off"
+            autoFocus
+            required
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+          />
+        </div>
+        {error && <div className="notice error">{error}</div>}
+        <div className="form-footer">
+          <span />
+          <button type="submit" className="primary" disabled={busy || key === ''}>
+            {busy ? 'Checking…' : 'Log in'}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+export function AdminScreen({ slug, businessName, logoUrl, bannerUrl }: AdminScreenProps) {
+  const api = `/api/t/${slug}`;
+  const [auth, setAuth] = useState<Auth>('checking');
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listMessage, setListMessage] = useState('Loading documents…');
   const [notice, setNotice] = useState<Notice>(null);
@@ -154,21 +247,47 @@ export default function AdminPage() {
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Any 401 means the session is gone (expired, logged out elsewhere, or the
+  // secret was rotated). Back to the login form, with nothing left on screen.
+  const unauthorized = useCallback(() => {
+    setAuth('out');
+    setDocuments(null);
+  }, []);
+
+  // First: does this browser hold a session for THIS tenant?
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch(`${api}/admin/session`);
+        const body = await response.json();
+        setAuth(body.admin === true ? 'in' : 'out');
+      } catch {
+        setAuth('out');
+      }
+    })();
+  }, [api]);
+
   const loadDocuments = useCallback(async () => {
     let response: Response | null = null;
     try {
-      response = await fetch('/api/documents');
+      response = await fetch(`${api}/documents`);
+      if (response.status === 401) return unauthorized();
       if (!response.ok) throw new Error('failed');
       setDocuments(await response.json());
     } catch (error) {
       setDocuments(null);
       setListMessage(await describeFailure(error as Error, response));
     }
-  }, []);
+  }, [api, unauthorized]);
 
   useEffect(() => {
-    void loadDocuments();
-  }, [loadDocuments]);
+    if (auth === 'in') void loadDocuments();
+  }, [auth, loadDocuments]);
+
+  const logout = useCallback(async () => {
+    await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
+    unauthorized();
+  }, [api, unauthorized]);
 
   const submit = useCallback(
     async (event: React.FormEvent) => {
@@ -195,11 +314,12 @@ export default function AdminPage() {
       setSubmitting(true);
       let response: Response | null = null;
       try {
-        response = await fetch('/api/documents', {
+        response = await fetch(`${api}/documents`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: trimmedTitle, source: source.trim(), content: trimmedContent }),
         });
+        if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
         const result = await response.json();
 
@@ -222,22 +342,48 @@ export default function AdminPage() {
         setSubmitting(false);
       }
     },
-    [content, loadDocuments, source, title],
+    [api, content, loadDocuments, source, title, unauthorized],
   );
 
   const length = content.trim().length;
   const chunkCount = estimateChunkCount(length);
 
+  const header = (
+    <BrandHeader
+      businessName={businessName}
+      logoUrl={logoUrl}
+      bannerUrl={bannerUrl}
+      subtitle="Knowledge base"
+    >
+      {auth === 'in' && (
+        <button type="button" className="link" onClick={logout}>
+          Log out
+        </button>
+      )}
+      <Link className="button" href={`/t/${slug}`}>
+        ← Chat
+      </Link>
+    </BrandHeader>
+  );
+
+  if (auth !== 'in') {
+    return (
+      <>
+        {header}
+        <main>
+          {auth === 'checking' ? (
+            <div className="small muted">Checking your session…</div>
+          ) : (
+            <LoginForm api={api} slug={slug} onLoggedIn={() => setAuth('in')} />
+          )}
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
-      <header>
-        <h1>Knowledge base</h1>
-        <nav>
-          <Link className="button" href="/">
-            ← Chat
-          </Link>
-        </nav>
-      </header>
+      {header}
 
       <main>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
@@ -314,7 +460,9 @@ export default function AdminPage() {
               {documents.map((doc) => (
                 <DocumentRow
                   key={doc.id}
+                  api={api}
                   doc={doc}
+                  onUnauthorized={unauthorized}
                   onChanged={loadDocuments}
                   onClearNotice={() => setNotice(null)}
                   onError={(message) => setNotice({ message, kind: 'error' })}

@@ -114,6 +114,23 @@ export async function listDocuments(tenant: TenantContext): Promise<DocumentSumm
 }
 
 /**
+ * How many documents this tenant has. Counted by Postgres, with no rows fetched.
+ *
+ * The chat page uses it to say "your knowledge base is empty" before the user
+ * wonders why every answer is a refusal. It is a separate function from
+ * listDocuments() because the list is admin-only (Phase 6), while "is there
+ * anything to ask about?" is something any visitor may know.
+ */
+export async function countDocuments(tenant: TenantContext): Promise<number> {
+  const { count, error } = await supabase
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id);
+  if (error) throw new Error(`Could not count documents: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
  * Delete a document. Its chunks go with it.
  *
  * The cascade is declared in schema.sql (`on delete cascade`) and Postgres

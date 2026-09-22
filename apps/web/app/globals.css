@@ -273,3 +273,20 @@ input[type="text"]:focus, textarea:focus { outline: 2px solid var(--accent); out
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+
+/* --- tenancy (Phase 7) -------------------------------------------------- */
+
+/* The tenant's theme arrives as custom properties on this element (lib/branding.ts).
+   Everything below it already reads var(--accent) and friends, so a theme is
+   five variables and no new rules. It needs its own background because
+   <body> sits outside it and would keep the default --bg. */
+.tenant-root { min-height: 100vh; background: var(--bg); color: var(--ink); }
+
+h1.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo { height: 28px; width: auto; border-radius: 4px; }
+.brand-subtitle { color: var(--muted); font-weight: 400; }
+.brand-subtitle::before { content: "·"; margin-right: 10px; }
+.brand-banner { display: block; width: 100%; max-height: 120px; object-fit: cover; }
+
+/* The assistant's name above each of its turns. */
+.speaker { font-size: 12px; font-weight: 600; color: var(--accent); margin: 0 0 4px 2px; }

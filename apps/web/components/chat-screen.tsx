@@ -1,0 +1,370 @@
+'use client';
+
+// S-1 · Chat. Ask questions, see answers grounded in the knowledge base.
+//
+// TENANCY (Phase 7): rendered by app/t/[tenant]/page.tsx, a Server Component
+// that resolves the tenant and passes everything in as props. The slug is
+// NEVER parsed out of window.location. It arrives from the server, which has
+// already checked that it names a real tenant. Every fetch is prefixed with it.
+//
+// Ported from public/index.html + public/app.js. The two rules that ran through
+// that file still hold, one of them for free:
+//
+//   1. Never inject server or model output as markup. In the POC that meant
+//      `textContent, NEVER innerHTML`, written out at every call site. React
+//      escapes children by default, so the rule now costs nothing — and comes
+//      back the moment anyone reaches for dangerouslySetInnerHTML.
+//   2. No markdown rendering in the MVP. Newlines are handled by CSS
+//      (white-space: pre-wrap), not by parsing.
+
+import Link from 'next/link';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import type { Source } from '@rag/pipeline';
+import { SourcesPanel } from '@/components/sources-panel';
+import { describeFailure, readEventStream } from '@/lib/chat-stream';
+import { BrandHeader } from '@/components/brand-header';
+
+/** Everything the server resolved about the tenant. No ids, no admin hash. */
+export interface ChatScreenProps {
+  slug: string;
+  businessName: string;
+  assistantName: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  /** Counted on the server: the document list itself is admin-only (Phase 6). */
+  documentCount: number;
+}
+
+type Turn =
+  | { id: number; kind: 'user'; text: string }
+  | { id: number; kind: 'pending' }
+  // `error` is set when a failure arrives AFTER the answer started: the partial
+  // answer is kept and the error shown underneath it, rather than discarding
+  // text the model already produced.
+  | {
+      id: number;
+      kind: 'answer';
+      text: string;
+      sources: Source[];
+      searchQuery: string;
+      question: string;
+      error?: string;
+    }
+  | { id: number; kind: 'failed'; message: string; question: string };
+
+let nextId = 0;
+
+export function ChatScreen({
+  slug,
+  businessName,
+  assistantName,
+  logoUrl,
+  bannerUrl,
+  documentCount,
+}: ChatScreenProps) {
+  const api = `/api/t/${slug}`;
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [input, setInput] = useState('');
+  // An empty knowledge base makes every question return the refusal, which
+  // looks broken if you do not know why. Better to say so up front. The count
+  // comes from the server, so there is no request to wait for.
+  const emptyKb = documentCount === 0;
+
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // The conversation lives in the database; the browser only has to remember
+  // its id — the server re-sends the last few messages to the model on every
+  // turn. Refreshing the page starts a new conversation, which is deliberate:
+  // listing past conversations is out of scope (mvp.md).
+  const conversationId = useRef<string | null>(null);
+  // True while the reader is at the bottom. Set false the moment they scroll up
+  // to re-read something: yanking the viewport while someone is reading is
+  // worse than making them scroll.
+  const stick = useRef(true);
+
+  const scrollToBottom = useCallback(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
+  // useLayoutEffect, not useEffect: scrolling after the browser has painted the
+  // new text produces a visible jump on every delta.
+  useLayoutEffect(() => {
+    if (stick.current) scrollToBottom();
+  }, [turns, scrollToBottom]);
+
+  const onScroll = useCallback(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
+  const send = useCallback(
+    async (text: string) => {
+      setBusy(true);
+      stick.current = true;
+
+      const userId = nextId++;
+      const replyId = nextId++;
+      setTurns((prev) => [
+        ...prev,
+        { id: userId, kind: 'user', text },
+        { id: replyId, kind: 'pending' },
+      ]);
+
+      let response: Response | null = null;
+      // Mirrors the POC's `bubble` variable: non-null once `meta` has arrived,
+      // which is how we know whether a failure should replace the turn or sit
+      // underneath a partial answer.
+      let started = false;
+      let answered = '';
+
+      try {
+        response = await fetch(`${api}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Asking for the streamed form. Drop this header and the same
+            // route returns one JSON body instead (D-019).
+            Accept: 'text/event-stream',
+          },
+          body: JSON.stringify({ conversationId: conversationId.current, message: text }),
+        });
+        // Validation errors still arrive as a normal status, because they
+        // happen before any streaming starts.
+        if (!response.ok) throw new Error('request failed');
+
+        let streamError: string | null = null;
+        // The server ends every successful answer with `done`. Without checking
+        // for it, ANY end of stream looks like success — including the server
+        // dying or the socket dropping mid-sentence, which would leave a
+        // truncated answer on screen indistinguishable from a complete one.
+        let sawDone = false;
+
+        await readEventStream(response, (event, data) => {
+          if (event === 'meta') {
+            conversationId.current = data.conversationId;
+            started = true;
+            // Swapped in the moment retrieval finishes, before a single token
+            // of the answer exists — so the sources panel appears first and you
+            // can read what the model was given while it is still deciding what
+            // to make of it (D-019).
+            setTurns((prev) =>
+              prev.map((turn) =>
+                turn.id === replyId
+                  ? {
+                      id: replyId,
+                      kind: 'answer',
+                      text: '',
+                      sources: data.sources,
+                      searchQuery: data.searchQuery,
+                      question: text,
+                    }
+                  : turn,
+              ),
+            );
+          } else if (event === 'delta') {
+            answered += data.text;
+            setTurns((prev) =>
+              prev.map((turn) =>
+                turn.id === replyId && turn.kind === 'answer'
+                  ? { ...turn, text: turn.text + data.text }
+                  : turn,
+              ),
+            );
+          } else if (event === 'done') {
+            sawDone = true;
+          } else if (event === 'error') {
+            // A failure that happened after the response started. The status
+            // code was already committed to 200, so this is the only way it can
+            // reach us — and it has to be treated as seriously as a bad status.
+            streamError = data.error;
+          }
+        });
+
+        if (streamError) throw new Error(streamError);
+        if (!sawDone) throw new Error('The connection closed before the answer finished.');
+      } catch (caught) {
+        const message = await describeFailure(caught as Error, response);
+        // If the answer had already started, keep what arrived and put the
+        // error underneath it rather than discarding a partial answer.
+        if (started && answered !== '') {
+          setTurns((prev) =>
+            prev.map((turn) =>
+              turn.id === replyId && turn.kind === 'answer' ? { ...turn, error: message } : turn,
+            ),
+          );
+        } else {
+          setTurns((prev) =>
+            prev.map((turn) =>
+              turn.id === replyId ? { id: replyId, kind: 'failed', message, question: text } : turn,
+            ),
+          );
+        }
+      } finally {
+        setBusy(false);
+        inputRef.current?.focus();
+      }
+    },
+    [api],
+  );
+
+  /**
+   * Retry: drop the failed answer AND the question above it, then resend.
+   *
+   * Removing only the error would leave the original question in place while
+   * send() adds it again — the same question twice after one retry.
+   */
+  const retry = useCallback(
+    (failedId: number, question: string) => {
+      setTurns((prev) => {
+        const index = prev.findIndex((turn) => turn.id === failedId);
+        if (index === -1) return prev;
+        const previous = prev[index - 1];
+        const from = previous && previous.kind === 'user' ? index - 1 : index;
+        return prev.slice(0, from);
+      });
+      void send(question);
+    },
+    [send],
+  );
+
+  const submit = useCallback(() => {
+    const text = input.trim();
+    if (text === '' || busy) return;
+    setInput('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+    void send(text);
+  }, [busy, input, send]);
+
+  const newChat = useCallback(() => {
+    // Clearing the id is all it takes: the server creates a new conversation
+    // row on the next message. The old conversation stays in the database.
+    conversationId.current = null;
+    setTurns([]);
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="chat-layout">
+      <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl}>
+        <button className="link" type="button" onClick={newChat}>
+          New chat
+        </button>
+        <Link className="button" href={`/t/${slug}/admin`}>
+          Knowledge base
+        </Link>
+      </BrandHeader>
+
+      <div id="messages" ref={messagesRef} onScroll={onScroll}>
+        <div className="messages-inner">
+          {turns.length === 0 && (
+            <div className="empty-state">
+              <strong>
+                Ask {assistantName} a question about {businessName}.
+              </strong>
+              <span>
+                {emptyKb
+                  ? 'Your knowledge base is empty — add a document first.'
+                  : 'The answer will show the chunks it came from.'}
+              </span>
+              {emptyKb && (
+                <>
+                  <br />
+                  <Link
+                    className="button"
+                    href={`/t/${slug}/admin`}
+                    style={{ marginTop: '12px', display: 'inline-block' }}
+                  >
+                    Go to the knowledge base
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          <div id="turns">
+            {turns.map((turn) => {
+              if (turn.kind === 'user') {
+                return (
+                  <div className="turn user" key={turn.id}>
+                    <div className="bubble">{turn.text}</div>
+                  </div>
+                );
+              }
+
+              if (turn.kind === 'pending') {
+                return (
+                  <div className="turn assistant" key={turn.id}>
+                    <div className="speaker">{assistantName}</div>
+                    <div className="bubble pending">Searching the knowledge base…</div>
+                  </div>
+                );
+              }
+
+              if (turn.kind === 'failed') {
+                return (
+                  <div className="turn assistant" key={turn.id}>
+                    <div className="notice error">
+                      {turn.message}
+                      <button type="button" onClick={() => retry(turn.id, turn.question)}>
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="turn assistant" key={turn.id}>
+                  <div className="speaker">{assistantName}</div>
+                  <div className="bubble">{turn.text}</div>
+                  <SourcesPanel
+                    sources={turn.sources}
+                    searchQuery={turn.searchQuery}
+                    question={turn.question}
+                  />
+                  {turn.error && <div className="notice error">{turn.error}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="composer">
+        <div className="composer-inner">
+          {/* A textarea rather than an input so Shift+Enter can insert a
+              newline while Enter alone sends (screens.md § S-1). */}
+          <textarea
+            id="input"
+            ref={inputRef}
+            rows={1}
+            placeholder="Ask a question…"
+            autoFocus
+            disabled={busy}
+            value={input}
+            onChange={(event) => {
+              setInput(event.target.value);
+              // Grow with the content, up to the max-height in the stylesheet.
+              const el = event.target;
+              el.style.height = 'auto';
+              el.style.height = `${el.scrollHeight}px`;
+            }}
+            onKeyDown={(event) => {
+              // Enter sends; Shift+Enter inserts a newline.
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <button className="primary" type="button" disabled={busy} onClick={submit}>
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

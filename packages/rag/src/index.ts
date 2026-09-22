@@ -23,7 +23,7 @@ export {
   NO_ANSWER,
 } from './constants.js';
 
-export { ingestDocument, listDocuments, deleteDocument, getChunks } from './ingest.js';
+export { ingestDocument, listDocuments, countDocuments, deleteDocument, getChunks } from './ingest.js';
 export { buildPrompt } from './prompt.js';
 export { greetingReply, greetingText } from './greeting.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';

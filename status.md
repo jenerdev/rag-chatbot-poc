@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phases 1–6 are done (schema, index, pipeline, persona, routes, admin auth).
-  Phase 7 (the screens) is next. The screens are broken until then
+  eval baseline) Phases 1–7 are done and signed off in the browser. Phase 8 (the record) is
+  next
 
 ---
 
@@ -143,10 +143,37 @@ Phase 7, step 4. Use curl until then.
 3. `tenant:key` was added alongside `tenant:add`. The two existing tenants had
    no way to get a key otherwise.
 
-**8. Tenancy Phase 7 — the screens** (`plan.md` § Phase 7), then Phase 8.
-- The screens need a login form, because the admin routes now return 401.
-- The chat page's empty-knowledge-base check (`GET /documents`) is now
-  admin-only. Pass a document count from the server layout instead.
+~~**8. Tenancy Phase 7 — the screens.**~~ **Done 2026-09-23, and signed off by
+the user in a real browser** (all seven walk steps passed).
+- **Pages:** `/t/<slug>` and `/t/<slug>/admin` are Server Components that
+  resolve the tenant and pass props to `components/chat-screen.tsx` and
+  `components/admin-screen.tsx`. Both were moved with `git mv`.
+- **Frame:** `app/t/[tenant]/layout.tsx` applies the theme through the `style`
+  prop and sets the tab title to the business name.
+- **Branding:** `lib/branding.ts` allowlists five theme keys, checks each
+  against a colour regex, and accepts `https:` URLs only.
+- **Admin screen:** a login form, a logout button, and a fall-back to the form
+  on any 401.
+- **Chat screen:** the empty-knowledge-base hint now comes from the new
+  `countDocuments()`, passed from the server.
+- **Other pages:** `/` is a static page with no tenant list and no redirect.
+  `/t/nope` gives a 404 "No such workspace".
+- **Villa's theme** is `{accent #0f766e, accentSoft #e7f5f2, bg #faf7f2}`.
+- **Hostile-theme test:** `ink: "red;}body{display:none"`,
+  `panel: "url(javascript:alert(1))"`, an unknown key, and `javascript:` /
+  `http:` URLs. Every one was dropped: 0 occurrences in the HTML, and only the
+  3 valid variables were rendered.
+- **Checks:** the static bundle grep is clean, and `dangerouslySetInnerHTML`
+  appears only in comments. Tests pass (41 + 13), isolation is 11/11, eval is
+  9/10, and verify is 14/14.
+
+**9. Tenancy Phase 8 — cutover and the record** (`plan.md` § Phase 8). Its
+to-do list:
+- D-025…D-030 go into `decisions.md`. D-028 must record the three Phase 6
+  deviations, and D-006 needs amending.
+- Amend CLAUDE.md rule 1: the battery now needs BOTH tenants.
+- Clean up the architecture and flow docs, which still show un-prefixed
+  `/api/…` paths.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -154,7 +181,7 @@ Phase 7, step 4. Use curl until then.
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**9. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**10. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -509,6 +536,19 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 7)
+- **Did:** Moved the screens into components, driven by Server Component
+  pages under `app/t/[tenant]/`. Added the branding allowlist, `BrandHeader`,
+  the assistant's name above its turns, the admin login and logout, the
+  not-found page, and a static root. Added `countDocuments()`.
+- **Observed:** villa renders
+  `style="--accent:#0f766e;--accent-soft:#e7f5f2;--bg:#faf7f2"` and northwind
+  renders no style (the defaults). The titles are "Villa Amihan Private Resort"
+  and "Northwind Labs". The hostile theme values rendered 0 times. `/t/nope`
+  and `/admin` give 404. The user walked both tenants in the browser, and all
+  steps passed.
+- **Next:** Phase 8.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 6)
 - **Did:** Admin auth, hand-rolled on `node:crypto`: scrypt hashes with the cost

@@ -3146,3 +3146,41 @@ tenant's property.
 - **The real keys were never seen by Claude.** Auth was tested against a
   throwaway tenant whose key went to a gitignored scratch file. The file was
   deleted, and so was the tenant.
+
+---
+
+## Tenancy Phase 7 — the screens · done 2026-09-23, signed off in the browser
+
+**What was done:**
+- **Pages:** both screens live under `/t/<slug>`. The pages are Server
+  Components that resolve the tenant (a 404 on a miss) and hand the Client
+  Components plain props: the slug, the names, the validated image URLs, and
+  the document count. The browser never works out which tenant it is on.
+- **Theme:** five allowlisted custom properties set through the `style` prop.
+  `globals.css` needed no rewrite, only the rules for the new elements.
+- **Admin screen:** it checks for a session first and shows a login form
+  otherwise. Any 401 drops back to that form.
+
+**Why it mattered:** this is where two tenants become visibly two products.
+It is also where the § 2.4 trap lives: branding is data from the database
+that becomes markup.
+
+**What each observed value proves:**
+- **Hostile theme values rendered 0 times, and only three variables appeared.**
+  A tenant cannot write CSS or scripts into its own page. That applies to a
+  CSS-rule break-out (`;}body{…`), a `url(javascript:…)`, an unknown key, and
+  non-https image URLs.
+- **Villa is styled and northwind is not.** Each tenant's theme is scoped to
+  that tenant's pages.
+- **`/t/nope` → 404 "No such workspace", and `/` has no list or redirect.**
+  Neither reveals which slugs exist.
+- **The browser walk passed, all seven steps.** Each tenant answers its own
+  question and refuses the other's, the sources never cross tenants, and
+  logging in to one tenant does not log you in to the other.
+
+**Traps avoided:**
+- **`notFound()` in a layout** skips that segment's own `not-found.tsx`. So
+  the pages call it, and the layout only styles.
+- **The chat page's empty-knowledge-base check** used `GET /documents`, which
+  Phase 6 made admin-only. It now comes from a server-side count, which also
+  removes a request made on page load.
