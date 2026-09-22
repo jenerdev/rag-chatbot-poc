@@ -67,7 +67,15 @@ Paste each into the Supabase SQL editor and run it, one after the other:
    the composite foreign keys, and tenant-scoped versions of both search
    functions. It also seeds one tenant, `northwind`, with no admin key yet.
 
-All three are idempotent. Verify:
+Run them once, in that order, on a fresh project. **Re-running is only safe for
+`schema-tenancy.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
+`create table`, so a second run fails. More importantly, re-running
+`schema.sql` or `schema-hybrid.sql` on a database that already has tenancy
+quietly recreates the old **unscoped** `match_chunks` / `match_chunks_fts`,
+which search every tenant's chunks. If you ever re-run either of them, re-run
+`schema-tenancy.sql` straight after: its last step drops those again.
+
+Verify:
 
 ```sql
 select * from pg_extension where extname = 'vector';          -- one row

@@ -19,20 +19,20 @@
   changes: hybrid search (D-015), query rewriting (D-016), reworded grounding
   instruction (D-017), paragraph-aware chunking (D-018), streaming (D-019).
   **The entire original post-MVP list is now done.**
-- **Current phase:** **migration** to Next.js + TypeScript on Turborepo
-  ([`plan/steps.md`](./plan/steps.md), 8 phases). **Phases 0–7 done and signed
-  off** as of 2026-09-22, on branch `feat/nextjs-migration`. Only Phase 8
-  (deploy) is left, and it is optional — D-013 still says local-only
-- **Status:** the POC is deleted; the repo is one Next.js app and five packages.
-  A new API key is in place and **real grounded answers work end to end**, over
-  both the JSON and the SSE paths. Phase 4 was closed on structural parity
-  (87/0 chunker, 22/0 pipeline, 24/0 API) rather than on the eval baseline,
-  which was never captured — a deliberate, recorded choice
-- **Working on right now:** nothing implemented. **The migration is functionally
-  complete** — the `mvp.md` definition of done passes in the browser on the new
-  stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) **Tenancy is complete** (plan.md Phases 0–8, 2026-09-23). Nothing is in
-  progress. The next pieces of work are the optional plans in plan.md § 7
+- **Current phase:** **none.** Tenancy ([`plan.md`](./plan.md), Phases 0–8)
+  was completed 2026-09-23 and merged into `master` by fast-forward
+  (`88bf00f`). The feature branch `feat/nextjs-migration` is deleted. Before
+  that, the Next.js + TypeScript migration ([`plan/steps.md`](./plan/steps.md))
+  finished 2026-09-22. Its optional Phase 8 (deploy) was never done, and D-013
+  still says local-only.
+- **Status:** one Next.js app and five packages, **multi-tenant**: tenants
+  `northwind` (id 1) and `villa` (id 3), each with its own documents, persona,
+  theme and admin key. Measured on the final code: eval 9/10 (the known
+  `antecedent` model limit), isolation 11/11, verify 14/14, and tests 41 + 13.
+  Both tenants were also walked by hand in the browser.
+- **Working on right now:** nothing. The next pieces of work are the optional
+  plans in plan.md § 7. **Real auth + RLS comes before any public URL** (R-2,
+  R-11, R-13).
 
 ---
 

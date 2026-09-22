@@ -164,6 +164,11 @@ The schema is **three files, run in order** in the Supabase SQL editor, all in
    describes the FINAL state: its last step drops the pre-tenancy function
    signatures that files 1 and 2 create. See "Tenancy" below.
 
+⚠ **The order is also the recovery rule.** Re-running file 1 or 2 against a
+tenant database recreates the unscoped search functions with `create or
+replace`, and they would search every tenant, with no error. Always follow
+either one with file 3.
+
 The block below is `schema.sql`, the shape everything else builds on:
 
 ```sql
