@@ -22,6 +22,15 @@ const QUESTIONS = [
   ['off topic   ', 'Explain the offside rule in football.'],
 ];
 
+// The probe measures northwind's corpus: its questions are about the fictional
+// laboratory. Named explicitly, because match_chunks has no default tenant.
+const { data: northwind, error: tenantError } = await supabase
+  .from('tenants')
+  .select('id')
+  .eq('slug', 'northwind')
+  .single();
+if (tenantError) throw new Error(`No northwind tenant: ${tenantError.message}`);
+
 // One embeddings call for every question at once — same batching trick as ingest.
 const vectors = await embed(QUESTIONS.map(([, q]) => q));
 
@@ -32,6 +41,7 @@ for (let i = 0; i < QUESTIONS.length; i++) {
   const [kind, question] = QUESTIONS[i];
   const { data, error } = await supabase.rpc('match_chunks', {
     query_embedding: vectors[i],
+    p_tenant_id: northwind.id,
     match_count: 5,
     min_similarity: 0, // show everything
   });

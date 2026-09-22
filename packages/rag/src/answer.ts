@@ -6,7 +6,7 @@ import { MAX_HISTORY, NO_ANSWER } from './constants.js';
 import { greetingReply } from './greeting.js';
 import { buildPrompt } from './prompt.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
-import type { Answer, HistoryMessage, RetrievedChunk, Source, StreamMeta } from './types.js';
+import type { Answer, HistoryMessage, RetrievedChunk, Source, StreamMeta, TenantContext } from './types.js';
 
 /**
  * Find or create the conversation row.
@@ -14,11 +14,37 @@ import type { Answer, HistoryMessage, RetrievedChunk, Source, StreamMeta } from 
  * Created lazily on the first message of a session. Extracted from
  * prepareAnswer() because the greeting path needs an id too — it still saves
  * the turn, so the transcript has no gap in it, but it never retrieves.
+ *
+ * A client-supplied id is VERIFIED, not trusted (plan.md § 2.2). It used to be
+ * returned as-is, which was harmless with one tenant. With several, posting
+ * tenant A's conversation id to tenant B's chat would load A's last six
+ * messages as history and paste them into B's prompt: the chunks would be B's,
+ * but the conversation would not. So the id is used only if this tenant owns
+ * it. Otherwise, whether it belongs to another tenant or does not exist at
+ * all, a new conversation is started, and the caller gets the new id back in
+ * the reply.
  */
-async function ensureConversation(conversationId: string | null): Promise<string> {
-  if (conversationId) return conversationId;
+async function ensureConversation(
+  tenant: TenantContext,
+  conversationId: string | null,
+): Promise<string> {
+  if (conversationId) {
+    const { data: owned, error } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('id', conversationId)
+      .maybeSingle();
+    if (error) throw new Error(`Could not load the conversation: ${error.message}`);
+    if (owned) return owned.id;
+    console.log(`[query] ${tenant.slug}: conversation ${conversationId} is not this tenant's; starting a new one`);
+  }
 
-  const { data, error } = await supabase.from('conversations').insert({}).select('id').single();
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({ tenant_id: tenant.id })
+    .select('id')
+    .single();
   if (error) throw new Error(`Could not start a conversation: ${error.message}`);
   return data.id;
 }
@@ -42,14 +68,16 @@ interface Prepared {
  * handle that case themselves, because what they do about it differs.
  */
 async function prepareAnswer({
+  tenant,
   conversationId,
   message,
 }: {
+  tenant: TenantContext;
   conversationId: string | null;
   message: string;
 }): Promise<Prepared> {
-  // 1. Conversation row. Created lazily on the first message of a session.
-  const id = await ensureConversation(conversationId);
+  // 1. Conversation row, created lazily, and verified to be this tenant's.
+  const id = await ensureConversation(tenant, conversationId);
 
   // 2. Recent history: newest-first from the database, then reversed, because
   //    "the last 6" needs a descending query but the model needs chronological
@@ -58,6 +86,7 @@ async function prepareAnswer({
   const { data: recent, error: historyError } = await supabase
     .from('messages')
     .select('role, content')
+    .eq('tenant_id', tenant.id)
     .eq('conversation_id', id)
     .order('id', { ascending: false })
     .limit(MAX_HISTORY);
@@ -78,7 +107,7 @@ async function prepareAnswer({
   const [questionVector] = await embed([searchQuery]);
 
   // 5. Retrieval: cosine search and keyword search, fused (D-015).
-  const matches = await retrieve(searchQuery, questionVector!);
+  const matches = await retrieve(tenant, searchQuery, questionVector!);
   console.log(
     `[query] "${searchQuery}" -> ${matches.length} chunks`,
     matches.map((m) => `${m.similarity.toFixed(3)}/${m.foundBy}`).join(' '),
@@ -89,11 +118,14 @@ async function prepareAnswer({
 
   // 7. Attach document titles. match_chunks returns document_id but not the
   //    title, and the sources panel needs a human-readable label. One extra
-  //    query is simpler than joining inside the SQL function.
+  //    query is simpler than joining inside the SQL function. Tenant-filtered
+  //    too: a title is not a secret, but another tenant's title in this
+  //    tenant's sources panel is a leak.
   const documentIds = [...new Set(matches.map((m) => m.document_id))];
   const { data: docs, error: titleError } = await supabase
     .from('documents')
     .select('id, title')
+    .eq('tenant_id', tenant.id)
     .in('id', documentIds);
   if (titleError) throw new Error(`Could not load document titles: ${titleError.message}`);
   const titleById = new Map(docs.map((d) => [d.id, d.title]));
@@ -123,9 +155,11 @@ async function prepareAnswer({
  *   10.  save both messages, return the answer and its sources
  */
 export async function answerQuestion({
+  tenant,
   conversationId,
   message,
 }: {
+  tenant: TenantContext;
   conversationId: string | null;
   message: string;
 }): Promise<Answer> {
@@ -134,12 +168,13 @@ export async function answerQuestion({
   // the refusal — see greeting.ts for why this is not a document.
   const greeting = greetingReply(message);
   if (greeting !== null) {
-    const id = await ensureConversation(conversationId);
-    await saveMessages(id, message, greeting);
+    const id = await ensureConversation(tenant, conversationId);
+    await saveMessages(tenant, id, message, greeting);
     return { conversationId: id, reply: greeting, sources: [], searchQuery: message };
   }
 
   const { id, history, searchQuery, matches, sources } = await prepareAnswer({
+    tenant,
     conversationId,
     message,
   });
@@ -147,12 +182,12 @@ export async function answerQuestion({
   // The short circuit (D-008). Faster, free, and it removes any chance of the
   // model ignoring its instructions and answering from training data anyway.
   if (matches.length === 0) {
-    await saveMessages(id, message, NO_ANSWER);
+    await saveMessages(tenant, id, message, NO_ANSWER);
     return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery };
   }
 
   const reply = await chat(buildPrompt(matches, history, message));
-  await saveMessages(id, message, reply);
+  await saveMessages(tenant, id, message, reply);
 
   // searchQuery is returned so the UI can show what was actually searched for
   // when it differs from what the user typed. Retrieval silently searching for
@@ -174,11 +209,13 @@ export async function answerQuestion({
  * database either way.
  */
 export async function answerQuestionStream({
+  tenant,
   conversationId,
   message,
   onMeta,
   onDelta,
 }: {
+  tenant: TenantContext;
   conversationId: string | null;
   message: string;
   onMeta: (meta: StreamMeta) => void;
@@ -189,14 +226,15 @@ export async function answerQuestionStream({
   // arrives down exactly the same channel as an answer.
   const greeting = greetingReply(message);
   if (greeting !== null) {
-    const id = await ensureConversation(conversationId);
+    const id = await ensureConversation(tenant, conversationId);
     onMeta({ conversationId: id, searchQuery: message, sources: [] });
     onDelta(greeting);
-    await saveMessages(id, message, greeting);
+    await saveMessages(tenant, id, message, greeting);
     return greeting;
   }
 
   const { id, history, searchQuery, matches, sources } = await prepareAnswer({
+    tenant,
     conversationId,
     message,
   });
@@ -207,13 +245,13 @@ export async function answerQuestionStream({
   // special case: a refusal arrives down the same channel as any other answer.
   if (matches.length === 0) {
     onDelta(NO_ANSWER);
-    await saveMessages(id, message, NO_ANSWER);
+    await saveMessages(tenant, id, message, NO_ANSWER);
     return NO_ANSWER;
   }
 
   try {
     const reply = await chatStream(buildPrompt(matches, history, message), onDelta);
-    await saveMessages(id, message, reply);
+    await saveMessages(tenant, id, message, reply);
     return reply;
   } catch (error) {
     // The client was handed this conversationId in `meta` and will send it
@@ -228,6 +266,7 @@ export async function answerQuestionStream({
     const maybePartial = (error as { partial?: unknown }).partial;
     const partial = typeof maybePartial === 'string' ? maybePartial : '';
     await saveMessages(
+      tenant,
       id,
       message,
       partial === '' ? '[no answer — the request failed]' : `${partial} […answer interrupted]`,
@@ -244,24 +283,47 @@ export async function answerQuestionStream({
  * against the wrong turn.
  */
 async function saveMessages(
+  tenant: TenantContext,
   conversationId: string,
   userMessage: string,
   assistantMessage: string,
 ): Promise<void> {
+  // tenant_id on each row is checked by the composite foreign key against the
+  // conversation's own tenant_id. A message cannot land in another tenant's
+  // conversation even if this code were wrong.
   const { error } = await supabase.from('messages').insert([
-    { conversation_id: conversationId, role: 'user', content: userMessage },
-    { conversation_id: conversationId, role: 'assistant', content: assistantMessage },
+    { tenant_id: tenant.id, conversation_id: conversationId, role: 'user', content: userMessage },
+    { tenant_id: tenant.id, conversation_id: conversationId, role: 'assistant', content: assistantMessage },
   ]);
   if (error) throw new Error(`Could not save messages: ${error.message}`);
 }
 
-/** Every message in a conversation, oldest first. Used to restore the UI. */
+/**
+ * Every message in a conversation, oldest first. Used to restore the UI.
+ *
+ * Returns `null` when this tenant has no such conversation, and `[]` when it
+ * has one with no messages yet. Those are different answers. Only the first is
+ * a 404, and "belongs to another tenant" is deliberately the same `null` as
+ * "does not exist" (plan.md § 2.2). Before tenancy, any conversation's
+ * transcript was readable by anyone who had its uuid.
+ */
 export async function getMessages(
+  tenant: TenantContext,
   conversationId: string,
-): Promise<{ role: 'user' | 'assistant'; content: string; created_at: string }[]> {
+): Promise<{ role: 'user' | 'assistant'; content: string; created_at: string }[] | null> {
+  const { data: owned, error: ownError } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .eq('id', conversationId)
+    .maybeSingle();
+  if (ownError) throw new Error(`Could not load the conversation: ${ownError.message}`);
+  if (!owned) return null;
+
   const { data, error } = await supabase
     .from('messages')
     .select('role, content, created_at')
+    .eq('tenant_id', tenant.id)
     .eq('conversation_id', conversationId)
     .order('id', { ascending: true });
   if (error) throw new Error(`Could not load messages: ${error.message}`);

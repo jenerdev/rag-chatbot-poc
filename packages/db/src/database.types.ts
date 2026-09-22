@@ -1,6 +1,9 @@
 // database.types.ts — the shape of the database, for @supabase/supabase-js.
 //
-// HAND-WRITTEN FROM `sql/schema.sql` AND `sql/schema-hybrid.sql`, not generated.
+// HAND-WRITTEN FROM `sql/schema.sql`, `sql/schema-hybrid.sql` AND
+// `sql/schema-tenancy.sql`, not generated. This describes the schema AFTER the
+// D-031 bridge is removed: `tenant_id` is required on every insert, and only
+// the tenant-scoped signatures of the two search functions exist.
 //
 // The plan called for `supabase gen types typescript`, which needs either a
 // personal access token (`supabase login`, interactive) or a database URL. The
@@ -12,7 +15,7 @@
 // database from a script means the connection pooler, whose hostname carries a
 // region this repo does not record.
 //
-// So these are written from the two .sql files, which are committed, are what
+// So these are written from the .sql files, which are committed, are what
 // actually ran, and are the source of truth this project already treats as
 // authoritative. To regenerate once credentials are to hand:
 //
@@ -50,9 +53,48 @@ export type VectorInput = number[] | string;
 export interface Database {
   public: {
     Tables: {
+      tenants: {
+        Row: {
+          id: number;
+          /** the /t/<slug> segment; shape and reserved words are checked in SQL */
+          slug: string;
+          business_name: string;
+          assistant_name: string;
+          logo_url: string | null;
+          banner_url: string | null;
+          theme: Json;
+          /** scrypt hash. null means nobody can administer this tenant. NEVER select it casually. */
+          admin_key_hash: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: never;
+          slug: string;
+          business_name: string;
+          assistant_name: string;
+          logo_url?: string | null;
+          banner_url?: string | null;
+          theme?: Json;
+          admin_key_hash?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: never;
+          slug?: string;
+          business_name?: string;
+          assistant_name?: string;
+          logo_url?: string | null;
+          banner_url?: string | null;
+          theme?: Json;
+          admin_key_hash?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       documents: {
         Row: {
           id: number;
+          tenant_id: number;
           title: string;
           /** optional: url, filename, note */
           source: string | null;
@@ -61,6 +103,8 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          /** required: no default once the D-031 bridge is removed */
+          tenant_id: number;
           /** `generated always as identity` — never supplied by the client */
           id?: never;
           title: string;
@@ -69,6 +113,7 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          tenant_id?: number;
           id?: never;
           title?: string;
           source?: string | null;
@@ -80,6 +125,7 @@ export interface Database {
       chunks: {
         Row: {
           id: number;
+          tenant_id: number;
           document_id: number;
           /** position within the document */
           chunk_index: number;
@@ -90,6 +136,8 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          /** required: no default once the D-031 bridge is removed */
+          tenant_id: number;
           id?: never;
           document_id: number;
           chunk_index: number;
@@ -98,6 +146,7 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          tenant_id?: number;
           id?: never;
           document_id?: number;
           chunk_index?: number;
@@ -112,20 +161,30 @@ export interface Database {
             referencedRelation: 'documents';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'chunks_document_tenant_fk';
+            columns: ['document_id', 'tenant_id'];
+            referencedRelation: 'documents';
+            referencedColumns: ['id', 'tenant_id'];
+          },
         ];
       };
       conversations: {
         Row: {
           /** uuid, `default gen_random_uuid()` */
           id: string;
+          tenant_id: number;
           created_at: string;
         };
-        /** Every column has a default — which is why `.insert({})` is legal. */
+        /** Every column but tenant_id has a default. */
         Insert: {
+          /** required: no default once the D-031 bridge is removed */
+          tenant_id: number;
           id?: string;
           created_at?: string;
         };
         Update: {
+          tenant_id?: number;
           id?: string;
           created_at?: string;
         };
@@ -134,6 +193,7 @@ export interface Database {
       messages: {
         Row: {
           id: number;
+          tenant_id: number;
           conversation_id: string;
           /** `check (role in ('user', 'assistant'))` — the database enforces this */
           role: 'user' | 'assistant';
@@ -141,6 +201,8 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          /** required: no default once the D-031 bridge is removed */
+          tenant_id: number;
           id?: never;
           conversation_id: string;
           role: 'user' | 'assistant';
@@ -148,6 +210,7 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          tenant_id?: number;
           id?: never;
           conversation_id?: string;
           role?: 'user' | 'assistant';
@@ -161,15 +224,23 @@ export interface Database {
             referencedRelation: 'conversations';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'messages_conversation_tenant_fk';
+            columns: ['conversation_id', 'tenant_id'];
+            referencedRelation: 'conversations';
+            referencedColumns: ['id', 'tenant_id'];
+          },
         ];
       };
     };
     Views: Record<never, never>;
     Functions: {
-      /** sql/schema.sql § 7 — cosine similarity search. */
+      /** sql/schema-tenancy.sql § 8 — cosine similarity search within ONE tenant. */
       match_chunks: {
         Args: {
           query_embedding: VectorInput;
+          /** no default in SQL, and required here: a forgotten tenant is a compile error */
+          p_tenant_id: number;
           match_count?: number;
           min_similarity?: number;
         };
@@ -180,11 +251,12 @@ export interface Database {
           similarity: number;
         }[];
       };
-      /** sql/schema-hybrid.sql § 3 — keyword search, reporting BOTH scores. */
+      /** sql/schema-tenancy.sql § 8 — keyword search within ONE tenant, reporting BOTH scores. */
       match_chunks_fts: {
         Args: {
           query_text: string;
           query_embedding: VectorInput;
+          p_tenant_id: number;
           match_count?: number;
         };
         Returns: {

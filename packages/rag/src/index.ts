@@ -11,6 +11,7 @@
 //   prompt.ts      chunks + history + question -> the messages array
 //   retrieve.ts    question -> standalone query -> two searches -> one list
 //   answer.ts      the whole query pipeline, streaming and not
+//   tenant.ts      a slug -> the TenantContext every call above requires
 
 export {
   MATCH_COUNT,
@@ -27,6 +28,7 @@ export { buildPrompt } from './prompt.js';
 export { greetingReply, GREETING_REPLY } from './greeting.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
+export { loadTenant } from './tenant.js';
 
 export type {
   Answer,
@@ -38,4 +40,5 @@ export type {
   RetrievedChunk,
   Source,
   StreamMeta,
+  TenantContext,
 } from './types.js';

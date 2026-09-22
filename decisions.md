@@ -780,7 +780,7 @@ because it would mean editing the grounding prompt.
 
 ---
 
-## D-031 · A temporary tenancy bridge between Phase 1 and Phase 3 · **Added 2026-09-23, expires in tenancy Phase 3**
+## D-031 · A temporary tenancy bridge between Phase 1 and Phase 3 · **Database half REMOVED 2026-09-23 (Phase 3). The route pin remains until Phase 5.**
 
 **Context:** `plan.md` says Phases 0–2 touch no application code. Phase 1 as
 written contradicts that. With `tenant_id` NOT NULL and no default, today's
@@ -813,6 +813,26 @@ tenant.
 drop statements are at the bottom of `schema-tenancy.sql`. Phase 3 is not done
 until they have run. Its grep for tenant filters should then also find no call
 that reaches the old overloads.
+
+**Removed 2026-09-23.** `schema-tenancy.sql` was rewritten to describe the final
+state: its step 9 drops the default, `tenancy_bridge_default_tenant()`, and both
+old signatures, so re-running it can never put the bridge back. Observed
+afterwards:
+- the old `match_chunks` and `match_chunks_fts` calls return `PGRST202 Could not
+  find the function`;
+- an insert without `tenant_id` fails with `23502 null value in column
+  "tenant_id" ... violates not-null constraint`.
+
+**What remains, until Phase 5: a route pin.** Phase 3 made `tenant` a required
+argument, but the routes do not move to `/api/t/<slug>/` until Phase 5. So the
+existing routes call `bridgeTenant()` in `apps/web/lib/tenant.ts`, which
+resolves `northwind` by slug and throws if it is missing. It is a hard pin, not
+a default. Nothing falls back to it, and no request can pick another tenant
+through those routes, so villa is unreachable over HTTP until Phase 5. That is
+strictly safer than the database bridge it replaced. Verified over HTTP: the
+document list shows only northwind; villa's document 38 gives `[]` for its
+chunks and `404` on delete; the parking question is refused. Phase 5 deletes
+`bridgeTenant()` along with the old routes.
 
 ---
 

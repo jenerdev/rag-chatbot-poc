@@ -12,23 +12,18 @@
 -- functions at the bottom. The composite foreign keys in step 6 are the one
 -- guard that does not depend on anyone remembering to write a filter.
 --
--- THE BRIDGE (D-031): temporary, removed in Phase 3
--- -------------------------------------------------
--- Today's pipeline does not know tenants exist. It inserts rows without a
--- tenant_id and calls match_chunks without p_tenant_id. Without a bridge, this
--- file would break ingest, chat and `pnpm eval` until Phase 3 is finished. So
--- two things are here that the finished design forbids (D-027):
+-- THE BRIDGE (D-031), and why step 9 exists
+-- -------------------------------------------
+-- Between tenancy Phases 1 and 3 this file also gave tenant_id a default of
+-- northwind, and left the old unfiltered match_chunks and match_chunks_fts in
+-- place, so that the pipeline kept working before it knew tenants existed.
+-- Phase 3 threaded the tenant through every call, and the bridge was removed.
 --
---   1. tenant_id defaults to the northwind tenant (step 4), and
---   2. the old, UNFILTERED match_chunks and match_chunks_fts stay alongside the
---      new tenant-scoped versions (step 8). They are overloads, not
---      replacements: a call that sends p_tenant_id reaches the new function,
---      and a call that does not reaches the old one.
---
--- Both are harmless while northwind is the only tenant, and both become a
--- cross-tenant leak once a second tenant exists and the app still has not been
--- threaded (Phase 3). The drop statements are at the very end, commented out.
--- Phase 3 runs them.
+-- This file now describes the FINAL state. Re-running it never puts the
+-- bridge back. Step 9 drops the default, the helper function and the
+-- pre-tenancy search signatures, which schema.sql and schema-hybrid.sql still
+-- create on a fresh install. Every step is `if exists` / `if not exists`, so
+-- the file is idempotent from any starting point.
 
 -- 1. The tenants table.
 create table if not exists tenants (
@@ -82,18 +77,9 @@ alter table chunks        alter column tenant_id set not null;
 alter table conversations alter column tenant_id set not null;
 alter table messages      alter column tenant_id set not null;
 
--- BRIDGE (D-031): a default so today's un-threaded inserts keep working.
--- A column DEFAULT cannot contain a subquery, so it calls this function. The
--- name says what it is, so it is easy to find and hard to mistake for design.
-create or replace function tenancy_bridge_default_tenant()
-returns bigint
-language sql stable
-as $$ select id from tenants where slug = 'northwind' $$;
-
-alter table documents     alter column tenant_id set default tenancy_bridge_default_tenant();
-alter table chunks        alter column tenant_id set default tenancy_bridge_default_tenant();
-alter table conversations alter column tenant_id set default tenancy_bridge_default_tenant();
-alter table messages      alter column tenant_id set default tenancy_bridge_default_tenant();
+-- There is deliberately NO default. An insert that does not say which tenant
+-- it belongs to fails, which is the point (D-027). Step 9 removes the default
+-- the D-031 bridge added.
 
 -- 5. (id, tenant_id) is unique on the parents. It already is, because id alone
 --    is unique. This constraint exists so step 6 has something to reference.
@@ -155,8 +141,9 @@ create index if not exists messages_tenant_conv_idx on messages (tenant_id, conv
 -- Supabase's .rpc() passes arguments by name, so its position (second) is
 -- documentation; the missing default is what actually protects you.
 --
--- These are new overloads. The old signatures from schema.sql and
--- schema-hybrid.sql still exist, unfiltered, until the bridge is removed.
+-- `create or replace` with a new parameter list does not replace the old
+-- functions. It creates overloads next to them. The old, unfiltered signatures
+-- from schema.sql and schema-hybrid.sql are dropped in step 9.
 create or replace function match_chunks (
   query_embedding vector(1536),
   p_tenant_id     bigint,
@@ -220,23 +207,24 @@ as $$
   limit match_count;
 $$;
 
--- PostgREST caches the schema. Without this, the new columns and overloads are
--- invisible to .rpc() and .from() until the cache refreshes on its own.
+-- 9. Remove the D-031 bridge and the pre-tenancy search functions.
+--
+-- After this, nothing in the database can search or write without naming a
+-- tenant. An un-threaded .rpc('match_chunks', {query_embedding, ...}) fails
+-- with "Could not find the function", instead of quietly searching everyone.
+alter table documents     alter column tenant_id drop default;
+alter table chunks        alter column tenant_id drop default;
+alter table conversations alter column tenant_id drop default;
+alter table messages      alter column tenant_id drop default;
+drop function if exists tenancy_bridge_default_tenant();
+drop function if exists match_chunks (vector(1536), int, float);
+drop function if exists match_chunks_fts (text, vector(1536), int);
+
+-- PostgREST caches the schema. Without this, the new columns and functions are
+-- invisible to .rpc() and .from(), and the dropped ones still look callable,
+-- until the cache refreshes on its own.
 notify pgrst, 'reload schema';
 
 -- Verify:
 --   select count(*) from chunks where tenant_id is null;          -- must be 0
 --   pnpm --filter @rag/db verify                                    -- 14 checks
-
--- ---------------------------------------------------------------------------
--- REMOVE THE BRIDGE, in Phase 3, once every insert and .rpc() sends the tenant:
---
---   alter table documents     alter column tenant_id drop default;
---   alter table chunks        alter column tenant_id drop default;
---   alter table conversations alter column tenant_id drop default;
---   alter table messages      alter column tenant_id drop default;
---   drop function tenancy_bridge_default_tenant();
---   drop function match_chunks (vector(1536), int, float);
---   drop function match_chunks_fts (text, vector(1536), int);
---   notify pgrst, 'reload schema';
--- ---------------------------------------------------------------------------

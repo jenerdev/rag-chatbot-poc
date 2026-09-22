@@ -4,7 +4,7 @@ import { chat } from '@rag/openai';
 import { supabase } from '@rag/db';
 import type { FtsRow, MatchRow } from '@rag/db';
 import { CANDIDATE_COUNT, MATCH_COUNT, MIN_SIMILARITY, REWRITE_MAX_TOKENS, RRF_K } from './constants.js';
-import type { FoundBy, HistoryMessage, RetrievedChunk } from './types.js';
+import type { FoundBy, HistoryMessage, RetrievedChunk, TenantContext } from './types.js';
 
 /**
  * Turn a follow-up question into one that can be searched on its own.
@@ -117,9 +117,17 @@ export async function rewriteQuestion(
  * only one of them found — which is exactly the behaviour we want, and it
  * needs no tuning to get it.
  *
+ * TENANCY: both searches filter by tenant INSIDE the SQL function, before the
+ * `limit`, so another tenant's chunk never takes up a candidate slot. Filtering
+ * here, after the rows came back, would be too late: ten slots full of the
+ * wrong tenant would fuse into zero results. Nothing in this function can
+ * reach another tenant's chunks, because `p_tenant_id` is required in SQL and
+ * in the types.
+ *
  * @returns chunks ordered best-first, each tagged with which search found it
  */
 export async function retrieve(
+  tenant: TenantContext,
   question: string,
   questionVector: number[],
 ): Promise<RetrievedChunk[]> {
@@ -128,12 +136,14 @@ export async function retrieve(
   const [vectorResult, keywordResult] = await Promise.all([
     supabase.rpc('match_chunks', {
       query_embedding: questionVector,
+      p_tenant_id: tenant.id,
       match_count: CANDIDATE_COUNT,
       min_similarity: MIN_SIMILARITY,
     }),
     supabase.rpc('match_chunks_fts', {
       query_text: question,
       query_embedding: questionVector,
+      p_tenant_id: tenant.id,
       match_count: CANDIDATE_COUNT,
     }),
   ]);
@@ -171,7 +181,7 @@ export async function retrieve(
   const merged = [...fused.values()].sort((a, b) => b.score - a.score).slice(0, MATCH_COUNT);
 
   console.log(
-    `[retrieve] vector:${vectorHits.length} keyword:${keywordHits.length} ` +
+    `[retrieve] ${tenant.slug} vector:${vectorHits.length} keyword:${keywordHits.length} ` +
       `-> fused:${merged.length} [${merged.map((c) => c.foundBy).join(' ')}]`,
   );
 

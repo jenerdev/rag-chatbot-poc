@@ -11,7 +11,7 @@
 // --conditions=react-server is REQUIRED, because the pipeline imports @rag/db,
 // which is marked server-only and refuses to load in a plain Node process.
 // Both flags live in this package's `eval` script — run it with pnpm, not node.
-import { answerQuestion, NO_ANSWER } from '../dist/index.js';
+import { answerQuestion, loadTenant, NO_ANSWER } from '../dist/index.js';
 
 const label = process.argv[2] ?? 'unlabelled';
 
@@ -65,12 +65,18 @@ console.log('='.repeat(78));
 console.log('PROMPT EVAL:', label);
 console.log('='.repeat(78));
 
+// Every case asks northwind, by name. There is no default tenant to fall back
+// on (D-027), so a missing northwind is an error, not an empty battery. Phase 4
+// adds the villa cases and the cross-tenant leakage cases.
+const northwind = await loadTenant('northwind');
+if (!northwind) throw new Error('No northwind tenant. Run packages/db/sql/schema-tenancy.sql first.');
+
 let pass = 0;
 for (const c of CASES) {
   let conversationId = null;
   let last = null;
   for (const turn of c.turns) {
-    last = await answerQuestion({ conversationId, message: turn });
+    last = await answerQuestion({ tenant: northwind, conversationId, message: turn });
     conversationId = last.conversationId;
   }
 

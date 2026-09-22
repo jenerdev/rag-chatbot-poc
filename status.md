@@ -31,8 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phase 1 (schema, 14/14 verify) and Phase 2 (index measurement,
-  iterative scan chosen) are done; Phase 3 (pipeline) is next
+  eval baseline) Phases 1–3 are done (schema, index measurement, pipeline threaded; the D-031
+  database bridge is removed). Phase 4 (persona) is next
 
 ---
 
@@ -77,8 +77,18 @@ Phase 2". Verify is still 14/14.
 Don't use the app until Phase 3: "parking spaces" pulls villa chunks at 0.362
 through the old unfiltered function.
 
-**4. Tenancy Phase 3 — thread the tenant through `@rag/pipeline`, then Phases 4–8** (`plan.md`). Phase 3 must also run the bridge-removal
-block at the bottom of `schema-tenancy.sql`.
+~~**4. Tenancy Phase 3 — thread the tenant through `@rag/pipeline`.**~~ **Done
+2026-09-23.** Every pipeline function takes a required `TenantContext`, and the
+plan's grep shows a tenant filter on all 15 lines. `pnpm build`, `typecheck` and
+`test` pass (40 + 13). `pnpm --filter @rag/pipeline isolation` passes 11/11.
+Eval is **5/6** with the same verdicts, and the score probe is **identical** to
+Phase 0. **D-031's database bridge is removed:** the old functions give
+`PGRST202`, and a tenant-less insert gives `23502`. The routes are pinned to
+northwind by `bridgeTenant()` until Phase 5. Also fixed: `listDocuments()` had
+been failing since Phase 1 ("more than one relationship was found").
+
+**5. Tenancy Phase 4 — persona, then measure** (`plan.md` § Phase 4), then
+Phases 5–8. Phase 5 must delete `bridgeTenant()` and the old routes.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -86,7 +96,7 @@ block at the bottom of `schema-tenancy.sql`.
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**5. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**6. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -441,6 +451,33 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 3)
+- **Did:** Added `TenantContext` and `loadTenant()` (which selects four explicit
+  columns). Made `tenant` the required first argument of `ingestDocument`,
+  `listDocuments`, `deleteDocument`, `getChunks`, `retrieve`, `answerQuestion`,
+  `answerQuestionStream` and `getMessages`. Fixed § 2.2:
+  `ensureConversation()` now verifies ownership, and `getMessages()` returns
+  `null` for "not yours / not there". Updated `database.types.ts` to the
+  bridge-free schema. Pinned the existing routes to northwind with
+  `bridgeTenant()`. Pointed eval and scores at northwind by name. Added
+  `tools/isolation.mjs`. Rewrote `schema-tenancy.sql` so step 9 removes the
+  bridge, and the user re-ran it.
+- **Observed:** 15/15 grep lines show a tenant. Build, typecheck and test pass
+  (40 + 13). Isolation passes 11/11, both with and without the bridge. Eval is
+  5/6 with the same verdicts; `absent-2` stays refused with villa loaded. The
+  score probe output is byte-identical to `scores-pre-tenancy.txt`. Verify is
+  14/14. After the removal: `PGRST202` for the old functions and `23502` for a
+  tenant-less insert. Over HTTP: northwind-only list, villa document 38 gives
+  `[]` and `404`, and the parking question is refused.
+- **Found:** `listDocuments()` had been broken since Phase 1. Two foreign keys
+  now link chunks to documents, and PostgREST would not pick one. Neither
+  verify nor eval calls it. It is fixed with `chunks!chunks_document_tenant_fk(count)`.
+- **Deviation:** `plan.md` asks for `tools/parity.mjs` at 22/0, but that script
+  compared against `apps/legacy-poc`, which was deleted in migration Phase 7.
+  Substituted: the eval verdicts, the score-probe diff against Phase 0, and the
+  isolation suite.
+- **Next:** Phase 4, the persona.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 2)
 - **Did:** Seeded tenant `villa` (id 3; id 2 was the deleted verify probe) with

@@ -60,6 +60,9 @@ if (chunkError || !chunk) {
   if (vector) {
     const { data: matches, error: rpcError } = await supabase.rpc('match_chunks', {
       query_embedding: vector,
+      // Scoped to the chunk's own tenant. match_chunks has no unscoped form
+      // once the D-031 bridge is removed.
+      p_tenant_id: chunk.tenant_id,
       match_count: 3,
       min_similarity: 0,
     });

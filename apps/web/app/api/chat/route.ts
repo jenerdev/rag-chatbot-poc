@@ -3,6 +3,7 @@ import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta } from '@rag/pipeline';
 import { badRequest, withRoute } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
+import { bridgeTenant } from '@/lib/tenant';
 
 // nodejs, NOT edge: the pipeline uses supabase-js and holds a long-lived
 // connection open while the model writes. `force-dynamic` because a cached
@@ -29,6 +30,9 @@ export const POST = withRoute(async (request: Request) => {
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
   const args = {
+    // ⚠ D-031 bridge: pinned to northwind until Phase 5 moves this route to
+    // /api/t/[tenant]/chat.
+    tenant: await bridgeTenant(),
     conversationId: parsed.data.conversationId,
     message: parsed.data.message.trim(),
   };

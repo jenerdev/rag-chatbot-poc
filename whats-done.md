@@ -2968,3 +2968,54 @@ only place that is looked at before real tenants depend on it.
 - **Measuring the function call itself** showed only `Function Scan on
   match_chunks`, because the function is not inlined. The query body was
   explained directly instead, and the setting was proven from the catalog.
+
+---
+
+## Tenancy Phase 3 — the tenant threaded through `@rag/pipeline` · done 2026-09-23
+
+**What was done:**
+- `TenantContext { id, slug, businessName, assistantName }` is the pipeline's
+  view of a tenant. `loadTenant(slug)` is the only place a `tenants` row
+  becomes one, and it names its four columns.
+- Every pipeline function that touches the database takes `tenant` as a
+  required first argument. Every query gets `.eq('tenant_id', …)`, every insert
+  gets `tenant_id`, and both RPCs get `p_tenant_id`.
+- § 2.2 is fixed. A client-supplied `conversationId` is used only if this
+  tenant owns it. `getMessages()` returns `null` for "not yours / not there"
+  and `[]` for "yours, empty".
+- The existing routes are pinned to northwind by `bridgeTenant()`.
+- The D-031 database bridge is removed, and `schema-tenancy.sql` now describes
+  the final state.
+
+**Why it mattered:** this is where Rule 2 becomes code. After this, the only
+thing between two tenants is these filters, and the missing default makes a
+forgotten one a compile error or a database error, not a silent read.
+
+**What each observed value proves:**
+- **15/15 grep lines carry a tenant.** Every call was read line by line, as the
+  plan demands. Two lines had no visible filter: the chunk insert, where the
+  tenant is in `rows`, and the R-7 cleanup delete, which now filters too.
+- **Isolation 11/11, with and without the bridge.** One tenant asking for the
+  other's documents, chunks, conversation or transcript gets nothing. A delete
+  across tenants is refused. An ingest lands in the right tenant.
+- **Score probe byte-identical to Phase 0, and eval 5/6 with the same
+  verdicts.** Tenancy is a filter, not a behaviour change. `absent-2` stays
+  refused with villa's parking documents in the same table. That means CLAUDE.md
+  rule 1's "Northwind only" precondition is now enforced by tenancy rather than
+  by discipline. It is amended in Phase 8.
+- **`PGRST202` for the old functions, `23502` for a tenant-less insert.** The
+  bridge is gone, not merely unused. An un-threaded call now fails loudly.
+- **HTTP: a northwind-only list, `[]` and `404` for villa's document 38.** The
+  route pin holds end to end, through Next.js.
+
+**Traps hit and avoided:**
+- **Phase 1 had silently broken `listDocuments()`.** The composite foreign key
+  is a second relationship between chunks and documents, and PostgREST refuses
+  to guess between two. Nothing that was being run called it. Naming the
+  relationship fixes it, and the name chosen, the composite FK, can only join
+  within one tenant.
+- **Keeping the bridge in the SQL file** would have re-armed it on the next
+  idempotent re-run. The file was rewritten to drop it instead.
+- **`parity.mjs` could not be re-run**, because the legacy POC it compared
+  against is deleted. That was replaced by measurements that can still be
+  taken, and recorded as a deviation rather than claimed.

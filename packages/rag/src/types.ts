@@ -6,6 +6,25 @@
 
 import type { MatchRow } from '@rag/db';
 
+/**
+ * What the pipeline needs to know about a tenant.
+ *
+ * A value object, not a row. It is narrower than the `tenants` table on
+ * purpose: `admin_key_hash` is not in this type, so it cannot end up in a JSON
+ * response by accident, however the object gets passed around.
+ *
+ * Every pipeline function that touches the database takes one of these as a
+ * REQUIRED first argument (D-027). There is no default and no ambient "current
+ * tenant". A call site that forgets to say which tenant it means does not
+ * compile.
+ */
+export interface TenantContext {
+  id: number;
+  slug: string;
+  businessName: string;
+  assistantName: string;
+}
+
 /** Which search found a chunk. Rendered as a badge in the sources panel (D-015). */
 export type FoundBy = 'vector' | 'keyword' | 'both';
 
