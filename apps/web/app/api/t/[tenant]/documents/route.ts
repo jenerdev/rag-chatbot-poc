@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ingestDocument, listDocuments } from '@rag/pipeline';
+import { requireAdmin } from '@/lib/admin-auth';
 import { badRequest } from '@/lib/route';
 import { createDocumentSchema, firstError } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -11,6 +12,9 @@ export const dynamic = 'force-dynamic';
 
 /** Add a document: chunk it, embed it, store it. */
 export const POST = withTenantRoute(async (request, { tenant }) => {
+  // Admin only (Phase 6). The chat route is the product and stays open. Editing
+  // the knowledge base behind it needs this tenant's key.
+  requireAdmin(request, tenant);
   const parsed = createDocumentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
@@ -18,7 +22,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   return NextResponse.json(result, { status: 201 });
 });
 
-/** List the tenant's documents with their chunk counts. */
-export const GET = withTenantRoute(async (_request, { tenant }) => {
+/** List the tenant's documents with their chunk counts. Admin only. */
+export const GET = withTenantRoute(async (request, { tenant }) => {
+  requireAdmin(request, tenant);
   return NextResponse.json(await listDocuments(tenant));
 });

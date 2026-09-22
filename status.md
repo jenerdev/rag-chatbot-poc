@@ -31,9 +31,8 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phases 1–5 are done (schema, index, pipeline, persona, routes under
-  `/api/t/<slug>/`). Phase 6 (admin auth) is next. The screens are broken until
-  Phase 7
+  eval baseline) Phases 1–6 are done (schema, index, pipeline, persona, routes, admin auth).
+  Phase 7 (the screens) is next. The screens are broken until then
 
 ---
 
@@ -116,8 +115,38 @@ All five route files moved to `app/api/t/[tenant]/`, behind `withTenantRoute()`.
 and `/api/documents`, which are now 404. The plan prefixes those fetches in
 Phase 7, step 4. Use curl until then.
 
-**7. Tenancy Phase 6 — admin auth** (`plan.md` § Phase 6), then Phases 7–8.
-CLAUDE.md rule 1 still needs amending in Phase 8.
+~~**7. Tenancy Phase 6 — admin auth.**~~ **Done 2026-09-23.**
+- **Code:** `ADMIN_COOKIE_SECRET` is required in `env.ts`. scrypt
+  `hashAdminKey`/`verifyAdminKey` live in `@rag/db`. `lib/admin-auth.ts` has an
+  HMAC-signed cookie that carries the slug and an expiry.
+  `POST/GET/DELETE /api/t/<slug>/admin/session` handles login, status and
+  logout. `requireAdmin()` guards the list, add and delete document routes and
+  the chunks route; chat stays open. `pnpm --filter @rag/db tenant:add` and
+  `tenant:key` print a key once.
+- **Keys:** northwind and villa both have keys, issued by the user. Claude
+  never saw them.
+- **Checked over curl, against a throwaway tenant (since deleted):**
+  - no cookie, wrong key, a cookie from another tenant, a swapped slug, a
+    tampered signature, a correctly signed but expired cookie, and after
+    logout: all **401**;
+  - right key: **200**, with `Path=/api/t/authprobe; HttpOnly; SameSite=lax`;
+  - a tenant with no key: 401, "has no admin key set";
+  - chat with no cookie: **200**.
+- **Static bundle:** 0 files contain `admin_key`, `ADMIN_COOKIE_SECRET`,
+  `service_role`, `rag_admin`, `scrypt`, or the secret's value.
+
+**Deviations, which D-028 must record in Phase 8:**
+1. The cookie path is `/api/t/<slug>`, not `/t/<slug>`. The guarded routes
+   live under `/api/`, and a `/t/<slug>` cookie would never be sent to them.
+2. The key hashing is in `@rag/db`, not `apps/web/lib`, because
+   `tools/tenant.mjs` needs it too.
+3. `tenant:key` was added alongside `tenant:add`. The two existing tenants had
+   no way to get a key otherwise.
+
+**8. Tenancy Phase 7 — the screens** (`plan.md` § Phase 7), then Phase 8.
+- The screens need a login form, because the admin routes now return 401.
+- The chat page's empty-knowledge-base check (`GET /documents`) is now
+  admin-only. Pass a document count from the server layout instead.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -125,7 +154,7 @@ CLAUDE.md rule 1 still needs amending in Phase 8.
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**8. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**9. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -480,6 +509,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 6)
+- **Did:** Admin auth, hand-rolled on `node:crypto`: scrypt hashes with the cost
+  stored inside the hash, and HMAC session cookies scoped to `/api/t/<slug>`.
+  Added the session route, `requireAdmin()` on the four admin handlers, and the
+  `tenant:add` / `tenant:key` tools. The user set `ADMIN_COOKIE_SECRET` (43
+  characters) and issued keys for both tenants.
+- **Observed:** hashing takes 50 ms, and verify returns true / false / false /
+  false for the right key, a wrong key, a null hash and junk. All 16 curl
+  cases pass, against the throwaway tenants `authprobe` (11) and `nokeyprobe`
+  (12), both deleted. The key appeared 0 times in the dev log.
+  `tenant:add Bad.Slug` fails with `tenants_slug_shape`. The static bundle
+  grep is clean. Tests pass (41 + 13), and verify is 14/14.
+- **Deviations:** the cookie path, where the hashing lives, and `tenant:key`
+  (see "Next up").
+- **Next:** Phase 7, the screens.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 5)
 - **Did:** Moved the five route files to `app/api/t/[tenant]/`, file by file.

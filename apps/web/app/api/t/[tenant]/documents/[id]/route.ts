@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { deleteDocument } from '@rag/pipeline';
+import { requireAdmin } from '@/lib/admin-auth';
 import { badRequest, parseId } from '@/lib/route';
 import { withTenantRoute } from '@/lib/tenant';
 
@@ -12,7 +13,8 @@ export const dynamic = 'force-dynamic';
  * Half of the project's success criterion lives here: delete the document, ask
  * the same question again, and the bot must stop knowing the answer.
  */
-export const DELETE = withTenantRoute<{ id: string }>(async (_request, { tenant, params }) => {
+export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
+  requireAdmin(request, tenant);
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
 

@@ -63,6 +63,16 @@ export const chatSchema = z.object({
     ),
 });
 
+/** An admin login. The key is checked against a scrypt hash, never compared as text. */
+export const adminLoginSchema = z.object({
+  key: z
+    .string({ required_error: 'An admin key is required', invalid_type_error: 'An admin key is required' })
+    .min(1, 'An admin key is required')
+    // Generated keys are 43 characters. The cap stops a megabyte "key" from
+    // costing a megabyte of scrypt input.
+    .max(256, 'That is not an admin key'),
+});
+
 /**
  * The first error message from a failed parse.
  *

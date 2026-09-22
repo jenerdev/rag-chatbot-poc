@@ -18,6 +18,10 @@ const REQUIRED = [
   'OPENAI_EMBEDDING_MODEL',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
+  // Signs the admin session cookie (lib/admin-auth.ts). Without it, no admin
+  // could ever log in, so a missing one gets the same one-clear-sentence
+  // treatment as a missing API key.
+  'ADMIN_COOKIE_SECRET',
 ] as const;
 
 const missing = REQUIRED.filter((name) => !process.env[name]);

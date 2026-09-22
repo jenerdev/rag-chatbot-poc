@@ -6,6 +6,7 @@
     "OPENAI_EMBEDDING_MODEL",
     "SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
+    "ADMIN_COOKIE_SECRET",
     "PORT"
   ],
   "globalDependencies": [

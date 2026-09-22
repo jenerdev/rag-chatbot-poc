@@ -2,6 +2,7 @@
 // types the retrieval step reads.
 
 export { supabase } from './client.js';
+export { generateAdminKey, hashAdminKey, verifyAdminKey } from './admin-key.js';
 export type { Database, Json, StoredVector, VectorInput } from './database.types.js';
 
 /** The expected dimensions, coupled to the embedding model by `vector(1536)` (D-004). */

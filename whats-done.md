@@ -3099,3 +3099,50 @@ tenant on a request's behalf.
 - **An ingest example against a fixture tenant in the README.** Anyone who
   copy-pasted it would have silently changed the eval battery's verdicts. It
   was replaced by a warning.
+
+---
+
+## Tenancy Phase 6 — admin auth · done 2026-09-23
+
+**What was done:** Editing a tenant's knowledge base now requires that
+tenant's admin key.
+- **Keys** are scrypt-hashed (N = 2^15, a 16-byte salt, stored as
+  `scrypt$N$salt$hash`), in `@rag/db`'s `admin-key.ts`. They are checked with
+  `timingSafeEqual`. A NULL hash means nobody can administer the tenant.
+- **Logging in** (`POST /api/t/<slug>/admin/session`) sets an httpOnly,
+  SameSite=lax cookie, `<slug>.<expiry>.<hmac>`, with its path set to
+  `/api/t/<slug>`.
+- **`requireAdmin()`** guards the admin routes by throwing a 401 through the
+  existing error map. Chat stays open.
+- **The tools** `tenant:add` / `tenant:key` generate a 32-byte key, print it
+  once, and store only its hash.
+
+**Why it mattered:** before this, anyone who could reach the API could delete
+any tenant's documents. The chat is the product, but the knowledge base is the
+tenant's property.
+
+**What each observed value proves:**
+- **Cookies from another tenant, swapped-slug, tampered and expired: all 401.**
+  readSession checks three things: the HMAC, the slug match, and the expiry.
+  The cross-tenant case was sent by hand, so it proves the server check
+  itself, not just the browser's path scoping.
+- **`Path=/api/t/authprobe; HttpOnly; SameSite=lax`.** Browsers do not send the
+  cookie to any other tenant's routes, scripts cannot read it, and it is not
+  sent on cross-site POSTs. `Secure` is set everywhere except `next dev`.
+- **Key-less tenant: 401, "has no admin key set".** Default-deny: a missing
+  column value locks the admin panel instead of opening it.
+- **Chat 200 with no cookie.** The guard is only where it belongs.
+- **The key appeared 0 times in the dev log, and 0 static files contain
+  `admin_key`, the secret or `scrypt`.** The rule 2 grep, applied to the new
+  secret, is clean.
+
+**Deviations and traps:**
+- **The plan's cookie path (`/t/<slug>`) would have made login a no-op.** The
+  cookie would be set and then never sent to `/api/t/<slug>/…`, which is where
+  it is checked. So the path is `/api/t/<slug>`.
+- **`tenant:key` was not in the plan**, but northwind and villa were created
+  in Phase 1 and Phase 2 with no key, so they could never have been
+  administered.
+- **The real keys were never seen by Claude.** Auth was tested against a
+  throwaway tenant whose key went to a gitignored scratch file. The file was
+  deleted, and so was the tenant.
