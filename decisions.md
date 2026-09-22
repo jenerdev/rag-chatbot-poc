@@ -780,7 +780,7 @@ because it would mean editing the grounding prompt.
 
 ---
 
-## D-031 · A temporary tenancy bridge between Phase 1 and Phase 3 · **Database half REMOVED 2026-09-23 (Phase 3). The route pin remains until Phase 5.**
+## D-031 · A temporary tenancy bridge between Phase 1 and Phase 3 · **Fully removed 2026-09-23: the database half in Phase 3, the route pin in Phase 5**
 
 **Context:** `plan.md` says Phases 0–2 touch no application code. Phase 1 as
 written contradicts that. With `tenant_id` NOT NULL and no default, today's
@@ -833,6 +833,11 @@ strictly safer than the database bridge it replaced. Verified over HTTP: the
 document list shows only northwind; villa's document 38 gives `[]` for its
 chunks and `404` on delete; the parking question is refused. Phase 5 deletes
 `bridgeTenant()` along with the old routes.
+
+**Route pin removed 2026-09-23 (Phase 5).** `bridgeTenant()` is deleted. Every
+route now lives under `app/api/t/[tenant]/` behind `withTenantRoute()`. The old
+paths return `404`: `POST /api/chat` and `GET /api/documents` were both
+observed as 404. Nothing of D-031 remains.
 
 ---
 

@@ -3062,3 +3062,40 @@ could be measured rather than assumed.
 - **Adding the optional "answer only from context" sentence by default.** It
   was measured as unnecessary, so it stays out. Every extra line in that prompt
   is something the next edit has to re-measure.
+
+---
+
+## Tenancy Phase 5 — routes under `/api/t/<slug>/` · done 2026-09-23
+
+**What was done:** Every route moved under `app/api/t/[tenant]/`. The new
+`withTenantRoute()` in `apps/web/lib/tenant.ts` resolves the slug through the
+cached `getTenant()`, answers an unknown one with a 404, and hands the handler a
+`TenantContext`. It is built on `withRoute()`, so the single error map still
+applies. The Phase 3 route pin, `bridgeTenant()`, is deleted, and the old
+paths no longer exist.
+
+**Why it mattered:** the URL is now the only way a request names a tenant.
+There is no default and no redirect, so there is nothing that could pick a
+tenant on a request's behalf.
+
+**What each observed value proves:**
+- **northwind shows only document 37, villa only documents 38–45.** The slug
+  selects the tenant end to end, through Next.js.
+- **`/api/t/nope/documents` → `404 No workspace named "nope"`.** An unknown
+  tenant is an error that names the slug. It is neither a fallback nor a list
+  of real slugs.
+- **`/api/chat` → `404`.** The old paths are gone, not redirected. A
+  compatibility shim would have been the default tenant by another name.
+- **Villa's document 38 through northwind gives `[]` for chunks and `404` on
+  delete.** These are indistinguishable from an id that does not exist, so ids
+  cannot be enumerated across tenants.
+- **SSE: `meta`, 13 × `delta`, `done` on villa.** The streaming path survived
+  the move and the wrapper.
+
+**Traps avoided:**
+- **Stale `.next/types`.** They still referenced the old route paths and
+  failed `tsc`. A clean build regenerated them. Nothing was wrong in the
+  source.
+- **An ingest example against a fixture tenant in the README.** Anyone who
+  copy-pasted it would have silently changed the eval battery's verdicts. It
+  was replaced by a warning.

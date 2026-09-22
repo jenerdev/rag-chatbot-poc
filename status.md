@@ -31,8 +31,9 @@
 - **Working on right now:** nothing implemented. **The migration is functionally
   complete** — the `mvp.md` definition of done passes in the browser on the new
   stack. **Multi-tenancy is underway:** [`plan.md`](./plan.md) Phase 0 (the
-  eval baseline) Phases 1–4 are done (schema, index, pipeline, persona; the eval is 9/10 with
-  the six original verdicts unchanged). Phase 5 (routes) is next
+  eval baseline) Phases 1–5 are done (schema, index, pipeline, persona, routes under
+  `/api/t/<slug>/`). Phase 6 (admin auth) is next. The screens are broken until
+  Phase 7
 
 ---
 
@@ -97,11 +98,26 @@ because "Amihan" is also in the business name, which made the persona check
 meaningless. Output: `plan/baseline/eval-post-persona.txt`. Details:
 `notes.md` § "Tenancy Phase 4".
 
-**6. Tenancy Phase 5 — routes under `/api/t/<slug>/`.** Delete `bridgeTenant()`
-and the old routes (`/api/chat` becomes a 404). Update the README's curl
-examples. Then Phases 6–8. ⚠ CLAUDE.md rule 1 ("northwind and nothing else")
-is now wrong: the battery needs BOTH tenants. That gets amended in Phase 8, as
-planned.
+~~**6. Tenancy Phase 5 — routes under `/api/t/<slug>/`.**~~ **Done 2026-09-23.**
+All five route files moved to `app/api/t/[tenant]/`, behind `withTenantRoute()`.
+`bridgeTenant()` is deleted, so D-031 is fully gone. Observed over curl:
+- `/api/t/northwind/documents` lists only document 37;
+- `/api/t/villa/documents` lists only documents 38–45;
+- `/api/t/nope/documents` gives `404 {"error":"No workspace named \"nope\""}`;
+- the old `/api/chat` and `/api/documents` give `404`;
+- villa's document 38, asked for through northwind, gives `[]` for its chunks
+  and `404` on delete;
+- the parking question is refused by northwind and answered by villa from
+  villa's titles;
+- villa's SSE gives `meta`, then 13 × `delta`, then `done`.
+
+`apps/web/README.md` has the new table and curl examples.
+⚠ **The two screens are broken until Phase 7.** They still fetch `/api/chat`
+and `/api/documents`, which are now 404. The plan prefixes those fetches in
+Phase 7, step 4. Use curl until then.
+
+**7. Tenancy Phase 6 — admin auth** (`plan.md` § Phase 6), then Phases 7–8.
+CLAUDE.md rule 1 still needs amending in Phase 8.
 
 **Tenancy, the rule for Phases 3–8:** the one thing to internalise before starting is `plan.md` § 0 Rule 2:
 **after this, the only thing between tenant A and tenant B is a
@@ -109,7 +125,7 @@ planned.
 RLS — so isolation is proven by the `leak-1`/`leak-2`/`leak-3` cases, not by
 having read the queries.
 
-**7. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
+**8. Phase 8 of the migration — deploy** (`plan/steps.md` § Phase 8). The step
 that catches a proxy buffering the stream, which cannot be caught locally.
 Before it, read `README.md` § "Before you put this in production" — R-2 in
 particular (RLS is enabled with no policies; `service_role` bypasses it) stops
@@ -464,6 +480,19 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-23 — session 6, continued (tenancy Phase 5)
+- **Did:** Moved the five route files to `app/api/t/[tenant]/`, file by file.
+  `git mv` of the `documents` directory failed with `Permission denied`, most
+  likely a Windows handle. Replaced `bridgeTenant()` with `withTenantRoute()`,
+  which resolves the slug, returns 404 on a miss, and is built on
+  `withRoute()`. Updated the table and curl examples in `apps/web/README.md`.
+- **Observed:** a clean build lists only the five `/api/t/[tenant]/…` routes.
+  Typecheck and test pass (41 + 13). The curl done-when passes: northwind
+  shows only document 37, villa only 38–45, `nope` gives 404, the old paths
+  give 404, cross-tenant access gives `[]` and 404, and SSE works.
+- **Known gap:** the screens fetch the old paths until Phase 7.
+- **Next:** Phase 6, admin auth.
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 4)
 - **Did:** `buildPrompt(tenant, …)` gets one persona line, and the grounding

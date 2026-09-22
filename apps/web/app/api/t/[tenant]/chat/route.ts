@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta } from '@rag/pipeline';
-import { badRequest, withRoute } from '@/lib/route';
+import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
-import { bridgeTenant } from '@/lib/tenant';
+import { withTenantRoute } from '@/lib/tenant';
 
 // nodejs, NOT edge: the pipeline uses supabase-js and holds a long-lived
 // connection open while the model writes. `force-dynamic` because a cached
@@ -25,14 +25,12 @@ const encoder = new TextEncoder();
  * is written; curl, a script, and every example in the docs get the original
  * single JSON body. Nothing that already worked stops working.
  */
-export const POST = withRoute(async (request: Request) => {
+export const POST = withTenantRoute(async (request, { tenant }) => {
   const parsed = chatSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
   const args = {
-    // ⚠ D-031 bridge: pinned to northwind until Phase 5 moves this route to
-    // /api/t/[tenant]/chat.
-    tenant: await bridgeTenant(),
+    tenant,
     conversationId: parsed.data.conversationId,
     message: parsed.data.message.trim(),
   };
