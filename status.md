@@ -52,10 +52,19 @@ user. verify **28/28**. Villa is seeded with the bookings application
 turnover-gap question (§ 8) is still open. If the answer is yes, it becomes one
 column on `slots`.
 
-**▶ Bookings Phase 2: `@rag/bookings`.** [`plan/bookings.md`](./plan/bookings.md)
-§ 3. A server-only package exposing `checkAvailability`, `listBookings`,
-`createBooking` and `cancelBooking`, with `BookingInputError` (400) and
-`BookingConflictError` (409, `23P01` only), plus isolation cases.
+~~**Bookings Phase 2: `@rag/bookings`.**~~ **Done 2026-09-24.** The package
+exposes `checkAvailability`, `listBookings`, `createBooking`, `cancelBooking`,
+`listUnits`, `listSlots` and `bookingsConfig`, with three errors carrying
+400/409/404. There are 27 new unit tests, and
+`pnpm --filter @rag/bookings isolation` passes **13/13**.
+
+**▶ Bookings Phase 3: applications and admin routes.**
+[`plan/bookings.md`](./plan/bookings.md) § 3:
+- the registry in `packages/rag/src/applications.ts`;
+- `requireApplication()` in `apps/web/lib`, which returns 404;
+- `lib/route.ts` passing 400, 404 and 409 through. Today those become 500;
+- the four `/api/t/[tenant]/bookings…` routes;
+- README curls.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -575,6 +584,30 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 2)
+- **Did:** created `packages/bookings` (`@rag/bookings`, depends on `@rag/db`
+  only), containing `constants.ts`, `validate.ts` (pure), `errors.ts`,
+  `types.ts` and `bookings.ts`. Added `validate.test.ts` and
+  `tools/isolation.mjs`.
+- **Observed:**
+  - **Tests and typecheck:** 27 new tests pass, alongside pipeline's 41 and
+    chunker's 13. Typecheck: 10/10 tasks.
+  - **Isolation, 13/13:**
+    - Northwind gets a 404 from all three calls.
+    - A second Villa booking on the same slot gets `409 "That slot on
+      2027-07-21 overlaps an existing booking."`
+    - The probe tenant sees 0 of Villa's bookings, and cancelling Villa's
+      booking returns `false` with it still confirmed.
+    - Villa's unit id gets the same "No such unit or slot." as a
+      nonexistent one.
+    - Availability keys are `date,slot,status,unit`.
+  - **Cleanup:** afterwards, only `northwind` and `villa` exist, with 0
+    bookings.
+  - **Rule 6 grep:** all 7 queries in `bookings.ts` carry a tenant.
+- **Also observed:** at 01:04 SGT, the Manila date is 2026-09-24 while UTC is
+  still 2026-09-23. A server-UTC "today" would be one day behind right now.
+- **Next:** Phase 3.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 1)
 - **Did:** wrote `schema-bookings.sql`: `btree_gist`, `tenant_applications`

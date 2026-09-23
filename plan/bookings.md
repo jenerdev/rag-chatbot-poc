@@ -430,6 +430,17 @@ pasted into `whats-done.md` as observed.
 **Done when:** typecheck and tests are clean, and isolation goes from 11 to
 about 14, all passing.
 
+> **Done 2026-09-24.** Typecheck is clean, and there are 27 new tests. The
+> isolation checks went into a sibling script,
+> `pnpm --filter @rag/bookings isolation`, with **13/13** passing, rather than
+> into `packages/rag/tools/isolation.mjs`. That script imports
+> `@rag/pipeline`, which does not depend on `@rag/bookings` until Phase 6.
+> `MAX_AVAILABILITY_DAYS` lives in `@rag/bookings`, not in pipeline's
+> constants, because the package that enforces a limit should own it. The
+> package takes a `BookingTenant { id, slug }`, not pipeline's
+> `TenantContext`, because the dependency points the other way. TenantContext
+> satisfies it structurally.
+
 ### Phase 3 — Applications and admin routes
 
 1. `packages/rag/src/applications.ts`: the registry,

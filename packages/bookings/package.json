@@ -1,0 +1,32 @@
+{
+  "name": "@rag/bookings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "isolation": "node --conditions=react-server --env-file=../../.env tools/isolation.mjs"
+  },
+  "dependencies": {
+    "@rag/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@rag/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -3371,3 +3371,68 @@ plan/bookings.md § 1.3.
   08:00–17:00 Day Tour. The database applied "one slot per day" more
   faithfully than the hand-written expectation did, which is the argument for
   keeping the rule in the constraint.
+
+## Bookings Phase 2 — `@rag/bookings` · done 2026-09-24
+
+**What was done:** a new package, `packages/bookings`. It depends on `@rag/db`
+only, and is server-only through it. The files:
+
+- `validate.ts`: pure date and text checks, plus `localDate(timezone)`;
+- `errors.ts`: `BookingInputError` 400, `BookingConflictError` 409,
+  `BookingsNotEnabledError` 404;
+- `bookings.ts`: `checkAvailability`, `listBookings`, `createBooking`,
+  `cancelBooking`, `listUnits`, `listSlots`, `bookingsConfig`.
+
+It also has 27 unit tests and a 13-check isolation script,
+`pnpm --filter @rag/bookings isolation`, saved to
+`plan/baseline/isolation-bookings-phase2.txt`.
+
+**Why it mattered:** this is D-032 made real. The admin routes (Phase 3) and
+the chatbot's tool executor (Phase 6) both call these functions, so there is
+one place that validates a date, one place that maps `23P01` to 409, and one
+availability result type with no guest data in it.
+
+**What each observed value proves:**
+- **Northwind: all three calls throw `BookingsNotEnabledError`, status 404.** A
+  tenant without the application gets "not there", not "locked".
+- **Same Villa slot twice → `409 "That slot on 2027-07-21 overlaps an existing
+  booking."`** `createBooking` does no availability read first. The insert is
+  attempted and Postgres's `23P01` becomes the 409. There is no race window to
+  double-book in.
+- **The probe tenant, which has bookings too, sees 0 of Villa's bookings, gets
+  its own unit only from availability, and cannot cancel Villa's booking**
+  (`false`, and Villa's is still `confirmed`). Reads are tenant-scoped through
+  the package, not only in SQL.
+- **Villa's unit id and a nonexistent id both give "No such unit or slot."**
+  Byte-identical messages, so unit ids cannot be enumerated across tenants.
+- **Availability keys `date,slot,status,unit`, and neither the guest name nor
+  the phone appears in the serialised result.** Rule 3, at the package layer,
+  on top of the SQL layer. Rows are mapped field by field rather than spread,
+  so a column added to the SQL function later cannot reach a prompt by
+  accident.
+- **"2026-09-23 is in the past. Today is 2026-09-24."** The message names today.
+  When the chatbot gets this back as a tool result, the model has what it
+  needs to ask the user again.
+- **At 01:04 SGT (17:04Z), Manila's date is 2026-09-24 while UTC's is
+  2026-09-23.** Observed while checking the output above. A "today" taken from
+  the server's UTC clock would have been one day behind at that moment, and
+  would have accepted yesterday as a bookable date. This is plan § 2.3, seen
+  for real rather than predicted.
+
+**Deviations, each recorded in plan/bookings.md Phase 2:**
+- The isolation checks are a sibling script in `@rag/bookings`, not in
+  pipeline's `isolation.mjs`, because pipeline does not depend on bookings
+  until Phase 6.
+- `MAX_AVAILABILITY_DAYS` (31) lives in this package, because the package
+  that enforces a limit should own it.
+- Functions take `BookingTenant { id, slug }`, because `TenantContext` lives in
+  `@rag/pipeline` and the dependency points the other way. `TenantContext`
+  satisfies it structurally.
+
+**Traps avoided:**
+- **"2026-02-30" passes a regex, and `Date` silently rolls it into March.** The
+  round-trip check in `isIsoDate` rejects it, and a test pins it. A model will
+  write dates like that.
+- **Cleaning up by cancelling** would have left a cancelled row in Villa's
+  real booking history. The isolation script hard-deletes its one Villa
+  booking instead.

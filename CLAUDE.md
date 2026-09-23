@@ -68,6 +68,8 @@ packages/
     src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
     tools/verify.mjs     28 checks, no API key
     tools/tenant.mjs     tenant:add / tenant:key — prints a key once
+  bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
+    tools/isolation.mjs    13 cross-tenant checks, no API key
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant
     tools/prompt-eval.mjs  the battery, 10 cases, both tenants
     tools/isolation.mjs    11 cross-tenant checks through the pipeline
@@ -86,6 +88,7 @@ pnpm --filter @rag/db verify    # 28 checks, no API key needed
 pnpm eval                       # the prompt battery, 10 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6
+pnpm --filter @rag/bookings isolation   # 13 cross-tenant booking checks, no API key
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # key printed ONCE
 pnpm --filter @rag/db tenant:key -- <slug>                              # new key; old one dies
 ```
