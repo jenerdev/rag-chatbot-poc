@@ -89,12 +89,18 @@ replies now open with a sentence naming the date. A first, unscoped wording
 cost `leak-2` (1 of 3 runs). Scoped to availability, it is 3/3, and the full
 battery is 18/19.
 
-**▶ Bookings Phase 7: the chat screen.** [`plan/bookings.md`](./plan/bookings.md)
+~~**Bookings Phase 7: the chat screen.**~~ **Done 2026-09-24.** `chat-screen`
+handles `tool` events, and `sources-panel` shows an open "Checked
+availability" box with open/taken chips. The user walked it, and the server log
+confirms the slot-filling flow, the 23 Oct taken Day Tour, a documents answer
+with no tool, and Northwind's free refusal.
+
+**▶ Bookings Phase 8: the record.** [`plan/bookings.md`](./plan/bookings.md)
 § 3:
-- `chat-screen` handles the `tool` SSE event;
-- `sources-panel` gains a "Checked" section, showing the call and its
-  open/taken rows;
-- a browser walk (slot-filling, a taken date, a docs question, Northwind).
+- `CLAUDE.md` (rules 6 and 7, the traps);
+- `decisions.md` D-032–D-037, plus the D-008 amendment;
+- `risks.md` R-14–R-18;
+- `architecture.md` § 4, `flow.md`, `notes.md`, `README.md`, `todo.md`.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -614,6 +620,26 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 7)
+- **Did:**
+  - `chat-screen.tsx`: `toolCalls` on the answer turn, and a `tool` event
+    handler.
+  - `sources-panel.tsx`: `ToolCallBox`, an always-visible "Checked
+    availability · <date>" with a day row of `slot-chip`s. Errors show in red,
+    and an unknown tool is shown as raw JSON.
+  - CSS for `.checked` and `.tool-call`.
+- **Observed:**
+  - Build clean, bundle grep 0.
+  - curl SSE: `meta → tool → 32 deltas → done`. Northwind JSON: refusal,
+    `toolCalls: []`.
+  - **The walk (user):** passed, and the log confirms it:
+    - slot-filling: 0 tool calls, then `2026-10-08`, 3 open;
+    - 23 Oct: 1 open of 3;
+    - the docs question: 0 tool calls, 5 sources;
+    - Northwind: 0 chunks and no OpenAI call;
+    - also tried: 22 Oct, 0 open of 3.
+- **Next:** Phase 8, the record.
 
 ### 2026-09-24 — session 7, continued (availability replies name the date)
 - **Did:**

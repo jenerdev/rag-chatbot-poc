@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Source } from '@rag/pipeline';
+import type { Source, ToolCallRecord } from '@rag/pipeline';
 
 const FOUND_BY_TITLE: Record<string, string> = {
   vector: 'Found by semantic similarity',
@@ -44,6 +44,88 @@ function SourceBox({ source }: { source: Source }) {
   );
 }
 
+/** One availability row, as check_availability returns it. No guest fields exist to render. */
+interface SlotRow {
+  date: string;
+  unit: string;
+  slot: string;
+  status: 'open' | 'taken';
+}
+
+/** "Thu 8 Oct". A calendar date, so formatted as UTC. */
+function dayLabel(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * One tool call: what was asked, and exactly what came back.
+ *
+ * D-012's argument, extended to tools (D-037). An answer built from a tool
+ * result is only checkable if the result is on screen. If the model says
+ * "open" and the row says "taken", this is where you see it. It is also where
+ * a date the model resolved wrongly ("this Saturday", R-15) becomes visible
+ * instead of silent. The dates shown are the ones the model sent, not the
+ * ones the user typed.
+ *
+ * Everything is a React child, so it is escaped. The result has no guest data
+ * to show: check_availability never returns any (Rule 3).
+ */
+function ToolCallBox({ call }: { call: ToolCallRecord }) {
+  const result = call.result as { slots?: SlotRow[]; error?: string } | null;
+  const from = typeof call.args?.date_from === 'string' ? call.args.date_from : null;
+  const to = typeof call.args?.date_to === 'string' && call.args.date_to !== from ? call.args.date_to : null;
+
+  if (call.name !== 'check_availability') {
+    // A tool this screen does not know how to draw. Show it raw, never hide it.
+    return (
+      <div className="tool-call">
+        <div className="tool-head">{call.name}</div>
+        <pre className="chunk-text">{JSON.stringify({ args: call.args, result: call.result }, null, 2)}</pre>
+      </div>
+    );
+  }
+
+  // Group the rows by date, in the order they came back.
+  const byDate = new Map<string, SlotRow[]>();
+  for (const row of result?.slots ?? []) byDate.set(row.date, [...(byDate.get(row.date) ?? []), row]);
+  const multipleUnits = new Set((result?.slots ?? []).map((r) => r.unit)).size > 1;
+
+  return (
+    <div className="tool-call">
+      <div className="tool-head">
+        Checked availability
+        <span className="muted">
+          {' '}
+          · {from ? dayLabel(from) : '(no date)'}
+          {to ? ` – ${dayLabel(to)}` : ''}
+        </span>
+      </div>
+      {result?.error ? (
+        <div className="tool-error">{result.error}</div>
+      ) : (
+        [...byDate.entries()].map(([date, rows]) => (
+          <div className="day-head" key={date}>
+            <span className="day-label">{dayLabel(date)}</span>
+            <span className="day-slots">
+              {rows.map((r) => (
+                <span key={`${r.unit}/${r.slot}`} className={`slot-chip ${r.status}`}>
+                  {multipleUnits ? `${r.unit} · ` : ''}
+                  {r.slot}: {r.status}
+                </span>
+              ))}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 /**
  * The sources panel for one answer.
  *
@@ -54,39 +136,61 @@ function SourceBox({ source }: { source: Source }) {
  */
 export function SourcesPanel({
   sources,
+  toolCalls,
   searchQuery,
   question,
 }: {
   sources: Source[];
+  toolCalls: ToolCallRecord[];
   searchQuery: string;
   question: string;
 }) {
+  // Tool calls are shown OPEN, not inside the collapsed <details>. For an
+  // availability answer, the tool result is the whole basis of the answer,
+  // and the retrieved chunks are background. So they are the part to see
+  // without clicking.
+  const checked =
+    toolCalls.length > 0 ? (
+      <div className="checked">
+        {toolCalls.map((call, i) => (
+          <ToolCallBox key={i} call={call} />
+        ))}
+      </div>
+    ) : null;
+
   if (sources.length === 0) {
-    // Not an error. This is the system correctly declining to answer.
+    // Not an error. This is the system correctly declining to answer, or, with
+    // a tool call above it, answering from the tool instead (D-035).
     return (
-      <details className="sources">
-        <summary>No matching chunks above the similarity threshold.</summary>
-      </details>
+      <>
+        {checked}
+        <details className="sources">
+          <summary>No matching chunks above the similarity threshold.</summary>
+        </details>
+      </>
     );
   }
 
   return (
-    <details className="sources">
-      <summary>
-        {sources.length} source{sources.length === 1 ? '' : 's'}
-      </summary>
+    <>
+      {checked}
+      <details className="sources">
+        <summary>
+          {sources.length} source{sources.length === 1 ? '' : 's'}
+        </summary>
 
-      {/* If the search used different words from the ones typed, say so.
-          Retrieval quietly searching for something other than the question is
-          exactly the kind of thing that should be visible (D-016, same
-          argument as D-012). */}
-      {searchQuery && searchQuery !== question && (
-        <p className="rewrite-note">searched for: {searchQuery}</p>
-      )}
+        {/* If the search used different words from the ones typed, say so.
+            Retrieval quietly searching for something other than the question is
+            exactly the kind of thing that should be visible (D-016, same
+            argument as D-012). */}
+        {searchQuery && searchQuery !== question && (
+          <p className="rewrite-note">searched for: {searchQuery}</p>
+        )}
 
-      {sources.map((source) => (
-        <SourceBox key={source.id} source={source} />
-      ))}
-    </details>
+        {sources.map((source) => (
+          <SourceBox key={source.id} source={source} />
+        ))}
+      </details>
+    </>
   );
 }

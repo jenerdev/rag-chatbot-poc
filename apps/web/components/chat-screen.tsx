@@ -19,7 +19,7 @@
 
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type { Source } from '@rag/pipeline';
+import type { Source, ToolCallRecord } from '@rag/pipeline';
 import { SourcesPanel } from '@/components/sources-panel';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { BrandHeader } from '@/components/brand-header';
@@ -46,6 +46,8 @@ type Turn =
       kind: 'answer';
       text: string;
       sources: Source[];
+      /** Filled in by `tool` events, one per call, before the answer that uses them (plan/bookings.md Phase 7). */
+      toolCalls: ToolCallRecord[];
       searchQuery: string;
       question: string;
       error?: string;
@@ -158,6 +160,7 @@ export function ChatScreen({
                       kind: 'answer',
                       text: '',
                       sources: data.sources,
+                      toolCalls: [],
                       searchQuery: data.searchQuery,
                       question: text,
                     }
@@ -170,6 +173,18 @@ export function ChatScreen({
               prev.map((turn) =>
                 turn.id === replyId && turn.kind === 'answer'
                   ? { ...turn, text: turn.text + data.text }
+                  : turn,
+              ),
+            );
+          } else if (event === 'tool') {
+            // A tool call finished. It arrives after `meta` and before the
+            // answer written from it, so the reader can see what was checked
+            // while the answer is still being written, the same way sources
+            // arrive first (D-019, D-037).
+            setTurns((prev) =>
+              prev.map((turn) =>
+                turn.id === replyId && turn.kind === 'answer'
+                  ? { ...turn, toolCalls: [...turn.toolCalls, data as ToolCallRecord] }
                   : turn,
               ),
             );
@@ -322,6 +337,7 @@ export function ChatScreen({
                   <div className="bubble">{turn.text}</div>
                   <SourcesPanel
                     sources={turn.sources}
+                    toolCalls={turn.toolCalls}
                     searchQuery={turn.searchQuery}
                     question={turn.question}
                   />

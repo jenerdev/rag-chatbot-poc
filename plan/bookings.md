@@ -698,6 +698,20 @@ describes, not a battery that is too strict.
 **Done when:** the walk passes, and the panel shows the tool call before the
 answer finishes streaming.
 
+> **Done 2026-09-24.** The curl stream arrives in the order `meta → tool → 32
+> deltas → done`, the `tool` event carries no guest fields, and Northwind's
+> JSON has `toolCalls: []`. The user reported the walk as passed, and the
+> server log confirms each step:
+> - "I want to check availability" → 0 tool calls, 7 output tokens (the
+>   date question). "Oct 8 availability" → `check_availability 2026-10-08`,
+>   3 open.
+> - Day Tour on 23 Oct → 1 open of 3. Booking #27's Overnight blocks the
+>   morning.
+> - "How do I pay the reservation fee for the Overnight slot?" → 0 tool calls,
+>   5 sources.
+> - Northwind "Is the villa free on 8 October 2026?" → 0 chunks and no OpenAI
+>   call, so D-008's short circuit is intact.
+
 ### Phase 8 — The record
 
 1. `CLAUDE.md`:

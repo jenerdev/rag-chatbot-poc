@@ -342,3 +342,22 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 @media (max-width: 560px) {
   .booking { margin-left: 0; }
 }
+
+/* --- tool calls in the chat (plan/bookings.md Phase 7, D-037) ------------ */
+
+/* Shown open under the answer: for an availability answer, this IS what it
+   was built from. The day rows reuse .day-head / .slot-chip from S-3, so
+   the chat and the bookings screen show one slot the same way. */
+.checked { margin-top: 6px; max-width: 90%; }
+.tool-call {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 7px 10px;
+  margin-bottom: 6px;
+}
+.tool-head { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.tool-call .day-head { padding: 2px 0; }
+.tool-call .day-label { width: 86px; font-size: 13px; }
+.tool-error { font-size: 13px; color: var(--danger); }

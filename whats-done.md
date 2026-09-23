@@ -3785,3 +3785,48 @@ under both wordings before deciding what caused it.
 doubled the backslashes. It printed `false` for correct input, which looks
 like a broken function. The file's own code was then extracted and tested,
 and was right.
+
+## Bookings Phase 7 — tool calls in the chat screen · done 2026-09-24
+
+**What was done:** the chat screen shows what the tool said.
+- **`chat-screen.tsx`.** Each answer turn keeps a `toolCalls` list, and every
+  `tool` SSE event appends to it.
+- **`sources-panel.tsx`.** A `ToolCallBox` is rendered above the collapsed
+  sources and is always visible: "Checked availability · Thu 8 Oct", then one
+  row per date with an open or taken chip per slot. These are the same
+  `slot-chip`s as the bookings screen, so the two screens show a slot the
+  same way.
+- **Edge cases.** A tool error ("…is in the past") shows in red. A tool the
+  screen does not know is shown as raw JSON, never hidden.
+
+**Why it mattered:** D-012 says an answer is only checkable if you can see what
+it was built from. For an availability answer, that is the tool result, not
+the chunks. The box also makes R-15 visible: the dates shown are the ones the
+model SENT. If it resolved "this Saturday" to the wrong day, that shows on
+screen rather than in a log.
+
+**What each observed value proves:**
+- **curl SSE order: `meta → tool → 32 deltas → done`.** The tool box reaches
+  the screen before a word of the answer, the same way sources arrive first
+  (D-019).
+- **The `tool` event payload has `name`, `args`, and `result.slots` with
+  `date, unit, slot, status`, and nothing else.** No guest field reaches the
+  browser, over the wire.
+- **The walk, confirmed from the server log rather than only reported:**
+  - "I want to check availability" → no tool call, 7 output tokens (the date
+    question). "Oct 8 availability" → `check_availability {"date_from":
+    "2026-10-08"}`, 3 open. The `todo.md` slot-filling flow works in the real
+    UI.
+  - "Can I book the Day Tour on 23 October 2026?" → 1 open of 3. The user's
+    own walk booking #27 (Overnight 22 Oct) blocks the next morning, seen
+    end to end in the chat.
+  - "How do I pay the reservation fee for the Overnight slot?" → 0 tool calls,
+    5 sources. It mentions a slot and is still answered from the documents.
+  - Northwind "Is the villa free on 8 October 2026?" → `0 chunks`, and no
+    `[openai]` line after it. The free D-008 short circuit is intact in the
+    running app.
+- **Bundle grep `service_role|guest_phone|admin_key|SUPABASE` → 0.**
+
+**Trap avoided:** putting the tool result inside the collapsed sources
+`<details>`. For a tool answer that would hide the one thing it rests on,
+behind a click that most readers never make.
