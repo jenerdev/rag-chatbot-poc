@@ -616,7 +616,34 @@ returns a parsed `ToolCall` whose `arguments` string passes `JSON.parse`.
    the **original ten verdicts** against Phase 0, one by one.
 
 **Done when:** the original ten verdicts are unchanged (9/10), the eight new
-cases pass, isolation passes, and Northwind's prompt diff is empty. If
+cases pass, isolation passes, and Northwind's prompt diff is empty.
+
+> **Done 2026-09-24.** The battery gives **18/19**: `original 9/10 · tool
+> 9/9`. The original ten have the same verdicts as
+> `plan/baseline/eval-pre-bookings.txt`, compared line by line.
+> `pnpm --filter @rag/pipeline isolation` passes 11/11. Northwind's prompt,
+> built through `toolsFor()` as the answer path builds it, is identical to
+> the Phase 0 snapshot. There are nine tool cases, not eight, because
+> `tool-partial` was added for the Phase 5 finding.
+>
+> **Deviations:**
+> - There is no separate `seed` command. The battery seeds its own fixture
+>   at the start of every run and hard-deletes it at the end, because the
+>   dates are offsets from today, so a seed from yesterday would already be
+>   wrong.
+> - `MAX_AVAILABILITY_DAYS` lives in `@rag/bookings` (Phase 2).
+>
+> **Findings, recorded as they are:**
+> - `tool-ask` passed, but its reply was "I don't know based on the documents
+>   I have. Please provide a specific date…". That is the refusal string
+>   glued to the question.
+> - `tool-past` passed on the lenient branch: the tool returned "2020-01-01 is
+>   in the past", and the model answered with the bare refusal instead of
+>   passing that on.
+> - `tool-partial` was correct slot by slot, under the heading "the
+>   following slots are available:", which is followed by two taken slots.
+>
+> All three are wording, not wrong facts, and none of them is fixed yet. If
 `tool-open` or `tool-slotfill` fails because the model answered from
 `04-booking-and-payment.md`, fix the § 2.5 wording. That is the trap it
 describes, not a battery that is too strict.

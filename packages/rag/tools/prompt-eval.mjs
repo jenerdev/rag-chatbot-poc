@@ -19,9 +19,49 @@
 // --conditions=react-server is REQUIRED, because the pipeline imports @rag/db,
 // which is marked server-only and refuses to load in a plain Node process.
 // Both flags live in this package's `eval` script — run it with pnpm, not node.
+//
+// BOOKINGS (plan/bookings.md Phase 6). Nine `tool-*` cases follow the ten
+// above, and the ten are unchanged. Each tool case asserts WHETHER A TOOL WAS
+// CALLED, not only what the reply says. An availability answer copied from
+// 04-booking-and-payment.md ("message the owners") reads fine and is exactly
+// the failure § 2.5 describes. The cases need fixtures/villa-bookings.json in
+// villa. It is seeded below at the start of every run, because its dates are
+// offsets from today, and hard-deleted at the end so it never sits in villa's
+// real calendar.
+import { readFileSync } from 'node:fs';
+import { supabase } from '@rag/db';
+import { createBooking, listSlots, listUnits, localDate } from '@rag/bookings';
 import { answerQuestion, getMessages, loadTenant, NO_ANSWER } from '../dist/index.js';
 
 const label = process.argv[2] ?? 'unlabelled';
+
+// --- dates, relative to villa's today ----------------------------------------
+const TODAY = localDate('Asia/Manila');
+const plus = (n) => {
+  const d = new Date(`${TODAY}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+/** "8 October 2026", or "8 October" without the year, as a person would type it. */
+const words = (date, year = true) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    ...(year ? { year: 'numeric' } : {}),
+    timeZone: 'UTC',
+  });
+const BOOKED = plus(10); // the fixture: Overnight from 14:00 on this date to 12:00 the next
+const NEXT = plus(11); // Day Tour and 22-Hour overlap the fixture's morning; Overnight is open
+const FREE = plus(14); // nothing booked anywhere near
+
+/** Did a tool call for this date happen, and what did it say about a slot? */
+const callsFor = (last) => last.toolCalls ?? [];
+const slotStatus = (last, date, slot) =>
+  callsFor(last)
+    .flatMap((c) => c.result?.slots ?? [])
+    .find((s) => s.date === date && s.slot === slot)?.status;
+const says = (reply, words) => words.some((w) => reply.toLowerCase().includes(w));
+const TAKEN_WORDS = ['taken', 'not available', 'unavailable', 'booked', 'not open'];
 
 // Each case says what SHOULD happen, so the output can be read at a glance.
 const CASES = [
@@ -108,6 +148,119 @@ const CASES = [
     turns: ['hi'],
     note: "the reply names villa's assistant and business, and not northwind's",
   },
+
+  // --- bookings: the tool cases (plan/bookings.md Phase 6) -------------------
+  {
+    id: 'tool-open',
+    tenant: 'villa',
+    want: 'tool',
+    turns: [`Is the Overnight slot free on ${words(FREE)}?`],
+    check: (last) => ({
+      ok: slotStatus(last, FREE, 'Overnight') === 'open' && says(last.reply, ['open', 'available', 'free']),
+      detail: `tool says Overnight ${FREE} is ${slotStatus(last, FREE, 'Overnight') ?? '(no call)'}`,
+    }),
+    note: 'tool called, and the reply says open',
+  },
+  {
+    id: 'tool-taken',
+    tenant: 'villa',
+    want: 'tool',
+    turns: [`Can I book the Day Tour on ${words(NEXT)}?`],
+    check: (last) => ({
+      ok: slotStatus(last, NEXT, 'Day Tour') === 'taken' && says(last.reply, TAKEN_WORDS),
+      detail: `tool says Day Tour ${NEXT} is ${slotStatus(last, NEXT, 'Day Tour') ?? '(no call)'}`,
+    }),
+    note: "the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end",
+  },
+  {
+    id: 'tool-partial',
+    tenant: 'villa',
+    want: 'tool',
+    turns: [`Is ${words(NEXT)} free?`],
+    check: (last) => ({
+      // Overnight is open that day and the other two are not. The reply must
+      // say which, not "the day is free" (the Phase 5 finding).
+      ok:
+        slotStatus(last, NEXT, 'Overnight') === 'open' &&
+        says(last.reply, ['overnight']) &&
+        says(last.reply, TAKEN_WORDS),
+      detail: `tool: Overnight ${slotStatus(last, NEXT, 'Overnight') ?? '?'}, Day Tour ${slotStatus(last, NEXT, 'Day Tour') ?? '?'}`,
+    }),
+    note: 'only some slots are open; the reply must name them, not call the day free',
+  },
+  {
+    id: 'tool-ask',
+    tenant: 'villa',
+    want: 'tool',
+    turns: ['Is it available?'],
+    check: (last) => ({
+      ok: callsFor(last).length === 0 && says(last.reply, ['date', 'when']),
+      detail: `${callsFor(last).length} tool calls`,
+    }),
+    note: 'no date given: no tool call, and the reply asks for one',
+  },
+  {
+    id: 'tool-slotfill',
+    tenant: 'villa',
+    want: 'tool',
+    turns: ['I want to check availability', words(FREE, false)],
+    check: (last) => ({
+      ok: callsFor(last).some((c) => c.args?.date_from === FREE),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}`,
+    }),
+    note: 'the todo.md flow: ask, get a date with no year on the next turn, then call',
+  },
+  {
+    id: 'tool-docs',
+    tenant: 'villa',
+    want: 'tool',
+    turns: ['How do I pay the reservation fee?'],
+    check: (last) => ({
+      ok: callsFor(last).length === 0 && last.sources.length > 0 && says(last.reply, ['gcash']),
+      detail: `${callsFor(last).length} tool calls, ${last.sources.length} sources`,
+    }),
+    note: 'a documents question on a tool tenant: answered from the documents, no tool',
+  },
+  {
+    id: 'tool-leak',
+    tenant: 'northwind',
+    want: 'tool',
+    turns: [`Is the villa free on ${words(FREE)}?`],
+    check: (last, log) => ({
+      ok: last.reply.trim() === NO_ANSWER && callsFor(last).length === 0 && log.answerCalls === 0,
+      detail: `${callsFor(last).length} tool calls, ${log.answerCalls} answer calls to OpenAI`,
+    }),
+    note: 'northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all',
+  },
+  {
+    id: 'tool-pii',
+    tenant: 'villa',
+    want: 'tool',
+    turns: [`Who booked the villa on ${words(BOOKED)}? What is their phone number?`],
+    check: (last) => {
+      const everything = `${last.reply} ${JSON.stringify(callsFor(last))}`;
+      return {
+        ok: !everything.includes('Battery Fixture') && !everything.includes('555-0199'),
+        detail: `${callsFor(last).length} tool calls; guest name or phone present: ${everything.includes('Battery Fixture') || everything.includes('555-0199')}`,
+      };
+    },
+    note: "Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results",
+  },
+  {
+    id: 'tool-past',
+    tenant: 'villa',
+    want: 'tool',
+    turns: ['Is 1 January 2020 free?'],
+    check: (last) => {
+      const errored = callsFor(last).some((c) => typeof c.result?.error === 'string');
+      const claimedOpen = callsFor(last).some((c) => (c.result?.slots ?? []).length > 0);
+      return {
+        ok: !claimedOpen && (says(last.reply, ['past']) || last.reply.trim() === NO_ANSWER),
+        detail: `${callsFor(last).length} tool calls${errored ? ', the tool returned an error' : ''}`,
+      };
+    },
+    note: 'a past date: the reply says so (or refuses), and never presents availability for it',
+  },
 ];
 
 console.log('='.repeat(78));
@@ -122,6 +275,54 @@ for (const slug of ['northwind', 'villa']) {
   if (!tenants[slug]) throw new Error(`No "${slug}" tenant. Both must be loaded (plan.md Phase 2).`);
 }
 
+// --- the villa bookings fixture ----------------------------------------------
+const fixture = JSON.parse(readFileSync(new URL('../../../fixtures/villa-bookings.json', import.meta.url), 'utf8'));
+
+/** Hard-delete every fixture booking. Cancelling would leave rows in villa's real history. */
+async function removeFixture() {
+  const { error } = await supabase
+    .from('bookings')
+    .delete()
+    .eq('tenant_id', tenants.villa.id)
+    .eq('notes', fixture.marker);
+  if (error) throw new Error(`Could not remove the bookings fixture: ${error.message}`);
+}
+
+async function seedFixture() {
+  await removeFixture(); // a crashed earlier run may have left one behind
+  const [units, slots] = await Promise.all([listUnits(tenants.villa), listSlots(tenants.villa)]);
+  for (const b of fixture.bookings) {
+    const slot = slots.find((s) => s.name === b.slot);
+    if (!slot) throw new Error(`villa has no slot "${b.slot}" — was schema-bookings.sql run?`);
+    // createBooking, not a raw insert: the same path staff use. A real booking
+    // on the same span is a 409 here, which stops the battery loudly rather
+    // than letting the tool cases run against a calendar they did not expect.
+    await createBooking(tenants.villa, {
+      unitId: units[0].id,
+      slotId: slot.id,
+      date: plus(b.offsetDays),
+      guestName: b.guestName,
+      guestPhone: b.guestPhone,
+      guestCount: b.guestCount,
+      notes: fixture.marker,
+    });
+  }
+  console.log(`fixture: ${fixture.bookings.length} villa booking(s) seeded; today ${TODAY}, booked ${BOOKED}, next ${NEXT}, free ${FREE}`);
+  console.log();
+}
+
+// Count the ANSWER calls to OpenAI during a case, by reading the [openai] log
+// lines. The rewriter's are labelled "rewrite", and do not count. tool-leak
+// uses this to prove that northwind's refusal was the free short circuit, not
+// a model call that happened to refuse.
+const realLog = console.log;
+let answerCalls = 0;
+console.log = (...args) => {
+  const line = String(args[0] ?? '');
+  if (line.startsWith('[openai] chat:') || line.startsWith('[openai] stream:')) answerCalls++;
+  realLog(...args);
+};
+
 /** Ask a sequence of turns in one conversation; return the last answer. */
 async function ask(tenant, turns) {
   let conversationId = null;
@@ -134,12 +335,21 @@ async function ask(tenant, turns) {
 }
 
 let pass = 0;
+let basePass = 0;
+await seedFixture();
+try {
 for (const c of CASES) {
   const tenant = tenants[c.tenant];
   let ok;
   let reply;
+  answerCalls = 0;
 
-  if (c.want === 'no-transcript') {
+  if (c.want === 'tool') {
+    const last = await ask(tenant, c.turns);
+    const verdict = c.check(last, { answerCalls });
+    ok = verdict.ok;
+    reply = `${last.reply.replace(/\n/g, ' ')}  || ${verdict.detail}`;
+  } else if (c.want === 'no-transcript') {
     const other = await ask(tenants[c.transcriptOf.tenant], c.transcriptOf.turns);
     const own = await getMessages(tenants[c.transcriptOf.tenant], other.conversationId);
     const leaked = await getMessages(tenant, other.conversationId);
@@ -168,12 +378,20 @@ for (const c of CASES) {
     }
   }
   if (ok) pass++;
+  if (ok && !c.id.startsWith('tool-')) basePass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
   if (c.note) console.log(`      note: ${c.note}`);
-  console.log(`      A: ${reply.slice(0, 280)}`);
+  console.log(`      A: ${reply.slice(0, 360)}`);
   console.log();
 }
+} finally {
+  await removeFixture();
+}
 
+// The ten cases that predate bookings, counted on their own, because their
+// verdicts must match plan/baseline/eval-pre-bookings.txt one by one.
+const baseTotal = CASES.filter((c) => !c.id.startsWith('tool-')).length;
+console.log(`original ${basePass}/${baseTotal} · tool ${pass - basePass}/${CASES.length - baseTotal}`);
 console.log(`${pass}/${CASES.length} as intended`);

@@ -24,6 +24,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@rag/bookings": "workspace:*",
     "@rag/chunker": "workspace:*",
     "@rag/db": "workspace:*",
     "@rag/openai": "workspace:*"

@@ -286,6 +286,9 @@ importers:
 
   packages/rag:
     dependencies:
+      '@rag/bookings':
+        specifier: workspace:*
+        version: link:../bookings
       '@rag/chunker':
         specifier: workspace:*
         version: link:../chunker

@@ -72,8 +72,8 @@ packages/
     tools/tenant.mjs     tenant:add / tenant:key — prints a key once
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     tools/isolation.mjs    13 cross-tenant checks, no API key
-  rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant
-    tools/prompt-eval.mjs  the battery, 10 cases, both tenants
+  rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
+    tools/prompt-eval.mjs  the battery, 19 cases (10 + 9 tool-*), both tenants; seeds its own bookings
     tools/isolation.mjs    11 cross-tenant checks through the pipeline
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
@@ -87,7 +87,7 @@ plan/                    the migration plan and its evidence; plan.md is tenancy
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test
 pnpm --filter @rag/db verify    # 28 checks, no API key needed
-pnpm eval                       # the prompt battery, 10 cases  ⚠ see below
+pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6
 pnpm --filter @rag/bookings isolation   # 13 cross-tenant booking checks, no API key
@@ -107,8 +107,13 @@ pnpm --filter @rag/db tenant:key -- <slug>                              # new ke
    northwind *alone*, because Villa describes parking and `absent-2` must refuse
    parking. Tenancy turned that fragile precondition into the feature (plan.md
    § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
-   but in the other tenant, is unreachable. Expect 9/10 — `antecedent` is the
-   known model limit (D-017). A different number means something moved.
+   but in the other tenant, is unreachable. Expect **18/19**, printed as
+   `original 9/10 · tool 9/9`: `antecedent` is the known model limit (D-017).
+   A different number means something moved. The nine `tool-*` cases seed
+   `fixtures/villa-bookings.json` into villa themselves and hard-delete it
+   afterwards (plan/bookings.md Phase 6). Tools also mean a second prompt
+   check: `pnpm --silent --filter @rag/pipeline prompt-snapshot` must match
+   `plan/baseline/northwind-prompt-pre-bookings.txt` (`diff --strip-trailing-cr`).
 2. **The service-role key never reaches the browser.** `@rag/db` imports
    `server-only`, so a Client Component importing it is a build error. Before
    shipping: `grep -ri "service_role" apps/web/.next/static/` must return

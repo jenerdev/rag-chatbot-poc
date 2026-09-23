@@ -58,11 +58,29 @@ export interface Source {
   foundBy: FoundBy;
 }
 
+/**
+ * One tool call made while answering, as the UI shows it (D-037).
+ *
+ * The same argument as for Source (D-012). A tool result is part of what the
+ * answer was built from, so it is shown, not hidden. `result` is exactly what
+ * the model was given: SlotAvailability rows, or `{ error }`. It carries no
+ * guest data, because the executor only ever calls checkAvailability
+ * (plan/bookings.md Rule 3).
+ */
+export interface ToolCallRecord {
+  name: string;
+  /** The arguments as the model wrote them, parsed. Null if they were not valid JSON. */
+  args: Record<string, unknown> | null;
+  result: unknown;
+}
+
 /** The non-streaming reply. */
 export interface Answer {
   conversationId: string;
   reply: string;
   sources: Source[];
+  /** Empty for a tenant with no tools, and for any turn where the model called none. */
+  toolCalls: ToolCallRecord[];
   /**
    * What retrieval actually searched for, which is not always what was typed
    * (D-016). Returned so the UI can show it — a retriever silently searching

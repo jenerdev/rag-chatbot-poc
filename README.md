@@ -170,7 +170,7 @@ rm nw.jar villa.jar
 Then:
 
 ```bash
-pnpm eval                               # 10 cases; expect 9/10
+pnpm eval                               # 19 cases; expect 18/19 (original 9/10 · tool 9/9)
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks; expect all PASS
 ```
 

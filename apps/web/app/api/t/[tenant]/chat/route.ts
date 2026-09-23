@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
-import type { StreamMeta } from '@rag/pipeline';
+import type { StreamMeta, ToolCallRecord } from '@rag/pipeline';
 import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -72,6 +72,10 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
           ...args,
           onMeta: (meta: StreamMeta) => send('meta', meta),
           onDelta: (text: string) => send('delta', { text }),
+          // One event per tool call, as it completes and before the answer
+          // built from it (plan/bookings.md Phase 6). A client that does not
+          // know this event ignores it: the answer still arrives as deltas.
+          onTool: (record: ToolCallRecord) => send('tool', record),
         });
         send('done', {});
       } catch (error) {

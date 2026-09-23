@@ -1,12 +1,22 @@
 // answer.ts — the query pipeline, from a typed question to a grounded answer.
 
-import { chat, chatStream, embed } from '@rag/openai';
+import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
+import type { ChatMessage, ChatTurn } from '@rag/openai';
 import { supabase } from '@rag/db';
-import { MAX_HISTORY, NO_ANSWER } from './constants.js';
+import { MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { greetingReply } from './greeting.js';
 import { buildPrompt } from './prompt.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
-import type { Answer, HistoryMessage, RetrievedChunk, Source, StreamMeta, TenantContext } from './types.js';
+import { executeTool, toolsFor } from './tools.js';
+import type {
+  Answer,
+  HistoryMessage,
+  RetrievedChunk,
+  Source,
+  StreamMeta,
+  TenantContext,
+  ToolCallRecord,
+} from './types.js';
 
 /**
  * Find or create the conversation row.
@@ -146,13 +156,84 @@ async function prepareAnswer({
 }
 
 /**
+ * The tool loop, shared by both answer paths (plan/bookings.md Phase 6).
+ *
+ * Ask the model with the tools offered. If it asks for calls, run each one,
+ * append the request and the results to the conversation, and ask again. Stop
+ * when it answers in text. `complete` is the only thing that differs between
+ * the two paths: chat() or chatStream().
+ *
+ * Bounded by MAX_TOOL_ROUNDS. A model still asking for tools after that many
+ * rounds is looping, and this throws rather than retrying (architecture.md
+ * § 9). The error names the limit, so it reaches the user as a real reason.
+ *
+ * `messages` is a local copy. The tool request and result messages exist only
+ * for this turn. They are not saved (messages.role allows only user and
+ * assistant), and the next turn calls the tool again, which is what you want
+ * for data that changes (plan/bookings.md § 2.6).
+ */
+async function toolLoop(
+  tenant: TenantContext,
+  prompt: ChatMessage[],
+  complete: (messages: ChatMessage[]) => Promise<ChatTurn>,
+  onTool?: (record: ToolCallRecord) => void,
+): Promise<{ text: string; records: ToolCallRecord[] }> {
+  const messages = [...prompt];
+  const records: ToolCallRecord[] = [];
+  let text = '';
+
+  for (let round = 0; ; round++) {
+    const turn = await complete(messages);
+    text += turn.content ?? '';
+    if (turn.toolCalls.length === 0) return { text, records };
+
+    if (round >= MAX_TOOL_ROUNDS) {
+      throw new Error(
+        `The model asked for tools again after ${MAX_TOOL_ROUNDS} rounds (MAX_TOOL_ROUNDS). Stopping rather than looping.`,
+      );
+    }
+
+    messages.push(assistantToolCallMessage(turn));
+    for (const call of turn.toolCalls) {
+      const { record, content } = await executeTool(tenant, call);
+      records.push(record);
+      onTool?.(record);
+      messages.push(toolResultMessage(call.id, content));
+    }
+  }
+}
+
+/**
+ * D-035, the zero-match rule. It amends D-008 rather than removing it.
+ *
+ * With no retrieved chunk, the model's reply is accepted ONLY if it called a
+ * tool on this turn. Otherwise it is replaced with the refusal. So with zero
+ * chunks, the only possible outputs are the refusal and an answer built from
+ * a tool result. It can never be an answer from training data, which is what
+ * D-008 exists to prevent.
+ *
+ * For a tenant without tools, the model is not called at all when there are
+ * zero chunks, which is exactly D-008's short circuit. That path is in the two
+ * functions below, unchanged.
+ */
+function acceptReply(matches: RetrievedChunk[], records: ToolCallRecord[], text: string): string {
+  if (matches.length === 0 && records.length === 0) {
+    console.log('[query] zero chunks and no tool call: the reply is replaced with the refusal (D-035)');
+    return NO_ANSWER;
+  }
+  return text;
+}
+
+/**
  * Answer a question from the knowledge base, returning the whole reply.
  *
  * The flow, matching architecture.md § 3.2:
  *   1-7. prepareAnswer() above
- *   8.   nothing above the threshold? refuse WITHOUT calling OpenAI (D-008)
- *   9.   otherwise build the prompt (with the ORIGINAL question) and ask
- *   10.  save both messages, return the answer and its sources
+ *   8.   no tools, and nothing above the threshold? refuse WITHOUT calling
+ *        OpenAI (D-008)
+ *   9.   otherwise build the prompt (with the ORIGINAL question) and ask. With
+ *        tools, run the tool loop, then apply D-035's zero-match rule
+ *   10.  save both messages, return the answer, its sources and its tool calls
  */
 export async function answerQuestion({
   tenant,
@@ -170,30 +251,44 @@ export async function answerQuestion({
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     await saveMessages(tenant, id, message, greeting);
-    return { conversationId: id, reply: greeting, sources: [], searchQuery: message };
+    return { conversationId: id, reply: greeting, sources: [], searchQuery: message, toolCalls: [] };
   }
 
-  const { id, history, searchQuery, matches, sources } = await prepareAnswer({
+  const [{ id, history, searchQuery, matches, sources }, tools] = await Promise.all([
+    prepareAnswer({ tenant, conversationId, message }),
+    toolsFor(tenant),
+  ]);
+
+  // No tools: the path is exactly what it was before tools existed.
+  if (tools.definitions.length === 0) {
+    // The short circuit (D-008). Faster, free, and it removes any chance of the
+    // model ignoring its instructions and answering from training data anyway.
+    if (matches.length === 0) {
+      await saveMessages(tenant, id, message, NO_ANSWER);
+      return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery, toolCalls: [] };
+    }
+
+    const reply = await chat(buildPrompt(tenant, matches, history, message));
+    await saveMessages(tenant, id, message, reply);
+
+    // searchQuery is returned so the UI can show what was actually searched for
+    // when it differs from what the user typed. Retrieval silently searching for
+    // something other than the question is exactly the kind of thing that should
+    // be visible rather than hidden (same argument as the sources panel, D-012).
+    return { conversationId: id, reply, sources, searchQuery, toolCalls: [] };
+  }
+
+  // With tools the model is called even with zero chunks, because a tool may
+  // answer what the documents cannot. D-035 then decides whether its reply is
+  // allowed out.
+  const { text, records } = await toolLoop(
     tenant,
-    conversationId,
-    message,
-  });
-
-  // The short circuit (D-008). Faster, free, and it removes any chance of the
-  // model ignoring its instructions and answering from training data anyway.
-  if (matches.length === 0) {
-    await saveMessages(tenant, id, message, NO_ANSWER);
-    return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery };
-  }
-
-  const reply = await chat(buildPrompt(tenant, matches, history, message));
+    buildPrompt(tenant, matches, history, message, tools.prompt),
+    (messages) => chat(messages, { tools: tools.definitions }),
+  );
+  const reply = acceptReply(matches, records, text);
   await saveMessages(tenant, id, message, reply);
-
-  // searchQuery is returned so the UI can show what was actually searched for
-  // when it differs from what the user typed. Retrieval silently searching for
-  // something other than the question is exactly the kind of thing that should
-  // be visible rather than hidden (same argument as the sources panel, D-012).
-  return { conversationId: id, reply, sources, searchQuery };
+  return { conversationId: id, reply, sources, searchQuery, toolCalls: records };
 }
 
 /**
@@ -214,12 +309,15 @@ export async function answerQuestionStream({
   message,
   onMeta,
   onDelta,
+  onTool,
 }: {
   tenant: TenantContext;
   conversationId: string | null;
   message: string;
   onMeta: (meta: StreamMeta) => void;
   onDelta: (text: string) => void;
+  /** Fires as each tool call completes, before the answer that uses it is written. */
+  onTool?: (record: ToolCallRecord) => void;
 }): Promise<string> {
   // Same short circuit as the non-streaming path. `meta` still fires, with no
   // sources, so the client's state machine needs no special case: a greeting
@@ -233,24 +331,43 @@ export async function answerQuestionStream({
     return greeting;
   }
 
-  const { id, history, searchQuery, matches, sources } = await prepareAnswer({
-    tenant,
-    conversationId,
-    message,
-  });
+  const [{ id, history, searchQuery, matches, sources }, tools] = await Promise.all([
+    prepareAnswer({ tenant, conversationId, message }),
+    toolsFor(tenant),
+  ]);
 
   onMeta({ conversationId: id, searchQuery, sources });
 
-  // The short circuit again. Emitted as a single delta so the client needs no
-  // special case: a refusal arrives down the same channel as any other answer.
-  if (matches.length === 0) {
+  // No tools: the short circuit again, unchanged. Emitted as a single delta so
+  // the client needs no special case: a refusal arrives down the same channel
+  // as any other answer.
+  if (tools.definitions.length === 0 && matches.length === 0) {
     onDelta(NO_ANSWER);
     await saveMessages(tenant, id, message, NO_ANSWER);
     return NO_ANSWER;
   }
 
   try {
-    const reply = await chatStream(buildPrompt(tenant, matches, history, message), onDelta);
+    if (tools.definitions.length === 0) {
+      const reply = await chatStream(buildPrompt(tenant, matches, history, message), onDelta);
+      await saveMessages(tenant, id, message, reply);
+      return reply;
+    }
+
+    // With zero chunks the text is HELD, not streamed (plan/bookings.md
+    // § 2.7). Whether it may be shown depends on whether a tool gets called,
+    // and that is known only at the end. Text already on screen cannot be
+    // replaced by the refusal. With chunks there is nothing to decide, so it
+    // streams as it always has.
+    const hold = matches.length === 0;
+    const { text, records } = await toolLoop(
+      tenant,
+      buildPrompt(tenant, matches, history, message, tools.prompt),
+      (messages) => chatStream(messages, onDelta, { tools: tools.definitions, holdContent: hold }),
+      onTool,
+    );
+    const reply = acceptReply(matches, records, text);
+    if (hold) onDelta(reply);
     await saveMessages(tenant, id, message, reply);
     return reply;
   } catch (error) {

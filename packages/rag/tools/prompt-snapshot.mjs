@@ -12,7 +12,7 @@
 //
 //   pnpm --filter @rag/pipeline prompt-snapshot [slug]   (default: northwind)
 
-import { buildPrompt, loadTenant } from '../dist/index.js';
+import { buildPrompt, loadTenant, toolsFor } from '../dist/index.js';
 
 const slug = process.argv[2] ?? 'northwind';
 const tenant = await loadTenant(slug);
@@ -31,4 +31,9 @@ const history = [
 ];
 const question = 'Who do I contact on extension 4417?';
 
-process.stdout.write(JSON.stringify(buildPrompt(tenant, chunks, history, question), null, 2) + '\n');
+// The tools block comes from toolsFor(), exactly as answer.ts gets it. So for
+// a tenant with no tools, this is the real path rather than a call that simply
+// leaves the argument out. For villa it prints the tools block too, with
+// today's date in it, so that output changes daily and is not a baseline.
+const { prompt: tools } = await toolsFor(tenant);
+process.stdout.write(JSON.stringify(buildPrompt(tenant, chunks, history, question, tools), null, 2) + '\n');

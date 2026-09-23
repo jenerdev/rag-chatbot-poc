@@ -80,18 +80,18 @@ Without tools, the request body and the log line are unchanged, which is
 tested. There are 14 new fixture tests, and a real call with a dummy tool
 returned parseable arguments both ways.
 
-**▶ Bookings Phase 6: the tool in the pipeline, then measure.**
-[`plan/bookings.md`](./plan/bookings.md) § 3:
-- `tools.ts` (`toolsFor` / `executeTool`);
-- `MAX_TOOL_ROUNDS`;
-- the § 2.5 paragraph in `buildPrompt`, only when there are tools;
-- the D-035 zero-match rule in `answer.ts`;
-- the fixture `fixtures/villa-bookings.json`, and 8 battery cases (a 9th for
-  partial-open slots);
-- the Northwind prompt diff against the Phase 0 snapshot.
+~~**Bookings Phase 6: the tool in the pipeline, then measure.**~~ **Done
+2026-09-24.** Eval **18/19** (`original 9/10 · tool 9/9`), with the
+original ten the same verdict by verdict. Isolation 11/11. Northwind's prompt
+is identical to the Phase 0 snapshot. Three wording findings are open (see
+whats-done).
 
-**Carry in:** the model said "the villa is available" when only Overnight was
-open.
+**▶ Bookings Phase 7: the chat screen.** [`plan/bookings.md`](./plan/bookings.md)
+§ 3:
+- `chat-screen` handles the `tool` SSE event;
+- `sources-panel` gains a "Checked" section, showing the call and its
+  open/taken rows;
+- a browser walk (slot-filling, a taken date, a docs question, Northwind).
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -611,6 +611,40 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 6)
+- **Did:**
+  - Added `packages/rag/src/tools.ts`: `toolsFor()` builds `check_availability`
+    from the tenant's real slot names, and `executeTool()` checks the
+    application again, parses the arguments, and returns input errors as
+    `{error}`.
+  - Added `MAX_TOOL_ROUNDS = 2` and `ToolCallRecord`, and `Answer.toolCalls`.
+  - `buildPrompt(…, tools)` appends a block after END CONTEXT, only when there
+    are tools.
+  - `answer.ts`: a `toolLoop()` shared by both paths, plus `acceptReply()`
+    (D-035). A tenant with no tools keeps the old path verbatim.
+  - The chat route sends a `tool` SSE event.
+  - `prompt-snapshot` now goes through `toolsFor()`.
+  - Added `fixtures/villa-bookings.json`, 9 `tool-*` cases, and
+    `prompt.test.ts` (4 tests).
+- **Observed:**
+  - **Eval:** 18/19 (`original 9/10 · tool 9/9`). The original verdicts match
+    `eval-pre-bookings.txt` line by line.
+  - **Isolation:** 11/11. The Northwind prompt diff is empty. Tests total 99.
+  - **Tool calls:** `tool-leak`: 0 tool calls, 0 answer calls to OpenAI.
+    `tool-slotfill`: "8 October" with no year became
+    `{"date_from":"2026-10-08","date_to":"2026-10-08"}`.
+  - **Cost:** tool-tenant answer calls were 1,251–1,680 input tokens.
+  - **Streaming:** `meta → tool → 35 deltas`. For the zero-match "capital of
+    France?" on villa, the reply was held, D-035 replaced it, and 1 delta was
+    sent. That cost 485 in + 11 out, where it used to cost nothing.
+  - The fixture was removed afterwards, and #27 is untouched.
+- **Findings:**
+  - `tool-ask`'s reply begins with the refusal string.
+  - `tool-past`'s model gave the bare refusal after the tool's "in the past"
+    error.
+  - `tool-partial` is headed "available" above a list of taken slots.
+- **Next:** Phase 7.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 5)
 - **Did:** tool calling in `@rag/openai`, still raw fetch:

@@ -2,6 +2,7 @@
 
 import type { ChatMessage } from '@rag/openai';
 import { NO_ANSWER } from './constants.js';
+import type { PromptTools } from './tools.js';
 import type { HistoryMessage, TenantContext } from './types.js';
 
 /**
@@ -23,14 +24,38 @@ import type { HistoryMessage, TenantContext } from './types.js';
  * (plan.md § 2.6). So it names who is speaking and nothing else. It says
  * nothing about tone, eagerness or expertise. Phase 4 measured it against the
  * six Northwind verdicts before it was kept.
+ *
+ * TOOLS (D-036, plan/bookings.md § 2.5): when the tenant has tools, one more
+ * block is appended AFTER `--- END CONTEXT ---`, and only then. The grounding
+ * block is not touched. For a tenant without tools, `tools` is null and the
+ * output is the same string it was before tools existed, byte for byte.
+ * `pnpm --filter @rag/pipeline prompt-snapshot` diffed against
+ * plan/baseline/northwind-prompt-pre-bookings.txt is the proof.
+ *
+ * The block says a tool result is context too, so D-017's rules (connect,
+ * never add, say what is missing) apply to it without being restated. The
+ * tool-specific lines come from tools.ts, because only that file knows which
+ * tools this tenant has.
  */
 export function buildPrompt(
   tenant: Pick<TenantContext, 'assistantName' | 'businessName'>,
   chunks: { content: string }[],
   history: HistoryMessage[],
   question: string,
+  tools: PromptTools | null = null,
 ): ChatMessage[] {
   const context = chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
+
+  // Appended after the context block, never inside the grounding block above it.
+  const toolBlock = tools
+    ? [
+        '',
+        'You can also call tools. A tool result is context too, and every rule',
+        'above applies to it.',
+        ...tools.instructions,
+        `Today is ${tools.today} (${tools.weekday}), ${tools.timezone}.`,
+      ]
+    : [];
 
   return [
     {
@@ -78,6 +103,7 @@ export function buildPrompt(
         '--- CONTEXT ---',
         context,
         '--- END CONTEXT ---',
+        ...toolBlock,
       ].join('\n'),
     },
     ...history, // oldest first, so the conversation reads in order

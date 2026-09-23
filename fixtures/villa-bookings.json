@@ -1,0 +1,13 @@
+{
+  "about": "Bookings the eval battery seeds into tenant villa for the tool-* cases, then hard-deletes. Dates are offsets from villa's today (Asia/Manila), so the battery never goes stale. See plan/bookings.md Phase 6.",
+  "marker": "fixture:villa-bookings",
+  "bookings": [
+    {
+      "offsetDays": 10,
+      "slot": "Overnight",
+      "guestName": "Battery Fixture Guest",
+      "guestPhone": "0917-555-0199",
+      "guestCount": 20
+    }
+  ]
+}

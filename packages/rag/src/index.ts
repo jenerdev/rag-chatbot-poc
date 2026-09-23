@@ -13,6 +13,7 @@
 //   answer.ts      the whole query pipeline, streaming and not
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
+//   tools.ts       the tools a tenant's chatbot is offered, and where they run
 
 export {
   MATCH_COUNT,
@@ -22,6 +23,7 @@ export {
   MAX_HISTORY,
   REWRITE_MAX_TOKENS,
   NO_ANSWER,
+  MAX_TOOL_ROUNDS,
 } from './constants.js';
 
 export { ingestDocument, listDocuments, countDocuments, deleteDocument, getChunks } from './ingest.js';
@@ -31,6 +33,8 @@ export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
+export { executeTool, toolsFor } from './tools.js';
+export type { PromptTools, TenantTools, ToolExecution } from './tools.js';
 export type { ApplicationKey } from './applications.js';
 
 export type {
@@ -44,4 +48,5 @@ export type {
   Source,
   StreamMeta,
   TenantContext,
+  ToolCallRecord,
 } from './types.js';

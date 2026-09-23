@@ -16,6 +16,10 @@ import type { TenantContext } from './types.js';
 export const APPLICATIONS = {
   bookings: {
     label: 'Bookings',
+    // The chatbot tools this application offers. Read-only, all of them
+    // (D-037): the chat route is open, so a write tool would be an
+    // unauthenticated write. The definitions and the executor are in tools.ts.
+    tools: ['check_availability'],
   },
 } as const;
 

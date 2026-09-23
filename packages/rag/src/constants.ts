@@ -61,6 +61,15 @@ export const MAX_HISTORY = 6;
 // and we fall back to the original rather than searching with prose.
 export const REWRITE_MAX_TOKENS = 60;
 
+// --- tools (plan/bookings.md Phase 6) --------------------------------------
+
+// How many rounds of tool calls one answer may make. A round is one model
+// reply that asks for tools, then running them. Two means one call plus one
+// retry, which is enough for "that date was in the past, try again". A model
+// still asking after that is looping, and the answer fails loudly rather than
+// spending more calls. Provisional: not measured yet.
+export const MAX_TOOL_ROUNDS = 2;
+
 // The exact refusal string. Defined once because two different code paths can
 // produce it — the short circuit, and the model following its system prompt —
 // and the UI should not be able to tell them apart.

@@ -3610,3 +3610,86 @@ partly-open case.
 undefined and `JSON.stringify` silently dropped the `model` key. The first run
 failed on exactly that. Stubbing the env fixed it. Loosening the assertion
 would have left the key-list test unable to notice a request with no model.
+
+## Bookings Phase 6 — the tool in the pipeline, then measure · done 2026-09-24
+
+**What was done:**
+- **`tools.ts`.**
+  - `toolsFor(tenant)` offers `check_availability` only when the tenant has
+    the bookings application. Its description names the tenant's real slots
+    ("Overnight (from 14:00, 22 hours)") and its timezone. The schema has only
+    `date_from` and `date_to`, and no tenant or unit id (Rule 2).
+  - `executeTool()` checks enablement against the database again, parses the
+    arguments, and calls `checkAvailability`. A bad JSON argument or a
+    `BookingInputError` becomes the result `{error}`. Anything else throws.
+- **`answer.ts`.** One `toolLoop()` serves both paths, bounded by
+  `MAX_TOOL_ROUNDS = 2`. `acceptReply()` is D-035. A tenant without tools
+  takes the old code path, D-008's short circuit included, unchanged.
+- **Streaming.** With zero chunks, the text is held (`holdContent`) until
+  D-035 has decided.
+- **`buildPrompt(…, tools)`.** The block goes after END CONTEXT: "a tool
+  result is context too", the availability rules (including "never say a
+  whole day is free unless every slot is open", from the Phase 5 finding),
+  and today's date.
+- **The chat route** sends a `tool` event.
+- **The battery.** 9 `tool-*` cases, seeding `fixtures/villa-bookings.json`
+  (Overnight at +10 days) and deleting it again.
+- **Tests.** `prompt.test.ts`.
+
+**Why it mattered:** this is the feature, and the prompt change that CLAUDE.md
+rule 1 exists for. The measurement is what shows it did not cost a refusal.
+The original ten verdicts are unchanged, and Northwind's prompt is the same
+bytes.
+
+**What each observed value proves:**
+- **`original 9/10`, the same verdict for every one of the ten as
+  `eval-pre-bookings.txt`.** Adding tools cost no refusal and no answer on the
+  existing cases. `antecedent` is still the only failure (D-017).
+- **Northwind's prompt, built through `toolsFor()`, has an empty diff against
+  the Phase 0 snapshot.** The first attempt at this check passed trivially:
+  the snapshot script was not yet passing tools, because a Python edit had
+  silently failed its assertion. It was caught, and redone through the real
+  path.
+- **`tool-leak`: 0 tool calls and 0 OpenAI answer calls.** Northwind's refusal
+  is still the free D-008 short circuit, not a model that happened to
+  refuse.
+- **`tool-taken`: "The Day Tour slot on 5 October 2026 is taken", from a
+  fixture Overnight on 4 October.** § 2.1's cross-midnight rule, from SQL to
+  the model's sentence.
+- **`tool-slotfill`: "8 October", with no year, on the second turn became
+  `{"date_from":"2026-10-08",…}`.** The `todo.md` flow works, and the model
+  resolved the year from the "Today is 2026-09-24" line (§ 2.3).
+- **`tool-docs`: 0 tool calls, 5 sources, a GCash answer.** A documents
+  question on a tool tenant still goes to the documents.
+- **`tool-pii`: neither "Battery Fixture" nor "555-0199" appears in the reply
+  or the tool results.** Rule 3, end to end.
+- **Streaming: `meta → tool → 35 deltas`.** The tool call reaches the client
+  before the answer. **Zero-match on villa: held, replaced, 1 delta, 485 in +
+  11 out.** D-035 works on the streaming path, and it has a cost: that
+  question used to be free.
+- **Tool-tenant answer calls: 1,251–1,680 input tokens.** This is the price of
+  the tool definition plus the extra paragraph, and it goes into `notes.md`
+  in Phase 8.
+
+**Deviations:** there is no separate `seed` command. The battery seeds and
+cleans up its own fixture, because relative dates go stale overnight.
+
+**Findings, not fixed. Each is wording, not a wrong fact:**
+- **`tool-ask`:** "I don't know based on the documents I have. Please provide
+  a specific date for me to check availability." The refusal string is
+  glued to a clarifying question. The grounding block's "reply exactly …"
+  and the tools block's "ask for a date" are both being obeyed at once.
+- **`tool-past`:** the tool returned "2020-01-01 is in the past. Today is
+  2026-09-24." and the model answered with the bare refusal instead of
+  saying so. It passed on the lenient branch (it did not invent
+  availability). But the error message was written to be passed on, and it
+  was not.
+- **`tool-partial`:** each slot's status is right, under the heading "the
+  following slots are available:", which then lists two taken slots.
+
+Fixing any of them means editing the tools block, which means another eval run.
+
+**Trap avoided:** trusting a passing check without checking that it could
+fail. "NORTHWIND PROMPT: IDENTICAL" was first printed by a script that had
+not been changed, and that would have been identical whatever the pipeline
+did.
