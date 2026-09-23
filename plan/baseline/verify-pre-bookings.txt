@@ -1,0 +1,19 @@
+$ node --conditions=react-server --env-file=../../.env tools/verify.mjs
+PASS  read documents  — 9 rows
+PASS  read chunks  — 34 rows
+PASS  read conversations  — 265 rows
+PASS  read messages  — 688 rows
+PASS  embedding arrives as a string  — typeof string
+PASS  parses to 1536 finite numbers  — 1536 dims
+PASS  match_chunks rows match MatchRow
+PASS  a chunk is its own nearest neighbour  — chunk 148, top 148
+PASS  self-similarity is 1  — 1.000000
+PASS  results are ordered most-similar first  — 1.000 > 0.616 > 0.547
+PASS  every row has a tenant_id  — documents 0 · chunks 0 · conversations 0 · messages 0
+PASS  a chunk cannot belong to another tenant's document  — 23503 insert or update on table "chunks" violates foreign key constraint "chunks_document_tenant_fk"
+PASS  match_chunks(own tenant) finds the chunk at 1.000000  — top 148 at 1.000000
+PASS  match_chunks(another tenant) returns zero rows  — 0 rows
+
+documents 9 · chunks 34 · conversations 265 · messages 688
+
+OK — the database layer is wired correctly.

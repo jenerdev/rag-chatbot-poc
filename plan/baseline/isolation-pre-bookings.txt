@@ -1,0 +1,23 @@
+$ node --conditions=react-server --env-file=../../.env tools/isolation.mjs
+PASS  loadTenant  — northwind 1, villa 3, nope null
+PASS  no admin hash in TenantContext  — id,slug,businessName,assistantName
+PASS  listDocuments per tenant  — northwind 1 [4], villa 8 [4,3,3,4,4,5,4,3]
+PASS  getChunks cross-tenant is empty  — doc 38
+PASS  deleteDocument cross-tenant refused  — doc 38 survives
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 352 in + 10 out
+PASS  northwind refuses the villa fact  — I don't know based on the documents I have.
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How many cars can park at the resort?" -> 5 chunks 0.440/both 0.367/both 0.430/both 0.457/both 0.365/both
+[openai] chat: 1130 in + 23 out
+PASS  villa answers from villa sources only  — Parking fits six cars inside the gate. Additional vehicles can park along Sampaguita Lane  | Villa Amihan — Amenities and Facilities; Villa Amihan Private Resort — Overview; Villa Amihan — Frequently Asked Questions; Villa Amihan — Directions and Getting There
+[query] northwind: conversation 2072f205-cb4c-4a58-80bc-4f4ce872918a is not this tenant's; starting a new one
+PASS  a villa conversation id is not reused by northwind  — 2072f205 -> d51a602d
+PASS  getMessages cross-tenant is null  — northwind null, villa 2 messages
+[ingest] villa "isolation probe": 33 chars -> 1 chunks
+[ingest] embedded 1 chunks, 1536 dims each
+PASS  ingest lands in the right tenant, chunks and all  — doc 59, 1 chunk
+PASS  probe document removed  — doc 59
+
+ALL ISOLATION CHECKS PASS

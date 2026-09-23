@@ -3221,3 +3221,84 @@ them to delete villa, and with it the leak cases that protect isolation.
 - **Testing the loader against the real tenants** would have given each of
   them duplicate documents and shifted the eval verdicts. A throwaway tenant
   gave the same proof without that cost.
+
+---
+
+# Bookings
+
+## Bookings plan written · done 2026-09-24
+
+[`plan/bookings.md`](./plan/bookings.md), Phases 0–8. It covers a booking
+manager for a tenant's staff, and then the chatbot's first tool,
+`check_availability`, so availability is answered from live data instead of
+from a document.
+
+### What was decided before writing
+
+| Decision | Why this one, not the alternative |
+|---|---|
+| Domain logic in `@rag/bookings`, HTTP in `apps/web` (**D-032**) | The admin routes and the tool executor call the same functions. If the chatbot called this app's own `/api`, it would add a network hop, an auth problem and a loss of types |
+| Applications as a code registry plus a `tenant_applications` table (**D-033**) | An application is code, so a row cannot create one. The row only switches it on for a tenant, and the model is offered only the tools of enabled applications |
+| Chatbot tools are read-only (**D-037**) | The chat route is open. A write tool there would be an unauthenticated write to the database through the model |
+
+### The finding that changed the data model
+
+The first sketch had rooms. `sample-documents/02-rates-and-schedules.md` says
+otherwise: Villa sells the **whole property** in three slots, Overnight runs
+from 14:00 to 12:00 the next day, and "only one slot is sold per day". So a
+booking is a `tstzrange`, computed in SQL from the tenant's timezone, and an
+exclusion constraint rejects overlaps. Every rule in the document (Overnight on
+the 1st blocks the Day Tour on the 2nd, and so on) falls out of range overlap
+with no code, and the same model still covers a hotel later.
+
+### The traps the plan is built around
+
+- **"Check, then insert" double-books** under concurrency. The exclusion
+  constraint makes the loser a `23P01` → 409, whatever the timing (§ 2.2).
+- **D-008's short circuit would make the tool unreachable**, because "Is the
+  12th free?" may retrieve nothing. It is reworded, not removed (D-035): with
+  zero chunks, a reply is accepted only if a tool was called that turn.
+  Northwind, which has no tools, gets exactly D-008's behaviour (§ 2.4).
+- **The documents tell the model to message the owners.** The bot could answer
+  availability from `04-booking-and-payment.md` and never call the tool. The
+  battery therefore asserts *that the tool was called*, not just what the
+  reply says (§ 2.5).
+- **The model has no clock.** Today's date, in the tenant's timezone, goes into
+  the tools paragraph, or "this Saturday" resolves against training data (§ 2.3).
+- **PII through a tool result.** The availability result type has no guest
+  fields, and the SQL function never selects them (Rule 3).
+
+### Status
+
+Nothing is built yet. The next step is Phase 0, the baseline. Three questions
+for the Villa owners (§ 8) block the slot seed in Phase 1.
+
+## Bookings Phase 0 — the baseline · done 2026-09-24
+
+**What was done:** the four baselines from `plan/bookings.md` Phase 0, in
+`plan/baseline/`: `verify-pre-bookings.txt`, `isolation-pre-bookings.txt`,
+`eval-pre-bookings.txt` and `northwind-prompt-pre-bookings.txt`. A new script,
+`pnpm --filter @rag/pipeline prompt-snapshot [slug]`, prints the exact
+`buildPrompt()` messages for a tenant, using fixed chunks and fixed history.
+
+**Why it mattered:** Phase 6 changes `buildPrompt()` and the zero-match path.
+Without these files, "the original ten verdicts are unchanged" and
+"Northwind's prompt is byte-identical" could only be asserted, not checked.
+
+**What each observed value proves:**
+- **verify 14/14** (9 documents, 34 chunks). The schema is the tenancy end
+  state, which is what `schema-bookings.sql` will be applied on top of.
+- **isolation 11/11.** Cross-tenant reads are refused before any bookings
+  table exists, so a later failure belongs to the new code.
+- **eval 9/10, and the one FAIL is `antecedent`**, the known D-017 model limit.
+  That matches the number `CLAUDE.md` rule 1 expects, so nothing had drifted
+  since tenancy Phase 8.
+- **Northwind's prompt: sha256 `d6337d0f…`**, 18 lines, with the persona line
+  "You are Nora, the assistant for Northwind Labs." followed by the D-017
+  block. Phase 6 must produce this same hash.
+
+**Trap avoided:** snapshotting a prompt built from *retrieved* chunks. Its
+bytes would move with embedding noise and database content, and a diff would
+flag changes unrelated to the prompt code, so real ones would get ignored.
+Fixed inputs mean the only things that can change the hash are
+`buildPrompt()` and the tenant's persona columns.

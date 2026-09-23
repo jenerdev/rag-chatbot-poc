@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-23
+> Last updated: 2026-09-24
 
 ---
 
@@ -30,13 +30,27 @@
   theme and admin key. Measured on the final code: eval 9/10 (the known
   `antecedent` model limit), isolation 11/11, verify 14/14, and tests 41 + 13.
   Both tenants were also walked by hand in the browser.
-- **Working on right now:** nothing. The next pieces of work are the optional
-  plans in plan.md § 7. **Real auth + RLS comes before any public URL** (R-2,
-  R-11, R-13).
+- **Working on right now:** the **bookings plan**,
+  [`plan/bookings.md`](./plan/bookings.md) (Phases 0–8, written 2026-09-24).
+  It adds a booking manager for staff and the first chatbot tool,
+  `check_availability`. Nothing from it is built yet. **Real auth + RLS still
+  comes before any public URL** (R-2, R-11, R-13).
 
 ---
 
 ## ▶ Next up (do this next)
+
+~~**Bookings Phase 0: baseline.**~~ **Done 2026-09-24.** verify **14/14**,
+isolation **11/11**, eval **9/10** (the known `antecedent` failure only).
+Northwind's prompt was captured with the new `prompt-snapshot` script (sha256
+`d6337d0f…`). All four files are in `plan/baseline/*-pre-bookings.txt`.
+
+**▶ Bookings Phase 1: schema.** [`plan/bookings.md`](./plan/bookings.md) § 3.
+**Blocked on the Villa owners** for § 8's questions: does an Overnight block
+the next day's Day Tour, and is there a turnover gap? Those answers decide the
+slot seed. The rest of the SQL file (tables, constraint, functions) can be
+written first.
+
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
 steps pass in the browser: the document list and its chunks, the live estimate,
@@ -555,6 +569,29 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 0)
+- **Did:** captured the baseline. Added `packages/rag/tools/prompt-snapshot.mjs`
+  and its `prompt-snapshot` script, which prints `buildPrompt()` output for
+  fixed chunks and history.
+- **Observed:** verify 14/14 (documents 9, chunks 34, conversations 265,
+  messages 688). Isolation 11/11. Eval 9/10: `antecedent` FAIL, the other nine
+  PASS, 12 OpenAI chat calls. Northwind's prompt file is 18 lines, sha256
+  `d6337d0f21c8b478e045c801181168e95b56355057c4fb4331abcef2fb046ba8`.
+- **Next:** Phase 1, the slot seed waiting on the owners' answers.
+
+### 2026-09-24 — session 7 (bookings planning)
+- **Did:** wrote [`plan/bookings.md`](./plan/bookings.md): a code registry of
+  applications plus a `tenant_applications` table, a `@rag/bookings` package
+  (domain logic that both the admin routes and the chatbot tool call directly),
+  an admin booking screen, hand-written tool calling in `@rag/openai`, and one
+  read-only tool, `check_availability`.
+- **Found:** Villa does not have rooms. It sells three whole-property slots,
+  and two of them cross midnight (`02-rates-and-schedules.md`). So bookings are
+  `tstzrange`s with an exclusion constraint. D-008's short circuit would make
+  the tool unreachable, so it is reworded (D-035) rather than removed.
+- **Next:** Phase 0, then the § 8 questions for the owners.
+
 
 ### 2026-09-23 — session 6, continued (tenancy Phase 8)
 - **Did:** the record. decisions.md got D-025 to D-030 and the D-006
