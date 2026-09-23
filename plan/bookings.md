@@ -546,6 +546,21 @@ Still no pipeline changes. This phase is only the transport, and it is hand-writ
 **Done when:** tests pass, and one real call made by hand with a dummy tool
 returns a parsed `ToolCall` whose `arguments` string passes `JSON.parse`.
 
+> **Done 2026-09-24.** 14 new tests, all fixture-based, with no key. Real
+> calls with a dummy `check_availability` tool:
+>
+> | Call | Tokens | Result |
+> |---|---|---|
+> | `chat` | 91 in + 21 out, 1 tool call | `{"date_from":"2026-10-12"}` |
+> | `chatStream` | 91 in + 21 out, 1 tool call | the same arguments, reassembled from fragments |
+> | Round trip: tool result sent back | 147 in + 15 out, 0 tool calls | a text answer, with the streamed deltas byte-equal to `content` |
+>
+> **Finding for Phase 6:** the dummy result said only *Overnight* was open,
+> and the model replied "The villa is available for booking on 12 October
+> 2026". That is a whole-day claim the tool did not make. The § 2.5 paragraph
+> needs a sentence making the answer name slots, and the battery needs a case
+> where only some slots are open.
+
 ### Phase 6 — The tool, in the pipeline, then measure
 
 1. `packages/rag/src/tools.ts`:

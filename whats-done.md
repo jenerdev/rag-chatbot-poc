@@ -3552,3 +3552,61 @@ proven by this walk. This is recorded as it is rather than rounded up.
 defines. It would have rendered as a plain button while reading as if it were
 styled. The screen reuses the knowledge base's plain Delete button style
 instead.
+
+## Bookings Phase 5 — tool calling in `@rag/openai` · done 2026-09-24
+
+**What was done:** tool calling added to the two hand-written requests, still
+with no SDK (D-002):
+- **Types.** `ChatMessage` is a union (system/user, assistant with optional
+  `tool_calls` and nullable content, tool with `tool_call_id`). Also
+  `ToolDefinition`, `ToolCall` (arguments kept as a string), `WireToolCall`
+  and `ChatTurn`.
+- **`chat()`.** Overloaded: with `tools` it returns a `ChatTurn`, without them
+  a string. The existing callers are unchanged.
+- **`chatStream()`.** Overloaded the same way, plus a per-index `Map`
+  accumulator for tool-call fragments, and a `holdContent` option that
+  collects text instead of emitting it.
+- **Helpers.** `assistantToolCallMessage()` and `toolResultMessage()` for the
+  round trip.
+- **Tests.** 14 fixture tests with `fetch` and the env stubbed.
+
+**Why it mattered:** Phase 6's loop needs three things from the transport: the
+calls the model asked for, a way to send results back, and a way to hold text
+until the zero-match rule has decided. All three now exist and are tested
+without a network. The request for a tenant with no tools is provably the
+request it was before.
+
+**What each observed value proves:**
+- **Body keys without tools: `messages, model, stream, stream_options,
+  temperature` (stream) and `max_tokens, messages, model, temperature` (the
+  rewriter), with the log lines unchanged.** Northwind's wire request cannot
+  have moved. Rule 1 is checked at the HTTP layer, not only at the prompt
+  string.
+- **A network cut inside `"2026-10-12"` and inside the blank line still
+  reassembled `{"date_from":"2026-10-12","date_to":"2026-10-14"}`.** The
+  existing split-event buffering carries tool-call fragments too. This is the
+  boundary bug § 2.7 predicted.
+- **Interleaved indexes 0/1 came back as two separate calls with the right
+  dates.** Per-index accumulation, not "the current call".
+- **No `[DONE]` → `OpenAIError` 502 with `partial: "Let me check"`.** The R-3
+  guard still holds with tools on.
+- **Real calls:**
+  - `chat`: 91 in + 21 out, 1 tool call. `chatStream`: 91 in + 21 out, 1 tool
+    call. Both returned `{"date_from":"2026-10-12"}`, which `JSON.parse`
+    accepted.
+  - Round trip with a tool result: 147 in + 15 out, 0 tool calls, a text
+    answer, with the streamed deltas byte-equal to the returned content.
+  - The shapes match the real API, not only the fixtures written to imitate
+    it.
+
+**Finding carried into Phase 6:** the dummy result listed only *Overnight* as
+open, and the model answered "The villa is available for booking on 12 October
+2026." That is a claim about the whole day which the tool did not make. It is
+the tool-result version of adding a fact the context does not state (D-017).
+Phase 6's paragraph must require naming the slots, and the battery gets a
+partly-open case.
+
+**Trap avoided:** vitest runs without `.env`, so `OPENAI_CHAT_MODEL` was
+undefined and `JSON.stringify` silently dropped the `model` key. The first run
+failed on exactly that. Stubbing the env fixed it. Loosening the assertion
+would have left the key-list test unable to notice a request with no model.

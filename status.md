@@ -74,13 +74,24 @@ database confirms the Overnight booking (#27, 22 Oct) and the refused next-day
 booking. **It does not confirm the UI cancel:** #27 was still `confirmed`
 afterwards.
 
-**▶ Bookings Phase 5: tool calling in `@rag/openai`.**
+~~**Bookings Phase 5: tool calling in `@rag/openai`.**~~ **Done 2026-09-24.**
+`chat` and `chatStream` take `tools` and return `{ content, toolCalls }`.
+Without tools, the request body and the log line are unchanged, which is
+tested. There are 14 new fixture tests, and a real call with a dummy tool
+returned parseable arguments both ways.
+
+**▶ Bookings Phase 6: the tool in the pipeline, then measure.**
 [`plan/bookings.md`](./plan/bookings.md) § 3:
-- the `ToolDefinition`, `ToolCall` and widened `ChatMessage` types;
-- `chat(messages, { tools })` returning `{ content, toolCalls }`, via an
-  overload;
-- `chatStream` with an accumulator per tool-call index and `holdContent`;
-- recorded SSE fixture tests, which need no API key.
+- `tools.ts` (`toolsFor` / `executeTool`);
+- `MAX_TOOL_ROUNDS`;
+- the § 2.5 paragraph in `buildPrompt`, only when there are tools;
+- the D-035 zero-match rule in `answer.ts`;
+- the fixture `fixtures/villa-bookings.json`, and 8 battery cases (a 9th for
+  partial-open slots);
+- the Northwind prompt diff against the Phase 0 snapshot.
+
+**Carry in:** the model said "the villa is available" when only Overnight was
+open.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -600,6 +611,31 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 5)
+- **Did:** tool calling in `@rag/openai`, still raw fetch:
+  - `ChatMessage` is now a union over four roles, adding `tool`.
+  - New types `ToolDefinition`, `ToolCall`, `WireToolCall` and `ChatTurn`.
+  - `chat` / `chatStream` overloads keyed on `tools`, a per-index accumulator,
+    and `holdContent`.
+  - `assistantToolCallMessage` and `toolResultMessage`.
+  - The tool-call count in the log line, only when tools were offered.
+  - Added vitest to the package.
+- **Observed:**
+  - 14/14 new tests, and the repo total is 95 (13 + 27 + 14 + 41).
+    Typecheck is 11/11.
+  - The tests cover a call split across 3 events, a network cut inside the
+    arguments string, interleaved indexes 0/1, `holdContent`, no `[DONE]`
+    (502 with the partial text), and a missing id.
+  - Without tools, the body keys are exactly
+    `messages,model,stream,stream_options,temperature` and the log line is the
+    old one.
+  - Real calls: chat 91+21 with 1 tool call; stream 91+21 with 1 tool call,
+    both `{"date_from":"2026-10-12"}`; round trip 147+15, a text answer, with
+    the deltas equal to `content`.
+- **Finding:** given "Overnight open" only, the model said "The villa is
+  available … on 12 October". This goes into Phase 6's prompt and battery.
+- **Next:** Phase 6.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 4)
 - **Did:**

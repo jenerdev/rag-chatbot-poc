@@ -65,7 +65,7 @@ apps/web/              Next.js 15, App Router
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
-  openai/              @rag/openai — embed, chat, chatStream over raw fetch
+  openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
   db/                  @rag/db — the client, the types, sql/ (4 files), and server-only
     src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
     tools/verify.mjs     28 checks, no API key

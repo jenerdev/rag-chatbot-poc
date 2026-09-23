@@ -8,16 +8,86 @@
 // This module knows NOTHING about chunks, documents, prompts or retrieval. It
 // takes text and returns vectors; it takes messages and returns a string.
 // Everything RAG-specific lives in @rag/pipeline.
+//
+// Offered tools, it returns the tool calls the model asked for as well
+// (plan/bookings.md Phase 5), and it still runs none of them. It does not
+// know what a tool does, and it does not parse the arguments. The loop that
+// runs tools and sends their results back is @rag/pipeline's, and it is
+// hand-written for the same reason these two requests are (D-002).
 
 const EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 const CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
-/** The three roles this project sends. OpenAI accepts others; nothing here uses them. */
-export type ChatRole = 'system' | 'user' | 'assistant';
+/**
+ * The four roles this project sends.
+ *
+ * `tool` arrived with tool calling (plan/bookings.md Phase 5). It is how the
+ * RESULT of a tool goes back to the model: one message per call, pointing at
+ * the call's id. The model never runs anything. It asks for a call, and this
+ * side runs it and pastes the result into the conversation as text, which is
+ * the same move as pasting retrieved chunks into the system message.
+ */
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
-export interface ChatMessage {
-  role: ChatRole;
-  content: string;
+/**
+ * One message in the array sent to the model.
+ *
+ * A union, not one interface, because the four roles carry different fields.
+ * An assistant turn that asked for tools has `tool_calls` and may have
+ * `content: null`. A tool result has `tool_call_id`. `{ role, content }`
+ * with a string content is still a valid ChatMessage, which is all that
+ * buildPrompt() and the query rewriter ever build.
+ */
+export type ChatMessage =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: WireToolCall[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+/**
+ * A tool the model may ask to call, in the shape the Chat Completions API
+ * takes. `parameters` is a JSON Schema object. The model reads the
+ * description and the schema, and nothing else, so they are the whole
+ * interface, which makes them prompt text.
+ */
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+/**
+ * A tool call as the model asked for it.
+ *
+ * `arguments` is a STRING, and it stays one here. It is JSON the model wrote,
+ * so it can be malformed, and parsing it is the job of whoever runs the tool
+ * and can say what "malformed" means to the model. This module is transport.
+ */
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+/** A tool call as it travels inside an assistant message, both from OpenAI and back to it. */
+export interface WireToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+/**
+ * The model's reply to a request that offered tools.
+ *
+ * Either or both can be present. `toolCalls` empty means the model answered
+ * in text. `content` null or empty with calls present means it wants the
+ * tools run first.
+ */
+export interface ChatTurn {
+  content: string | null;
+  toolCalls: ToolCall[];
 }
 
 export interface ChatOptions {
@@ -26,6 +96,47 @@ export interface ChatOptions {
   temperature?: number;
   /** Distinguishes the two kinds of call in the cost log. */
   label?: string;
+}
+
+export interface ToolChatOptions extends ChatOptions {
+  /** Offered to the model. Non-empty: an empty array is a caller bug, and is refused. */
+  tools: ToolDefinition[];
+}
+
+/** The assistant message that records a tool request, to append before the tool results. */
+export function assistantToolCallMessage(turn: ChatTurn): ChatMessage {
+  return {
+    role: 'assistant',
+    content: turn.content,
+    tool_calls: turn.toolCalls.map((call) => ({
+      id: call.id,
+      type: 'function',
+      function: { name: call.name, arguments: call.arguments },
+    })),
+  };
+}
+
+/** A tool's result, as the message the model reads it from. */
+export function toolResultMessage(toolCallId: string, content: string): ChatMessage {
+  return { role: 'tool', tool_call_id: toolCallId, content };
+}
+
+/**
+ * Tools go in the request body only when there are tools.
+ *
+ * A request without tools must be byte-identical to the request this module
+ * sent before tool calling existed. That is how Northwind, which has no tools,
+ * is guaranteed to behave exactly as it did (plan/bookings.md Rule 1). Sending
+ * `tools: []` would not be identical, and OpenAI rejects an empty array anyway.
+ */
+function toolsField(tools: ToolDefinition[] | undefined): { tools?: ToolDefinition[] } {
+  if (tools === undefined) return {};
+  if (tools.length === 0) throw new Error('chat: `tools` was passed but is empty. Omit it instead.');
+  return { tools };
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
 /**
@@ -111,7 +222,7 @@ interface EmbeddingsResponse {
 }
 
 interface ChatResponse {
-  choices: { message: { content: string } }[];
+  choices: { message: { content: string | null; tool_calls?: WireToolCall[] } }[];
   usage: { prompt_tokens: number; completion_tokens: number };
 }
 
@@ -179,8 +290,20 @@ export async function embed(texts: string[]): Promise<number[][]> {
  * chunks are not injected into the model, they are pasted into this array as
  * ordinary text (architecture.md § 6).
  */
-export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+//
+// TOOL CALLING (plan/bookings.md Phase 5): pass `tools`, and the reply is a
+// ChatTurn, `{ content, toolCalls }`, instead of a string. Two overloads rather
+// than one union return type, so the existing callers (the answer and the
+// query rewriter) still get a plain string and need no narrowing. The
+// overload is decided by the `tools` key being present.
+export async function chat(messages: ChatMessage[], options?: ChatOptions): Promise<string>;
+export async function chat(messages: ChatMessage[], options: ToolChatOptions): Promise<ChatTurn>;
+export async function chat(
+  messages: ChatMessage[],
+  options: ChatOptions | ToolChatOptions = {},
+): Promise<string | ChatTurn> {
   const { maxTokens, temperature = 0.2, label = 'chat' } = options;
+  const tools = 'tools' in options ? options.tools : undefined;
 
   const res = await fetch(CHAT_URL, {
     method: 'POST',
@@ -195,22 +318,61 @@ export async function chat(messages: ChatMessage[], options: ChatOptions = {}): 
       // one short line — capping it means a confused model cannot burn output
       // tokens writing an essay where a question was wanted.
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      ...toolsField(tools),
     }),
   });
 
   if (!res.ok) throw await toError(res);
 
   const body = (await res.json()) as ChatResponse;
+  const message = body.choices[0]!.message;
+  const toolCalls = (message.tool_calls ?? []).map((call) => ({
+    id: call.id,
+    name: call.function.name,
+    arguments: call.function.arguments,
+  }));
+
   // `label` distinguishes the two kinds of call in the log, so the cost of
   // query rewriting is visible rather than blended into the answer's cost.
-  console.log(`[openai] ${label}: ${body.usage.prompt_tokens} in + ${body.usage.completion_tokens} out`);
-  return body.choices[0]!.message.content;
+  // The tool-call count is added only when tools were offered, so a call
+  // without tools logs exactly the line it always did.
+  console.log(
+    `[openai] ${label}: ${body.usage.prompt_tokens} in + ${body.usage.completion_tokens} out` +
+      (tools ? `, ${plural(toolCalls.length, 'tool call')}` : ''),
+  );
+
+  if (tools) return { content: message.content, toolCalls };
+  // Without tools the model always answers in text. `?? ''` only covers a
+  // null that the API does not send in this case, so the type can stay string.
+  return message.content ?? '';
 }
 
 interface StreamChunk {
   error?: { message?: string };
   usage?: { prompt_tokens: number; completion_tokens: number };
-  choices?: { delta?: { content?: string } }[];
+  choices?: {
+    delta?: {
+      content?: string | null;
+      tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
+    };
+  }[];
+}
+
+export interface StreamOptions {
+  temperature?: number;
+}
+
+export interface ToolStreamOptions extends StreamOptions {
+  tools: ToolDefinition[];
+  /**
+   * Collect the text instead of calling onDelta with it.
+   *
+   * For the zero-match case of plan/bookings.md § 2.4. With no retrieved
+   * chunk, a reply is allowed out only if the model called a tool, and that
+   * is not known until the stream ends. Text already on screen cannot be
+   * taken back, so it is held.
+   */
+  holdContent?: boolean;
 }
 
 /**
@@ -239,15 +401,40 @@ interface StreamChunk {
  * `stream_options.include_usage` asks OpenAI for a final chunk carrying the
  * token counts, which a streamed response would otherwise never report.
  *
- * @param onDelta called with each fragment as it lands
- * @returns the complete answer
+ * TOOL CALLING (plan/bookings.md § 2.7). With `tools`, a tool call arrives in
+ * pieces too, keyed by `index`:
+ *
+ *     data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_x","function":{"name":"check_availability","arguments":""}}]}}]}
+ *     data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"date_fr"}}]}}]}
+ *     data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"om\":\"2026-10-12\"}"}}]}}]}
+ *
+ * The id and name come once, in the first fragment. The `arguments` string is
+ * spread over many fragments, and it is not JSON until the last one has
+ * arrived. So fragments are appended per index and nothing is parsed here.
+ * Two calls in one turn interleave, which is why it is per index and not
+ * "the current call".
+ *
+ * @param onDelta called with each fragment of TEXT as it lands (never with tool-call fragments)
+ * @returns the complete answer, or with `tools`, the complete ChatTurn
  */
 export async function chatStream(
   messages: ChatMessage[],
   onDelta: (text: string) => void,
-  options: { temperature?: number } = {},
-): Promise<string> {
+  options?: StreamOptions,
+): Promise<string>;
+export async function chatStream(
+  messages: ChatMessage[],
+  onDelta: (text: string) => void,
+  options: ToolStreamOptions,
+): Promise<ChatTurn>;
+export async function chatStream(
+  messages: ChatMessage[],
+  onDelta: (text: string) => void,
+  options: StreamOptions | ToolStreamOptions = {},
+): Promise<string | ChatTurn> {
   const { temperature = 0.2 } = options;
+  const tools = 'tools' in options ? options.tools : undefined;
+  const holdContent = 'holdContent' in options && options.holdContent === true;
 
   const res = await fetch(CHAT_URL, {
     method: 'POST',
@@ -258,6 +445,7 @@ export async function chatStream(
       temperature,
       stream: true,
       stream_options: { include_usage: true },
+      ...toolsField(tools),
     }),
   });
 
@@ -267,6 +455,9 @@ export async function chatStream(
   let buffer = '';
   let answer = '';
   let usage: StreamChunk['usage'] = undefined;
+  // One entry per tool-call index, filled in fragment by fragment. A Map, not
+  // an array, so an index that arrives out of order leaves no hole.
+  const calls = new Map<number, ToolCall>();
   // OpenAI ends a healthy stream with the literal `data: [DONE]`. Without
   // tracking it, ANY end of stream looks like success — including a dropped
   // connection halfway through a sentence. The partial text would then be
@@ -315,10 +506,22 @@ export async function chatStream(
 
         if (parsed.usage) usage = parsed.usage;
 
-        const text = parsed.choices?.[0]?.delta?.content;
+        const delta = parsed.choices?.[0]?.delta;
+
+        const text = delta?.content;
         if (text) {
           answer += text;
-          onDelta(text);
+          if (!holdContent) onDelta(text);
+        }
+
+        for (const fragment of delta?.tool_calls ?? []) {
+          const call = calls.get(fragment.index) ?? { id: '', name: '', arguments: '' };
+          if (fragment.id) call.id = fragment.id;
+          // The name normally arrives whole, in the first fragment. Appending
+          // costs nothing and is still right if it is ever split.
+          if (fragment.function?.name) call.name += fragment.function.name;
+          if (fragment.function?.arguments) call.arguments += fragment.function.arguments;
+          calls.set(fragment.index, call);
         }
       }
     }
@@ -335,8 +538,24 @@ export async function chatStream(
     );
   }
 
+  const toolCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
+
   if (usage) {
-    console.log(`[openai] stream: ${usage.prompt_tokens} in + ${usage.completion_tokens} out`);
+    console.log(
+      `[openai] stream: ${usage.prompt_tokens} in + ${usage.completion_tokens} out` +
+        (tools ? `, ${plural(toolCalls.length, 'tool call')}` : ''),
+    );
   }
-  return answer;
+
+  if (!tools) return answer;
+
+  // A call with no id or no name cannot be answered: a tool result has to name
+  // the id it answers. Refuse it here, loudly, rather than hand the executor
+  // something it will fail on less clearly.
+  for (const call of toolCalls) {
+    if (!call.id || !call.name) {
+      throw new OpenAIError(`OpenAI streamed a tool call with no ${call.id ? 'name' : 'id'}`, 502);
+    }
+  }
+  return { content: answer === '' ? null : answer, toolCalls };
 }
