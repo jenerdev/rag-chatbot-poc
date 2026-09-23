@@ -3302,3 +3302,72 @@ bytes would move with embedding noise and database content, and a diff would
 flag changes unrelated to the prompt code, so real ones would get ignored.
 Fixed inputs mean the only things that can change the hash are
 `buildPrompt()` and the tenant's persona columns.
+
+## Bookings Phase 1 — schema · done 2026-09-24
+
+**What was done:** `packages/db/sql/schema-bookings.sql`, run by the user in
+the Supabase SQL editor. It adds:
+
+- **`tenant_applications`**, with a trigger that requires a valid
+  `config.timezone` for `bookings`;
+- **`units` and `slots`**;
+- **`bookings`**, with composite FKs to both, and the `bookings_no_overlap`
+  exclusion constraint over `(unit_id =, during &&)` that ignores cancelled
+  rows;
+- **the `bookings_compute_during` trigger** and **`slot_range()`**;
+- **`check_availability(p_tenant_id, p_from, p_to)`**, which has no default
+  tenant;
+- **RLS** on, with no policies;
+- **the Villa seed.**
+
+Hand-written types went into `database.types.ts`, and verify checks 15–28
+into `verify.mjs`. Results: `plan/baseline/verify-post-bookings-schema.txt`.
+
+**Why it mattered:** everything later (the package, the admin screen, the
+chatbot tool) reads availability from this. If the rule "these two bookings
+overlap" lived in TypeScript, two callers could disagree about it. Here it
+lives in one constraint, and `check_availability` applies the same `&&` test,
+so "open" means "an insert would succeed".
+
+**What each observed value proves:**
+- **`["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")`** for an Overnight on
+  1 Oct. 14:00 Manila is 06:00Z, and the 22-hour span ends at 04:00Z the next
+  day, which is 12:00 Manila. Timezone and midnight-crossing are both right,
+  computed by Postgres, with no date library.
+- **A supplied `during` of 2000-01-01 came back as the computed 2026-11-01
+  range.** The trigger overwrites; it does not trust the caller.
+- **`23P01 … "bookings_no_overlap"`** for a Day Tour on 2 Oct after an Overnight
+  on 1 Oct. The document's "Overnight blocks the next morning" rule, enforced
+  by range overlap alone.
+- **Day Tour 00:00Z–09:00Z, then Evening 09:00Z–13:00Z on the same day, both
+  accepted.** Half-open ranges: back-to-back bookings do not collide.
+- **A cancelled booking freed its span**: the Day Tour refused earlier was
+  then accepted.
+- **Cross-tenant unit → `23503 bookings_unit_tenant_fk`, and cross-tenant slot
+  → `23503 Slot 3 does not belong to tenant 21`.** Cross-tenant writes are
+  refused by the database, not by a filter someone has to remember.
+- **`check_availability` keys: `booked_date,slot,status,unit`**, with no guest
+  fields. Rule 3 is enforced at the SQL layer. Asked as Northwind, it returned
+  **0 rows**.
+- **`22023 time zone "Mars/Olympus_Mons" not recognized`.** A bad timezone
+  fails when it is written, not eight hours out on the first booking.
+- **After the run:** tenants are only `northwind` (1) and `villa` (3), with 0
+  bookings. The probe cascade cleaned up all four tables, which also proves
+  that the `no action` slot FK does not block deleting a tenant.
+
+**Deviation:** the plan had a `create_booking()` RPC compute `during`. It
+became a trigger, which is stronger: every insert path gets the same range, and
+the trigger also refuses bookings for a tenant without the application
+(`23503 Tenant 21 does not have the bookings application`). Recorded in
+plan/bookings.md § 1.3.
+
+**Traps caught:**
+- **A HEAD count on a missing table returned `count: null` with no error.**
+  Before the SQL ran, "read the bookings tables" passed. The check now also
+  requires a numeric count. Without that, it would have kept passing against
+  a database the file was never run on.
+- **My expected value for check 25 was wrong, not the SQL.** I expected
+  Overnight on 2 Oct to be open, but it starts at 14:00, inside that day's
+  08:00–17:00 Day Tour. The database applied "one slot per day" more
+  faithfully than the hand-written expectation did, which is the argument for
+  keeping the rule in the constraint.

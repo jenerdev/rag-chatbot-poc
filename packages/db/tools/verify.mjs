@@ -109,6 +109,254 @@ if (chunkError || !chunk) {
   check(!nulls.bad, 'every row has a tenant_id', nulls.join(' · '));
 }
 
+// 15–27 are bookings Phase 1 (plan/bookings.md § 1). They run inside the same
+// throwaway verify-probe tenant as 12–14, give it the bookings application, a
+// unit and three slots, and book against those. Villa's real bookings are
+// never touched: Villa is only READ, for the cross-tenant checks. Deleting the
+// probe tenant cascades through all four new tables.
+//
+// The dates are fixed. The database does not care whether a date is in the
+// past (@rag/bookings does), and fixed dates make the expected ranges exact.
+async function bookingChecks(probeId) {
+  // An insert that is SUPPOSED to fail. If it succeeds, the guard is missing:
+  // the row is removed so it cannot affect later checks, and the error is null.
+  const insertExpectingFailure = async (row) => {
+    const { data, error } = await supabase.from('bookings').insert(row).select('id');
+    if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
+    return error;
+  };
+  const book = (row) =>
+    supabase
+      .from('bookings')
+      .insert({ tenant_id: probeId, guest_name: 'verify.mjs probe', ...row })
+      .select('id, during')
+      .single();
+
+  // 15. The four new tables are reachable.
+  {
+    const seen = [];
+    let bad = false;
+    for (const table of ['tenant_applications', 'units', 'slots', 'bookings']) {
+      const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
+      seen.push(error ? `${table}: ${error.message}` : `${table} ${count}`);
+      // A HEAD request for a table that does not exist can come back with NO
+      // error and a null count, because the error travels in a body HEAD does
+      // not have. Observed here before the SQL was run. So a missing count is
+      // a failure too.
+      if (error || typeof count !== 'number') bad = true;
+    }
+    check(!bad, 'read the bookings tables', bad ? `${seen.join(' · ')} — run sql/schema-bookings.sql` : seen.join(' · '));
+    if (bad) return;
+  }
+
+  // 16. The seed: villa has bookings in Asia/Manila, northwind has nothing.
+  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
+  const idOf = Object.fromEntries((tenants ?? []).map((t) => [t.slug, t.id]));
+  const { data: apps } = await supabase
+    .from('tenant_applications')
+    .select('tenant_id, application_key, config')
+    .in('tenant_id', [idOf.villa ?? -1, idOf.northwind ?? -1]);
+  const villaApp = apps?.find((a) => a.tenant_id === idOf.villa);
+  const northwindApps = apps?.filter((a) => a.tenant_id === idOf.northwind) ?? [];
+  check(
+    villaApp?.config?.timezone === 'Asia/Manila' && northwindApps.length === 0,
+    'villa has bookings, northwind has none',
+    `villa ${JSON.stringify(villaApp?.config ?? null)} · northwind ${northwindApps.length} rows`,
+  );
+
+  // 17. An unknown timezone is refused on write (22023), not on the first
+  //     booking eight hours out.
+  {
+    const { error } = await supabase
+      .from('tenant_applications')
+      .insert({ tenant_id: probeId, application_key: 'bookings', config: { timezone: 'Mars/Olympus_Mons' } });
+    if (!error) await supabase.from('tenant_applications').delete().eq('tenant_id', probeId);
+    check(
+      error?.code === '22023',
+      'an unknown timezone is refused',
+      error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED — the timezone trigger is missing',
+    );
+  }
+
+  // The probe's own setup. Evening exists only here: it starts at exactly the
+  // instant Day Tour ends, which is what check 20 needs.
+  await supabase
+    .from('tenant_applications')
+    .insert({ tenant_id: probeId, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+  const { data: unit } = await supabase.from('units').insert({ tenant_id: probeId, name: 'Probe unit' }).select('id').single();
+  const { data: slotRows } = await supabase
+    .from('slots')
+    .insert([
+      { tenant_id: probeId, name: 'Day Tour', start_time: '08:00', duration: '9 hours' },
+      { tenant_id: probeId, name: 'Overnight', start_time: '14:00', duration: '22 hours' },
+      { tenant_id: probeId, name: 'Evening', start_time: '17:00', duration: '4 hours' },
+    ])
+    .select('id, name');
+  const slot = Object.fromEntries((slotRows ?? []).map((s) => [s.name, s.id]));
+  if (!unit || !slot['Day Tour'] || !slot.Overnight || !slot.Evening) {
+    check(false, 'set up the probe unit and slots', 'insert returned nothing');
+    return;
+  }
+
+  // 18. `during` is computed in SQL from the slot and the timezone. Overnight
+  //     on 1 Oct in Manila is 14:00+08 to 12:00+08 the next day.
+  const overnight = await book({ unit_id: unit.id, slot_id: slot.Overnight, booked_date: '2026-10-01' });
+  const expected = '["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")';
+  check(
+    overnight.data?.during === expected,
+    'during is computed from slot and timezone',
+    overnight.error ? overnight.error.message : overnight.data.during,
+  );
+
+  // 19. A `during` supplied by the caller is overwritten, not trusted.
+  {
+    const forged = await book({
+      unit_id: unit.id,
+      slot_id: slot.Overnight,
+      booked_date: '2026-11-01',
+      during: '[2000-01-01,2000-01-02)',
+    });
+    check(
+      forged.data?.during === '["2026-11-01 06:00:00+00","2026-11-02 04:00:00+00")',
+      'a supplied during is overwritten',
+      forged.error ? forged.error.message : forged.data.during,
+    );
+  }
+
+  // 20. The exclusion constraint. Overnight on 1 Oct runs until 12:00 on 2 Oct,
+  //     so a Day Tour from 08:00 on 2 Oct overlaps it. This PASSES when the
+  //     insert FAILS with 23P01.
+  {
+    const error = await insertExpectingFailure({
+      tenant_id: probeId,
+      unit_id: unit.id,
+      slot_id: slot['Day Tour'],
+      booked_date: '2026-10-02',
+      guest_name: 'verify.mjs probe',
+    });
+    check(
+      error?.code === '23P01',
+      "an Overnight blocks the next day's Day Tour",
+      error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED — the exclusion constraint is missing',
+    );
+  }
+
+  // 21. Half-open ranges. Day Tour ends at 17:00 and Evening starts at 17:00:
+  //     back to back, not overlapping. A closed range would refuse the second.
+  {
+    const day = await book({ unit_id: unit.id, slot_id: slot['Day Tour'], booked_date: '2026-10-05' });
+    const evening = await book({ unit_id: unit.id, slot_id: slot.Evening, booked_date: '2026-10-05' });
+    check(
+      !day.error && !evening.error,
+      'back-to-back slots do not overlap',
+      day.error?.message ?? evening.error?.message ?? `${day.data.during} then ${evening.data.during}`,
+    );
+  }
+
+  // 22. A cancelled booking frees its span: the Day Tour of check 20 now fits.
+  {
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('tenant_id', probeId).eq('id', overnight.data?.id ?? -1);
+    const retry = await book({ unit_id: unit.id, slot_id: slot['Day Tour'], booked_date: '2026-10-02' });
+    check(!retry.error, 'a cancelled booking frees its slot', retry.error ? `${retry.error.code} ${retry.error.message}` : retry.data.during);
+  }
+
+  // 23–24. Cross-tenant writes are refused, for the unit (composite FK) and
+  //        for the slot (the trigger, with the same 23503).
+  {
+    const { data: villaUnit } = await supabase.from('units').select('id').eq('tenant_id', idOf.villa ?? -1).limit(1).maybeSingle();
+    const { data: villaSlot } = await supabase.from('slots').select('id').eq('tenant_id', idOf.villa ?? -1).limit(1).maybeSingle();
+    if (!villaUnit || !villaSlot) {
+      check(false, "a booking cannot use another tenant's unit or slot", 'villa has no unit or slot — the seed did not run');
+    } else {
+      const unitError = await insertExpectingFailure({
+        tenant_id: probeId,
+        unit_id: villaUnit.id,
+        slot_id: slot['Day Tour'],
+        booked_date: '2026-12-01',
+        guest_name: 'verify.mjs: this row must never exist',
+      });
+      check(
+        unitError?.code === '23503',
+        "a booking cannot use another tenant's unit",
+        unitError ? `${unitError.code} ${unitError.message}` : 'INSERT SUCCEEDED — the composite FK is missing',
+      );
+      const slotError = await insertExpectingFailure({
+        tenant_id: probeId,
+        unit_id: unit.id,
+        slot_id: villaSlot.id,
+        booked_date: '2026-12-01',
+        guest_name: 'verify.mjs: this row must never exist',
+      });
+      check(
+        slotError?.code === '23503',
+        "a booking cannot use another tenant's slot",
+        slotError ? `${slotError.code} ${slotError.message}` : 'INSERT SUCCEEDED — the slot check is missing',
+      );
+    }
+  }
+
+  // 25. check_availability agrees with the constraint, and carries no guest
+  //     data. Live bookings now: Day Tour 2 Oct (08–17), and nothing else near.
+  //     So on 1 Oct, Overnight (to 12:00 on 2 Oct) is taken and the rest open.
+  //     On 2 Oct, Day Tour is taken, and so is Overnight, which starts at
+  //     14:00 inside that Day Tour. That is Villa's "only one slot is sold per
+  //     day", with no rule written for it. Evening starts at 17:00, exactly as
+  //     the Day Tour ends, so it is open. (The first version of this check
+  //     expected Overnight open on 2 Oct. The SQL was right and the
+  //     expectation was wrong.)
+  {
+    const { data, error } = await supabase.rpc('check_availability', {
+      p_tenant_id: probeId,
+      p_from: '2026-10-01',
+      p_to: '2026-10-02',
+    });
+    const got = (data ?? []).map((r) => `${r.booked_date} ${r.slot} ${r.status}`).join(', ');
+    const want = [
+      '2026-10-01 Day Tour open',
+      '2026-10-01 Overnight taken',
+      '2026-10-01 Evening open',
+      '2026-10-02 Day Tour taken',
+      '2026-10-02 Overnight taken',
+      '2026-10-02 Evening open',
+    ].join(', ');
+    const keys = data?.[0] ? Object.keys(data[0]).sort().join(',') : '';
+    check(!error && got === want, 'check_availability matches the constraint', error ? error.message : got);
+    check(keys === 'booked_date,slot,status,unit', 'check_availability returns no guest data', `keys: ${keys}`);
+  }
+
+  // 26. The same function, asked as another tenant, returns nothing: the
+  //     leakage check of 14, for bookings.
+  {
+    const { data, error } = await supabase.rpc('check_availability', {
+      p_tenant_id: idOf.northwind ?? -1,
+      p_from: '2026-10-01',
+      p_to: '2026-10-02',
+    });
+    check(
+      !error && data.length === 0,
+      'check_availability(northwind) returns zero rows',
+      error ? error.message : `${data.length} rows`,
+    );
+  }
+
+  // 27. Without the application, a tenant cannot hold bookings at all.
+  {
+    await supabase.from('tenant_applications').delete().eq('tenant_id', probeId).eq('application_key', 'bookings');
+    const error = await insertExpectingFailure({
+      tenant_id: probeId,
+      unit_id: unit.id,
+      slot_id: slot.Evening,
+      booked_date: '2026-12-02',
+      guest_name: 'verify.mjs: this row must never exist',
+    });
+    check(
+      error?.code === '23503',
+      'no bookings application, no bookings',
+      error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED — the trigger does not check the application',
+    );
+  }
+}
+
 // 12–14 need a chunk to work with, and a second tenant that owns nothing.
 if (chunk && typeof chunk.tenant_id === 'number') {
   const { data: probe, error: probeError } = await supabase
@@ -172,6 +420,8 @@ if (chunk && typeof chunk.tenant_id === 'number') {
         'match_chunks(another tenant) returns zero rows',
         other.error ? other.error.message : `${other.data.length} rows`,
       );
+
+      await bookingChecks(probe.id);
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);

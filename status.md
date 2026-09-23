@@ -45,11 +45,17 @@ isolation **11/11**, eval **9/10** (the known `antecedent` failure only).
 Northwind's prompt was captured with the new `prompt-snapshot` script (sha256
 `d6337d0f…`). All four files are in `plan/baseline/*-pre-bookings.txt`.
 
-**▶ Bookings Phase 1: schema.** [`plan/bookings.md`](./plan/bookings.md) § 3.
-**Blocked on the Villa owners** for § 8's questions: does an Overnight block
-the next day's Day Tour, and is there a turnover gap? Those answers decide the
-slot seed. The rest of the SQL file (tables, constraint, functions) can be
-written first.
+~~**Bookings Phase 1: schema.**~~ **Done 2026-09-24.**
+`packages/db/sql/schema-bookings.sql` was run in the Supabase SQL editor by the
+user. verify **28/28**. Villa is seeded with the bookings application
+(Asia/Manila), unit "Whole property", and three slots. Northwind has none. The
+turnover-gap question (§ 8) is still open. If the answer is yes, it becomes one
+column on `slots`.
+
+**▶ Bookings Phase 2: `@rag/bookings`.** [`plan/bookings.md`](./plan/bookings.md)
+§ 3. A server-only package exposing `checkAvailability`, `listBookings`,
+`createBooking` and `cancelBooking`, with `BookingInputError` (400) and
+`BookingConflictError` (409, `23P01` only), plus isolation cases.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -569,6 +575,21 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 1)
+- **Did:** wrote `schema-bookings.sql`: `btree_gist`, `tenant_applications`
+  with a timezone trigger, `units`, `slots`, `bookings` with composite FKs and
+  the `bookings_no_overlap` exclusion constraint, a `bookings_compute_during`
+  trigger, `slot_range()`, `check_availability()`, and the Villa seed. Added
+  hand-written types and verify checks 15–28. The user ran the SQL.
+- **Observed:** verify 28/28. Overnight 2026-10-01 in Manila is
+  `["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")`. An overlap fails with
+  `23P01 … "bookings_no_overlap"`. An unknown timezone fails with `22023`.
+  Cross-tenant unit and slot fail with `23503`. After the run: 0 bookings, and
+  only `northwind` (1) and `villa` (3) remain.
+- **Deviations:** a trigger computes `during` instead of the planned
+  `create_booking()` RPC. Verify has 28 checks, not "about 20".
+- **Next:** Phase 2.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 0)
 - **Did:** captured the baseline. Added `packages/rag/tools/prompt-snapshot.mjs`

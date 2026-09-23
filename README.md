@@ -92,7 +92,7 @@ select slug from tenants;                                     -- northwind
 Then, with no OpenAI key needed:
 
 ```bash
-pnpm --filter @rag/db verify     # 14 checks, including cross-tenant ones
+pnpm --filter @rag/db verify     # 28 checks, including cross-tenant ones
 ```
 
 ### 3. Create tenants and their admin keys — before adding any document

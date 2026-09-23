@@ -64,9 +64,9 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch
-  db/                  @rag/db — the client, the types, sql/ (3 files), and server-only
+  db/                  @rag/db — the client, the types, sql/ (4 files), and server-only
     src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
-    tools/verify.mjs     14 checks, no API key
+    tools/verify.mjs     28 checks, no API key
     tools/tenant.mjs     tenant:add / tenant:key — prints a key once
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant
     tools/prompt-eval.mjs  the battery, 10 cases, both tenants
@@ -82,7 +82,7 @@ plan/                    the migration plan and its evidence; plan.md is tenancy
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test
-pnpm --filter @rag/db verify    # 14 checks, no API key needed
+pnpm --filter @rag/db verify    # 28 checks, no API key needed
 pnpm eval                       # the prompt battery, 10 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6

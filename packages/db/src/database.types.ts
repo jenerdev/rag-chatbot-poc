@@ -1,7 +1,7 @@
 // database.types.ts — the shape of the database, for @supabase/supabase-js.
 //
-// HAND-WRITTEN FROM `sql/schema.sql`, `sql/schema-hybrid.sql` AND
-// `sql/schema-tenancy.sql`, not generated. This describes the schema AFTER the
+// HAND-WRITTEN FROM `sql/schema.sql`, `sql/schema-hybrid.sql`,
+// `sql/schema-tenancy.sql` AND `sql/schema-bookings.sql`, not generated. This describes the schema AFTER the
 // D-031 bridge is removed: `tenant_id` is required on every insert, and only
 // the tenant-scoped signatures of the two search functions exist.
 //
@@ -232,9 +232,167 @@ export interface Database {
           },
         ];
       };
+      /** sql/schema-bookings.sql § 2 — a row means the application is on for that tenant (D-033). */
+      tenant_applications: {
+        Row: {
+          tenant_id: number;
+          /** `check (application_key in ('bookings'))`, the same keys as the code registry */
+          application_key: 'bookings';
+          /** for bookings: `{ timezone: <IANA name> }`, required and validated by a trigger */
+          config: Json;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          application_key: 'bookings';
+          config?: Json;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          application_key?: 'bookings';
+          config?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      /** sql/schema-bookings.sql § 3 — a thing that can be booked. */
+      units: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          id?: never;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          id?: never;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      /** sql/schema-bookings.sql § 4 — a named time window, in the tenant's timezone. */
+      slots: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          name: string;
+          /** `time`, as "HH:MM:SS" */
+          start_time: string;
+          /** `interval`, as PostgREST renders it, e.g. "22:00:00" */
+          duration: string;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          id?: never;
+          name: string;
+          start_time: string;
+          duration: string;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          id?: never;
+          name?: string;
+          start_time?: string;
+          duration?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      /** sql/schema-bookings.sql § 5 — guest data lives here and ONLY here; check_availability never returns it. */
+      bookings: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          unit_id: number;
+          slot_id: number;
+          /** `date`, as "YYYY-MM-DD": the date the slot starts on */
+          booked_date: string;
+          /** `tstzrange`, as a string like `["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")` */
+          during: string;
+          /** `check (status in ('pending','confirmed','cancelled'))` */
+          status: 'pending' | 'confirmed' | 'cancelled';
+          guest_name: string;
+          guest_phone: string | null;
+          guest_count: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          id?: never;
+          unit_id: number;
+          slot_id: number;
+          booked_date: string;
+          /** computed by the bookings_compute_during trigger, which overwrites anything supplied */
+          during?: never;
+          status?: 'pending' | 'confirmed' | 'cancelled';
+          guest_name: string;
+          guest_phone?: string | null;
+          guest_count?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          id?: never;
+          unit_id?: number;
+          slot_id?: number;
+          booked_date?: string;
+          during?: never;
+          status?: 'pending' | 'confirmed' | 'cancelled';
+          guest_name?: string;
+          guest_phone?: string | null;
+          guest_count?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bookings_unit_tenant_fk';
+            columns: ['unit_id', 'tenant_id'];
+            referencedRelation: 'units';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+          {
+            foreignKeyName: 'bookings_slot_tenant_fk';
+            columns: ['slot_id', 'tenant_id'];
+            referencedRelation: 'slots';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {
+      /**
+       * sql/schema-bookings.sql § 7 — open or taken, per (date, unit, slot), for ONE tenant.
+       * Returns no guest data, by design (plan/bookings.md Rule 3).
+       */
+      check_availability: {
+        Args: {
+          /** no default in SQL, and required here (D-027) */
+          p_tenant_id: number;
+          /** "YYYY-MM-DD" */
+          p_from: string;
+          p_to: string;
+        };
+        Returns: {
+          booked_date: string;
+          unit: string;
+          slot: string;
+          status: 'open' | 'taken';
+        }[];
+      };
       /** sql/schema-tenancy.sql § 8 — cosine similarity search within ONE tenant. */
       match_chunks: {
         Args: {

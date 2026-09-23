@@ -177,8 +177,14 @@ tenant, it has no default, and the filter is inside the function.
   per (date, unit, slot) in the range, with `status` set to `open` or `taken`.
   It never returns who holds a slot. Rule 3 is enforced in SQL, the layer
   closest to the data.
-- **`create_booking(p_tenant_id, p_unit_id, p_slot_id, p_date, p_guest_name, …)`**
-  computes `during` from the slot and the tenant's timezone, then inserts:
+- **`during` is computed by a `before insert or update` trigger**
+  (`bookings_compute_during`), from the slot and the tenant's timezone.
+  *Deviation, Phase 1:* this was first planned as a `create_booking()` RPC. A
+  trigger is stronger, because a plain `.insert()`, a script, or someone typing
+  in the SQL editor all get the same range, and a supplied `during` is
+  overwritten rather than trusted. The trigger also refuses a booking for a
+  tenant without the application. The range expression it uses (as
+  `slot_range()`) is:
 
   ```sql
   tstzrange(
@@ -390,6 +396,9 @@ number means something moved; stop and find it first.
 **Done when:** verify passes about 20/20, and the exact `during` string is
 pasted into `whats-done.md` as observed.
 
+> **Done 2026-09-24: 28/28.** That is 14 existing checks plus 14 new ones.
+> "About 20" was an estimate made before the checks were written.
+
 ### Phase 2 — `@rag/bookings`
 
 1. `packages/bookings/`: `server-only`, depends on `@rag/db` only. Its
@@ -526,8 +535,11 @@ returns a parsed `ToolCall` whose `arguments` string passes `JSON.parse`.
    § 2.4's rule. `Answer` and the SSE stream gain `toolCalls: { name, args,
    result }[]`, a new `tool` SSE event sent as each call completes, and a
    `[tool]` log prefix beside `[query]` and `[retrieve]`.
-5. Rule 1 check: `buildPrompt` for Northwind's fixed question must be
-   byte-identical to `plan/baseline/northwind-prompt-pre-bookings.txt`.
+5. Rule 1 check: `pnpm --silent --filter @rag/pipeline prompt-snapshot` must be
+   byte-identical to `plan/baseline/northwind-prompt-pre-bookings.txt`. Compare
+   with `diff --strip-trailing-cr`, not a raw hash. The file was committed with
+   LF, and a Windows checkout can rewrite it as CRLF, which changes the hash
+   but not the prompt.
 6. The battery. The fixture is `fixtures/villa-bookings.json`, with dates
    **relative to today**, so the battery does not start failing next month.
    Load it with a new `pnpm --filter @rag/bookings seed`. New cases, each
