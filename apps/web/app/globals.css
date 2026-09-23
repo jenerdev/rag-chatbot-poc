@@ -290,3 +290,55 @@ h1.brand { display: flex; align-items: center; gap: 10px; }
 
 /* The assistant's name above each of its turns. */
 .speaker { font-size: 12px; font-weight: 600; color: var(--accent); margin: 0 0 4px 2px; }
+
+/* --- bookings (S-3, plan/bookings.md Phase 4) --------------------------- */
+
+/* Same look as the text inputs above, for the controls the knowledge base never needed. */
+select, input[type="date"], input[type="number"] {
+  width: 100%;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}
+select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.field-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.field-row > .field { flex: 1 1 160px; }
+.field-row > .field.grow { flex: 2 1 240px; }
+.field-row > .field.narrow { flex: 0 1 110px; }
+
+.range-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.range-head h2 { margin: 0; }
+.range-nav { display: flex; gap: 6px; }
+
+.day { border-top: 1px solid var(--line); padding: 10px 0; }
+.day-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.day-label { width: 92px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.day-slots { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Open is quiet, taken is the thing to notice. */
+.slot-chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.slot-chip.open { background: var(--ok-soft); border-color: #bbf7d0; color: var(--ok); }
+.slot-chip.taken { background: var(--danger-soft); border-color: #fecaca; color: var(--danger); }
+
+.booking { margin: 8px 0 0 104px; padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.booking-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.booking-slot { font-size: 12px; font-weight: 600; color: var(--accent); }
+.booking-guest { font-weight: 600; }
+.booking-meta { flex: 1; font-size: 13px; color: var(--muted); }
+.booking-notes { margin-top: 4px; font-size: 13px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.booking.cancelled { opacity: 0.55; }
+.booking.cancelled .booking-guest { text-decoration: line-through; }
+
+@media (max-width: 560px) {
+  .booking { margin-left: 0; }
+}

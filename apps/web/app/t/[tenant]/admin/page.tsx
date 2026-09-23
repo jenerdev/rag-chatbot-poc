@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AdminScreen } from '@/components/admin-screen';
+import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { getTenant } from '@/lib/tenant';
 
@@ -13,7 +14,7 @@ export default async function TenantAdminPage({ params }: { params: Promise<{ te
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
 
-  const branding = await loadBranding(tenant);
+  const [branding, bookingsEnabled] = await Promise.all([loadBranding(tenant), hasApplication(tenant, 'bookings')]);
 
   return (
     <AdminScreen
@@ -21,6 +22,7 @@ export default async function TenantAdminPage({ params }: { params: Promise<{ te
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      bookingsEnabled={bookingsEnabled}
     />
   );
 }

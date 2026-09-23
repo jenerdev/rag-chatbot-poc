@@ -67,13 +67,20 @@ The changes:
 
 27 curl cases pass.
 
-**▶ Bookings Phase 4: the admin screen.** [`plan/bookings.md`](./plan/bookings.md)
-§ 3, covering:
-- `app/t/[tenant]/admin/bookings/page.tsx`, which calls `notFound()` without
-  the application, plus a `bookings-screen` Client Component;
-- a list grouped by date, a create form and a cancel button;
-- a link from the knowledge-base admin, shown only when the application is on;
-- a walk in the browser.
+~~**Bookings Phase 4: the admin screen.**~~ **Done 2026-09-24.** Added
+`/t/[tenant]/admin/bookings` (404 without the application), `bookings-screen`
+and the shared `admin-login`. The user reported the walk as passed. The
+database confirms the Overnight booking (#27, 22 Oct) and the refused next-day
+booking. **It does not confirm the UI cancel:** #27 was still `confirmed`
+afterwards.
+
+**▶ Bookings Phase 5: tool calling in `@rag/openai`.**
+[`plan/bookings.md`](./plan/bookings.md) § 3:
+- the `ToolDefinition`, `ToolCall` and widened `ChatMessage` types;
+- `chat(messages, { tools })` returning `{ content, toolCalls }`, via an
+  overload;
+- `chatStream` with an accumulator per tool-call index and `holdContent`;
+- recorded SSE fixture tests, which need no API key.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -593,6 +600,28 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 4)
+- **Did:**
+  - Added `app/t/[tenant]/admin/bookings/page.tsx`, which calls `notFound()`
+    unless `hasApplication`.
+  - Added `components/bookings-screen.tsx`: a create form, a 14-day list of
+    open/taken chips plus that day's bookings, and cancel.
+  - Moved `LoginForm` and `describeFailure` into `components/admin-login.tsx`.
+  - Added a Bookings link on the knowledge-base admin page, shown only when
+    the application is enabled, and a bookings section in `globals.css`.
+- **Observed:**
+  - Typecheck is 11/11, and the build lists `/t/[tenant]/admin/bookings` at
+    3.5 kB.
+  - The bundle grep for `service_role|guest_phone|admin_key|SUPABASE` finds
+    0 files.
+  - Pages: Villa's bookings page is 200, Northwind's and `nope`'s are 404.
+    The Bookings link appears on Villa's admin page (1) and not Northwind's (0).
+  - **The walk (user):** reported as passed. The database shows #27, Overnight
+    2026-10-22, `["2026-10-22 06:00:00+00","2026-10-23 04:00:00+00")`,
+    `confirmed`. The log shows `[error] That slot on 2026-10-23 overlaps an
+    existing booking.` There is no cancelled row, so step 4 is unconfirmed.
+- **Next:** Phase 5. Also: decide whether to keep #27.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 3)
 - **Did:**

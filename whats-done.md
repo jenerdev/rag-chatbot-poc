@@ -3501,3 +3501,54 @@ in plan/bookings.md Phase 3.
 - **Port 3000 belonged to another project** (`gecom-apps`). A second
   `next dev` on this repo would also have fought over `.next`. The checks ran
   on a production build on port 3100 instead, which was stopped afterwards.
+
+## Bookings Phase 4 — the admin screen · done 2026-09-24 (one step unconfirmed)
+
+**What was done:**
+- **The page.** `/t/[tenant]/admin/bookings` is a Server Component. It returns
+  the ordinary "No such workspace" 404 when the tenant has no bookings
+  application.
+- **The screen.** `components/bookings-screen.tsx` is a Client Component
+  containing:
+  - the login;
+  - a create form whose date input has `min` set to the tenant's today;
+  - a 14-day range, where each day shows every slot as an open or taken chip,
+    then the bookings that start that day, with Cancel;
+  - earlier / today / later navigation.
+- **The shared login.** `LoginForm` and `describeFailure` moved into
+  `components/admin-login.tsx`, so both admin screens use one login. One
+  session cookie (path `/api/t/<slug>`) covers both.
+- **The link.** The knowledge-base admin page shows a Bookings link only when
+  `hasApplication(tenant, 'bookings')` is true.
+
+**Why it mattered:** it is the first thing a tenant's staff can actually use.
+It also exercises the whole stack built in Phases 1–3 from a real browser:
+the SQL constraint, the package, the routes, the error map and the session
+cookie.
+
+**What each observed value proves:**
+- **Villa's bookings page is 200; Northwind's and `nope`'s are 404, with the
+  same page.** A tenant without the application cannot tell the feature
+  exists.
+- **Bookings link: 1 occurrence on Villa's admin page, 0 on Northwind's.**
+  Decided on the server from `tenant_applications`, not hard-coded per slug.
+- **Bundle grep `service_role|guest_phone|admin_key|SUPABASE` → 0 files.** The
+  screen imports `@rag/bookings` for types only (`import type`), so no server
+  code reached the browser. CLAUDE.md rule 2 holds.
+- **Booking #27: Overnight 2026-10-22, `["2026-10-22 06:00:00+00","2026-10-23
+  04:00:00+00")`.** Made through the form, it is the same range verify.mjs
+  computes. Browser → route → package → trigger agree.
+- **`That slot on 2026-10-23 overlaps an existing booking.` in the server
+  log.** The user tried the next-day slot in the UI, and the 409's message
+  reached the form, as the plan's step 3 expects.
+
+**What was NOT confirmed:** the user reported the walk as passed, but step 4
+(cancel in the UI, then both days back to open) left no trace. #27 was still
+`confirmed` afterwards, with no cancelled row. The cancel *route* is proven
+(Phase 3: cancel → 200, availability back to open). The Cancel *button* is not
+proven by this walk. This is recorded as it is rather than rounded up.
+
+**Trap avoided:** a Cancel button with a `danger` class that no stylesheet
+defines. It would have rendered as a plain button while reading as if it were
+styled. The screen reuses the knowledge base's plain Delete button style
+instead.

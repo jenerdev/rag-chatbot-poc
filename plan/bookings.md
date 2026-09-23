@@ -503,6 +503,20 @@ about 14, all passing.
 **Done when:** the walk passes by hand, and
 `grep -ri "service_role\|guest_phone" apps/web/.next/static/` returns nothing.
 
+> **Done 2026-09-24, with one gap.** The bundle grep returns 0 files. Page
+> status: Villa's bookings page is 200, Northwind's and `nope`'s are 404, and
+> the Bookings link appears only on Villa's admin page. The user reported the
+> walk as passed. The database confirms steps 2–3 (booking #27, an Overnight on
+> 2026-10-22, stored as `["2026-10-22 06:00:00+00","2026-10-23 04:00:00+00")`)
+> and the refused next-day booking (`That slot on 2026-10-23 overlaps an
+> existing booking.` in the server log). **Step 4, cancelling in the UI, left
+> no trace:** #27 was still `confirmed` afterwards. The cancel route itself is
+> proven by Phase 3's curls; the UI button is not proven by this walk.
+>
+> **Deviation:** `LoginForm` and `describeFailure` moved from `admin-screen.tsx`
+> into `components/admin-login.tsx`, unchanged apart from one sentence ("The
+> admin pages need…"), so the two screens share one login.
+
 ### Phase 5 — Tool calling in `@rag/openai`
 
 Still no pipeline changes. This phase is only the transport, and it is hand-written

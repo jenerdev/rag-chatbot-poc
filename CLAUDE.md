@@ -52,9 +52,10 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/layout.tsx      tenant theme (style prop) + tab title
   app/t/[tenant]/page.tsx        S-1 chat — Server Component, resolves the tenant
   app/t/[tenant]/admin/page.tsx  S-2 knowledge base — same
+  app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session; chat/ does JSON and SSE
-  components/                    chat-screen, admin-screen (Client), brand-header, sources-panel
+  components/                    chat-screen, admin-screen, bookings-screen, admin-login (Client), brand-header, sources-panel
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → TenantContext, 404 on a miss
   lib/admin-auth.ts      signed session cookie, requireAdmin()
