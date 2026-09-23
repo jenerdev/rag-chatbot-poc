@@ -34,6 +34,11 @@ import { createBooking, listSlots, listUnits, localDate } from '@rag/bookings';
 import { answerQuestion, getMessages, loadTenant, NO_ANSWER } from '../dist/index.js';
 
 const label = process.argv[2] ?? 'unlabelled';
+// `--only <prefix>` runs just the cases whose id starts with it, e.g.
+// `pnpm eval before-fix --only tool-`. Cheap before/after runs of a subset.
+// The full battery is still what decides whether a prompt change is kept.
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt === -1 ? null : process.argv[onlyAt + 1];
 
 // --- dates, relative to villa's today ----------------------------------------
 const TODAY = localDate('Asia/Manila');
@@ -180,10 +185,14 @@ const CASES = [
     check: (last) => ({
       // Overnight is open that day and the other two are not. The reply must
       // say which, not "the day is free" (the Phase 5 finding).
+      // Phase 6 also found "the following slots are available:" above a list
+      // with two taken slots in it. Every fact was right, and the sentence
+      // introducing them was not. That wording is now a fail.
       ok:
         slotStatus(last, NEXT, 'Overnight') === 'open' &&
         says(last.reply, ['overnight']) &&
-        says(last.reply, TAKEN_WORDS),
+        says(last.reply, TAKEN_WORDS) &&
+        !/(slots|following|these)[^.:\n]{0,40}available\s*:/i.test(last.reply),
       detail: `tool: Overnight ${slotStatus(last, NEXT, 'Overnight') ?? '?'}, Day Tour ${slotStatus(last, NEXT, 'Day Tour') ?? '?'}`,
     }),
     note: 'only some slots are open; the reply must name them, not call the day free',
@@ -194,10 +203,13 @@ const CASES = [
     want: 'tool',
     turns: ['Is it available?'],
     check: (last) => ({
-      ok: callsFor(last).length === 0 && says(last.reply, ['date', 'when']),
-      detail: `${callsFor(last).length} tool calls`,
+      // The reply must ASK. Phase 6 found "I don't know based on the documents
+      // I have. Please provide a specific date…": the refusal glued to the
+      // question. Containing the refusal string is now a fail.
+      ok: callsFor(last).length === 0 && says(last.reply, ['date', 'when']) && !last.reply.includes(NO_ANSWER),
+      detail: `${callsFor(last).length} tool calls; contains the refusal: ${last.reply.includes(NO_ANSWER)}`,
     }),
-    note: 'no date given: no tool call, and the reply asks for one',
+    note: 'no date given: no tool call, and the reply asks for one, without the refusal sentence',
   },
   {
     id: 'tool-slotfill',
@@ -255,11 +267,14 @@ const CASES = [
       const errored = callsFor(last).some((c) => typeof c.result?.error === 'string');
       const claimedOpen = callsFor(last).some((c) => (c.result?.slots ?? []).length > 0);
       return {
-        ok: !claimedOpen && (says(last.reply, ['past']) || last.reply.trim() === NO_ANSWER),
+        // No longer "or refuses". The tool's error ("… is in the past. Today
+        // is …") was written to be passed on, and Phase 6 found the model
+        // giving the bare refusal instead.
+        ok: !claimedOpen && says(last.reply, ['past']),
         detail: `${callsFor(last).length} tool calls${errored ? ', the tool returned an error' : ''}`,
       };
     },
-    note: 'a past date: the reply says so (or refuses), and never presents availability for it',
+    note: 'a past date: the reply says it is in the past, and never presents availability for it',
   },
 ];
 
@@ -334,11 +349,12 @@ async function ask(tenant, turns) {
   return last;
 }
 
+const RUN = only ? CASES.filter((x) => x.id.startsWith(only)) : CASES;
 let pass = 0;
 let basePass = 0;
 await seedFixture();
 try {
-for (const c of CASES) {
+for (const c of RUN) {
   const tenant = tenants[c.tenant];
   let ok;
   let reply;
@@ -392,6 +408,8 @@ for (const c of CASES) {
 
 // The ten cases that predate bookings, counted on their own, because their
 // verdicts must match plan/baseline/eval-pre-bookings.txt one by one.
-const baseTotal = CASES.filter((c) => !c.id.startsWith('tool-')).length;
-console.log(`original ${basePass}/${baseTotal} · tool ${pass - basePass}/${CASES.length - baseTotal}`);
-console.log(`${pass}/${CASES.length} as intended`);
+// Totals are over the cases that RAN, so a `--only` run cannot print a
+// misleading "original 0/10".
+const baseTotal = RUN.filter((c) => !c.id.startsWith('tool-')).length;
+console.log(`original ${basePass}/${baseTotal} · tool ${pass - basePass}/${RUN.length - baseTotal}`);
+console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);

@@ -83,8 +83,10 @@ returned parseable arguments both ways.
 ~~**Bookings Phase 6: the tool in the pipeline, then measure.**~~ **Done
 2026-09-24.** Eval **18/19** (`original 9/10 · tool 9/9`), with the
 original ten the same verdict by verdict. Isolation 11/11. Northwind's prompt
-is identical to the Phase 0 snapshot. Three wording findings are open (see
-whats-done).
+is identical to the Phase 0 snapshot. The three wording findings were then
+fixed (tool cases 6/9 → 7/9 → 9/9; full battery still 18/19). One new side
+effect is open: availability replies are terse "Open: / Taken:" lines that
+often omit the date.
 
 **▶ Bookings Phase 7: the chat screen.** [`plan/bookings.md`](./plan/bookings.md)
 § 3:
@@ -611,6 +613,28 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (Phase 6 wording fixes)
+- **Did:**
+  - Tightened `tool-ask` (the refusal string is now a fail), `tool-partial`
+    (an "…available:" heading is a fail) and `tool-past` (the lenient
+    refusal branch is removed).
+  - Added `--only <prefix>` to the eval, with totals over the cases that ran.
+  - Rewrote the tools block's instructions in `tools.ts`, twice.
+- **Observed** (tool cases only):
+  - Before the fix, tightened: 6/9, the three failing with the Phase 6
+    wording.
+  - Prohibitions ("never introduce…", "do not add…"): 7/9. Only `tool-past`
+    was fixed: "1 January 2020 is in the past. Today is 2026-09-24."
+  - Positive instructions ("two lines, Open: / Taken:", "your whole reply is
+    one question"): 9/9. `tool-ask`: "Which date are you referring to for
+    availability?"
+  - Full battery: 18/19 (`original 9/10 · tool 9/9`). The original verdicts
+    are identical, and so is the Northwind prompt. The fixture was removed
+    and #27 is untouched.
+- **Found:** replies are now form-like ("Open: 22-Hour Whole Day, Day Tour,
+  Overnight / Taken: None") and often omit the date.
+- **Next:** Phase 7, or first make the format carry the date.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 6)
 - **Did:**

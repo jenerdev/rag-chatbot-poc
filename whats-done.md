@@ -3693,3 +3693,49 @@ Fixing any of them means editing the tools block, which means another eval run.
 fail. "NORTHWIND PROMPT: IDENTICAL" was first printed by a script that had
 not been changed, and that would have been identical whatever the pipeline
 did.
+
+## Phase 6 wording fixes · done 2026-09-24
+
+**What was done:** the three wording findings from Phase 6, fixed in the
+tools block only (`tools.ts`). The grounding block was not touched. Each fix
+was measured against a case tightened to fail on the old wording first. Also
+added `pnpm eval <label> --only <prefix>`.
+
+**Why it mattered:** the battery passed all three before, so it could not
+have told a fix from no fix. A check that cannot fail cannot measure a
+change. Tightening them first turned "the replies read oddly" into three
+FAILs with the exact bad sentences in them.
+
+**What each observed value proves:**
+- **Tightened, on the unchanged prompt: tool cases 6/9.** `tool-partial`
+  failed on "the following slots are available: … taken … taken",
+  `tool-ask` on "I don't know based on the documents I have. Please
+  provide…", and `tool-past` on the bare refusal. The checks now catch
+  exactly what was seen.
+- **First wording, prohibitions: 7/9.** Only `tool-past` was fixed, with "1
+  January 2020 is in the past. Today is 2026-09-24.". A positive instruction
+  ("tell the user what the error says"). `tool-partial` and `tool-ask`
+  produced almost the same sentences as before. "Never introduce a list as
+  available" and "do not add the I-don't-know sentence" were ignored.
+- **Second wording, what to write instead: 9/9.**
+  - `tool-partial`: "Open: Overnight / Taken: 22-Hour Whole Day, Day Tour".
+  - `tool-ask`: "Which date are you referring to for availability?"
+  - It is the same lesson as D-017, which had to separate "connect" from
+    "add" to stop a vague prohibition. This model follows a concrete
+    instruction about what to write, and loses a prohibition to the pull of
+    a familiar phrase. Here the familiar phrase is the refusal sentence the
+    grounding block says to "reply exactly".
+- **Full battery after: 18/19, the original ten identical verdict by verdict,
+  the Northwind prompt diff empty.** The fix did not leak outside tool
+  tenants, and did not cost a refusal.
+
+**New side effect, not fixed:** availability replies are now terse and
+form-like. "Is the Overnight slot free on 8 October?" → "Open: 22-Hour Whole
+Day, Day Tour, Overnight / Taken: None", with no date and no direct "yes".
+Correct, and less natural than before. A line asking for the date first
+would probably fix it, and would need another eval run.
+
+**Trap avoided:** editing the saved before-fix output. That run printed
+"original 0/10 · 6/19" because the totals still counted all 19 cases under
+`--only`. The code was fixed, and the saved file's summary line was
+corrected with a note saying so, rather than silently.

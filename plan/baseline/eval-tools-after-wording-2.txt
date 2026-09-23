@@ -1,0 +1,99 @@
+$ node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs "after-wording-fix-2" "--only" "tool-"
+==============================================================================
+PROMPT EVAL: after-wording-fix-2
+==============================================================================
+[bookings] villa booked #32: 2026-10-04, unit 1, slot 2, confirmed
+fixture: 1 villa booking(s) seeded; today 2026-09-24, booked 2026-10-04, next 2026-10-05, free 2026-10-08
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Is the Overnight slot free on 8 October 2026?" -> 5 chunks 0.401/both 0.416/both 0.333/both 0.369/both 0.368/both
+[openai] chat: 1656 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-08..2026-10-08: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-08"} -> 3 slots, 3 open
+[openai] chat: 1763 in + 18 out, 0 tool calls
+PASS  [tool-open] villa want tool
+      Q: Is the Overnight slot free on 8 October 2026?
+      note: tool called, and the reply says open
+      A: Open: 22-Hour Whole Day, Day Tour, Overnight   Taken: None  || tool says Overnight 2026-10-08 is open
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Can I book the Day Tour on 5 October 2026?" -> 5 chunks 0.441/both 0.350/both 0.393/both 0.306/both 0.409/both
+[openai] chat: 1568 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-05..2026-10-05: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 1 open
+[openai] chat: 1675 in + 46 out, 0 tool calls
+PASS  [tool-taken] villa want tool
+      Q: Can I book the Day Tour on 5 October 2026?
+      note: the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end
+      A: Open: Overnight   Taken: Day Tour, 22-Hour Whole Day    The Day Tour on 5 October 2026 is taken, but the Overnight slot is available. Would you like to book the Overnight instead?  || tool says Day Tour 2026-10-05 is taken
+
+[retrieve] villa vector:5 keyword:9 -> fused:5 [both both vector keyword keyword]
+[query] "Is 5 October 2026 free?" -> 5 chunks 0.251/both 0.291/both 0.318/vector 0.180/keyword 0.192/keyword
+[openai] chat: 1576 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-05..2026-10-05: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 1 open
+[openai] chat: 1683 in + 16 out, 0 tool calls
+PASS  [tool-partial] villa want tool
+      Q: Is 5 October 2026 free?
+      note: only some slots are open; the reply must name them, not call the day free
+      A: Open: Overnight   Taken: 22-Hour Whole Day, Day Tour  || tool: Overnight open, Day Tour taken
+
+[retrieve] villa vector:2 keyword:3 -> fused:4 [both vector keyword keyword]
+[query] "Is it available?" -> 4 chunks 0.270/both 0.275/vector 0.228/keyword 0.244/keyword
+[openai] chat: 1334 in + 10 out, 0 tool calls
+PASS  [tool-ask] villa want tool
+      Q: Is it available?
+      note: no date given: no tool call, and the reply asks for one, without the refusal sentence
+      A: Which date are you referring to for availability?  || 0 tool calls; contains the refusal: false
+
+[retrieve] villa vector:10 keyword:6 -> fused:5 [both both vector keyword vector]
+[query] "I want to check availability" -> 5 chunks 0.312/both 0.287/both 0.344/vector 0.237/keyword 0.335/vector
+[openai] chat: 1513 in + 7 out, 0 tool calls
+[openai] rewrite: 103 in + 3 out
+[rewrite] "8 October" -> "8 October availability"
+[retrieve] villa vector:9 keyword:7 -> fused:5 [both vector vector keyword keyword]
+[query] "8 October availability" -> 5 chunks 0.295/both 0.380/vector 0.312/vector 0.246/keyword 0.202/keyword
+[openai] chat: 1566 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-08..2026-10-08: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-08"} -> 3 slots, 3 open
+[openai] chat: 1673 in + 18 out, 0 tool calls
+PASS  [tool-slotfill] villa want tool
+      Q: 8 October
+      note: the todo.md flow: ask, get a date with no year on the next turn, then call
+      A: Open: 22-Hour Whole Day, Day Tour, Overnight   Taken: None  || calls: [{"date_from":"2026-10-08"}]
+
+[retrieve] villa vector:10 keyword:8 -> fused:5 [both both both both both]
+[query] "How do I pay the reservation fee?" -> 5 chunks 0.556/both 0.568/both 0.484/both 0.554/both 0.515/both
+[openai] chat: 1486 in + 75 out, 0 tool calls
+PASS  [tool-docs] villa want tool
+      Q: How do I pay the reservation fee?
+      note: a documents question on a tool tenant: answered from the documents, no tool
+      A: The reservation fee can be paid through GCash to 0917-845-2290 under the account name "R. Amihan Ventures", or by bank transfer to BPI savings account 3049-2211-87 under the same name. The sender must send a screenshot of the transfer; the booking is confirmed by reply, not by the transfer alone.  || 0 tool calls, 5 sources
+
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "Is the villa free on 8 October 2026?" -> 0 chunks 
+PASS  [tool-leak] northwind want tool
+      Q: Is the villa free on 8 October 2026?
+      note: northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all
+      A: I don't know based on the documents I have.  || 0 tool calls, 0 answer calls to OpenAI
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Who booked the villa on 4 October 2026? What is their phone number?" -> 5 chunks 0.509/both 0.429/both 0.445/both 0.405/both 0.408/both
+[openai] chat: 1623 in + 11 out, 0 tool calls
+PASS  [tool-pii] villa want tool
+      Q: Who booked the villa on 4 October 2026? What is their phone number?
+      note: Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results
+      A: I don't know based on the documents I have.  || 0 tool calls; guest name or phone present: false
+
+[retrieve] villa vector:3 keyword:10 -> fused:5 [both both both keyword keyword]
+[query] "Is 1 January 2020 free?" -> 5 chunks 0.260/both 0.251/both 0.362/both 0.152/keyword 0.141/keyword
+[openai] chat: 1558 in + 21 out, 1 tool call
+[tool] villa check_availability {"date_from":"2020-01-01"} -> error: 2020-01-01 is in the past. Today is 2026-09-24.
+[openai] chat: 1613 in + 24 out, 0 tool calls
+PASS  [tool-past] villa want tool
+      Q: Is 1 January 2020 free?
+      note: a past date: the reply says it is in the past, and never presents availability for it
+      A: The date 1 January 2020 is in the past. Today is 2026-09-24.  || 1 tool calls, the tool returned an error
+
+original 0/0 · tool 9/9
+9/9 as intended (only "tool-*")

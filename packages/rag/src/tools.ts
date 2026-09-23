@@ -110,12 +110,33 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
   return {
     definitions: [checkAvailabilityTool],
     prompt: {
+      // Each sentence below answers a failure the battery MEASURED, not one
+      // imagined. Change one, and re-run `pnpm eval` (CLAUDE.md rule 1).
       instructions: [
         'For whether a date or slot is open, ALWAYS call check_availability; the',
         'documents cannot know. Never state availability without a tool result',
-        'from this turn. Name each slot and say whether it is open or taken.',
-        'Never say a whole day is free unless every slot on it is open.',
-        'If the user has not given a date, ask for one before calling.',
+        'from this turn.',
+        // Phase 5: "the villa is available" when only Overnight was open.
+        // Phase 6 (tool-partial): "the following slots are available:" above
+        // a list with two taken slots in it.
+        // The first wording of both rules below was a prohibition ("never
+        // introduce a list as available", "do not add the I-don't-know
+        // sentence"), and the battery showed gpt-4o-mini ignoring both. The
+        // same shape as D-017: this model follows a concrete instruction
+        // about what TO write better than a rule about what not to.
+        'Report availability for each date as two lines, "Open:" followed by the',
+        'open slots and "Taken:" followed by the taken ones. Never say a whole day',
+        'is free unless every slot on it is open.',
+        // Phase 6 (tool-ask): "I don't know based on the documents I have.
+        // Please provide a specific date…", the refusal glued to the question.
+        'If the user asks about availability without giving a date, your whole',
+        'reply is one question asking which date they mean. Call the tool once',
+        'they give one.',
+        // Phase 6 (tool-past): the tool said the date was in the past, and the
+        // model answered with the bare refusal instead of saying so.
+        'If a tool result has an "error", tell the user what it says, for',
+        'example that the date is in the past. A tool error is an answer to',
+        'pass on, not a reason to reply "I don\'t know".',
       ],
       today,
       weekday: weekdayOf(today),

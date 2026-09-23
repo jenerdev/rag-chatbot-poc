@@ -643,7 +643,22 @@ cases pass, isolation passes, and Northwind's prompt diff is empty.
 > - `tool-partial` was correct slot by slot, under the heading "the
 >   following slots are available:", which is followed by two taken slots.
 >
-> All three are wording, not wrong facts, and none of them is fixed yet. If
+> All three are wording, not wrong facts.
+>
+> **Fixed 2026-09-24, same session.** The three cases were tightened first,
+> so each of them *fails* on the wording found:
+>
+> | Run | Tool cases | Detail |
+> |---|---|---|
+> | Before the fix, tightened | 6/9 | the three failed, as intended |
+> | First wording: prohibitions | 7/9 | only `tool-past` fixed |
+> | Second wording: what to write | 9/9 | "Open: … / Taken: …" lines, and "a question asking which date" |
+>
+> Full battery afterwards: **18/19**, with the original ten the same verdict
+> by verdict. Northwind's prompt diff is empty. The fix was only ever in the
+> tools block; the grounding block was not touched. **New side effect:**
+> replies are now terse and form-like ("Open: … Taken: None"), and often
+> leave out the date. They are correct, but less natural. Not fixed. If
 `tool-open` or `tool-slotfill` fails because the model answered from
 `04-booking-and-payment.md`, fix the § 2.5 wording. That is the trap it
 describes, not a battery that is too strict.
