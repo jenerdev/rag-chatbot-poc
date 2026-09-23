@@ -3871,3 +3871,16 @@ data" and "chatbot can ask question" are both done.
 **Trap avoided:** leaving trap 6 as it was. It is true for Northwind and wrong
 for villa. A rule that is half right is the one most likely to be followed
 into a regression.
+
+## Phase 4's missing step, confirmed · 2026-09-24
+
+**What happened:** after the merge, the user cancelled booking #27 (the
+Overnight on 22 Oct from the Phase 4 walk) from the admin screen, on this
+repo's own `next dev` (:3000, PID 16536).
+
+**What it proves:** #27 is `status = 'cancelled'`, the row is kept and not
+deleted, and `check_availability` for 22–23 Oct returns **6 of 6 open**. The
+Overnight had made the 23rd's Day Tour and 22-Hour taken. The UI Cancel
+button → `DELETE /bookings/27` → `cancelBooking` → the exclusion constraint
+ignoring cancelled rows. That is the step the Phase 4 walk recorded as
+unconfirmed, now proven from the browser as well as by Phase 3's curl.

@@ -14,8 +14,8 @@
 > The eval gives 18/19 (`original 9/10 · tool 9/9`), bookings isolation 13/13,
 > verify 28/28, and tests 99. The decisions are D-032–D-037, plus a D-008
 > amendment, and the risks are R-14–R-18. Still open: § 8's turnover question
-> for the owners, and the UI cancel from the Phase 4 walk, which was never
-> confirmed.
+> for the owners. The Phase 4 UI cancel is **now confirmed**: booking #27 was
+> cancelled from the admin screen, and 22–23 Oct went back to all open.
 
 ---
 

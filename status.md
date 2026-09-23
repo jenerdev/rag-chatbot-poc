@@ -105,9 +105,9 @@ items are done.
 
 **▶ Next, your call:**
 1. **Merge `feat/bookings` into `master`** (a fast-forward, like tenancy).
-2. **Two loose ends:** ask the Villa owners § 8's turnover-gap question, and
-   decide on booking #27 (Overnight 22 Oct, from the Phase 4 walk; still
-   `confirmed`).
+2. **One loose end:** ask the Villa owners § 8's turnover-gap question.
+   Booking #27 has been cancelled, which is also the UI cancel from the
+   Phase 4 walk, now confirmed.
 3. **Pick the next plan:** a `request_booking` tool (guests book in chat,
    `plan/bookings.md` § 7, which needs auth and rate limiting first),
    Messenger, recording unanswered questions, or real auth + RLS.
@@ -630,6 +630,16 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (after the merge)
+- **Did:** fast-forwarded `master` to `23a84cd` (11 commits) and deleted
+  `feat/bookings`. On master: typecheck 11/11, tests 99, verify OK. The user
+  then cancelled booking #27 from the admin screen, with this repo's
+  `next dev` on :3000.
+- **Observed:** #27 is `cancelled`. `check_availability` for 2026-10-22..23
+  is 6 of 6 open.
+- **So:** the Phase 4 walk's step 4 (cancel in the UI frees the slot) is
+  confirmed, not just the route.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 8, the record)
 - **Did:**
