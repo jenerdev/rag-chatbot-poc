@@ -353,6 +353,25 @@ Reading the operators:
 - `min_similarity` is the "do I actually know this?" gate. Below it the system
   refuses to answer rather than guessing — see § 6.
 
+### Bookings: four more tables (bookings Phase 1, `schema-bookings.sql`)
+
+Only tenants with the **bookings** application use these (D-033). Today that
+is villa. Each one carries `tenant_id`, and each child points at its parent
+with a composite FK, the same pattern as `chunks → documents`.
+
+| Table | What a row is | The part that matters |
+|---|---|---|
+| `tenant_applications` | "this tenant has this application" | primary key `(tenant_id, application_key)`. A row means on. `config.timezone` is required and validated by a trigger (`22023` for an unknown name) |
+| `units` | a thing that can be booked | villa has one, `Whole property`. A hotel would have one per room |
+| `slots` | a named time window | `start_time` (wall clock, tenant's timezone) and `duration`, which may cross midnight. Villa: Day Tour 08:00+9h, Overnight 14:00+22h, 22-Hour Whole Day 08:00+22h |
+| `bookings` | one booking, with guest data | `during tstzrange '[)'` is set by the `bookings_compute_during` trigger, never by the client. `bookings_no_overlap` excludes two live bookings of one unit whose `during` overlaps (`23P01`). Cancelled rows free their span |
+
+`check_availability(p_tenant_id, p_from, p_to)` returns one row per (date, unit,
+slot) as `open` or `taken`, using the same `&&` test as the constraint, and **no
+guest data**: whatever it returns reaches a prompt (D-037). Like
+`match_chunks`, `p_tenant_id` has no default. The details and the measured
+ranges are in D-034.
+
 ---
 
 ## 5. API surface
@@ -368,7 +387,7 @@ named "<slug>"`.
 | `GET` | `/` | — | a static page; no tenant list, no redirect | public |
 | `GET` | `/t/<slug>` | — | S-1 chat | public |
 | `GET` | `/t/<slug>/admin` | — | S-2 knowledge base; a login form until a session exists | public page, admin data |
-| `POST` | `/api/t/<slug>/chat` | `{ conversationId?, message }` | `{ conversationId, reply, sources[], searchQuery }`, or SSE with `Accept: text/event-stream` | **open** |
+| `POST` | `/api/t/<slug>/chat` | `{ conversationId?, message }` | `{ conversationId, reply, sources[], searchQuery, toolCalls[] }`, or SSE (`meta`, `tool`, `delta`, `done`, `error`) with `Accept: text/event-stream` | **open** |
 | `GET` | `/api/t/<slug>/conversations/:id/messages` | — | `[{ role, content, created_at }]`, or 404 if not this tenant's | **open** |
 | `POST` | `/api/t/<slug>/admin/session` | `{ key }` | `{ admin: true }` and the session cookie | open (it is the login) |
 | `GET` | `/api/t/<slug>/admin/session` | — | `{ admin: boolean }` | open |
@@ -377,12 +396,24 @@ named "<slug>"`.
 | `GET` | `/api/t/<slug>/documents` | — | `[{ id, title, source, chunkCount, created_at }]` | **admin** |
 | `DELETE` | `/api/t/<slug>/documents/:id` | — | `{ deleted: true }` (chunks cascade) | **admin** |
 | `GET` | `/api/t/<slug>/documents/:id/chunks` | — | `[{ id, chunk_index, content }]` | **admin** |
+| `GET` | `/t/<slug>/admin/bookings` | — | S-3 bookings; 404 without the application | public page, admin data |
+| `GET` | `/api/t/<slug>/bookings/setup` | — | `{ timezone, today, units[], slots[] }` | **admin** + app |
+| `GET` | `/api/t/<slug>/bookings/availability` | `?from=YYYY-MM-DD&to=` (≤ 31 days) | `[{ date, unit, slot, status }]` | **admin** + app |
+| `GET` | `/api/t/<slug>/bookings` | `?from=&to=` (≤ 92 days) | `[{ id, date, unit, slot, status, guestName, … }]` | **admin** + app |
+| `POST` | `/api/t/<slug>/bookings` | `{ unitId, slotId, date, guestName, guestPhone?, guestCount?, notes? }` | the booking, `201`. `409` if the span is taken | **admin** + app |
+| `DELETE` | `/api/t/<slug>/bookings/:id` | — | `{ cancelled: true }`; the row stays, as `cancelled` | **admin** + app |
 
 **Admin** means `requireAdmin()` in `apps/web/lib/admin-auth.ts`: the request
 must carry this tenant's session cookie. That is an HMAC-signed
 `<slug>.<expiry>.<mac>`, httpOnly, SameSite=lax, with its path set to
 `/api/t/<slug>`. Without one, the route answers `401 Admin login required`
 (D-028). The chat stays open, because it is the product.
+
+**+ app** means `requireApplication(tenant, 'bookings')` as well, which is a
+`404` for a tenant without it. It runs after the admin check, so a stranger gets
+the same `401` whether or not the tenant has bookings. The error map passes
+`400`, `404` and `409` through for the app's own errors. An `OpenAIError`'s `400`
+or `404` is still a `500`, because it means this server sent the bad request.
 
 **Another tenant's id behaves exactly like a missing one.** A document id from
 another tenant gives `[]` for its chunks and `404` on delete. A conversation id
@@ -436,6 +467,18 @@ Three things worth understanding here:
 **Belt and braces:** when `match_chunks` returns nothing above the threshold, do
 not call OpenAI at all — return the "I don't know" string directly. It is faster,
 free, and removes any chance of the model ignoring its instructions.
+
+**With tools (bookings, 2026-09-24).** For a tenant that has tools, one more block
+is appended **after** `--- END CONTEXT ---`: "A tool result is context too, and
+every rule above applies to it", the availability rules, and today's date in
+the tenant's timezone (D-036). The model may then ask for a tool call. The
+pipeline runs it (`executeTool`), appends the request and the result as an
+`assistant` message with `tool_calls` and a `tool` message, and asks again, up
+to `MAX_TOOL_ROUNDS` (2). The result is pasted in as text, exactly like the
+chunks: the model never touches the database. The belt-and-braces rule becomes
+D-035. With zero chunks, the reply is kept only if a tool was called.
+Otherwise it is the refusal. A tenant without tools still never reaches
+OpenAI.
 
 ---
 

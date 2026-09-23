@@ -4,6 +4,9 @@
 > Turborepo monorepo, 2026-09-22 — see [`plan/steps.md`](./plan/steps.md).
 > **Multi-tenant** since 2026-09-23: one deployment, many businesses, each with
 > its own documents, name, assistant and look — see [`plan.md`](./plan.md).
+> **Bookings and the first chatbot tool** since 2026-09-24: `villa` has a staff
+> booking screen, and the bot checks live availability instead of guessing
+> from a document — see [`plan/bookings.md`](./plan/bookings.md).
 > **Type:** Learning project · **Builder:** Solo
 > **Findings:** [`notes.md`](./notes.md) · **Build log:** [`whats-done.md`](./whats-done.md)
 
@@ -53,7 +56,7 @@ Fill in `.env`:
 | `SUPABASE_SERVICE_ROLE_KEY` | same page — the **`service_role`** key, not `anon` |
 | `ADMIN_COOKIE_SECRET` | 32+ random characters that sign admin sessions: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. Changing it logs every admin out |
 
-### 2. Create the schema — three files, in order
+### 2. Create the schema — four files, in order
 
 Paste each into the Supabase SQL editor and run it, one after the other:
 
@@ -66,9 +69,15 @@ Paste each into the Supabase SQL editor and run it, one after the other:
    `tenants` table (so **five tables** in all), `tenant_id` on the other four,
    the composite foreign keys, and tenant-scoped versions of both search
    functions. It also seeds one tenant, `northwind`, with no admin key yet.
+4. [`schema-bookings.sql`](./packages/db/sql/schema-bookings.sql) — the
+   bookings application: `tenant_applications`, `units`, `slots`, `bookings`
+   (so **nine tables**), the no-overlap constraint and `check_availability`.
+   Needs `btree_gist`, which it enables. If a `villa` tenant exists, it seeds
+   villa's unit and three slots, so run it **after** step 3 of the next
+   section, or run it again once villa exists. It is idempotent.
 
 Run them once, in that order, on a fresh project. **Re-running is only safe for
-`schema-tenancy.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
+`schema-tenancy.sql`, `schema-bookings.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
 `create table`, so a second run fails. More importantly, re-running
 `schema.sql` or `schema-hybrid.sql` on a database that already has tenancy
 quietly recreates the old **unscoped** `match_chunks` / `match_chunks_fts`,
@@ -80,7 +89,7 @@ Verify:
 ```sql
 select * from pg_extension where extname = 'vector';          -- one row
 select tablename, rowsecurity from pg_tables
-  where schemaname = 'public';                                -- five rows, all true
+  where schemaname = 'public';                                -- nine rows, all true
 select slug from tenants;                                     -- northwind
 ```
 
@@ -124,7 +133,8 @@ pnpm build      # then: pnpm --filter web start
 | Page | What to do |
 |---|---|
 | `/t/<slug>/admin` | Log in with that tenant's admin key. Paste a document, watch the live chunk estimate, then add it. |
-| `/t/<slug>` | Ask a question. Expand the sources under the answer. |
+| `/t/<slug>` | Ask a question. Expand the sources under the answer. On villa, ask "is 8 October free?": a **Checked availability** box shows what the tool said. |
+| `/t/<slug>/admin/bookings` | Staff bookings, for a tenant with the bookings application (villa). 404 otherwise. |
 | `/` | A static page. It does not list tenants or redirect to one — each tenant is reached by its own address. |
 
 An unknown slug is a 404 ("No such workspace").

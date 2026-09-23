@@ -14,6 +14,12 @@
 > all done): one database, many businesses, each at `/t/<slug>` with its own
 > documents, assistant name, theme and admin key. Read `plan.md` § 0 before
 > touching any query.
+>
+> **It has applications** since 2026-09-24 ([`plan/bookings.md`](./plan/bookings.md),
+> Phases 0–8, all done): `villa` has **bookings**, a staff screen at
+> `/t/<slug>/admin/bookings`, and the chatbot's first tool,
+> `check_availability`. Read that plan's § 0 before touching the prompt or a
+> tool.
 
 ## What this is
 
@@ -27,6 +33,7 @@ answer was built from.
 resolve tenant → (every step below is scoped to it)
 paste document → chunk → embed → store in pgvector
 ask question   → rewrite → embed → vector + keyword search → fuse → prompt → stream
+                                                     tools? → model asks → run for THIS tenant → ask again
 ```
 
 ## The thing to understand before changing anything
@@ -78,7 +85,8 @@ packages/
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
-plan/                    the migration plan and its evidence; plan.md is tenancy
+plan/                    the migration plan and its evidence; plan.md is tenancy; plan/bookings.md is bookings
+fixtures/villa-bookings.json  the battery's booking fixture, seeded and removed by pnpm eval
 ```
 
 ## Commands
@@ -136,7 +144,19 @@ pnpm --filter @rag/db tenant:key -- <slug>                              # new ke
    *writes*; nothing but your filter stops a cross-tenant *read*. After any
    change to a query, run `pnpm --filter @rag/pipeline isolation` and
    `pnpm eval` — the `leak-*` cases must stay green — and re-run plan.md
-   Phase 3's grep: every line it prints must carry a tenant.
+   Phase 3's grep: every line it prints must carry a tenant. The same applies
+   to `tenant_applications`, `units`, `slots` and `bookings`
+   (`pnpm --filter @rag/bookings isolation`, 13 checks). **The model never
+   supplies a tenant.** No tool's argument schema has a tenant, unit or
+   booking id; the executor takes `tenant` from the server (plan/bookings.md
+   Rule 2).
+7. **A tool result carries nothing the chat user may not see.** It goes into a
+   prompt, and a prompt-injected model can recite it. `check_availability`
+   returns `date, unit, slot, status` and nothing else, and rows are mapped
+   field by field, never spread. Chatbot tools are **read-only**: the chat
+   route is open, so a write tool is an unauthenticated write (D-037). A
+   tool's result is shown to the user as "Checked availability", open,
+   because it is what the answer was built from.
 
 ## Traps that will actually cost you time
 
@@ -158,19 +178,36 @@ All are expanded in `risks.md`.
    row is inserted, delete that row in the `catch`, or you get a document with
    zero chunks that can never be retrieved (R-7).
 6. **Short-circuit the empty retrieval.** When nothing clears the threshold,
-   return the refusal string directly — do not call OpenAI (D-008).
+   return the refusal string directly — do not call OpenAI (D-008). For a
+   tenant **with tools** the model is called anyway, and its reply is kept
+   only if it called a tool; otherwise it becomes the refusal (D-035). The
+   text is held, not streamed, until that is decided.
 7. **Changing the chunker does not re-chunk stored documents.** Delete and
    re-add them, or they keep their old boundaries.
+8. **"Check, then insert" double-books.** Never read availability and then
+   insert. Insert, and let `bookings_no_overlap` refuse the loser with
+   `23P01`, which `@rag/bookings` maps to a 409 (D-034).
+9. **"Today" is the tenant's, not the server's.** At 01:04 SGT the UTC date was
+   still yesterday. `localDate(timezone)` for dates; `slot_range()` in SQL for
+   turning wall-clock time into instants. The model has no clock, so the tools
+   block states today's date.
+10. **A tools-block sentence can cost a documents answer.** "Start with a
+    sentence that names the date" passed every tool case and made a Wi-Fi
+    question refuse 2 runs in 3. Run the full battery, not `--only`, and when a
+    verdict flips, repeat that case before deciding why (R-18).
 
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.
 - Tunable constants in `packages/rag/src/constants.ts`, SCREAMING_SNAKE_CASE.
+  Booking limits live in `packages/bookings/src/constants.ts`, beside the code
+  that enforces them.
 - Validate at the route boundary, throw in the pipeline, map errors to status
   codes in exactly one place (`apps/web/lib/route.ts`).
 - Every Route Handler lives under `app/api/t/[tenant]/` and is wrapped in
   `withTenantRoute()` (which wraps `withRoute()`). Admin-only handlers call
-  `requireAdmin(request, tenant)` first. The chat route stays open.
+  `requireAdmin(request, tenant)` first, then `requireApplication()` if the
+  route belongs to an application. The chat route stays open.
 - Every tenant-owned query carries `.eq('tenant_id', tenant.id)` — rule 6.
   "Not yours" and "not there" must look identical (`[]`, `null`, 404), or ids
   can be enumerated across tenants.
@@ -185,7 +222,8 @@ All are expanded in `risks.md`.
   same rule: theme colours reach the page as CSS custom properties through the
   `style` prop, from the allowlist in `lib/branding.ts` (D-030).
 - `console.log` in the pipeline is deliberate: `[ingest]`, `[retrieve]`,
-  `[query]` and `[openai]` are how you see chunks, scores and cost. Leave them.
+  `[query]`, `[openai]`, `[tool]` and `[bookings]` are how you see chunks,
+  scores, cost and what a tool said. Leave them.
 
 ## Keeping the record
 

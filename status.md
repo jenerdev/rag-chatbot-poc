@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-24
+> Last updated: 2026-09-24 (bookings complete)
 
 ---
 
@@ -30,10 +30,12 @@
   theme and admin key. Measured on the final code: eval 9/10 (the known
   `antecedent` model limit), isolation 11/11, verify 14/14, and tests 41 + 13.
   Both tenants were also walked by hand in the browser.
-- **Working on right now:** the **bookings plan**,
-  [`plan/bookings.md`](./plan/bookings.md) (Phases 0–8, written 2026-09-24).
-  It adds a booking manager for staff and the first chatbot tool,
-  `check_availability`. Nothing from it is built yet. **Real auth + RLS still
+- **Working on right now:** nothing. **Bookings is complete**
+  ([`plan/bookings.md`](./plan/bookings.md), Phases 0–8, 2026-09-24, on
+  `feat/bookings`, not merged yet). villa has a staff booking screen and the
+  chatbot's first tool, `check_availability`. On the final code: eval 18/19
+  (`original 9/10 · tool 9/9`), isolation 11/11, bookings isolation 13/13,
+  verify 28/28, and tests 99 (13 + 27 + 14 + 45). **Real auth + RLS still
   comes before any public URL** (R-2, R-11, R-13).
 
 ---
@@ -95,12 +97,20 @@ availability" box with open/taken chips. The user walked it, and the server log
 confirms the slot-filling flow, the 23 Oct taken Day Tour, a documents answer
 with no tool, and Northwind's free refusal.
 
-**▶ Bookings Phase 8: the record.** [`plan/bookings.md`](./plan/bookings.md)
-§ 3:
-- `CLAUDE.md` (rules 6 and 7, the traps);
-- `decisions.md` D-032–D-037, plus the D-008 amendment;
-- `risks.md` R-14–R-18;
-- `architecture.md` § 4, `flow.md`, `notes.md`, `README.md`, `todo.md`.
+~~**Bookings Phase 8: the record.**~~ **Done 2026-09-24.** CLAUDE.md
+(rules 6–7, traps 8–10), decisions D-032–D-037 plus the D-008 amendment, risks
+R-14–R-18, architecture, flow, notes and README. `todo.md` was left alone,
+because it holds your uncommitted edits. Its tool-call and ask-a-question
+items are done.
+
+**▶ Next, your call:**
+1. **Merge `feat/bookings` into `master`** (a fast-forward, like tenancy).
+2. **Two loose ends:** ask the Villa owners § 8's turnover-gap question, and
+   decide on booking #27 (Overnight 22 Oct, from the Phase 4 walk; still
+   `confirmed`).
+3. **Pick the next plan:** a `request_booking` tool (guests book in chat,
+   `plan/bookings.md` § 7, which needs auth and rate limiting first),
+   Messenger, recording unanswered questions, or real auth + RLS.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -620,6 +630,21 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 8, the record)
+- **Did:**
+  - `CLAUDE.md`: the header, the flow line, rule 6 extended, a new rule 7,
+    trap 6 amended, new traps 8–10, the conventions and layout.
+  - `decisions.md`: D-032–D-037, and D-008 amended.
+  - `risks.md`: R-14–R-18, and the "still missing" list.
+  - `architecture.md` § 4–6, `flow.md` (the diagram and step 11a),
+    `notes.md` (the bookings section), `README.md`.
+- **Observed**, for `notes.md`: the same villa question with the same 5
+  chunks, tools off → on: 1,260 → 1,682 and 1,279 → 1,701 input tokens, so
+  **+422 per answer call**.
+- **Not done:** `todo.md` (your edits are in it). Tool-call latency (not
+  measured, and said so).
+- **Next:** merge, the two loose ends, then choose the next plan.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 7)
 - **Did:**

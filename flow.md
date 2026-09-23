@@ -158,16 +158,23 @@ sequenceDiagram
     end
 
     R-->>A: event: meta — sources appear NOW, before any answer
-    alt nothing cleared MIN_SIMILARITY
+    alt no tools, and nothing cleared MIN_SIMILARITY
         R-->>A: event: delta — "I don't know based on the documents I have."
         Note over R,O: OpenAI is never called. Faster, free, unignorable.
-    else chunks retrieved
-        R->>O: POST /v1/chat/completions (stream: true)<br/>system rules + chunks + history + ORIGINAL question
+    else chunks retrieved, or the tenant has tools
+        R->>O: POST /v1/chat/completions (stream: true)<br/>system rules + chunks + history + ORIGINAL question<br/>+ tools, only if the tenant has any
+        opt the model asks for a tool (at most MAX_TOOL_ROUNDS)
+            O-->>R: tool_calls, streamed in fragments per index
+            R->>P: executeTool → checkAvailability → rpc check_availability(p_tenant_id)
+            R-->>A: event: tool — the call and its open/taken rows
+            R->>O: ask again, with the tool result as a message
+        end
         loop each fragment
             O-->>R: delta
-            R-->>A: event: delta
+            R-->>A: event: delta (HELD instead if there were zero chunks)
             A->>A: append to the answer (React escapes it)
         end
+        Note over R: zero chunks and no tool call → the reply is replaced by the refusal (D-035)
     end
     R->>P: INSERT user + assistant messages
     R-->>A: event: done
@@ -210,10 +217,18 @@ sequenceDiagram
 10. **`meta` is sent.** The sources panel appears here, **before the model has
    written anything.** You can read what it was given while it decides what to
    make of it.
-11. **Either** nothing cleared the threshold — the refusal is returned and
-    **OpenAI is never called** (D-008) — **or** the prompt is assembled and
-    streamed. Note the prompt carries your *original* words, not the rewrite;
-    an answer addressing a silently reworded question reads wrong.
+11. **Either** the tenant has no tools and nothing cleared the threshold, so
+    the refusal is returned and **OpenAI is never called** (D-008). **Or** the
+    prompt is assembled and streamed. Note the prompt carries your *original*
+    words, not the rewrite; an answer addressing a silently reworded question
+    reads wrong.
+11a. **If the tenant has tools** (villa has `check_availability`), the model
+    may ask for a call instead of answering. The pipeline runs it for **this
+    tenant**. The model never names a tenant, because the tool's schema has
+    nowhere to put one. It sends a `tool` event, so "Checked availability"
+    appears on screen, and asks the model again with the result. With zero
+    chunks, the reply is kept only if a tool was called, and it is held back
+    rather than streamed until that is known (D-035).
 12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 

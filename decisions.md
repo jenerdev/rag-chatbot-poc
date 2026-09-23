@@ -190,6 +190,18 @@ ignoring the refusal instruction.
 real similarity scores on real questions and tune it. Too high and it refuses
 things it knows; too low and it hallucinates from noise.
 
+**Amended 2026-09-24 by D-035 (bookings Phase 6).** For a tenant with **no
+tools**, nothing changed: zero chunks still means the refusal, with no OpenAI
+call. `tool-leak` measured 0 answer calls for Northwind. For a tenant **with
+tools**, the short circuit would have made the tool unreachable, because "is
+the 12th free?" can match no document. So the model IS called with zero
+chunks, and its reply is accepted only if it called a tool on that turn.
+Otherwise the reply is replaced with the refusal. The guarantee D-008 exists
+for (never an answer from training data when nothing was retrieved) still
+holds. What is lost, for tool tenants only, is "free": a zero-match question
+cost 485 in + 11 out, measured on "What is the capital of France?" asked of
+villa.
+
 ---
 
 ## D-009 · Express 4, not Express 5 · **SUPERSEDED 2026-09-22 by D-021**
@@ -1082,6 +1094,189 @@ chunks and `404` on delete; the parking question is refused. Phase 5 deletes
 route now lives under `app/api/t/[tenant]/` behind `withTenantRoute()`. The old
 paths return `404`: `POST /api/chat` and `GET /api/documents` were both
 observed as 404. Nothing of D-031 remains.
+
+---
+
+## D-032 · Booking logic in `@rag/bookings`, HTTP in `apps/web`, and the tool calls the package directly · **Added 2026-09-24 (bookings Phases 2–3)**
+
+**Decision:** availability and bookings live in a server-only package,
+`@rag/bookings` (depends on `@rag/db` only). The admin Route Handlers and the
+chatbot's tool executor are its two callers, and both call the same functions
+in process. The chatbot never makes an HTTP request to this app's own `/api`.
+
+**Why:** two callers, one function. One place validates a date, one place maps
+`23P01` to 409, and one result type (`SlotAvailability`) has no guest fields.
+An HTTP hop from the pipeline to the app would add latency, an auth problem
+(the chat route has no admin session) and a loss of types, for nothing.
+
+**Consequences:** validation lives in the package, not only at the route,
+because the tool executor has no zod schema in front of it. The package takes
+`BookingTenant { id, slug }` rather than pipeline's `TenantContext`, because
+the dependency points pipeline → bookings → db. `TenantContext` satisfies it
+structurally.
+
+**Reverse if:** bookings becomes its own deployed service. Then this package
+becomes that service's client, and the rule "one function, two callers" moves
+with it.
+
+---
+
+## D-033 · Applications are a registry in code; `tenant_applications` only switches them on · **Added 2026-09-24 (bookings Phases 1, 3)**
+
+**Decision:** `APPLICATIONS` in `packages/rag/src/applications.ts` names each
+application and its tools. `tenant_applications (tenant_id, application_key,
+config)` says which tenant has which. Having a row means "on". There is no
+`enabled` column. A `check` constraint lists the same keys as the registry, and
+`enabledApplications()` also drops any key the registry does not know.
+
+**Why:** an application is code (tables, a package, tool definitions, an
+executor), and a row cannot create one. A boolean would give three states
+(no row, false, true) where two are needed, and one more thing every query
+must filter on.
+
+**Where it is enforced, four times:**
+- the page: `notFound()`;
+- the routes: `requireApplication()`, a 404, after `requireAdmin()` so a
+  stranger always gets 401;
+- the tool executor: it re-checks enablement at call time, whatever the model
+  was offered;
+- the database: the `bookings_compute_during` trigger refuses a booking for a
+  tenant without the application (`23503 Tenant 21 does not have the bookings
+  application`).
+
+**Reverse if:** a tenant needs two instances of one application. The primary
+key allows one per tenant, which is enough until a real tenant needs more.
+
+---
+
+## D-034 · A booking is a time range under an exclusion constraint, computed in SQL from the tenant's timezone · **Added 2026-09-24 (bookings Phase 1)**
+
+**Decision:** `bookings.during` is a half-open `tstzrange`, computed by a
+`before insert or update` trigger from the slot's `start_time` and `duration`
+and the tenant's `config.timezone`. It overwrites anything the insert supplied.
+`bookings_no_overlap exclude using gist (unit_id with =, during with &&) where
+(status <> 'cancelled')` makes two live bookings of one unit overlap-proof.
+`check_availability()` applies the same `&&` test.
+
+**Why:** Villa sells the whole property in three slots, two of which cross
+midnight. "Only one slot is sold per day" and "an Overnight blocks the next
+morning's Day Tour" follow from range overlap with no rule written in code, and
+the same model covers a hotel (one unit per room). The constraint, not timing,
+prevents double-booking: a "check, then insert" in code double-books when two
+requests race. The trigger rather than the planned `create_booking()` RPC,
+because every insert path then gets the same range. The conversion is done in
+Postgres, which has the IANA database, not with `Intl` in JavaScript.
+
+**Measured:** Overnight 2026-10-01 in Manila is `["2026-10-01
+06:00:00+00","2026-10-02 04:00:00+00")`. A supplied `during` of 2000-01-01 was
+overwritten. The overlap fails with `23P01`. Back-to-back slots (17:00 end,
+17:00 start) are both accepted. `check_availability` marked Overnight on 2 Oct
+taken because it starts inside that day's Day Tour, which is the case my own
+expectation had got wrong.
+
+**What it costs:** changing a tenant's timezone does not move existing
+bookings. That is deliberate: they keep the instants the guests were told. A
+turnover gap between bookings (the owners' open question) is not modelled yet.
+
+**Reverse if:** availability needs capacity rather than exclusivity ("3 of 5
+Deluxe rooms left"). Add a `unit_type`, keep one `unit` per room, and the
+constraint still holds per unit.
+
+---
+
+## D-035 · Zero chunks: accept the model's reply only if it called a tool this turn · **Added 2026-09-24 (bookings Phase 6). Amends D-008**
+
+**Decision:** for a tenant with tools, the model is called even when retrieval
+returns nothing. `acceptReply()` then replaces its text with `NO_ANSWER` unless
+a tool was called on that turn. While streaming, that text is **held** by
+`chatStream(…, { holdContent })` until the decision is made, because text
+already on screen cannot be replaced. For a tenant without tools, D-008 is
+unchanged.
+
+**Why:** D-008's short circuit would have made the tool unreachable. It also
+could not simply be removed, because that brings back the model answering from
+training data with nothing retrieved. With this rule, the only possible
+outputs at zero chunks are the refusal and an answer built from a tool result.
+
+**Measured:** `tool-leak`, Northwind with no tools, made 0 answer calls.
+"What is the capital of France?" asked of villa made one call, and the reply
+was held, replaced, and sent as 1 delta, at 485 in + 11 out.
+
+**Reverse if:** a cheap pre-classifier ("is this an availability question?")
+proves more reliable than letting the main model decide. Then zero chunks and
+"not availability" can short-circuit for free again.
+
+---
+
+## D-036 · The tools block goes after the context, only when there are tools, and every sentence in it is measured · **Added 2026-09-24 (bookings Phase 6)**
+
+**Decision:** `buildPrompt(…, tools)` appends one block after `--- END CONTEXT
+---`: "A tool result is context too, and every rule above applies to it", the
+availability rules from `tools.ts`, and "Today is <date> (<weekday>),
+<timezone>". The grounding block (D-017) and the persona line (D-029) are
+untouched. With no tools, the output is byte-identical to before.
+`prompt-snapshot` diffed against `plan/baseline/northwind-prompt-pre-bookings.txt`
+is the check.
+
+**Why after, and why "context too":** D-017's rules (connect, never add, say
+what is missing) then apply to a tool result without being restated. Today's
+date is there because the model has no clock. "8 October", with no year,
+resolved to `2026-10-08` because of it.
+
+**Every sentence answers a measured failure. The wording history, all on
+gpt-4o-mini:**
+
+| Wording | Tool cases | What it showed |
+|---|---|---|
+| First block | 9/9 | the checks were too loose to fail |
+| Checks tightened | 6/9 | three wording faults caught |
+| Prohibitions ("never…", "do not…") | 7/9 | only the tool-error sentence worked |
+| What to write instead | 9/9 | the Open/Taken lines and one date question |
+
+After that, the "name the date" check made it 6/9 again. An unscoped "start
+with a sentence that names the date" was 9/9 on the tool cases, and cost
+`leak-2`'s villa control, 1 run in 3. Scoped to "when you answer about
+availability" it was 3 in 3, and the full battery is **18/19**, with the
+original ten identical to the pre-bookings baseline.
+
+**The lesson that generalises D-017:** this model follows a concrete
+instruction about what to write, and loses a prohibition to a familiar
+phrase. And an instruction written for one kind of answer must say so, or it
+lands on every answer.
+
+**What it costs:** 422 input tokens per answer call on a tool tenant (the same
+villa question with the same 5 chunks: 1,260 → 1,682). Every edit re-opens
+R-14 and R-18.
+
+---
+
+## D-037 · Chatbot tools are read-only, results carry no PII, and every call is shown · **Added 2026-09-24 (bookings Phases 1, 6, 7)**
+
+**Decision:** the only tool is `check_availability`. Its result is
+`SlotAvailability { date, unit, slot, status }`, a type with no guest field.
+The SQL function selects none, and the package maps rows field by field
+rather than spreading them. The tool's schema has no tenant, unit or booking
+id; the executor takes `tenant` from the server. Every call is sent to the
+browser as a `tool` SSE event and shown, open, as "Checked availability"
+above the sources (D-012 extended).
+
+**Why:** the chat route is open, so a write tool would be an unauthenticated
+write through the model. Anything a tool returns goes into a prompt, and a
+prompt-injected model can recite it. So PII is kept out of the result, not
+out of the model's behaviour. Showing the call makes a wrong date, or an
+answer that disagrees with its tool result, visible on screen.
+
+**Measured:** `tool-pii` ("Who booked … What is their phone number?"):
+neither the fixture's name nor its phone appeared in the reply or the tool
+results. `check_availability` keys are `booked_date,slot,status,unit`. The
+wire payload of the `tool` event has no guest field. The browser bundle grep
+for `guest_phone` returns 0.
+
+**Reverse if:** guests are allowed to request a booking in chat. That is a
+`request_booking` tool creating `pending` rows only, after an explicit
+confirmation turn, with rate limiting and a guest identity step, and it
+belongs in its own plan (`plan/bookings.md` § 7). It needs R-2 taken
+seriously first.
 
 ---
 

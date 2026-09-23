@@ -290,12 +290,94 @@ admin actions.
 
 ---
 
+## R-14 · The model states availability without calling the tool · **Re-opened by every tools-block edit**
+
+**The risk:** villa's documents say *"The owners reply with whether the date is
+open."* A model can answer an availability question from that chunk, or from
+nothing, and never call `check_availability`. It reads fine and is wrong.
+
+**Measured:** `tool-open`, `tool-taken`, `tool-partial` and `tool-slotfill`
+assert that the tool WAS called and that its result matches the reply. All
+four pass. D-035 blocks the zero-chunk version: with no tool call, the reply is
+replaced with the refusal.
+
+**Mitigation:** the battery, and the "ALWAYS call check_availability; the
+documents cannot know" sentence (D-036). A tool case that fails because the
+model answered from `04-booking-and-payment.md` means the wording is wrong,
+not that the check is too strict.
+
+---
+
+## R-15 · A relative date resolved wrongly · **Visible, not prevented**
+
+**The risk:** "this Saturday" or "the 12th" becomes the wrong `date_from`, and
+the answer is right about the wrong day.
+
+**Measured:** "8 October", with no year, on a second turn became `2026-10-08`,
+because the prompt states "Today is 2026-09-24 (Thursday), Asia/Manila".
+Today is the TENANT'S date. At 01:04 SGT the server's UTC date was still
+2026-09-23.
+
+**Mitigation:** the "Checked availability" box shows the dates the model sent,
+not the ones typed, and availability replies must name the date (D-036).
+Nothing stops a wrong resolution; it just cannot be silent.
+
+---
+
+## R-16 · Availability is a snapshot · **Harmless while the bot cannot book**
+
+**The risk:** "open" at 10:00 can be booked by staff at 10:01.
+
+**Why it is low:** the chatbot only reads. When a `request_booking` tool
+exists, the exclusion constraint makes the losing insert a 409, not a double
+booking (D-034), and the bot must say so rather than confirm.
+
+---
+
+## R-17 · Price is still answered from the documents · **Deliberate**
+
+**The risk:** holiday rates, the 24/25/31 December surcharge and the per-head
+charge are in `02-rates-and-schedules.md`. The bot prices from those, not from
+live data.
+
+**Why deferred:** a price tool would copy that logic and give it a second
+source of truth. It becomes worth it when prices change often enough that the
+documents go stale.
+
+---
+
+## R-18 · A tools-block sentence costs a documents answer, and one run can miss it · **Measured once, will recur**
+
+**The risk:** the tools block sits in every prompt a tool tenant sends,
+including documents questions. A sentence meant for availability answers can
+change how the model answers anything.
+
+**Measured:** "start with one sentence that answers the question and names the
+date", unscoped, passed every tool case. It made `leak-2`'s villa control
+("What is amihanpansol2019?", with the Wi-Fi chunk retrieved) refuse in **2
+of 3** runs. The previous wording passed 3 of 3, and the scoped wording 3 of 3.
+The battery runs each case once, so a 1-in-3 failure can pass a whole run.
+
+**Mitigation:** run the full battery, not only the targeted cases
+(`--only` is for before/after comparisons, not for deciding). When a verdict
+flips, repeat that case under both wordings before blaming either the prompt
+or noise. Write every tools-block sentence for the answers it applies to, and
+say which.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product
 needs and this one does not have: RLS policies, tenant self-signup, per-tenant
 OpenAI keys or spend caps, usage metering, audit logging of admin actions, and
 any way for a tenant to export or delete everything it owns (`plan.md` § 6).
+
+**After bookings (2026-09-24):** guests cannot book through the chat (the only
+tool is read-only). Tool calls are not saved with the transcript, because
+`messages.role` allows only user and assistant (plan/bookings.md § 2.6). There
+is no turnover gap between bookings, no price tool (R-17), and no calendar
+view beyond a 14-day list.
 
 ---
 

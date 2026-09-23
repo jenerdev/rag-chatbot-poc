@@ -757,6 +757,61 @@ refusal is the tenant filter inside `match_chunks_fts` at work.
 
 ---
 
+## Bookings Phase 6: the first tool, measured (2026-09-24)
+
+**The change:** villa gets one tool, `check_availability`, and a tools block
+after the context (D-036). Northwind gets nothing, and its prompt is
+byte-identical to `plan/baseline/northwind-prompt-pre-bookings.txt`.
+
+**The battery, 19 cases:**
+
+| Part | Result | Notes |
+|---|---|---|
+| The original ten | 9/10, identical verdict by verdict to `eval-pre-bookings.txt` | `antecedent` is still the D-017 limit |
+| Tool cases | 9/9 | open, taken, partly open, no date, slot-filling, a docs question, Northwind, PII, a past date |
+
+The fixture is one Overnight at +10 days, seeded and hard-deleted by the
+battery itself.
+
+**What the wording taught** (tool cases only, gpt-4o-mini):
+
+| Wording | Tool cases | Example reply |
+|---|---|---|
+| First block | 9/9 on loose checks | "the following slots are available: … taken … taken" |
+| Checks tightened to fail on that | 6/9 | "I don't know based on the documents I have. Please provide a specific date…" |
+| Prohibitions | 7/9 | only "1 January 2020 is in the past." was fixed |
+| What to write instead | 9/9 | "Open: Overnight / Taken: 22-Hour Whole Day, Day Tour" |
+| + "name the date", unscoped | 9/9, but `leak-2` failed | see below |
+| + "name the date", scoped to availability | 9/9, full battery 18/19 | "No, the Day Tour and 22-Hour Whole Day slots are taken on 5 October 2026, but the Overnight slot is open." |
+
+**The regression a targeted run would have shipped.** `leak-2`'s villa control
+is "What is amihanpansol2019?", with the Wi-Fi chunk retrieved. Repeated three
+times per wording:
+
+| Wording | Villa control passed |
+|---|---|
+| unscoped "name the date" | 1 of 3 |
+| previous wording | 3 of 3 |
+| scoped to availability | 3 of 3 |
+
+A Wi-Fi question has no date to name, so the model took the one sentence it can
+always say (R-18).
+
+**Cost:**
+
+| What | Tokens |
+|---|---|
+| Same villa question, same 5 chunks, tools off → on | 1,260 → 1,682 and 1,279 → 1,701 in: **+422 per answer call** |
+| An availability answer (two calls) | about 1,600–1,700 in for the first, 1,700–1,800 in for the second, so roughly **3,300–3,500 in** |
+| A zero-match question on villa | 485 in + 11 out, where D-008 was free |
+| Northwind | unchanged. Its answer calls are 352–877 in, and a zero-match question still costs nothing |
+
+**Not measured:** tool-call latency. Every availability answer makes two model
+calls instead of one, so it is slower, but this project has no timing numbers
+for it yet.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character

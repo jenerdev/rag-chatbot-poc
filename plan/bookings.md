@@ -9,6 +9,13 @@
 > ([`plan.md`](../plan.md), Phases 0–8) was complete. Read
 > [§ 0](#0-the-three-rules) before touching anything, and
 > [§ 2.1](#21-villa-does-not-have-rooms) before designing a table.
+>
+> **Status: complete, 2026-09-24.** Phases 0–8 are done on `feat/bookings`.
+> The eval gives 18/19 (`original 9/10 · tool 9/9`), bookings isolation 13/13,
+> verify 28/28, and tests 99. The decisions are D-032–D-037, plus a D-008
+> amendment, and the risks are R-14–R-18. Still open: § 8's turnover question
+> for the owners, and the UI cancel from the Phase 4 walk, which was never
+> confirmed.
 
 ---
 
@@ -730,6 +737,28 @@ answer finishes streaming.
    `notes.md` (the zero-match cost measured in Phase 6, and tool-call latency).
 5. `status.md`, `whats-done.md` and `todo.md`, per `CLAUDE.md` § Keeping the record.
 6. `README.md`: the fourth SQL file, `seed`, and the booking curls.
+
+> **Done 2026-09-24.** The changes:
+> - **`CLAUDE.md`:** rule 6 extended to the four tables, with "the model never
+>   supplies a tenant"; a new rule 7 (tool results carry no PII, tools are
+>   read-only); trap 6 amended; new traps 8–10; the conventions; the header.
+> - **`decisions.md`:** D-032–D-037, and D-008 amended in place.
+> - **`risks.md`:** R-14–R-18, plus the "still missing" list.
+> - **`architecture.md`:** § 4 bookings tables, § 5 routes, § 6 the tools
+>   block.
+> - **`flow.md`:** the tool loop in the diagram, and step 11a.
+> - **`notes.md`:** the battery, the wording history, `leak-2`'s 1/3 vs 3/3,
+>   and the cost: +422 input tokens per tool-tenant answer call, about 3,300–
+>   3,500 per availability answer, and 485 for a zero-match question.
+>   Latency is marked not measured.
+> - **`README.md`:** four SQL files, nine tables, the bookings screen, the
+>   chat's Checked box. The booking curls were already added in Phase 3.
+>
+> **Deviations:**
+> - There is no `seed` command to document, because the battery seeds itself.
+> - `todo.md` was **not** edited. It holds the user's own uncommitted changes.
+>   Its "add tool calls for dynamic data" and "chatbot can ask question"
+>   items are both done, for the user to tick.
 
 ---
 

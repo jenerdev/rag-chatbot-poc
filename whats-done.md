@@ -3830,3 +3830,44 @@ screen rather than in a log.
 **Trap avoided:** putting the tool result inside the collapsed sources
 `<details>`. For a tool answer that would hide the one thing it rests on,
 behind a click that most readers never make.
+
+## Bookings Phase 8 — the record · done 2026-09-24
+
+**What was done:** the documentation, so the repo stops describing a bot that
+only reads documents.
+
+| File | What changed |
+|---|---|
+| `CLAUDE.md` | the header names the bookings plan. Rule 6 covers the four new tables and says the model never supplies a tenant. New rule 7: tool results carry no PII, and tools are read-only. Trap 6 is amended for D-035. New traps: 8 "check, then insert", 9 the tenant's today, 10 a tools-block sentence costing a documents answer |
+| `decisions.md` | D-032–D-037 in the house format, and D-008 amended in place, saying what changed and why the guarantee still holds |
+| `risks.md` | R-14–R-18, and the "still missing" list extended |
+| `architecture.md` | the bookings tables in § 4, the six routes and the SSE `tool` event in § 5, the tools block and D-035 in § 6 |
+| `flow.md` | the tool loop in the sequence diagram, and step 11a |
+| `notes.md` | the bookings section: the battery, the wording history, the leak-2 repeats, and the cost |
+| `README.md` | status, four SQL files and nine tables, the bookings screen and the Checked box |
+
+**Why it mattered:** the next reader, human or model, starts from these files.
+A `CLAUDE.md` that still said "short-circuit the empty retrieval, do not call
+OpenAI" would send them to "fix" D-035 back into D-008, and make the tool
+unreachable again.
+
+**What each observed value proves:**
+- **Tools off → on, the same villa question with the same 5 chunks: 1,260 →
+  1,682 and 1,279 → 1,701 input tokens.** Measured for this phase from
+  `eval-pre-bookings.txt` against `eval-post-date-scoped.txt`, not estimated.
+  The tool definition and the block cost **+422 input tokens on every answer
+  call of a tool tenant**, documents questions included. An availability
+  answer makes two calls, about 3,300–3,500 input tokens.
+- **Every other number in the new sections is one observed in Phases 0–7:**
+  the `during` range, `23P01`/`23503`/`22023`, 18/19, 6/9 → 7/9 → 9/9, 1/3 vs
+  3/3, 485 + 11, 0 answer calls, 13/13, 28/28. Tool-call latency was not
+  measured, and `notes.md` says so rather than giving a number.
+
+**Deviation:** `todo.md` was not edited. It holds the user's own uncommitted
+changes, and committing them inside a docs commit would publish someone
+else's work under this one's message. Its items "add tool calls for dynamic
+data" and "chatbot can ask question" are both done.
+
+**Trap avoided:** leaving trap 6 as it was. It is true for Northwind and wrong
+for villa. A rule that is half right is the one most likely to be followed
+into a regression.
