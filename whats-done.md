@@ -3436,3 +3436,68 @@ availability result type with no guest data in it.
 - **Cleaning up by cancelling** would have left a cancelled row in Villa's
   real booking history. The isolation script hard-deletes its one Villa
   booking instead.
+
+## Bookings Phase 3 — applications and admin routes · done 2026-09-24
+
+**What was done:**
+- **The registry.** `APPLICATIONS = { bookings: { label } }` and
+  `enabledApplications(tenant)` in `@rag/pipeline`. Keys that the registry does
+  not know are dropped even if the database holds them.
+- **The gate.** `requireApplication()` and `hasApplication()` in
+  `apps/web/lib/applications.ts`, memoised per request with `cache()`. A
+  missing application is a 404.
+- **The error map.** `lib/route.ts` now passes 400/401/404/409 through for
+  status-carrying errors that are not `OpenAIError`.
+- **Validation.** `createBookingSchema` checks types only; `@rag/bookings`
+  owns the rules.
+- **The routes,** each `withTenantRoute` → `requireAdmin` →
+  `requireApplication` → package:
+  - `GET/POST /api/t/[tenant]/bookings`;
+  - `DELETE /bookings/[id]` (cancels);
+  - `GET /bookings/availability`;
+  - `GET /bookings/setup`.
+- **Docs.** README curls.
+
+**Why it mattered:** the package's errors now reach a client as what they are.
+Before the `route.ts` change, a double booking would have been reported as a
+500, a server failure, when it is the most expected outcome in the feature.
+
+**What each observed value proves** (27 curl cases, `next start --port 3100`,
+throwaway tenant `bookprobe` id 24, deleted afterwards):
+- **No cookie → 401 "Admin login required", and a valid cookie without the
+  application → 404 "does not have the bookings application".** The order
+  admin → application means a stranger always gets 401. Whether a tenant
+  has bookings is visible only to that tenant's admin.
+- **Create → 201. Same slot → 409. Day on 11 Oct after Night on 10 Oct →
+  409.** The exclusion constraint's `23P01` travels through package → route →
+  error map as a 409, with the package's message intact.
+- **`2026-02-30`, a past date, a blank name, and 40 days → 400**, each with the
+  package's own wording ("Use YYYY-MM-DD.", "Today is 2026-09-24.", "The limit
+  is 31 days."). One set of rules, in one place.
+- **Villa's unit id from bookprobe → 400 "No such unit or slot."** A
+  cross-tenant id looks exactly like no id, over HTTP too.
+- **Cancel → 200, and availability for 10–11 Oct returns to all open.** The row
+  is kept as `cancelled` (confirmed in the database before the probe was
+  deleted), and it frees the span.
+- **bookprobe's valid session cookie, sent by hand to `villa` and `northwind`,
+  → 401.** `readSession` checks the slug inside the signed cookie, not only
+  that the signature is valid. The cookie's path is `/api/t/bookprobe`, so a
+  browser would not even send it there.
+- **`/api/t/nope/bookings` → 404 "No workspace named "nope"".** Unchanged
+  tenant resolution, now covering the new routes.
+
+**Deviation:** only non-OpenAI errors pass client statuses through. An
+`OpenAIError` 400 or 404 is OpenAI telling this server it sent a bad request
+or an unknown model name. That is a server fault, and it stays a 500. Recorded
+in plan/bookings.md Phase 3.
+
+**Traps caught:**
+- **The first cross-tenant cookie test tested nothing.** curl's cookie jar
+  writes httpOnly cookies as `#HttpOnly_localhost …` lines. Filtering out
+  comment lines removed the cookie, so "probe cookie at villa → 401" was
+  really "no cookie → 401". It was re-run with the cookie proven valid first,
+  by getting past admin at its own tenant. A test that cannot fail is not a
+  test.
+- **Port 3000 belonged to another project** (`gecom-apps`). A second
+  `next dev` on this repo would also have fought over `.next`. The checks ran
+  on a production build on port 3100 instead, which was stopped afterwards.

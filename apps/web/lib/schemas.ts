@@ -74,6 +74,26 @@ export const adminLoginSchema = z.object({
 });
 
 /**
+ * A new booking, from the admin screen.
+ *
+ * Shape only. The meaning (a real date, not in the past, a non-blank name,
+ * lengths) is checked by @rag/bookings. That package has a second caller, the
+ * chatbot's tool executor, which has no zod schema in front of it. If the rules
+ * lived here too they would be two copies free to drift, so they live in one
+ * place and this only rejects the wrong TYPES.
+ */
+export const createBookingSchema = z.object({
+  unitId: z.number({ required_error: 'A unit is required', invalid_type_error: 'A unit is required' }),
+  slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
+  date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
+  guestName: z.string({ required_error: 'Guest name is required.', invalid_type_error: 'Guest name is required.' }),
+  guestPhone: z.string({ invalid_type_error: 'Guest phone must be text.' }).nullish(),
+  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
+  notes: z.string({ invalid_type_error: 'Notes must be text.' }).nullish(),
+  status: z.enum(['pending', 'confirmed'], { invalid_type_error: 'Status must be "pending" or "confirmed".' }).optional(),
+});
+
+/**
  * The first error message from a failed parse.
  *
  * The POC returned one message per request, and the screens are built to render

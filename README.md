@@ -179,6 +179,33 @@ The one expected eval failure is `antecedent` — a `gpt-4o-mini` model limit
 The four newest cases, `leak-1`, `leak-2`, `leak-3` and `persona`, are the
 cross-tenant ones: each asks one tenant for something only the other has.
 
+### Bookings (villa)
+
+`villa` has the **bookings** application: one unit (`Whole property`) and three
+slots, seeded by `packages/db/sql/schema-bookings.sql`. Northwind does not, and
+every bookings route answers it with a 404. All four routes are admin-only, so
+log in first as above:
+
+```bash
+curl -b villa.jar localhost:3000/api/t/villa/bookings/setup          # units, slots, timezone, today
+curl -b villa.jar 'localhost:3000/api/t/villa/bookings/availability?from=2026-10-10&to=2026-10-11'
+curl -b villa.jar -X POST localhost:3000/api/t/villa/bookings \
+  -H 'content-type: application/json' \
+  -d '{"unitId":1,"slotId":2,"date":"2026-10-10","guestName":"Ana Cruz","guestCount":12}'   # 201
+curl -b villa.jar 'localhost:3000/api/t/villa/bookings?from=2026-10-01&to=2026-10-31'
+curl -b villa.jar -X DELETE localhost:3000/api/t/villa/bookings/<id>                         # cancels
+```
+
+Take `unitId` and `slotId` from `setup`. What to expect:
+
+| Case | Response |
+|---|---|
+| Book the same slot twice | **409**, `"That slot on 2026-10-10 overlaps an existing booking."` |
+| Book a Day Tour the morning after an Overnight | **409**, because the Overnight runs until 12:00 |
+| A past date, an impossible date, or more than 31 days | **400**, with a message that says what is wrong |
+
+Cancelling keeps the row with status `cancelled`, and frees the slot.
+
 **Stopping the server on Windows** (`pkill` will not do it):
 
 ```powershell

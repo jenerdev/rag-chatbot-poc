@@ -472,6 +472,17 @@ about 14, all passing.
 | The same route for `northwind` | 404 |
 | No cookie | 401 |
 
+> **Done 2026-09-24.** 27 curl cases were run against `next start` on port
+> 3100, using a throwaway `bookprobe` tenant (id 24), since deleted. Northwind
+> gives 401 without its own cookie, and a tenant without the application gives
+> 404 behind a valid cookie. That ordering is deliberate: admin first, then
+> the application, so a stranger always gets 401.
+>
+> **Deviation:** `lib/route.ts` passes 400/401/404/409 through only for errors
+> that are **not** `OpenAIError`. An OpenAI 400 or 404 means this server sent
+> a bad request or named an unknown model, which is our fault, not the
+> browser's. So it is still a 500.
+
 ### Phase 4 — The admin screen
 
 1. `app/t/[tenant]/admin/bookings/page.tsx`: a Server Component that resolves

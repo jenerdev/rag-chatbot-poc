@@ -58,13 +58,22 @@ exposes `checkAvailability`, `listBookings`, `createBooking`, `cancelBooking`,
 400/409/404. There are 27 new unit tests, and
 `pnpm --filter @rag/bookings isolation` passes **13/13**.
 
-**▶ Bookings Phase 3: applications and admin routes.**
-[`plan/bookings.md`](./plan/bookings.md) § 3:
-- the registry in `packages/rag/src/applications.ts`;
-- `requireApplication()` in `apps/web/lib`, which returns 404;
-- `lib/route.ts` passing 400, 404 and 409 through. Today those become 500;
-- the four `/api/t/[tenant]/bookings…` routes;
-- README curls.
+~~**Bookings Phase 3: applications and admin routes.**~~ **Done 2026-09-24.**
+The changes:
+- the `APPLICATIONS` registry and `enabledApplications()` in `@rag/pipeline`;
+- `requireApplication()` in `apps/web/lib/applications.ts`;
+- `lib/route.ts` now passes 400/404/409 through (not for `OpenAIError`);
+- four routes under `/api/t/[tenant]/bookings`, with README curls.
+
+27 curl cases pass.
+
+**▶ Bookings Phase 4: the admin screen.** [`plan/bookings.md`](./plan/bookings.md)
+§ 3, covering:
+- `app/t/[tenant]/admin/bookings/page.tsx`, which calls `notFound()` without
+  the application, plus a `bookings-screen` Client Component;
+- a list grouped by date, a create form and a cancel button;
+- a link from the knowledge-base admin, shown only when the application is on;
+- a walk in the browser.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -584,6 +593,37 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (bookings Phase 3)
+- **Did:**
+  - Added the `APPLICATIONS` registry and `enabledApplications()` in
+    `packages/rag/src/applications.ts`.
+  - Added `apps/web/lib/applications.ts`: `requireApplication()` and
+    `hasApplication()`, memoised with `cache()`.
+  - `lib/route.ts`: `CLIENT_STATUSES` {400,401,404,409}, applied to errors
+    that are not `OpenAIError`.
+  - Added `createBookingSchema`, which checks shape only.
+  - Four routes: `bookings` (GET/POST), `bookings/[id]` (DELETE, which
+    cancels), `bookings/availability` and `bookings/setup`.
+  - README curls; `web` now depends on `@rag/bookings`.
+- **Observed:**
+  - Typecheck is 11/11, and the build lists all four routes.
+  - 27 curl cases against `next start --port 3100`, using the throwaway
+    `bookprobe` (id 24), since deleted:
+    - no cookie → 401; the application off → 404; setup reports today as
+      `2026-09-24`;
+    - create → 201; the same slot → 409; Day the morning after Night → 409;
+    - `2026-02-30` → 400; a past date → 400 with "Today is 2026-09-24";
+      a blank name → 400; Villa's unit id → 400 "No such unit or slot.";
+    - 40 days → 400; cancel → 200, with availability back to open;
+      a nonexistent id → 404; `nope` → 404;
+    - bookprobe's valid cookie at `villa` and `northwind` → 401.
+  - Afterwards: tenants `northwind` and `villa`, 0 bookings.
+- **Caught:** the first cross-tenant cookie test sent no cookie. The curl jar
+  writes httpOnly cookies as `#HttpOnly_` lines, and a comment filter removed
+  them. Re-run with a real cookie, which was verified by getting past admin at
+  its own tenant.
+- **Next:** Phase 4.
 
 ### 2026-09-24 — session 7, continued (bookings Phase 2)
 - **Did:** created `packages/bookings` (`@rag/bookings`, depends on `@rag/db`

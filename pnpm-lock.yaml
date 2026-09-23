@@ -172,6 +172,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@rag/bookings':
+        specifier: workspace:*
+        version: link:../../packages/bookings
       '@rag/chunker':
         specifier: workspace:*
         version: link:../../packages/chunker

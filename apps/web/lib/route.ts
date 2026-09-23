@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { OpenAIError } from '@rag/openai';
 import { assertEnv } from './env';
 
 // Errors -> status codes, in exactly one place.
@@ -14,28 +15,48 @@ import { assertEnv } from './env';
 // below has to be applied to EVERY handler by hand — one missed wrapper and
 // that route silently stops reporting why it failed.
 
-/** An error carrying an upstream HTTP status, as @rag/openai throws. */
+/** An error carrying an HTTP status: OpenAIError, AdminAuthError, and @rag/bookings' three. */
 function statusOf(error: unknown): number | undefined {
   const status = (error as { status?: unknown }).status;
   return typeof status === 'number' ? status : undefined;
 }
 
 /**
+ * Statuses a thrown error may pass straight through, because they describe the
+ * REQUEST: bad input (400), not logged in (401), not there (404), and a
+ * conflict with existing data (409). The last two came with @rag/bookings
+ * (plan/bookings.md Phase 3). Before that, a BookingConflictError would have
+ * reached the browser as a 500, as if the server had broken.
+ */
+const CLIENT_STATUSES = new Set([400, 401, 404, 409]);
+
+/**
  * Map a thrown error to a response.
  *
- * Errors thrown by @rag/openai carry the upstream HTTP status. Everything else
- * is a 500. The real message always reaches the client: no swallowing, no
- * generic "something went wrong", no retries (architecture.md § 9). This is a
- * learning project — the message is the point.
+ * Two kinds of error carry a status, and they mean different things:
+ *
+ *   - An OpenAIError's status is OPENAI'S reply to US. A 400 or 404 from OpenAI
+ *     is this server sending a bad request or naming a model that does not
+ *     exist, which is our fault, not the browser's. So only 401 (a bad key)
+ *     and 429 (out of credits) pass through, as they always have. 5xx becomes
+ *     502, and anything else is a 500.
+ *   - Every other status-carrying error (AdminAuthError, the @rag/bookings
+ *     errors) states the status of THIS request, so a client status passes
+ *     through as-is.
+ *
+ * Everything else is a 500. The real message always reaches the client: no
+ * swallowing, no generic "something went wrong", no retries (architecture.md
+ * § 9). This is a learning project — the message is the point.
  */
 export function errorResponse(error: unknown): NextResponse {
-  const upstream = statusOf(error);
-  const status =
-    upstream === 401 || upstream === 429
-      ? upstream
-      : upstream !== undefined && upstream >= 500
-        ? 502
-        : 500;
+  const carried = statusOf(error);
+  let status = 500;
+  if (error instanceof OpenAIError) {
+    if (carried === 401 || carried === 429) status = carried;
+    else if (carried !== undefined && carried >= 500) status = 502;
+  } else if (carried !== undefined && CLIENT_STATUSES.has(carried)) {
+    status = carried;
+  }
 
   const message = error instanceof Error ? error.message : String(error);
   console.error('[error]', message);

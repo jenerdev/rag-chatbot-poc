@@ -58,6 +58,7 @@ apps/web/              Next.js 15, App Router
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → TenantContext, 404 on a miss
   lib/admin-auth.ts      signed session cookie, requireAdmin()
+  lib/applications.ts    requireApplication(): 404 unless the tenant has it switched on
   lib/branding.ts        the five-key theme allowlist, https-only image URLs
   lib/env.ts             fail-fast config (D-023)
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser

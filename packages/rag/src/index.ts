@@ -12,6 +12,7 @@
 //   retrieve.ts    question -> standalone query -> two searches -> one list
 //   answer.ts      the whole query pipeline, streaming and not
 //   tenant.ts      a slug -> the TenantContext every call above requires
+//   applications.ts  which applications (bookings, …) a tenant has switched on
 
 export {
   MATCH_COUNT,
@@ -29,6 +30,8 @@ export { greetingReply, greetingText } from './greeting.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';
+export { APPLICATIONS, enabledApplications } from './applications.js';
+export type { ApplicationKey } from './applications.js';
 
 export type {
   Answer,
