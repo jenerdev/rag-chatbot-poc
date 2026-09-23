@@ -3884,3 +3884,66 @@ Overnight had made the 23rd's Day Tour and 22-Hour taken. The UI Cancel
 button → `DELETE /bookings/27` → `cancelBooking` → the exclusion constraint
 ignoring cancelled rows. That is the step the Phase 4 walk recorded as
 unconfirmed, now proven from the browser as well as by Phase 3's curl.
+
+---
+
+# Auth + RLS
+
+## Auth + RLS plan written · done 2026-09-24
+
+[`plan/auth-rls.md`](./plan/auth-rls.md), Phases 0–8. It makes Postgres
+enforce the tenant, rather than every query holding the `service_role`
+master key and remembering a filter. It also replaces the shared per-tenant
+admin key with staff accounts.
+
+### What was decided before writing, and why those three
+
+| Decision | Why this one |
+|---|---|
+| Staff log in with **Supabase Auth** (D-040) | password storage, reset tokens and email verification are the parts where a readable hand-rolled version is also the dangerous one. Our HMAC session cookie stays; the shared key goes |
+| **Tenant tokens on every request, chat included** (D-039) | the anonymous chat is the path open to the internet. Leaving it on `service_role` would protect the admin path, which is already behind a login, and not the exposed one |
+| **One role** (D-041) | the smallest policy set that works. A role column can come later |
+
+### The finding that shaped Phase 0
+
+The `.env` contains `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and
+`SUPABASE_JWKS_URL` (names only were read, never values). So the project uses
+Supabase's asymmetric JWT signing keys, and Supabase holds the private key.
+The whole design needs the server to mint a token PostgREST accepts, and that
+may not be possible the simple way. So Phase 0 is a spike with three ranked
+options:
+- **A:** our own key, imported as a signing key;
+- **B:** the legacy shared secret, a bridge with a deadline;
+- **C:** a direct Postgres connection with `set local role` and
+  `request.jwt.claims`.
+
+It has an explicit stop condition. The design must not quietly fall back to
+`service_role`.
+
+### The rules at the top
+
+1. **Two walls, each tested alone.** The code filters stay. RLS must stop a
+   leak with the filter removed (`select * from chunks` under villa's token
+   returns only villa's rows), and the filters must still pass their suites.
+2. **`service_role` leaves the request path,** with an import check.
+3. **No prompt changes,** so the battery must match 18/19 verdict by verdict.
+   A flipped verdict is a policy that is too tight.
+
+### Traps written down before they cost anything
+
+- **The signing key is itself a master key** (R-19). The gain is that one
+  function uses it, for one narrow token.
+- **RLS can cost the vector index** through non-leakproof quals. Measure it
+  as a token, not as `service_role`.
+- **`auth.uid()` casts `sub` to uuid,** so a chat token must carry no `sub`,
+  or policies error instead of denying.
+- **`check_availability` must become `security definer`,** or a chat token
+  would need SELECT on `bookings`, which holds guest PII.
+- **Supabase's default email sender is for testing.** Custom SMTP comes
+  before real staff.
+- **The eval and the tools need identities too:** an operator member per
+  tenant, not a quiet `service_role`.
+
+### Status
+
+Nothing is built yet. Next is Phase 0, which needs the Supabase dashboard.

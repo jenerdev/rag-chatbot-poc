@@ -30,13 +30,11 @@
   theme and admin key. Measured on the final code: eval 9/10 (the known
   `antecedent` model limit), isolation 11/11, verify 14/14, and tests 41 + 13.
   Both tenants were also walked by hand in the browser.
-- **Working on right now:** nothing. **Bookings is complete**
-  ([`plan/bookings.md`](./plan/bookings.md), Phases 0–8, 2026-09-24, on
-  `feat/bookings`, not merged yet). villa has a staff booking screen and the
-  chatbot's first tool, `check_availability`. On the final code: eval 18/19
-  (`original 9/10 · tool 9/9`), isolation 11/11, bookings isolation 13/13,
-  verify 28/28, and tests 99 (13 + 27 + 14 + 45). **Real auth + RLS still
-  comes before any public URL** (R-2, R-11, R-13).
+- **Working on right now:** the **auth + RLS plan**,
+  [`plan/auth-rls.md`](./plan/auth-rls.md) (Phases 0–8, written 2026-09-24, on
+  `feat/auth-rls`). Nothing is built yet. Bookings is complete and merged
+  (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
+  bookings isolation 13/13, verify 28/28, tests 99.
 
 ---
 
@@ -103,14 +101,16 @@ R-14–R-18, architecture, flow, notes and README. `todo.md` was left alone,
 because it holds your uncommitted edits. Its tool-call and ask-a-question
 items are done.
 
-**▶ Next, your call:**
-1. **Merge `feat/bookings` into `master`** (a fast-forward, like tenancy).
-2. **One loose end:** ask the Villa owners § 8's turnover-gap question.
-   Booking #27 has been cancelled, which is also the UI cancel from the
-   Phase 4 walk, now confirmed.
-3. **Pick the next plan:** a `request_booking` tool (guests book in chat,
-   `plan/bookings.md` § 7, which needs auth and rate limiting first),
-   Messenger, recording unanswered questions, or real auth + RLS.
+**▶ Auth + RLS Phase 0: the signing spike, and the baseline.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 2.1 and § 3. This project uses
+Supabase's asymmetric JWT signing keys (the `.env` has
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL`), so
+first prove the server can mint a token PostgREST accepts. Try, in order:
+A, our own key imported as a signing key; B, the legacy secret; C, a direct
+Postgres connection. **If none works, stop and re-plan.** Also check that
+Supabase Auth's email+password sign-in works, and save the baseline to
+`plan/baseline/*-pre-auth.txt`. You will need the Supabase dashboard for
+the spike.
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -630,6 +630,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (auth + RLS planning)
+- **Did:** branched `feat/auth-rls`, and committed the #27 record there
+  (`851c517`). Wrote [`plan/auth-rls.md`](./plan/auth-rls.md) after three
+  questions:
+  - staff log in with **Supabase Auth**;
+  - RLS covers **the anonymous chat path too**, through server-minted tenant
+    tokens;
+  - **one role**.
+- **Found:** the `.env` holds the new-style Supabase keys and a JWKS URL, so
+  the project signs JWTs asymmetrically. Minting our own tenant tokens is
+  therefore not guaranteed, and Phase 0 is a spike with three ranked options
+  and a stop condition.
+- **Next:** Phase 0.
 
 ### 2026-09-24 — session 7, continued (after the merge)
 - **Did:** fast-forwarded `master` to `23a84cd` (11 commits) and deleted
