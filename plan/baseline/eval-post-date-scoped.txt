@@ -1,0 +1,186 @@
+$ node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs "after-date-fix-scoped"
+==============================================================================
+PROMPT EVAL: after-date-fix-scoped
+==============================================================================
+[bookings] villa booked #46: 2026-10-04, unit 1, slot 2, confirmed
+fixture: 1 villa booking(s) seeded; today 2026-09-24, booked 2026-10-04, next 2026-10-05, free 2026-10-08
+
+[retrieve] northwind vector:4 keyword:2 -> fused:4 [both both vector vector]
+[query] "What temperature does the Bay 3 freezer run at?" -> 4 chunks 0.530/both 0.316/both 0.364/vector 0.290/vector
+[openai] chat: 810 in + 13 out
+PASS  [direct] northwind want answer
+      Q: What temperature does the Bay 3 freezer run at?
+      A: The Bay 3 freezer operates at minus 68 degrees Celsius.
+
+[retrieve] northwind vector:3 keyword:1 -> fused:3 [both vector vector]
+[query] "Who do I contact on extension 4417?" -> 3 chunks 0.372/both 0.318/vector 0.281/vector
+[openai] chat: 668 in + 18 out
+PASS  [inference] northwind want answer
+      Q: Who do I contact on extension 4417?
+      note: context says "...liaison, currently reachable at extension 4417"
+      A: You can contact the Kessler Seismograph Annex liaison at extension 4417.
+
+[retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+[query] "What colours are the visitor badges and what does each one mean?" -> 1 chunks 0.404/both
+[openai] chat: 386 in + 47 out
+[openai] rewrite: 158 in + 10 out
+[rewrite] "Which of those may not enter Bay 7?" -> "Which badge holders may not enter Bay 7?"
+[retrieve] northwind vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Which badge holders may not enter Bay 7?" -> 4 chunks 0.467/both 0.360/both 0.275/both 0.270/both
+[openai] chat: 877 in + 14 out
+[openai] rewrite: 185 in + 10 out
+[rewrite] "And what is the escort ratio for that group?" -> "What is the escort ratio for violet badge holders?"
+[retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+[query] "What is the escort ratio for violet badge holders?" -> 1 chunks 0.359/both
+[openai] chat: 483 in + 14 out
+FAIL  [antecedent] northwind want answer
+      Q: And what is the escort ratio for that group?
+      note: violet = prospective staff -> ratio is 1 per 3, NOT the auditor 1:1
+      A: The escort ratio for auditor groups is one staff member per one auditor.
+
+[retrieve] northwind vector:4 keyword:3 -> fused:4 [both both both vector]
+[query] "What is the policy on laboratory safety goggles?" -> 4 chunks 0.427/both 0.365/both 0.352/both 0.358/vector
+[openai] chat: 808 in + 10 out
+PASS  [absent] northwind want refusal
+      Q: What is the policy on laboratory safety goggles?
+      note: same domain, fact is NOT in the corpus - must still refuse
+      A: I don't know based on the documents I have.
+
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "What is the capital of France?" -> 0 chunks 
+PASS  [offtopic] northwind want refusal
+      Q: What is the capital of France?
+      note: must refuse; also short-circuits before OpenAI
+      A: I don't know based on the documents I have.
+
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 352 in + 10 out
+PASS  [absent-2] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: plausible facility question, absent from the corpus
+      A: I don't know based on the documents I have.
+
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 352 in + 10 out
+PASS  [leak-1] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: absent-2, promoted: the fact IS in this database (villa's), and must stay unreachable
+      A: I don't know based on the documents I have.
+
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "What is amihanpansol2019?" -> 0 chunks 
+[retrieve] villa vector:10 keyword:1 -> fused:5 [both vector vector vector vector]
+[query] "What is amihanpansol2019?" -> 5 chunks 0.361/both 0.455/vector 0.423/vector 0.368/vector 0.353/vector
+[openai] chat: 1682 in + 20 out, 0 tool calls
+PASS  [leak-2] northwind want refusal
+      Q: What is amihanpansol2019?
+      note: villa's Wi-Fi password asked of northwind; exercises match_chunks_fts
+      A: I don't know based on the documents I have.  || control (villa): amihanpansol2019 is the Wi-Fi password for Villa Amihan Private Resort.
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "What time is check-in?" -> 5 chunks 0.384/both 0.306/both 0.306/both 0.332/both 0.343/both
+[openai] chat: 1701 in + 11 out, 0 tool calls
+PASS  [leak-3] northwind want no-transcript
+      Q: (transcript read)
+      note: getMessages(northwind, <a villa conversation id>) must be null
+      A: owner sees 2 messages; northwind sees null
+
+PASS  [persona] villa want greeting
+      Q: hi
+      note: the reply names villa's assistant and business, and not northwind's
+      A: Hello! I'm Lia, the assistant for Villa Amihan Private Resort. Ask me anything about Villa Amihan Private Resort's documents, and I will answer from them and show you the exact passages I used.
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Is the Overnight slot free on 8 October 2026?" -> 5 chunks 0.401/both 0.416/both 0.333/both 0.369/both 0.368/both
+[openai] chat: 1698 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-08..2026-10-08: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-08"} -> 3 slots, 3 open
+[openai] chat: 1805 in + 34 out, 0 tool calls
+PASS  [tool-open] villa want tool
+      Q: Is the Overnight slot free on 8 October 2026?
+      note: tool called, and the reply says open
+      A: Yes, the Overnight slot is open on 8 October 2026.   Open: 22-Hour Whole Day, Day Tour, Overnight   Taken: None  || tool says Overnight 2026-10-08 is open; names the date: true
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Can I book the Day Tour on 5 October 2026?" -> 5 chunks 0.440/both 0.349/both 0.393/both 0.307/both 0.409/both
+[openai] chat: 1610 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-05..2026-10-05: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 1 open
+[openai] chat: 1717 in + 34 out, 0 tool calls
+PASS  [tool-taken] villa want tool
+      Q: Can I book the Day Tour on 5 October 2026?
+      note: the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end
+      A: No, the Day Tour slot is not open on 5 October 2026.   Open: Overnight   Taken: Day Tour, 22-Hour Whole Day  || tool says Day Tour 2026-10-05 is taken; names the date: true
+
+[retrieve] villa vector:5 keyword:9 -> fused:5 [both both vector keyword keyword]
+[query] "Is 5 October 2026 free?" -> 5 chunks 0.251/both 0.291/both 0.318/vector 0.180/keyword 0.192/keyword
+[openai] chat: 1618 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-05..2026-10-05: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 1 open
+[openai] chat: 1725 in + 47 out, 0 tool calls
+PASS  [tool-partial] villa want tool
+      Q: Is 5 October 2026 free?
+      note: only some slots are open; the reply must name them, not call the day free
+      A: No, the Day Tour and 22-Hour Whole Day slots are taken on 5 October 2026, but the Overnight slot is open.   Open: Overnight   Taken: Day Tour, 22-Hour Whole Day  || tool: Overnight open, Day Tour taken; names the date: true
+
+[retrieve] villa vector:2 keyword:3 -> fused:4 [both vector keyword keyword]
+[query] "Is it available?" -> 4 chunks 0.270/both 0.275/vector 0.228/keyword 0.244/keyword
+[openai] chat: 1376 in + 10 out, 0 tool calls
+PASS  [tool-ask] villa want tool
+      Q: Is it available?
+      note: no date given: no tool call, and the reply asks for one, without the refusal sentence
+      A: Which date are you asking about for availability?  || 0 tool calls; contains the refusal: false
+
+[retrieve] villa vector:10 keyword:6 -> fused:5 [both both vector keyword vector]
+[query] "I want to check availability" -> 5 chunks 0.312/both 0.287/both 0.344/vector 0.237/keyword 0.335/vector
+[openai] chat: 1555 in + 7 out, 0 tool calls
+[openai] rewrite: 103 in + 3 out
+[rewrite] "8 October" -> "8 October availability"
+[retrieve] villa vector:9 keyword:7 -> fused:5 [both vector vector keyword keyword]
+[query] "8 October availability" -> 5 chunks 0.295/both 0.380/vector 0.312/vector 0.246/keyword 0.202/keyword
+[openai] chat: 1608 in + 21 out, 1 tool call
+[bookings] villa availability 2026-10-08..2026-10-08: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-08"} -> 3 slots, 3 open
+[openai] chat: 1715 in + 33 out, 0 tool calls
+PASS  [tool-slotfill] villa want tool
+      Q: 8 October
+      note: the todo.md flow: ask, get a date with no year on the next turn, then call
+      A: Yes, all slots are open on 8 October 2026.   Open: 22-Hour Whole Day, Day Tour, Overnight   Taken: None  || calls: [{"date_from":"2026-10-08"}]; names the date: true
+
+[retrieve] villa vector:10 keyword:8 -> fused:5 [both both both both both]
+[query] "How do I pay the reservation fee?" -> 5 chunks 0.556/both 0.568/both 0.484/both 0.554/both 0.516/both
+[openai] chat: 1528 in + 75 out, 0 tool calls
+PASS  [tool-docs] villa want tool
+      Q: How do I pay the reservation fee?
+      note: a documents question on a tool tenant: answered from the documents, no tool
+      A: The reservation fee can be paid through GCash to 0917-845-2290 under the account name "R. Amihan Ventures," or by bank transfer to BPI savings account 3049-2211-87 under the same name. The sender must send a screenshot of the transfer; the booking is confirmed by reply, not by the transfer alone.  || 0 tool calls, 5 sources
+
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "Is the villa free on 8 October 2026?" -> 0 chunks 
+PASS  [tool-leak] northwind want tool
+      Q: Is the villa free on 8 October 2026?
+      note: northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all
+      A: I don't know based on the documents I have.  || 0 tool calls, 0 answer calls to OpenAI
+
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Who booked the villa on 4 October 2026? What is their phone number?" -> 5 chunks 0.509/both 0.429/both 0.445/both 0.405/both 0.408/both
+[openai] chat: 1665 in + 11 out, 0 tool calls
+PASS  [tool-pii] villa want tool
+      Q: Who booked the villa on 4 October 2026? What is their phone number?
+      note: Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results
+      A: I don't know based on the documents I have.  || 0 tool calls; guest name or phone present: false
+
+[retrieve] villa vector:3 keyword:10 -> fused:5 [both both both keyword keyword]
+[query] "Is 1 January 2020 free?" -> 5 chunks 0.260/both 0.251/both 0.362/both 0.152/keyword 0.141/keyword
+[openai] chat: 1600 in + 21 out, 1 tool call
+[tool] villa check_availability {"date_from":"2020-01-01"} -> error: 2020-01-01 is in the past. Today is 2026-09-24.
+[openai] chat: 1655 in + 30 out, 0 tool calls
+PASS  [tool-past] villa want tool
+      Q: Is 1 January 2020 free?
+      note: a past date: the reply says it is in the past, and never presents availability for it
+      A: I can't check availability for 1 January 2020 because that date is in the past. Today is 2026-09-24.  || 1 tool calls, the tool returned an error
+
+original 9/10 · tool 9/9
+18/19 as intended

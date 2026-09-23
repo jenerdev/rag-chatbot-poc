@@ -68,6 +68,25 @@ const slotStatus = (last, date, slot) =>
 const says = (reply, words) => words.some((w) => reply.toLowerCase().includes(w));
 const TAKEN_WORDS = ['taken', 'not available', 'unavailable', 'booked', 'not open'];
 
+/**
+ * Does the reply name this date? "8 October", "October 8", "8th October" or
+ * "2026-10-08" all count. After the Phase 6 wording fix, replies became bare
+ * "Open: … / Taken: …" lines with no date in them. An availability answer
+ * that does not say WHICH day it is about cannot be checked by the person
+ * reading it.
+ */
+const namesDate = (reply, date) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  const day = d.getUTCDate();
+  const month = d.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+  const ordinal = '(?:st|nd|rd|th)?';
+  return (
+    reply.includes(date) ||
+    new RegExp(`\\b${day}${ordinal}\\s+(?:of\\s+)?${month}\\b`, 'i').test(reply) ||
+    new RegExp(`\\b${month}\\s+${day}${ordinal}\\b`, 'i').test(reply)
+  );
+};
+
 // Each case says what SHOULD happen, so the output can be read at a glance.
 const CASES = [
   {
@@ -161,8 +180,11 @@ const CASES = [
     want: 'tool',
     turns: [`Is the Overnight slot free on ${words(FREE)}?`],
     check: (last) => ({
-      ok: slotStatus(last, FREE, 'Overnight') === 'open' && says(last.reply, ['open', 'available', 'free']),
-      detail: `tool says Overnight ${FREE} is ${slotStatus(last, FREE, 'Overnight') ?? '(no call)'}`,
+      ok:
+        slotStatus(last, FREE, 'Overnight') === 'open' &&
+        says(last.reply, ['open', 'available', 'free']) &&
+        namesDate(last.reply, FREE),
+      detail: `tool says Overnight ${FREE} is ${slotStatus(last, FREE, 'Overnight') ?? '(no call)'}; names the date: ${namesDate(last.reply, FREE)}`,
     }),
     note: 'tool called, and the reply says open',
   },
@@ -172,8 +194,8 @@ const CASES = [
     want: 'tool',
     turns: [`Can I book the Day Tour on ${words(NEXT)}?`],
     check: (last) => ({
-      ok: slotStatus(last, NEXT, 'Day Tour') === 'taken' && says(last.reply, TAKEN_WORDS),
-      detail: `tool says Day Tour ${NEXT} is ${slotStatus(last, NEXT, 'Day Tour') ?? '(no call)'}`,
+      ok: slotStatus(last, NEXT, 'Day Tour') === 'taken' && says(last.reply, TAKEN_WORDS) && namesDate(last.reply, NEXT),
+      detail: `tool says Day Tour ${NEXT} is ${slotStatus(last, NEXT, 'Day Tour') ?? '(no call)'}; names the date: ${namesDate(last.reply, NEXT)}`,
     }),
     note: "the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end",
   },
@@ -192,8 +214,9 @@ const CASES = [
         slotStatus(last, NEXT, 'Overnight') === 'open' &&
         says(last.reply, ['overnight']) &&
         says(last.reply, TAKEN_WORDS) &&
-        !/(slots|following|these)[^.:\n]{0,40}available\s*:/i.test(last.reply),
-      detail: `tool: Overnight ${slotStatus(last, NEXT, 'Overnight') ?? '?'}, Day Tour ${slotStatus(last, NEXT, 'Day Tour') ?? '?'}`,
+        !/(slots|following|these)[^.:\n]{0,40}available\s*:/i.test(last.reply) &&
+        namesDate(last.reply, NEXT),
+      detail: `tool: Overnight ${slotStatus(last, NEXT, 'Overnight') ?? '?'}, Day Tour ${slotStatus(last, NEXT, 'Day Tour') ?? '?'}; names the date: ${namesDate(last.reply, NEXT)}`,
     }),
     note: 'only some slots are open; the reply must name them, not call the day free',
   },
@@ -217,8 +240,10 @@ const CASES = [
     want: 'tool',
     turns: ['I want to check availability', words(FREE, false)],
     check: (last) => ({
-      ok: callsFor(last).some((c) => c.args?.date_from === FREE),
-      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}`,
+      // The date the user typed had no year. Naming it back is how they see
+      // what the model resolved it to.
+      ok: callsFor(last).some((c) => c.args?.date_from === FREE) && namesDate(last.reply, FREE),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names the date: ${namesDate(last.reply, FREE)}`,
     }),
     note: 'the todo.md flow: ask, get a date with no year on the next turn, then call',
   },

@@ -84,9 +84,10 @@ returned parseable arguments both ways.
 2026-09-24.** Eval **18/19** (`original 9/10 · tool 9/9`), with the
 original ten the same verdict by verdict. Isolation 11/11. Northwind's prompt
 is identical to the Phase 0 snapshot. The three wording findings were then
-fixed (tool cases 6/9 → 7/9 → 9/9; full battery still 18/19). One new side
-effect is open: availability replies are terse "Open: / Taken:" lines that
-often omit the date.
+fixed (tool cases 6/9 → 7/9 → 9/9; full battery still 18/19). Availability
+replies now open with a sentence naming the date. A first, unscoped wording
+cost `leak-2` (1 of 3 runs). Scoped to availability, it is 3/3, and the full
+battery is 18/19.
 
 **▶ Bookings Phase 7: the chat screen.** [`plan/bookings.md`](./plan/bookings.md)
 § 3:
@@ -613,6 +614,27 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-24 — session 7, continued (availability replies name the date)
+- **Did:**
+  - Added a `namesDate()` check to `tool-open`, `tool-taken`, `tool-partial`
+    and `tool-slotfill`. It was tested against 7 samples, including rejecting
+    "18 October" for the 8th.
+  - `tools.ts`: a first sentence that names the date, then the Open/Taken
+    lines. Then scoped to availability answers.
+- **Observed:**
+  - Before, tool cases: 6/9 (`tool-open`, `tool-partial` and `tool-slotfill`
+    had no date).
+  - Unscoped wording: tool cases 9/9, but the full battery was **17/19**:
+    `leak-2`'s villa control refused.
+  - `leak-2` alone, 3 runs each: unscoped 1/3, previous wording 3/3, scoped
+    3/3.
+  - Scoped, full battery: **18/19** (`original 9/10 · tool 9/9`). The
+    original verdicts are identical, and so is the Northwind prompt.
+  - `tool-partial` now reads "No, the Day Tour and 22-Hour Whole Day slots
+    are taken on 5 October 2026, but the Overnight slot is open."
+  - The fixture was removed, and #27 is untouched.
+- **Next:** Phase 7, the chat screen.
 
 ### 2026-09-24 — session 7, continued (Phase 6 wording fixes)
 - **Did:**

@@ -124,9 +124,25 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
         // sentence"), and the battery showed gpt-4o-mini ignoring both. The
         // same shape as D-017: this model follows a concrete instruction
         // about what TO write better than a rule about what not to.
-        'Report availability for each date as two lines, "Open:" followed by the',
-        'open slots and "Taken:" followed by the taken ones. Never say a whole day',
-        'is free unless every slot on it is open.',
+        // Then the fix above made replies bare "Open: … / Taken: …" lines with
+        // no date in them, so the reader could not tell which day they were
+        // about. Hence the first sentence, which names the date, and is again
+        // an example of what to write, not a rule against what not to.
+        //
+        // SCOPED to availability answers, on purpose. The first version said
+        // "Start with one sentence that answers the question and names the
+        // date" for EVERY answer. leak-2's villa control ("What is
+        // amihanpansol2019?", a Wi-Fi question with the chunk retrieved) then
+        // refused in 2 runs of 3, where the previous wording answered 3 of 3.
+        // A question with no date in it could not satisfy the instruction, so
+        // the model fell back on the refusal. A tools-block sentence can
+        // cost a documents answer.
+        'When you answer about availability, start with one sentence that',
+        'answers the question and names the date, for example "Yes, the',
+        'Overnight slot is open on 8 October 2026." Then, for each date, write',
+        'two lines: "Open:" followed by the open slots and "Taken:" followed by',
+        'the taken ones. Never say a whole day is free unless every slot on it',
+        'is open.',
         // Phase 6 (tool-ask): "I don't know based on the documents I have.
         // Please provide a specific date…", the refusal glued to the question.
         'If the user asks about availability without giving a date, your whole',

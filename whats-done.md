@@ -3739,3 +3739,49 @@ would probably fix it, and would need another eval run.
 "original 0/10 · 6/19" because the totals still counted all 19 cases under
 `--only`. The code was fixed, and the saved file's summary line was
 corrected with a note saying so, rather than silently.
+
+## Availability replies name the date · done 2026-09-24
+
+**What was done:** the four availability cases now also fail if the reply
+does not name the date (`namesDate()`: "8 October", "October 8th", "8th of
+October" or "2026-10-08", and never "18 October" for the 8th). The tools
+block gained a first sentence naming the date, and it was then scoped to
+availability answers after the battery caught it costing a documents answer.
+
+**Why it mattered:** "Open: 22-Hour Whole Day, Day Tour, Overnight / Taken:
+None" answers "which slots?" but not "which day?". In a chat that has gone on
+for a while, or across a range of dates, the reader cannot check it. And
+along the way, this is the clearest example so far of a prompt edit that
+passes the cases it targets while breaking one it does not.
+
+**What each observed value proves:**
+- **Old wording, tightened checks: tool cases 6/9.** `tool-open`,
+  `tool-partial` and `tool-slotfill` returned bare Open/Taken lines. The new
+  check catches exactly the problem.
+- **Unscoped "Start with one sentence that answers the question and names the
+  date": tool cases 9/9, full battery 17/19.** `leak-2` flipped from PASS.
+  Northwind was fine (0 chunks, a refusal). Villa's control ("What is
+  amihanpansol2019?", with 5 chunks retrieved, the first found by both
+  searches) replied with the refusal. The targeted cases alone would have
+  shipped this.
+- **`leak-2` alone, three runs per wording: unscoped 1/3, previous 3/3,
+  scoped 3/3.** The regression is caused by the sentence, not by noise, and
+  scoping removes it. A Wi-Fi question has no date to name, so an
+  instruction to name one for EVERY answer pushed the model onto the one
+  sentence it can always say.
+- **Scoped, full battery: 18/19, the original ten identical, the Northwind
+  prompt diff empty.** Kept.
+- **`tool-partial`: "No, the Day Tour and 22-Hour Whole Day slots are taken
+  on 5 October 2026, but the Overnight slot is open."** Better than the
+  unscoped run's "Yes, the Overnight slot is open…" for a question about
+  the whole day, which copied the example sentence almost word for word.
+
+**Lesson, for `risks.md` in Phase 8:** a tools-block sentence can cost a
+documents answer on a tools tenant. And the battery runs each case once, so a
+1-in-3 failure can pass a single run. When a verdict flips, repeat that case
+under both wordings before deciding what caused it.
+
+**Trap avoided:** testing `namesDate()` with a shell one-liner whose quoting
+doubled the backslashes. It printed `false` for correct input, which looks
+like a broken function. The file's own code was then extracted and tested,
+and was right.

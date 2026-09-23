@@ -658,7 +658,28 @@ cases pass, isolation passes, and Northwind's prompt diff is empty.
 > by verdict. Northwind's prompt diff is empty. The fix was only ever in the
 > tools block; the grounding block was not touched. **New side effect:**
 > replies are now terse and form-like ("Open: … Taken: None"), and often
-> leave out the date. They are correct, but less natural. Not fixed. If
+> leave out the date. They are correct, but less natural.
+>
+> **Also fixed, same session.** The four availability cases now also require
+> the reply to name the date. On the old wording that gave 6/9, with three
+> bare "Open:/Taken:" replies. A first sentence "…that answers the question
+> and names the date" gave 9/9 on the tool cases, **but the full battery
+> dropped to 17/19: `leak-2` flipped to FAIL.** Its villa control (the Wi-Fi
+> question) refused. Repeated three times:
+>
+> | Wording | Villa control |
+> |---|---|
+> | New, unscoped | passed 1 of 3 |
+> | Previous | passed 3 of 3 |
+> | Scoped: "When you answer about **availability**, start with…" | passed 3 of 3 |
+>
+> With the scoped wording the full battery is **18/19** again, the original
+> ten identical, and the Northwind prompt diff empty.
+>
+> **Lesson for R-14 / R-12:** a tools-block sentence can cost a *documents*
+> answer on the same tenant. The battery runs each case once, and a 1-in-3
+> failure can pass a single run. When a verdict flips, repeat that case
+> before blaming noise or the prompt. If
 `tool-open` or `tool-slotfill` fails because the model answered from
 `04-booking-and-payment.md`, fix the § 2.5 wording. That is the trap it
 describes, not a battery that is too strict.
