@@ -131,3 +131,10 @@ export interface IngestResult {
   title: string;
   chunkCount: number;
 }
+
+/** One question the documents could not answer, as the S-4 staff screen lists it. `id` is the refusal's message id. */
+export interface UnansweredQuestion {
+  id: number;
+  question: string;
+  askedAt: string;
+}

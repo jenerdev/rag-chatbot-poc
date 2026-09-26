@@ -15,6 +15,7 @@
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
+//   unanswered.ts  the questions the documents could not answer, for staff
 
 export {
   MATCH_COUNT,
@@ -45,6 +46,7 @@ export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { executeTool, toolsFor } from './tools.js';
+export { listUnanswered, UNANSWERED_LIMIT } from './unanswered.js';
 export type { PromptTools, TenantTools, ToolExecution } from './tools.js';
 export type { ApplicationKey } from './applications.js';
 
@@ -60,4 +62,5 @@ export type {
   StreamMeta,
   TenantContext,
   ToolCallRecord,
+  UnansweredQuestion,
 } from './types.js';

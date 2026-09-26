@@ -284,6 +284,9 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
           Log out
         </button>
       )}
+      <Link className="button" href={`/t/${slug}/admin/unanswered`}>
+        Unanswered
+      </Link>
       {bookingsEnabled && (
         <Link className="button" href={`/t/${slug}/admin/bookings`}>
           Bookings

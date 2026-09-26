@@ -69,10 +69,11 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/page.tsx        S-1 chat — Server Component, resolves the tenant
   app/t/[tenant]/admin/page.tsx  S-2 knowledge base — same
   app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
+  app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
-  components/                    chat-screen, admin-screen, bookings-screen, admin-login, reset-password (Client), brand-header, sources-panel
+  components/                    chat-screen, admin-screen, bookings-screen, unanswered-screen, admin-login, reset-password (Client), brand-header, sources-panel
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → a CHAT TenantContext, 404 on a miss
   lib/admin-auth.ts      the staff session cookie; requireAdmin() re-checks the membership → a STAFF context
@@ -96,7 +97,8 @@ packages/
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     tools/prompt-eval.mjs  the battery, 29 cases (10 + 9 tool-* + 10 lang-*), both tenants; seeds its own bookings
-    tools/isolation.mjs    11 cross-tenant checks through the pipeline
+    src/unanswered.ts      listUnanswered(): the questions answered with NO_ANSWER, for staff
+    tools/isolation.mjs    12 cross-tenant checks through the pipeline
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -113,8 +115,8 @@ pnpm build · typecheck · test   # typecheck runs the service-import check firs
 pnpm --filter @rag/db verify    # 47 checks, no API key needed
 pnpm eval                       # the prompt battery, 29 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks, on chat tokens  ⚠ rule 6
-pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code filters alone (RLS bypassed)
+pnpm --filter @rag/pipeline isolation   # 12 cross-tenant checks, on chat tokens  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 12, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 12, code filters alone
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev

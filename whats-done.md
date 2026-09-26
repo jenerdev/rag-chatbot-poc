@@ -4724,3 +4724,51 @@ the request is found in the stored messages, not the history.
   retrieval).
 - The word lists are Tagalog and English only.
 - The mix is judged by counting words; nobody has listened to it yet.
+
+---
+
+## Unanswered questions screen (S-4) · done 2026-09-27
+
+**What was done:**
+- **`packages/rag/src/unanswered.ts`** (new): `listUnanswered(tenant)`. Two
+  tenant-filtered queries on `messages`: the newest 200 assistant rows whose
+  content is exactly `NO_ANSWER`, then the user rows in those conversations.
+  Each refusal is paired with the latest user message before it in the same
+  conversation. Returns `{ id, question, askedAt }`, mapped field by field.
+- **`GET /api/t/[tenant]/unanswered`**: `withTenantRoute` + `requireAdmin`.
+- **S-4** `app/t/[tenant]/admin/unanswered/page.tsx` and
+  `components/unanswered-screen.tsx`: same session/login pattern as S-3,
+  read-only, with a **Unanswered** link in the knowledge base's header.
+- **`tools/isolation.mjs`**: check 12, `listUnanswered per tenant`.
+
+**Why it mattered:** the refusal is the knowledge base telling staff what is
+missing, and until now it was only visible by reading SQL.
+
+**Why no new table:** every turn is already saved, refusals included, and a
+refusal is always the exact string (D-008 short-circuit, D-035 fallback, the
+grounding prompt). A table would have needed its own RLS policy (R-22) and
+verify checks for data that already exists.
+
+**Trap avoided: pairing by `id - 1`.** Identity values are per row, so a
+concurrent insert could sit between a turn's two rows. The pairing looks for
+the latest user row before the refusal instead.
+
+**Trap avoided: a check that passes on zero rows.** Check 12 asserts that
+northwind's refusal from check 6 IS on northwind's list (the positive twin)
+and is not on villa's, and that the two lists share no ids.
+
+**Checked, not assumed:**
+- isolation 12/12 on chat tokens and 12/12 filters-only: northwind 200 (the
+  limit), villa 68;
+- verify 47/47;
+- tests: pipeline 103, bookings 27, openai 14, chunker 13;
+- typecheck (with the service-import check) and build green; the build lists
+  `ƒ /api/t/[tenant]/unanswered` and `ƒ /t/[tenant]/admin/unanswered`;
+- `buildPrompt()` is untouched, so eval was not re-run.
+
+**Not done:**
+- Not walked in a browser. Running `pnpm build` beside `pnpm dev` replaced the
+  dev server's `.next`, and every page answered 500, so the HTTP check could
+  not run.
+- Partial answers are not caught, only the exact refusal.
+- Northwind's 200 are mostly eval and isolation traffic.

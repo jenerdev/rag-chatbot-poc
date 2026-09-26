@@ -22,7 +22,7 @@
 //
 // Run:  pnpm --filter @rag/pipeline isolation [-- --filters-only]
 import { asOperator, supabase as service } from '@rag/db/service';
-import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, NO_ANSWER } from '../dist/index.js';
+import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
 const filtersOnly = process.argv.includes('--filters-only');
@@ -46,6 +46,10 @@ const hijack = await answerQuestion({ tenant: nw, conversationId: aV.conversatio
 check(hijack.conversationId !== aV.conversationId, 'a villa conversation id is not reused by northwind', `${aV.conversationId.slice(0,8)} -> ${hijack.conversationId.slice(0,8)}`);
 const mX = await getMessages(nw, aV.conversationId), mV = await getMessages(villa, aV.conversationId);
 check(mX === null && mV?.length === 2, 'getMessages cross-tenant is null', `northwind ${mX}, villa ${mV?.length} messages`);
+// Northwind's refusal above is on its unanswered list (the positive twin, so
+// this cannot pass on zero rows) and nowhere on villa's.
+const uN = await listUnanswered(nw), uV = await listUnanswered(villa);
+check(uN.some(u => u.question === q) && !uV.some(u => u.question === q) && !uV.some(v => uN.some(n => n.id === v.id)), 'listUnanswered per tenant', `northwind ${uN.length}, villa ${uV.length}, the refusal only in northwind's`);
 const r = await ingestDocument({ tenant: villaAdmin, title: 'isolation probe', content: 'The probe word is zanzibarquartz.' });
 const inV = (await listDocuments(villa)).some(d => d.id === r.id && d.chunkCount === 1), inN = (await listDocuments(nw)).some(d => d.id === r.id);
 check(inV && !inN, 'ingest lands in the right tenant, chunks and all', `doc ${r.id}, ${r.chunkCount} chunk`);

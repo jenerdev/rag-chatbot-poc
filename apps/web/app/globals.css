@@ -361,3 +361,10 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 .tool-call .day-head { padding: 2px 0; }
 .tool-call .day-label { width: 86px; font-size: 13px; }
 .tool-error { font-size: 13px; color: var(--danger); }
+
+/* --- unanswered questions (S-4) ----------------------------------------- */
+
+.unanswered { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); }
+.unanswered:first-of-type { border-top: 0; }
+.unanswered-question { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.unanswered-when { font-size: 13px; color: var(--muted); white-space: nowrap; }

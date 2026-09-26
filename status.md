@@ -56,6 +56,16 @@
 
 ## ▶ Next up (do this next)
 
+~~**Unanswered questions screen (S-4).**~~ **Done 2026-09-27, uncommitted.**
+`/t/<slug>/admin/unanswered` lists what visitors asked that got the exact
+refusal, newest first, behind `requireAdmin()`. No new table: refusals were
+already saved. Pipeline isolation 12/12 both ways (new `listUnanswered per
+tenant`: northwind 200 at the limit, villa 68), verify 47/47, tests 103/27/14/13,
+typecheck and build green. **Not yet seen in a browser**: the build overwrote
+the running `pnpm dev`'s `.next`, so restart dev (delete `apps/web/.next`),
+log in at `/t/villa/admin`, click **Unanswered**. Northwind's list is mostly
+eval/isolation traffic.
+
 ~~**Taglish replies (D-043).**~~ **Done 2026-09-26, uncommitted.** A question
 in Tagalog or Taglish now gets a Taglish answer. English still gets English,
 and an explicit "Tagalog lang" or "in English" request holds for the whole
