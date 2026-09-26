@@ -1706,7 +1706,7 @@ and sends the friendly text at the end if the whole reply was the marker.
 
 **Limits:**
 - A tenant's own message is one string for every language. Only the default
-  follows the reply language.
+  follows the reply language. **Superseded by D-048.**
 - A reloaded transcript shows the English default, because there is no reply
   language at hand.
 - A partial answer that ends with the marker is shown as written.
@@ -1714,6 +1714,48 @@ and sends the friendly text at the end if the whole reply was the marker.
 **Reverse if:** tenants need a message per language (make the column jsonb
 keyed by language), or the refusal needs to carry a link or button, which
 would be a UI change, not text.
+
+---
+
+## D-048 · A tenant's fallback message is per reply language · **Added 2026-09-27**
+
+**The problem:** D-047's `fallback_message` was one string, so villa's
+Taglish sentence answered English questions too. Meanwhile northwind, with no
+message of its own, got a default that followed the language.
+
+**Decision:**
+- `tenants.fallback_messages` is jsonb, `{english, taglish, tagalog}`, and any
+  key may be missing.
+- `refusalText(tenant, language)` returns the tenant's text for the reply's
+  language, else the built-in default in that language. It never uses another
+  language's custom text, because that is the bug being fixed.
+- The reply language is the one D-043 already decides in code. No model call
+  and no translation happen at reply time.
+
+**How the shape is held:**
+- In Postgres: the `tenants_fallback_messages_shape` check allows only the
+  three keys, each a string of 1–500 characters.
+- In the loader: `fallbackMessagesOf()` keeps only known string keys, so a
+  bad row loses its wording and can't show anything odd.
+
+**Migration:** `schema-auth.sql` copies the old single string into all three
+keys, so nothing visible changed on the day, then drops the old column.
+`tenant_public()` is dropped and recreated for the new return type.
+
+**Unanswered questions are unaffected:** they match the stored marker
+`NO_ANSWER` (`unanswered.ts:51`), and the friendly text is never saved.
+
+**Measured:**
+- tests: 234 in the pipeline, including "a language the tenant did not write
+  gets the default in that language";
+- live on villa: English → its English line, Taglish → its Taglish line,
+  "Tagalog lang po…" → its Tagalog line. Northwind got the default. The
+  stream equalled the JSON reply each time;
+- verify 48/48 (check 42 lists `fallback_messages`), isolation 16/16 both
+  ways.
+
+**Reverse if:** a tenant's visitors write a fourth language. Add the key to
+`LanguagePreference`, the check constraint and the loader together.
 
 ---
 

@@ -56,6 +56,13 @@
 
 ## ▶ Next up (do this next)
 
+~~**Per-language fallback messages (D-048).**~~ **Done 2026-09-27** (code in
+`c6e360c`, record uncommitted). `tenants.fallback_messages` per reply
+language; villa has all three (English and Taglish as the user wrote them,
+Tagalog set by me). Live: each language gets its own line; verify 48/48,
+isolation 16/16 both ways, tests 234. **Next:** commit the record; the
+browser walk.
+
 ~~**Friendly refusal (D-047).**~~ **Done 2026-09-27, uncommitted.** Visitors
 no longer see "I don't know based on the documents I have." It stays the
 internal marker; the chat shows `tenants.fallback_message` (villa: Viber/SMS

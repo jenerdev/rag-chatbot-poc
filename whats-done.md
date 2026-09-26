@@ -5010,3 +5010,48 @@ bought nothing, so it was reverted:
 - A reloaded transcript shows the English default.
 - Not walked in the browser.
 
+---
+
+## Per-language fallback messages (D-048) · done 2026-09-27
+
+**What was done:**
+- **`schema-auth.sql`** (re-run by the user):
+  - `tenants.fallback_messages` jsonb with a shape check;
+  - the old single `fallback_message` copied into all three keys, then
+    dropped;
+  - `tenant_public()` recreated.
+- **`refusal.ts`:** `refusalText()` picks the tenant's text for the reply
+  language, else that language's default.
+- **`tenant.ts`:** `fallbackMessagesOf()` re-checks the jsonb.
+- **`tenant.mjs`:** `tenant:fallback -- <slug> <language> "<message>"`,
+  `<language> --clear`, `--clear`, or no argument to show all three. An unknown
+  language is refused.
+- **Tests:** `refusal.test.ts`, 234 in the pipeline.
+
+**Why it mattered:** villa's English-speaking visitors were answered in
+Taglish, while northwind, with no custom text, was answered in theirs.
+
+**A mistake, caught and undone:** after the SQL ran, the user had already
+set their own English and Taglish wording. My script set English and
+Tagalog without reading first, and overwrote their English. The first line
+of the script's output showed their text, so it was restored word for word
+straight away:
+- English: "Sorry, we don't have any information about that yet. You can
+  message us on Viber or SMS at 0917-845-2290 so we can assist you.";
+- Taglish: untouched;
+- Tagalog: the migrated copy of the old Taglish sentence was replaced by a
+  real Tagalog line, "Paumanhin po, wala pa kaming impormasyon…". The user was
+  offered the old one back.
+
+The lesson: read a tenant's settings before writing them. `tenant:fallback
+-- <slug>` shows them.
+
+**Checked, not assumed:**
+- live:
+  - "Do you offer massage?" → villa's English line;
+  - "May massage service po ba kayo?" → its Taglish line;
+  - "Tagalog lang po. May masahe po ba kayo?" → its Tagalog line;
+  - northwind → the built-in default;
+  - `refused` was true each time, and the stream equalled the JSON;
+- verify 48/48; isolation 16/16 both ways; typecheck green.
+
