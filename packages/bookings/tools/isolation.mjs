@@ -11,10 +11,16 @@
 //   * ONE booking in villa, 300 days out, HARD-deleted at the end. Cancelling
 //     it would leave a row in villa's real history.
 //
-// Run:  pnpm --filter @rag/bookings isolation
+// TWO WALLS (auth-rls Rule 1). By default staff work runs as each tenant's
+// OPERATOR member, on a staff token, as the admin routes' does, so both the
+// code filters and RLS stand in the way. With --filters-only it runs on the
+// service client: RLS bypassed, the tenant_id filters alone. Both must pass.
+// Needs: pnpm --filter @rag/db member:operator -- villa (and northwind)
+//
+// Run:  pnpm --filter @rag/bookings isolation [-- --filters-only]
 
-import { mintTenantToken, scopedClient } from '@rag/db';
-import { supabase } from '@rag/db/service';
+import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
+import { asOperator, operatorEmail, supabase, userIdByEmail } from '@rag/db/service';
 import {
   BookingConflictError,
   BookingInputError,
@@ -48,16 +54,16 @@ const { data: tenants, error: tenantError } = await supabase
   .select('id, slug')
   .in('slug', ['villa', 'northwind']);
 if (tenantError) throw new Error(tenantError.message);
-// Staff work (list, book, cancel) runs on the service client. RLS is
-// bypassed, so every check below is the CODE FILTERS' wall, alone (auth-rls
-// Rule 1). Until Phase 5 there is no member to mint a staff token for anyway.
-// Availability is what the chatbot asks, so it runs on a CHAT token, as the
-// tool executor's does. That also puts the security-definer
-// check_availability's own tenant check in the path.
-const withDb = (t) => t && { id: t.id, slug: t.slug, db: supabase };
+// Staff work (list, book, cancel) runs as each tenant's operator, or on the
+// service client with --filters-only. Availability is what the chatbot asks,
+// so it always runs on a CHAT token, as the tool executor's does. That also
+// puts the security-definer check_availability's own tenant check in the path.
+const filtersOnly = process.argv.includes('--filters-only');
+console.log(filtersOnly ? 'WALL: code filters alone (service client, RLS bypassed)' : 'WALL: filters + RLS (operator staff tokens, as the admin routes)');
+const staff = (t) => t && (filtersOnly ? { id: t.id, slug: t.slug, db: supabase } : asOperator({ id: t.id, slug: t.slug }));
 const chat = (t) => ({ ...t, db: scopedClient(mintTenantToken({ tenantId: t.id })) });
-const villa = withDb(tenants.find((t) => t.slug === 'villa'));
-const northwind = withDb(tenants.find((t) => t.slug === 'northwind'));
+const villa = await staff(tenants.find((t) => t.slug === 'villa'));
+const northwind = await staff(tenants.find((t) => t.slug === 'northwind'));
 if (!villa || !northwind) throw new Error('Needs tenants villa and northwind');
 
 // 300 days out, in villa's timezone: far enough that no real booking is there.
@@ -74,7 +80,18 @@ const { data: probeRow, error: probeError } = await supabase
   .select('id, slug')
   .single();
 if (probeError) throw new Error(`Could not create the probe tenant: ${probeError.message}`);
-const probe = { id: probeRow.id, slug: probeRow.slug, db: supabase };
+// The probe's staff: villa's operator, made a member of the probe for this
+// run only (deleting the probe tenant cascades to the membership). So this
+// user is a member of BOTH tenants, and the checks below prove a member of
+// two tenants still sees only the tenant its token names.
+let probeDb = supabase;
+if (!filtersOnly) {
+  const operatorId = await userIdByEmail(operatorEmail('villa'));
+  await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: probeRow.id });
+  probeDb = await staffClient(probeRow.id, operatorId);
+  if (!probeDb) throw new Error('Could not make the probe operator a member');
+}
+const probe = { id: probeRow.id, slug: probeRow.slug, db: probeDb };
 
 let villaBookingId = null;
 try {

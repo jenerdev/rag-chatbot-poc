@@ -63,14 +63,33 @@ export const chatSchema = z.object({
     ),
 });
 
-/** An admin login. The key is checked against a scrypt hash, never compared as text. */
-export const adminLoginSchema = z.object({
-  key: z
-    .string({ required_error: 'An admin key is required', invalid_type_error: 'An admin key is required' })
-    .min(1, 'An admin key is required')
-    // Generated keys are 43 characters. The cap stops a megabyte "key" from
-    // costing a megabyte of scrypt input.
-    .max(256, 'That is not an admin key'),
+const email = z
+  .string({ required_error: 'An email is required', invalid_type_error: 'An email is required' })
+  .trim()
+  .min(1, 'An email is required')
+  .max(320, 'That is not an email address')
+  .email('That is not an email address');
+
+// Supabase Auth's minimum is 6 by default. The cap stops a megabyte
+// "password" from reaching Supabase at all.
+const password = z
+  .string({ required_error: 'A password is required', invalid_type_error: 'A password is required' })
+  .min(1, 'A password is required')
+  .max(256, 'That password is too long');
+
+/** A staff login (auth-rls Phase 5). Checked by Supabase Auth, then against `memberships`. */
+export const adminLoginSchema = z.object({ email, password });
+
+/** "Forgot password?" The same answer whether or not the email has an account. */
+export const passwordResetSchema = z.object({ email });
+
+/** A new password, with the access token from the reset (or invite) link. */
+export const setPasswordSchema = z.object({
+  accessToken: z
+    .string({ required_error: 'The reset link is incomplete', invalid_type_error: 'The reset link is incomplete' })
+    .min(1, 'The reset link is incomplete')
+    .max(8192, 'The reset link is not valid'),
+  password: password.min(8, 'Use at least 8 characters'),
 });
 
 /**

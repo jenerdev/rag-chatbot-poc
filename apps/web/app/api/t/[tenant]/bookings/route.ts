@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
  * `GET /api/t/<slug>/bookings?from=2026-10-01&to=2026-10-31`
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant);
   await requireApplication(tenant, 'bookings');
 
   const url = new URL(request.url);
@@ -35,7 +35,7 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
 
 /** Book a slot. 201 with the booking, 409 if the span is taken, 400 on bad input. */
 export const POST = withTenantRoute(async (request, { tenant }) => {
-  requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant);
   await requireApplication(tenant, 'bookings');
 
   const parsed = createBookingSchema.safeParse(await request.json().catch(() => null));

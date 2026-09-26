@@ -6,6 +6,7 @@
 
 export { anonClient, mintTenantToken, scopedClient, TENANT_TOKEN_SECONDS } from './tenant-client.js';
 export type { DbClient } from './tenant-client.js';
+export { requestPasswordReset, setPasswordWithToken, signInStaff, staffClient, StaffAuthError } from './staff-auth.js';
 export { generateAdminKey, hashAdminKey, verifyAdminKey } from './admin-key.js';
 export type { Database, Json, StoredVector, VectorInput } from './database.types.js';
 

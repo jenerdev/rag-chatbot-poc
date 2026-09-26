@@ -76,9 +76,12 @@ packages/
   db/                  @rag/db — tenant-token clients, the types, sql/ (5 files), and server-only
     src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
-    src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
+    src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
+    src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey — unused since auth-rls Phase 5, deleted in Phase 6
     tools/verify.mjs     47 checks (19 through tenant tokens: RLS), no API key
-    tools/tenant.mjs     tenant:add / tenant:key — prints a key once
+    tools/tenant.mjs     tenant:add / tenant:key — prints a key once (the key opens nothing since Phase 5)
+    tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
+    tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     tools/isolation.mjs    12 cross-tenant checks, no API key
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
@@ -104,6 +107,10 @@ pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code fi
 pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, no API key
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # key printed ONCE
 pnpm --filter @rag/db tenant:key -- <slug>                              # new key; old one dies
+pnpm --filter @rag/db member:add -- <slug> <email>        # invites a new account; the link sets a password
+pnpm --filter @rag/db member:remove -- <slug> <email>     # effective on their NEXT request
+pnpm --filter @rag/db member:list -- <slug>
+pnpm --filter @rag/db member:operator -- <slug>           # the tools' own member; eval and isolation need it
 ```
 
 ## The rules you will be tempted to break
@@ -208,9 +215,12 @@ All are expanded in `risks.md`.
 - Validate at the route boundary, throw in the pipeline, map errors to status
   codes in exactly one place (`apps/web/lib/route.ts`).
 - Every Route Handler lives under `app/api/t/[tenant]/` and is wrapped in
-  `withTenantRoute()` (which wraps `withRoute()`). Admin-only handlers call
-  `requireAdmin(request, tenant)` first, then `requireApplication()` if the
-  route belongs to an application. The chat route stays open.
+  `withTenantRoute()` (which wraps `withRoute()`), which hands it a CHAT
+  context. Admin-only handlers start with `tenant = await requireAdmin(request,
+  tenant)`, which re-checks the membership and swaps in a STAFF context, so no
+  later line can touch the database as the chat token. Then
+  `requireApplication()` if the route belongs to an application. The chat
+  route stays open.
 - Every tenant-owned query carries `.eq('tenant_id', tenant.id)` — rule 6.
   "Not yours" and "not there" must look identical (`[]`, `null`, 404), or ids
   can be enumerated across tenants.

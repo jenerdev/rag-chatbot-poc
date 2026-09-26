@@ -1,30 +1,37 @@
 import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { verifyAdminKey } from '@rag/db';
+import { signInStaff, staffClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
 
-// Per-tenant admin sessions (plan.md Phase 6, D-028). Hand-rolled on
-// node:crypto, with no NextAuth or Supabase Auth, because "no library does a
-// step" holds here too.
+// Staff sessions (auth-rls Phase 5, D-040; the cookie is D-028's).
+//
+// WHO YOU ARE is Supabase Auth's job: an email and password, checked once at
+// login (@rag/db's staff-auth.ts). WHETHER YOU MAY ADMINISTER THIS TENANT is
+// ours: a `memberships` row, re-checked on EVERY request, so removing a member
+// takes effect on their next click, not when the cookie runs out.
 //
 // THE SHAPE
 // ---------
-// Logging in with a tenant's admin key sets a cookie holding
+// Logging in sets a cookie holding
 //
-//     <slug>.<expiry-ms>.<hmac-sha256(slug.expiry, ADMIN_COOKIE_SECRET)>
+//     <slug>.<user-id>.<expiry-ms>.<hmac-sha256(slug.user-id.expiry, ADMIN_COOKIE_SECRET)>
 //
-// There is no session table. The HMAC is what makes the cookie unforgeable, and
-// the expiry inside it is what makes it end.
+// There is no session table. The HMAC is what makes the cookie unforgeable,
+// and the expiry inside it is what makes it end. Slugs have no dots
+// (tenants_slug_shape) and a uuid has none, so `.` is a safe separator.
+//
+// A request that passes requireAdmin() gets a STAFF context back: a token
+// with this user as `sub` and `app_admin`. Postgres's app_is_admin() then
+// checks the membership AGAIN on every write, so even a bug here cannot
+// write for a non-member.
 //
 // THE PATH IS PART OF THE SECURITY
 // --------------------------------
 // The cookie is set with `path: /api/t/<slug>`. A browser sends a cookie only
 // to URLs under its path, so villa's cookie never even reaches a request to
 // /api/t/northwind/…. (`/api/t/villa` does not path-match `/api/t/villa2`;
-// the next character must be `/`.) plan.md said `/t/<slug>`, but the routes
-// this cookie guards live under `/api/t/<slug>`, so with that path the cookie
-// would never be sent to them.
+// the next character must be `/`.)
 //
 // That path is a courtesy of the browser, not a guarantee. curl sends whatever
 // it is given. So readSession() ALSO checks that the slug inside the cookie is
@@ -34,6 +41,13 @@ export const ADMIN_COOKIE = 'rag_admin';
 
 /** How long a login lasts. Long enough for a working session; short enough that a forgotten tab ends. */
 const SESSION_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * The ONE message for every failed login: a wrong password, an unknown email,
+ * and a real account that is not a member of this tenant. An attacker learns
+ * nothing about which emails exist or who belongs where.
+ */
+export const LOGIN_FAILED = 'That email and password do not match a staff account for this workspace.';
 
 function secret(): string {
   const value = process.env.ADMIN_COOKIE_SECRET ?? '';
@@ -47,36 +61,39 @@ function sign(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url');
 }
 
-/** The cookie value for a fresh session. Slugs contain no dots (tenants_slug_shape), so `.` is a safe separator. */
-export function signSession(slug: string, expiresAt: number): string {
-  const payload = `${slug}.${expiresAt}`;
+/** The cookie value for a fresh session. */
+export function signSession(slug: string, userId: string, expiresAt: number): string {
+  const payload = `${slug}.${userId}.${expiresAt}`;
   return `${payload}.${sign(payload)}`;
 }
 
 /**
- * Is this request carrying a live admin session for THIS tenant?
+ * The user id in this request's session cookie for THIS tenant, or null.
  *
  * Three checks, all of which must pass: the HMAC is ours (`timingSafeEqual`,
  * never `===`), the slug inside it is the tenant in the URL, and it has not
- * expired.
+ * expired. This says only that the cookie is genuine. Whether the user is
+ * still a member is requireAdmin()'s question.
  */
-export function readSession(request: Request, tenant: TenantContext): boolean {
+export function readSession(request: Request, tenant: TenantContext): string | null {
   const cookie = request.headers.get('cookie') ?? '';
   const raw = cookie
     .split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${ADMIN_COOKIE}=`))
     ?.slice(ADMIN_COOKIE.length + 1);
-  if (!raw) return false;
+  if (!raw) return null;
 
-  const [slug, expiry, mac] = decodeURIComponent(raw).split('.');
-  if (!slug || !expiry || !mac) return false;
+  // A cookie from before auth-rls Phase 5 has three parts, not four, and so
+  // is refused here: everyone logs in again, with an email this time.
+  const [slug, userId, expiry, mac, ...extra] = decodeURIComponent(raw).split('.');
+  if (!slug || !userId || !expiry || !mac || extra.length > 0) return null;
 
-  const expected = Buffer.from(sign(`${slug}.${expiry}`));
+  const expected = Buffer.from(sign(`${slug}.${userId}.${expiry}`));
   const given = Buffer.from(mac);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return false;
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
 
-  return slug === tenant.slug && Number(expiry) > Date.now();
+  return slug === tenant.slug && Number(expiry) > Date.now() ? userId : null;
 }
 
 /** A 401 carrying the real reason, raised through withRoute's single error map. */
@@ -85,58 +102,39 @@ class AdminAuthError extends Error {
 }
 
 /**
- * Guard an admin-only handler. Throws a 401 unless the request has a session
- * for this tenant.
+ * Guard an admin-only handler, and hand back the STAFF context it runs on.
  *
- * A throw rather than a returned response, so a guarded handler is one line and
- * cannot forget to `return` it. `errorResponse()` passes a 401 status through
- * unchanged (lib/route.ts).
+ * Throws a 401 unless the request has a session for this tenant AND the
+ * user is still a member. Callers replace their chat context with the result:
+ *
+ *     tenant = await requireAdmin(request, tenant);
+ *
+ * so no line after the guard can reach the database as the chat token by
+ * mistake. A throw rather than a returned response, so a guarded handler is
+ * one line and cannot forget to `return` it.
  */
-export function requireAdmin(request: Request, tenant: TenantContext): void {
-  if (!readSession(request, tenant)) {
-    throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
-  }
+export async function requireAdmin(request: Request, tenant: TenantContext): Promise<TenantContext> {
+  const userId = readSession(request, tenant);
+  if (!userId) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
+  const db = await staffClient(tenant.id, userId);
+  if (!db) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
+  return { ...tenant, db };
 }
 
 /**
- * Check a submitted key against this tenant's stored hash.
- *
- * The hash is selected here and only here, as ONE named column. It never goes
- * into a TenantContext, and never into anything that might be serialised into
- * a response.
+ * Email + password, then the membership. The user id on success, or null,
+ * which the route turns into LOGIN_FAILED whatever the reason was.
  */
-export async function checkAdminKey(tenant: TenantContext, key: string): Promise<'ok' | 'wrong' | 'unset'> {
-  // ⚠️ THE ONE `@rag/db/service` USE OUTSIDE tools/, until auth-rls Phase 6.
-  // This must read tenants.admin_key_hash, and no token can reach that
-  // column: `tenants` has no policies, and tenant_public() leaves it out, on
-  // purpose. Phase 6 deletes the admin key, this function, and this import.
-  //
-  // Imported HERE, lazily, not at the top of the file. Every admin route
-  // imports this module for requireAdmin(), and a top-level import would
-  // construct the service client, which throws on a missing key, for all of
-  // them. So only the admin-key login needs SUPABASE_SERVICE_ROLE_KEY, and
-  // the web process runs without it otherwise (auth-rls Phase 4).
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Admin-key login needs SUPABASE_SERVICE_ROLE_KEY until auth-rls Phase 6 (staff accounts replace it)');
-  }
-  const { supabase } = await import('@rag/db/service');
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('admin_key_hash')
-    .eq('id', tenant.id)
-    .single();
-  if (error) throw new Error(`Could not load the admin key: ${error.message}`);
-  // NULL = nobody can administer this tenant (default-deny). This is a
-  // different message from a wrong key, because a key-less tenant is a setup
-  // problem that the person at the keyboard needs to know about.
-  if (!data.admin_key_hash) return 'unset';
-  return (await verifyAdminKey(key, data.admin_key_hash)) ? 'ok' : 'wrong';
+export async function checkStaffLogin(tenant: TenantContext, email: string, password: string): Promise<string | null> {
+  const userId = await signInStaff(email, password);
+  if (!userId) return null;
+  return (await staffClient(tenant.id, userId)) ? userId : null;
 }
 
 /** Attach the session cookie, scoped to this tenant's API path. */
-export function setSessionCookie(response: NextResponse, tenant: TenantContext): NextResponse {
+export function setSessionCookie(response: NextResponse, tenant: TenantContext, userId: string): NextResponse {
   const expiresAt = Date.now() + SESSION_MS;
-  response.cookies.set(ADMIN_COOKIE, signSession(tenant.slug, expiresAt), {
+  response.cookies.set(ADMIN_COOKIE, signSession(tenant.slug, userId, expiresAt), {
     httpOnly: true, // no script can read it, so an XSS cannot exfiltrate it
     sameSite: 'lax', // not sent on cross-site POSTs, which is the CSRF half
     secure: process.env.NODE_ENV !== 'development',

@@ -24,9 +24,8 @@ const REQUIRED = [
   // can mint any claim.
   'TENANT_SIGNING_JWK',
   // SUPABASE_SERVICE_ROLE_KEY is deliberately NOT here since auth-rls Phase 4.
-  // No request path needs it. The admin-key login still does, until Phase 6,
-  // and checks for it itself (lib/admin-auth.ts), so the web process can run
-  // without the master key.
+  // Since Phase 5 no code in the web app uses it at all: staff log in through
+  // Supabase Auth and act through staff tokens. Only tools/ hold it.
   // Signs the admin session cookie (lib/admin-auth.ts). Without it, no admin
   // could ever log in, so a missing one gets the same one-clear-sentence
   // treatment as a missing API key.

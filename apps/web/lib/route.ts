@@ -15,7 +15,7 @@ import { assertEnv } from './env';
 // below has to be applied to EVERY handler by hand — one missed wrapper and
 // that route silently stops reporting why it failed.
 
-/** An error carrying an HTTP status: OpenAIError, AdminAuthError, and @rag/bookings' three. */
+/** An error carrying an HTTP status: OpenAIError, AdminAuthError, StaffAuthError, and @rag/bookings' three. */
 function statusOf(error: unknown): number | undefined {
   const status = (error as { status?: unknown }).status;
   return typeof status === 'number' ? status : undefined;
@@ -28,7 +28,8 @@ function statusOf(error: unknown): number | undefined {
  * (plan/bookings.md Phase 3). Before that, a BookingConflictError would have
  * reached the browser as a 500, as if the server had broken.
  */
-const CLIENT_STATUSES = new Set([400, 401, 404, 409]);
+// 429: Supabase Auth's sign-in rate limit, passed on as itself (auth-rls Phase 5).
+const CLIENT_STATUSES = new Set([400, 401, 404, 409, 429]);
 
 /**
  * Map a thrown error to a response.

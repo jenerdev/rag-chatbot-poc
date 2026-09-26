@@ -25,7 +25,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "node --conditions=react-server --env-file=../../.env tools/verify.mjs",
     "tenant:add": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs add",
-    "tenant:key": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs key"
+    "tenant:key": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs key",
+    "member:add": "node --conditions=react-server --env-file=../../.env tools/member.mjs add",
+    "member:remove": "node --conditions=react-server --env-file=../../.env tools/member.mjs remove",
+    "member:list": "node --conditions=react-server --env-file=../../.env tools/member.mjs list",
+    "member:operator": "node --conditions=react-server --env-file=../../.env tools/member.mjs operator"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2",

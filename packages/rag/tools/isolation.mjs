@@ -15,12 +15,13 @@
 // filters are left. The suite must pass BOTH ways. Passing only the first
 // would mean nobody knows whether the filters still hold.
 //
-// Admin writes (the probe ingest and its delete) run on the service client in
-// both modes, until auth-rls Phase 5 gives the tools an operator member to
-// mint a staff token for. That is setup, not the thing under test.
+// Admin writes (the probe ingest and its delete) run as villa's OPERATOR
+// member, on a staff token, as the admin routes' do (auth-rls § 2.7). With
+// --filters-only they run on the service client like everything else.
+// Needs: pnpm --filter @rag/db member:operator -- villa
 //
 // Run:  pnpm --filter @rag/pipeline isolation [-- --filters-only]
-import { supabase as service } from '@rag/db/service';
+import { asOperator, supabase as service } from '@rag/db/service';
 import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
@@ -28,7 +29,7 @@ const filtersOnly = process.argv.includes('--filters-only');
 const as = (t) => (t && filtersOnly ? { ...t, db: service } : t);
 console.log(filtersOnly ? 'WALL: code filters alone (service client, RLS bypassed)' : 'WALL: filters + RLS (chat tokens, as the app)');
 const nw = as(await loadTenant('northwind')), villa = as(await loadTenant('villa'));
-const villaAdmin = { ...villa, db: service }; // until Phase 5's operator member
+const villaAdmin = filtersOnly ? villa : await asOperator(villa);
 check(nw && villa && (await loadTenant('nope')) === null, 'loadTenant', `northwind ${nw?.id}, villa ${villa?.id}, nope null`);
 check(!('adminKeyHash' in nw) && !('admin_key_hash' in nw), 'no admin hash in TenantContext', Object.keys(nw).join(','));
 const dn = await listDocuments(nw), dv = await listDocuments(villa);

@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 4 done)
+> Last updated: 2026-09-26 (auth-rls Phase 5 done)
 
 ---
 
@@ -39,7 +39,9 @@
   no access path and the ids are identical, so nothing changed. **Phase 3
   done:** every request runs on a tenant token. Admin writes are broken until
   Phase 5, as planned. **Phase 4 done:** chat works with the service key
-  unset in the web process. Next is Phase 5. Bookings is complete and merged
+  unset in the web process. **Phase 5 done:** staff log in with Supabase
+  Auth, admin writes work again, and the web app no longer imports the
+  service client at all. Next is Phase 6. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -192,16 +194,40 @@ Phase 2").
   (a Phase 6 item). `admin-auth.ts` now imports the service client lazily,
   inside `checkAdminKey()`.
 
-**▶ Auth + RLS Phase 5: staff accounts.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 5.
-- Email + password login (Supabase Auth, then a membership check, then our
-  HMAC cookie carrying the user id).
-- `requireAdmin()` re-checks the membership on every request and mints a
-  staff token.
-- The password reset flow.
-- `tools/member.mjs`, and the tools' operator member.
-- The six curl cases in the plan.
-- This is what brings the admin writes back.
+~~**Auth + RLS Phase 5: staff accounts.**~~ **Done 2026-09-26.**
+- **Login:** email + password through Supabase Auth, then the membership,
+  then our cookie `<slug>.<userId>.<expiry>.<mac>`.
+- **Every admin request:** `tenant = await requireAdmin(…)` re-checks the
+  membership and swaps in a staff token.
+- **Also built:**
+  - the reset flow: "Forgot password?", then `/t/<slug>/admin/reset`, then
+    `…/admin/password`;
+  - `tools/member.mjs` and the operator members (`rag-operator+<slug>@example.com`);
+  - the eval, and both isolation suites (`--filters-only` on bookings too),
+    run their staff work as the operator.
+- **Measured:**
+  - **the six plan cases pass** (`staff-cases.mjs`), with the web process
+    holding NO service key;
+  - a member can add and delete a document, and book and read a booking back
+    with its guest name;
+  - verify 47/47, isolation 11/11 + 11/11, bookings isolation 12/12 + 12/12;
+  - eval 18/19 with identical verdicts; snapshot identical;
+  - in the browser: invite link → set password → log in → log out works.
+- **Pending:** the "Forgot password?" email. Supabase's built-in sender
+  returned `429 over_email_send_rate_limit` (R-21). Retry once the hourly cap
+  resets. It uses the same page and route the invite already exercised.
+- **Deviation:** the admin-key login is gone NOW, not in Phase 6. The way back
+  in is `member:add`.
+
+**▶ Auth + RLS Phase 6: remove the old.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 6.
+- Drop `tenants.admin_key_hash`.
+- Delete `admin-key.ts`, `tenant:key`, and the key half of `tenant.mjs`.
+- Add the import check (a script in `pnpm typecheck` that fails on
+  `@rag/db/service` under apps/ or packages/*/src).
+- `next build` with no service key in its environment.
+- Already done early: the service key is off the REQUIRED list (Phase 4), and
+  the key login is gone (Phase 5).
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -735,6 +761,35 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 5)
+- **Did:**
+  - `@rag/db` `staff-auth.ts`: `signInStaff`, `staffClient`,
+    `requestPasswordReset` and `setPasswordWithToken`;
+  - rewrote `admin-auth.ts` (a four-part cookie; an async `requireAdmin`
+    returning a staff context);
+  - all 9 guarded handlers now use `tenant = await requireAdmin(…)`;
+  - the login form takes email + password, with "Forgot password?";
+  - the reset page and its two routes;
+  - 429 added to the error map;
+  - `member.mjs` plus the operator helpers in `@rag/db/service`, and the
+    tools moved onto operator tokens;
+  - `staff-cases.mjs`.
+- **Observed:**
+  - the six cases pass, and admin writes work again, all with the web
+    process holding no service key;
+  - all the suites hold;
+  - the browser invite flow works.
+- **Found:**
+  - my first bookings check proved nothing, because a chat token also gets
+    `200 []`. It now books a real row and reads back its guest name.
+  - Supabase refuses to send to `example.com` (a 500, versus 200 for an
+    unknown email), and the built-in sender hit its hourly cap
+    (`over_email_send_rate_limit`). That became R-21, with an accurate error
+    message.
+  - `member.mjs`'s `process.exit(1)` crashed Node on Windows with a libuv
+    assertion, so it now throws instead.
+- **Next:** retry the reset email, then Phase 6.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 4)
 - **Did:**

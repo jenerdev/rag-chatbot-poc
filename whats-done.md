@@ -4342,3 +4342,117 @@ chat included, so Phase 4's own done-when could not pass.
   date in ISO form, which made the model ask "Which date do you mean?"
   instead of calling the tool. Neither was an auth effect. The walk now uses
   the phrasing the passing suites use.
+
+---
+
+## Auth + RLS Phase 5 — staff accounts · done 2026-09-26 (reset email pending)
+
+**What was done:**
+- **`@rag/db` `src/staff-auth.ts`:**
+  - `signInStaff` (Supabase Auth `signInWithPassword`; the session is revoked
+    straight away with `signOut({ scope: 'local' })`);
+  - `staffClient(tenantId, userId)`: mints a staff token, then reads the
+    membership through it, relying on `memberships_read_own`;
+  - `requestPasswordReset`, and `setPasswordWithToken` (a raw
+    `PUT /auth/v1/user`).
+- **`apps/web/lib/admin-auth.ts` rewritten:**
+  - the cookie is now `<slug>.<userId>.<expiry>.<mac>`;
+  - `requireAdmin()` is async and returns a staff context;
+  - all 9 guarded handlers start with `tenant = await requireAdmin(request,
+    tenant)`.
+- **Login and reset UI:**
+  - `LoginForm` takes email + password, with "Forgot password?";
+  - `/t/<slug>/admin/reset` is served by `reset-password.tsx`, which reads
+    the token from the #fragment, wipes it from the address bar, and posts it
+    once to `…/admin/password`;
+  - `…/admin/password-reset` sends the email;
+  - 429 now passes through the error map.
+- **The member CLI and the operator:**
+  - `tools/member.mjs` has add, remove, list and operator;
+  - `@rag/db/service` gained `operatorEmail`, `userIdByEmail` and
+    `asOperator`;
+  - the eval's seeding, rag isolation's probe ingest, and bookings
+    isolation's staff work all run as the operator member on staff tokens.
+    Bookings isolation also gained `--filters-only`.
+- **`tools/staff-cases.mjs`** runs the plan's six cases and more over HTTP.
+
+**Why it mattered:** this replaces one shared key per tenant, which anyone
+holding could use and nobody could revoke for just one person, with accounts.
+The database checks each account's membership on every write
+(`app_is_admin()`), and the app re-checks it on every request. It also
+brings back the admin writes that Phases 3–4 had knowingly broken.
+
+**What each observed value proves**
+(`plan/baseline/staff-cases-auth-phase5.txt`, and the web process had
+`SUPABASE_SERVICE_ROLE_KEY` EMPTY throughout):
+- **1: a member's login → 200, and a four-part cookie.**
+- **2, 3, 4: a wrong password, an unknown email, and a real account that is a
+  member of nothing → 401 each, with byte-identical messages.** The login
+  reveals nothing about which emails exist or who belongs where.
+- **6: northwind's cookie sent by hand to villa → 401.** The slug inside the
+  HMAC is checked, not just the browser's cookie path.
+- **5: the member removed mid-session → the SAME cookie gets 401 `"…no longer
+  a member of villa"`, and the session endpoint says `admin: false`.**
+  Removal takes effect on the next request, not at cookie expiry.
+- **A member adds (201) and deletes (200) a document, and books a slot (201)
+  and lists it back with its guest name.** Staff tokens read guest data where
+  chat tokens cannot. A chat token would also have got `200 []` from the list,
+  which is why the check books a real row.
+- **All of it runs with no service key in the web process.**
+  `grep @rag/db/service` over apps/ and packages/*/src finds no imports:
+  Phase 3's one exception is gone.
+- **The suites** (`plan/baseline/*-auth-phase5.txt`):
+  - verify 47/47;
+  - rag isolation 11/11, and 11/11 `--filters-only`;
+  - bookings isolation 12/12 on operator staff tokens, and 12/12
+    `--filters-only`;
+  - eval 18/19 with verdicts identical to the pre-auth baseline, its fixture
+    now seeded by a staff token;
+  - snapshot byte-identical; unit tests 13 + 14 + 27 + 45.
+- **The browser, from the server log:**
+  - `member:add` sent an invite to a yopmail.com inbox;
+  - the link opened the reset page, and `POST …/admin/password` returned 200;
+  - `POST …/admin/session` returned 200, then `DELETE` logged out.
+
+  The invite path works end to end.
+
+**Pending:** the "Forgot password?" email.
+- Both attempts got `429 over_email_send_rate_limit`: Supabase's built-in
+  sender had used up its hourly cap (R-21).
+- The recovery link lands on the same page, with `type=recovery` instead of
+  `invite`, and posts to the same route. Retry it once the cap resets.
+
+**Deviations from the plan, with the reasoning:**
+1. **The admin-key login is removed in Phase 5, not kept until Phase 6.**
+   - A key session has no user, so there is no `sub` to mint a staff token
+     for. Keeping it would have meant keeping the service client in the web
+     app for the key path.
+   - The plan's "way back in" is served better by `member:add`, which runs
+     with service_role in a tool and can always create a member.
+   - Phase 6 is left with the column drop, deleting `admin-key.ts` and
+     `tenant:key`, and the import check.
+2. **`requireAdmin()` returns the staff context, and callers reassign
+   `tenant`.** The plan says requireAdmin "mints a staff token". Making the
+   guard's result the only way to get one means no line after it can use
+   the chat token by mistake.
+3. **The membership check reads through the staff token** (the
+   `memberships_read_own` policy), not with service_role. So the check itself
+   is under RLS.
+4. **`setPasswordWithToken` is a raw `fetch`**, not supabase-js's
+   `updateUser()`. That needs a full session (refresh token included) set on
+   a client. The access token from the link is all the call needs, and the
+   browser gets no supabase-js at all.
+
+**Traps avoided:**
+- **A check that passes for the wrong reason.** "200 and an array" from the
+  bookings list is also what a chat token gets. The check books a real row
+  and requires its guest name back.
+- **One message for two limits.** Supabase has a sign-in limit and an email
+  cap. "Wait a few minutes" was wrong for the hourly email cap, so
+  `over_email_send_rate_limit` now gets its own message.
+- **`process.exit()` on Windows** with a supabase-js keep-alive socket open
+  crashes Node (`!(handle->flags & UV_HANDLE_CLOSING)`) and buries the real
+  message. `member.mjs` now throws, prints the message alone, and lets Node
+  exit by itself.
+- **A token in the address bar.** The reset page wipes the `#access_token`
+  from history as soon as it has read it.

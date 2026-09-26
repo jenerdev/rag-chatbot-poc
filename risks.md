@@ -372,6 +372,30 @@ say which.
 
 ---
 
+## R-21 · Supabase's built-in email sender caps staff email · **Blocks real staff; configuration fixes it**
+
+**The risk:** invites and password resets go by email. Supabase's built-in
+sender allows only a few emails an hour.
+- Observed in auth-rls Phase 5: an invite plus two reset requests used it up.
+  The next reset got `429 over_email_send_rate_limit`.
+- A real team onboarding, or one person who forgot a password twice, runs
+  into it.
+
+**Also measured:** the sender refuses undeliverable addresses (`example.com`)
+with `Email address … is invalid`.
+- The reset route surfaces that as a 500, while an unknown email gets the
+  generic 200.
+- So for accounts at undeliverable addresses, the tools' operators included,
+  the reset route shows that the account exists.
+- Those addresses are documented in the code anyway, and real staff addresses
+  are deliverable. It is kept visible rather than swallowed (architecture.md
+  § 9).
+
+**What fixes it:** custom SMTP (plan/auth-rls.md § 2.6), before any real staff
+are invited.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product

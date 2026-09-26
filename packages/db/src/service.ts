@@ -34,6 +34,8 @@ import 'server-only';
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types.js';
+import { staffClient } from './staff-auth.js';
+import type { DbClient } from './tenant-client.js';
 
 // The SERVICE ROLE key (D-006, superseded for requests by D-039).
 //
@@ -51,3 +53,45 @@ export const supabase = createClient<Database>(
     },
   },
 );
+
+// ---------------------------------------------------------------------------
+// The tools' OPERATOR member (plan/auth-rls.md § 2.7).
+//
+// The eval seeds bookings and the isolation suites ingest a probe document.
+// That is staff work, and the app does staff work with a staff token. So the
+// tools do too, as a real member with a documented address, not by quietly
+// keeping service_role for it. Create one per tenant with
+//
+//     pnpm --filter @rag/db member:operator -- <slug>
+//
+// The account has a random password that is never printed or used. The tools
+// mint its staff token directly, the same way requireAdmin() does.
+
+/** The operator's email for a tenant. `example.com` is reserved, so no mail ever goes to it. */
+export const operatorEmail = (slug: string) => `rag-operator+${slug}@example.com`;
+
+/** A user's id by email, through the admin API, or null. */
+export async function userIdByEmail(email: string): Promise<string | null> {
+  const wanted = email.toLowerCase();
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`Could not list users: ${error.message}`);
+    const found = data.users.find((user) => user.email?.toLowerCase() === wanted);
+    if (found) return found.id;
+    if (data.users.length < 1000) return null;
+  }
+}
+
+/**
+ * The same tenant, acting as its operator member: a STAFF context, under RLS
+ * and app_is_admin(). Throws, with the command to fix it, when there is no
+ * operator member.
+ */
+export async function asOperator<T extends { id: number; slug: string }>(tenant: T): Promise<T & { db: DbClient }> {
+  const userId = await userIdByEmail(operatorEmail(tenant.slug));
+  const db = userId ? await staffClient(tenant.id, userId) : null;
+  if (!db) {
+    throw new Error(`No operator member for "${tenant.slug}". Run: pnpm --filter @rag/db member:operator -- ${tenant.slug}`);
+  }
+  return { ...tenant, db };
+}

@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * the same question again, and the bot must stop knowing the answer.
  */
 export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant);
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
 

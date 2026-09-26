@@ -29,7 +29,7 @@
 // offsets from today, and hard-deleted at the end so it never sits in villa's
 // real calendar.
 import { readFileSync } from 'node:fs';
-import { supabase } from '@rag/db/service';
+import { asOperator, supabase } from '@rag/db/service';
 import { createBooking, listSlots, listUnits, localDate } from '@rag/bookings';
 import { answerQuestion, getMessages, loadTenant, NO_ANSWER } from '../dist/index.js';
 
@@ -316,9 +316,10 @@ for (const slug of ['northwind', 'villa']) {
 }
 // Every question below goes through tenants[slug], a CHAT token context,
 // exactly as the chat route's does. So the battery runs under RLS (auth-rls
-// Rule 3: same verdicts). Seeding the fixture is staff work, and until Phase
-// 5's operator member it runs on the service client, as setup.
-const villaAdmin = { ...tenants.villa, db: supabase };
+// Rule 3: same verdicts). Seeding the fixture is staff work, so it runs as
+// villa's operator member on a staff token, through the same createBooking
+// the admin route calls (§ 2.7). Removing it is cleanup, on the service client.
+const villaAdmin = await asOperator(tenants.villa);
 
 // --- the villa bookings fixture ----------------------------------------------
 const fixture = JSON.parse(readFileSync(new URL('../../../fixtures/villa-bookings.json', import.meta.url), 'utf8'));
