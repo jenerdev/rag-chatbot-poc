@@ -84,11 +84,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (5 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (6 files), and server-only
     src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     47 checks (19 through tenant tokens: RLS), no API key
+    tools/verify.mjs     48 checks (20 through tenant tokens: RLS), no API key
     tools/tenant.mjs     tenant:add — a new tenant has no members until member:add
     tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
     tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
@@ -97,8 +97,8 @@ packages/
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     tools/prompt-eval.mjs  the battery, 29 cases (10 + 9 tool-* + 10 lang-*), both tenants; seeds its own bookings
-    src/unanswered.ts      listUnanswered(): the questions answered with NO_ANSWER, for staff
-    tools/isolation.mjs    12 cross-tenant checks through the pipeline
+    src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
+    tools/isolation.mjs    16 cross-tenant checks through the pipeline
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -112,11 +112,11 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 47 checks, no API key needed
+pnpm --filter @rag/db verify    # 48 checks, no API key needed
 pnpm eval                       # the prompt battery, 29 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 12 cross-tenant checks, on chat tokens  ⚠ rule 6
-pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 12, code filters alone (RLS bypassed)
+pnpm --filter @rag/pipeline isolation   # 16 cross-tenant checks, on chat tokens  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 16, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 12, code filters alone
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
@@ -194,7 +194,7 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    - Then re-run plan.md Phase 3's grep: every line it prints must carry a
      tenant.
    - A new table needs its own policy, or tokens read nothing from it (R-22). The same applies
-   to `tenant_applications`, `units`, `slots` and `bookings`
+   to `tenant_applications`, `units`, `slots`, `bookings` and `unanswered_resolutions` (staff-only, D-045)
    (`pnpm --filter @rag/bookings isolation`, 12 checks). **The model never
    supplies a tenant.** No tool's argument schema has a tenant, unit or
    booking id; the executor takes `tenant` from the server (plan/bookings.md
@@ -245,7 +245,8 @@ All are expanded in `risks.md`.
    only if it called a tool; otherwise it becomes the refusal (D-035). The
    text is held, not streamed, until that is decided.
 7. **Changing the chunker does not re-chunk stored documents.** Delete and
-   re-add them, or they keep their old boundaries.
+   re-add them (or open and save each one: an edit re-ingests), or they keep
+   their old boundaries. An edit gives the document a NEW id (D-044).
 8. **"Check, then insert" double-books.** Never read availability and then
    insert. Insert, and let `bookings_no_overlap` refuse the loser with
    `23P01`, which `@rag/bookings` maps to a 409 (D-034).

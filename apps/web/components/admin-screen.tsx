@@ -1,6 +1,6 @@
 'use client';
 
-// S-2 · Knowledge base. Add, inspect and delete the documents the bot knows.
+// S-2 · Knowledge base. Add, inspect, edit and delete the documents the bot knows.
 //
 // Ported from public/admin.html + public/admin.js. Same rules as the chat page.
 //
@@ -27,7 +27,7 @@ import { useCallback, useEffect, useState } from 'react';
 // estimateChunkCount cannot know from a length alone. Measured, it errs in both
 // directions. The UI says "≈" for that reason; do not present it as exact.
 import { CHUNK_OVERLAP, CHUNK_SIZE, estimateChunkCount } from '@rag/chunker';
-import type { ChunkSummary, DocumentSummary } from '@rag/pipeline';
+import type { ChunkSummary, DocumentDetail, DocumentSummary } from '@rag/pipeline';
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
@@ -59,10 +59,16 @@ function DocumentRow({
   onError,
   onClearNotice,
   onUnauthorized,
+  onEdit,
+  editing,
 }: {
   api: string;
   doc: DocumentSummary;
   onChanged: () => void;
+  /** Load this document into the form above. */
+  onEdit: (doc: DocumentSummary) => void;
+  /** This row is the one in the form: deleting it mid-edit would make Save a 404. */
+  editing: boolean;
   onUnauthorized: () => void;
   onError: (message: string) => void;
   onClearNotice: () => void;
@@ -121,7 +127,10 @@ function DocumentRow({
           )}
           {` · ${new Date(doc.created_at).toLocaleDateString()}`}
         </span>
-        <button type="button" title="Delete this document" disabled={deleting} onClick={remove}>
+        <button type="button" title="Edit this document" disabled={deleting || editing} onClick={() => onEdit(doc)}>
+          ✎
+        </button>
+        <button type="button" title="Delete this document" disabled={deleting || editing} onClick={remove}>
           🗑
         </button>
       </div>
@@ -170,12 +179,15 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
   const [source, setSource] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // The document the form is editing, or null when it is adding a new one.
+  const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
 
   // Any 401 means the session is gone (expired, logged out elsewhere, or the
   // secret was rotated). Back to the login form, with nothing left on screen.
   const unauthorized = useCallback(() => {
     setAuth('out');
     setDocuments(null);
+    setEditing(null);
   }, []);
 
   // First: does this browser hold a session for THIS tenant?
@@ -213,6 +225,36 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
     unauthorized();
   }, [api, unauthorized]);
 
+  const clearForm = useCallback(() => {
+    setEditing(null);
+    setTitle('');
+    setSource('');
+    setContent('');
+  }, []);
+
+  // Edit: fetch the document's full original text (the list carries none of
+  // it) and load it into the same form that adds documents.
+  const startEdit = useCallback(
+    async (doc: DocumentSummary) => {
+      setNotice(null);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/documents/${doc.id}`);
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        const detail: DocumentDetail = await response.json();
+        setEditing({ id: detail.id, title: detail.title });
+        setTitle(detail.title);
+        setSource(detail.source ?? '');
+        setContent(detail.content);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+        setNotice({ message: `Could not open: ${await describeFailure(error as Error, response)}`, kind: 'error' });
+      }
+    },
+    [api, unauthorized],
+  );
+
   const submit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
@@ -238,8 +280,10 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
       setSubmitting(true);
       let response: Response | null = null;
       try {
-        response = await fetch(`${api}/documents`, {
-          method: 'POST',
+        // Editing is a PUT to the document; the server re-chunks and re-embeds
+        // it, then removes the old version. Adding is a POST, as before.
+        response = await fetch(editing ? `${api}/documents/${editing.id}` : `${api}/documents`, {
+          method: editing ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: trimmedTitle, source: source.trim(), content: trimmedContent }),
         });
@@ -248,14 +292,12 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
         const result = await response.json();
 
         setNotice({
-          message: `Added “${result.title}” — ${result.chunkCount} chunk${
+          message: `${editing ? 'Updated' : 'Added'} “${result.title}” — ${result.chunkCount} chunk${
             result.chunkCount === 1 ? '' : 's'
           } embedded.`,
           kind: 'ok',
         });
-        setTitle('');
-        setSource('');
-        setContent('');
+        clearForm();
         void loadDocuments();
       } catch (error) {
         setNotice({
@@ -266,7 +308,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
         setSubmitting(false);
       }
     },
-    [api, content, loadDocuments, source, title, unauthorized],
+    [api, clearForm, content, editing, loadDocuments, source, title, unauthorized],
   );
 
   const length = content.trim().length;
@@ -321,7 +363,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         <section className="card">
-          <h2>Add a document</h2>
+          <h2>{editing ? `Edit “${editing.title}”` : 'Add a document'}</h2>
           <form onSubmit={submit}>
             <div className="field">
               <label htmlFor="title">Title</label>
@@ -369,10 +411,19 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
                 {length.toLocaleString()} characters · ≈ {chunkCount} chunk
                 {chunkCount === 1 ? '' : 's'} ({CHUNK_SIZE} chars, {CHUNK_OVERLAP} overlap)
               </span>
+              {editing && (
+                <button type="button" disabled={submitting} onClick={clearForm}>
+                  Cancel
+                </button>
+              )}
               <button type="submit" className="primary" disabled={submitting}>
                 {/* Genuinely slow for a long document: the OpenAI embeddings
                     call is synchronous and there is no background job (mvp.md). */}
-                {submitting ? 'Embedding… (this may take a few seconds)' : 'Add to knowledge base'}
+                {submitting
+                  ? 'Embedding… (this may take a few seconds)'
+                  : editing
+                    ? 'Save changes'
+                    : 'Add to knowledge base'}
               </button>
             </div>
           </form>
@@ -396,6 +447,8 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
                   doc={doc}
                   onUnauthorized={unauthorized}
                   onChanged={loadDocuments}
+                  onEdit={startEdit}
+                  editing={editing?.id === doc.id}
                   onClearNotice={() => setNotice(null)}
                   onError={(message) => setNotice({ message, kind: 'error' })}
                 />

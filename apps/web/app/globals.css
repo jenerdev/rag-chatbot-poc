@@ -238,6 +238,8 @@ input[type="text"]:focus, textarea:focus { outline: 2px solid var(--accent); out
   flex-wrap: wrap;
 }
 .estimate { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Keeps Cancel beside Save when editing, instead of centred by space-between. */
+.form-footer .estimate { margin-right: auto; }
 
 .doc {
   border: 1px solid var(--line);

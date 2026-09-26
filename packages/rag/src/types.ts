@@ -119,6 +119,14 @@ export interface DocumentSummary {
   chunkCount: number;
 }
 
+/** One document with its full original text, for the admin page's edit form. */
+export interface DocumentDetail {
+  id: number;
+  title: string;
+  source: string | null;
+  content: string;
+}
+
 /** One chunk as the admin page's expandable row shows it — without the embedding. */
 export interface ChunkSummary {
   id: number;
@@ -137,4 +145,6 @@ export interface UnansweredQuestion {
   id: number;
   question: string;
   askedAt: string;
+  /** When staff marked it resolved (D-045), or null while it is open. */
+  resolvedAt: string | null;
 }

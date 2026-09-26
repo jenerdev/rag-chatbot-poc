@@ -228,6 +228,35 @@ export interface Database {
           },
         ];
       };
+      /** sql/schema-unanswered.sql § 2 — a row means staff marked that refusal resolved (D-045). Staff-only RLS. */
+      unanswered_resolutions: {
+        Row: {
+          /** the REFUSAL's id: the assistant message, as the S-4 list carries it */
+          message_id: number;
+          tenant_id: number;
+          resolved_at: string;
+        };
+        Insert: {
+          message_id: number;
+          tenant_id: number;
+          resolved_at?: string;
+        };
+        /** no update policy: a resolution is added or removed, never changed */
+        Update: Record<never, never>;
+        Relationships: [
+          {
+            foreignKeyName: 'unanswered_resolutions_message_fk';
+            columns: ['message_id', 'tenant_id'];
+            // false, as PostgREST sees it: message_id alone is the unique key,
+            // not (message_id, tenant_id), so it embeds the resolution as an
+            // ARRAY of at most one. Declared true, the type said object and
+            // the value was an array (isolation check 16, first run).
+            isOneToOne: false;
+            referencedRelation: 'messages';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+        ];
+      };
       /** sql/schema-bookings.sql § 2 — a row means the application is on for that tenant (D-033). */
       tenant_applications: {
         Row: {

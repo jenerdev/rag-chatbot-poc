@@ -2,7 +2,7 @@
 
 import { chunkText } from '@rag/chunker';
 import { embed } from '@rag/openai';
-import type { ChunkSummary, DocumentSummary, IngestResult, TenantContext } from './types.js';
+import type { ChunkSummary, DocumentDetail, DocumentSummary, IngestResult, TenantContext } from './types.js';
 
 /**
  * Store a document and make it searchable.
@@ -149,6 +149,66 @@ export async function deleteDocument(tenant: TenantContext, id: number): Promise
     .eq('id', id);
   if (error) throw new Error(`Could not delete the document: ${error.message}`);
   return (count ?? 0) > 0;
+}
+
+/**
+ * One document with its full original text, for the edit form.
+ *
+ * The text is kept on the documents row (schema.sql) precisely so it can be
+ * shown again: the chunks overlap, so gluing them back together would repeat
+ * sentences. `null` is "not yours OR not there", as in deleteDocument().
+ */
+export async function getDocument(tenant: TenantContext, id: number): Promise<DocumentDetail | null> {
+  const { data, error } = await tenant.db
+    .from('documents')
+    .select('id, title, source, content')
+    .eq('tenant_id', tenant.id)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load the document: ${error.message}`);
+  return data;
+}
+
+/**
+ * Replace a document's text: the new version is ingested, THEN the old one is
+ * deleted. The result has a NEW id.
+ *
+ * Why not update in place: an edit changes the chunks, and every chunk needs a
+ * fresh embedding. Patching rows would mean deleting chunks, which no token
+ * may do (chunks go only by cascade, schema-auth.sql), and an UPDATE policy on
+ * documents that nothing else needs. Ingest-then-delete uses the two paths
+ * that already exist and are already tested.
+ *
+ * Why this order: if embedding fails, ingestDocument() cleans up its own new
+ * row and the old version is untouched, so the bot keeps answering. The other
+ * order would leave the bot without the document during the embed call, and
+ * for good if it failed. For the moment both exist, a question could retrieve
+ * both copies; the prompt sees a repeated fact, nothing worse.
+ *
+ * `null`, before anything is written, when the document is not this tenant's
+ * or not there: an id from another tenant must not make a new document here.
+ */
+export async function updateDocument({
+  tenant,
+  id,
+  title,
+  source,
+  content,
+}: {
+  tenant: TenantContext;
+  id: number;
+  title: string;
+  source?: string | null;
+  content: string;
+}): Promise<IngestResult | null> {
+  if (!(await getDocument(tenant, id))) return null;
+
+  const result = await ingestDocument({ tenant, title, source, content });
+  // false here means someone deleted the old version in the meantime. The new
+  // one is in, so the edit still happened.
+  await deleteDocument(tenant, id);
+  console.log(`[ingest] ${tenant.slug} document ${id} replaced by ${result.id}`);
+  return result;
 }
 
 /**

@@ -56,6 +56,25 @@
 
 ## ▶ Next up (do this next)
 
+~~**Mark unanswered questions resolved (D-045).**~~ **Done 2026-09-27.** S-4
+has Open / Resolved tabs; **Mark resolved** and **Reopen** add or remove a
+row in `unanswered_resolutions` (new `schema-unanswered.sql`, applied by the
+user). verify 48/48, isolation 16/16 both ways, tests green, typecheck green,
+HTTP 401/404 on the new routes without a session. **Next:** the browser walk
+of the whole loop (unanswered → ✎ FAQ → ask in chat → mark resolved), then
+the three email checks.
+
+~~**Edit a document (D-044).**~~ **Done 2026-09-27, uncommitted.** ✎ on each
+knowledge-base row loads the full text into the form; **Save changes** PUTs
+it, and the server ingests the new version and then deletes the old one (new
+id). Isolation 14/14 both ways (new: `getDocument cross-tenant is null`,
+`updateDocument replaces in its own tenant only`), verify 47/47, tests green,
+typecheck green; over HTTP on `pnpm dev` GET/PUT without a session are 401,
+an unknown tenant 404. `pnpm build` not re-run (it would break the running
+dev server again). **Next:** walk it in the browser: log in at
+`/t/villa/admin`, click **Unanswered**, pick a question, ✎ the FAQ, add the
+answer, save, and ask the question in chat.
+
 ~~**Unanswered questions screen (S-4).**~~ **Done 2026-09-27, uncommitted.**
 `/t/<slug>/admin/unanswered` lists what visitors asked that got the exact
 refusal, newest first, behind `requireAdmin()`. No new table: refusals were

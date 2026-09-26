@@ -1505,6 +1505,83 @@ write a third language: the word lists are Tagalog and English only.
 
 ---
 
+## D-044 · Editing a document is ingest-then-delete, and the edit gets a new id · **Added 2026-09-27**
+
+**Decision:** `updateDocument()` checks that the document is this tenant's,
+ingests the new text as a new document, and then deletes the old one. There
+is no UPDATE.
+
+**Why:**
+- An edit changes every chunk, so every chunk needs a new embedding anyway.
+  Nothing from the old row is worth keeping except its text, which the form
+  replaces.
+- Updating in place would need two new policies: UPDATE on `documents` and
+  DELETE on `chunks`. `schema-auth.sql` deliberately has neither (chunks go
+  only by cascade). A new policy is a new surface to test (R-22). Ingest and
+  delete already exist and are already tested.
+- **The order:** if embedding fails, `ingestDocument()` removes its own new
+  row and the old version is untouched, so the bot keeps answering.
+  Delete-first would leave a gap during the embed call, and a permanent one
+  if it failed. While both versions exist, a question can retrieve both, and
+  the model sees the same fact twice.
+- The ownership check comes first, so another tenant's id is refused before
+  anything is written.
+
+**Cost:** the id changes, and the document moves to the top of the
+newest-first list. Nothing stores a document id beyond the request (sources
+are rebuilt per answer), so nothing dangles.
+
+**Measured:** isolation checks 13 (`getDocument cross-tenant is null`) and
+14 (`updateDocument replaces in its own tenant only`), 14/14 on chat and staff
+tokens and 14/14 filters-only.
+
+**Reverse if:** something starts to hold document ids long-term, such as
+citations stored with messages or links shared to a document. Then an edit
+must keep its id: an UPDATE on `documents`, a chunk-replace function, and
+policies for both.
+
+---
+
+## D-045 · "Resolved" is a staff-only row in its own table, never a delete · **Added 2026-09-27**
+
+**Decision:** marking an unanswered question resolved inserts a row into
+`unanswered_resolutions (message_id, tenant_id, resolved_at)`, keyed by the
+refusal's message id. Reopening deletes that row. The S-4 list has two tabs:
+Open (no row, an anti-join) and Resolved (an inner join).
+
+**Why not delete the question:** the list isn't stored anywhere. It's read
+out of `messages`, so deleting an entry means deleting a visitor's
+transcript, and no token may delete messages.
+
+**Why not a `resolved_at` column on `messages`:** it would need an UPDATE
+policy on a table the open chat token already reads and inserts into. A
+separate table keeps `messages` append-only, and its policies can demand
+`app_is_admin()` on every verb.
+
+**How the tenant is held:**
+- Wall 1: every query filters `tenant_id`. `resolveUnanswered()` first checks
+  that the id is this tenant's refusal.
+- Wall 2: the policies. A composite FK `(message_id, tenant_id)` →
+  `messages (id, tenant_id)` makes Postgres refuse a resolution whose tenant
+  disagrees with its message's.
+
+**Measured:**
+- verify 48 `auth: resolutions are staff-only`: chat insert 42501, staff
+  insert ok, chat reads 0, staff reads 1, staff deletes 1;
+- isolation 15 and 16, 16/16 both ways.
+
+**Trap found on the first run:** PostgREST embeds the resolution as an
+ARRAY, because `message_id` alone is the unique key, not
+`(message_id, tenant_id)`. The hand-written type said one-to-one, so
+`resolvedAt` read `undefined` and the resolved tab would have shown no
+dates. Check 16 caught it (`in resolved false`).
+
+**Reverse if:** resolutions need more than a flag, such as who resolved it,
+a note, or the document that answered it. Then extend this table. It is
+still not a reason to touch `messages`.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

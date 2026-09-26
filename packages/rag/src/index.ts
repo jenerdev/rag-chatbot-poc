@@ -29,7 +29,15 @@ export {
   LANGUAGE_SCAN_MESSAGES,
 } from './constants.js';
 
-export { ingestDocument, listDocuments, countDocuments, deleteDocument, getChunks } from './ingest.js';
+export {
+  ingestDocument,
+  listDocuments,
+  countDocuments,
+  deleteDocument,
+  getChunks,
+  getDocument,
+  updateDocument,
+} from './ingest.js';
 export { buildPrompt } from './prompt.js';
 export { greetingReply, greetingText } from './greeting.js';
 export {
@@ -46,13 +54,14 @@ export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { executeTool, toolsFor } from './tools.js';
-export { listUnanswered, UNANSWERED_LIMIT } from './unanswered.js';
+export { listUnanswered, reopenUnanswered, resolveUnanswered, UNANSWERED_LIMIT } from './unanswered.js';
 export type { PromptTools, TenantTools, ToolExecution } from './tools.js';
 export type { ApplicationKey } from './applications.js';
 
 export type {
   Answer,
   ChunkSummary,
+  DocumentDetail,
   DocumentSummary,
   FoundBy,
   HistoryMessage,

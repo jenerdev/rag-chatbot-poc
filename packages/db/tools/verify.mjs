@@ -559,6 +559,40 @@ async function authChecks(probeId, anyChunk) {
       );
     }
 
+    // 48. unanswered_resolutions is staff-only (schema-unanswered.sql, D-045).
+    //     A chat token can neither write nor read a resolution; a member's
+    //     staff token can do both, and delete it. The positive twin (the
+    //     member reads 1 row) is what stops "chat reads 0" passing vacuously.
+    {
+      const staff = asToken(staffToken(probeId, userId));
+      const { data: conv } = await supabase.from('conversations').insert({ tenant_id: probeId }).select('id').single();
+      const { data: rows } = await supabase
+        .from('messages')
+        .insert([
+          { tenant_id: probeId, conversation_id: conv.id, role: 'user', content: 'verify.mjs: a question' },
+          { tenant_id: probeId, conversation_id: conv.id, role: 'assistant', content: "I don't know based on the documents I have." },
+        ])
+        .select('id, role');
+      const refusalId = rows.find((r) => r.role === 'assistant').id;
+      const row = { message_id: refusalId, tenant_id: probeId };
+      const chatInsert = await probeChat.from('unanswered_resolutions').insert(row);
+      const staffInsert = await staff.from('unanswered_resolutions').insert(row);
+      const chatRead = await probeChat.from('unanswered_resolutions').select('message_id');
+      const staffRead = await staff.from('unanswered_resolutions').select('message_id');
+      const staffDelete = await staff.from('unanswered_resolutions').delete({ count: 'exact' }).eq('tenant_id', probeId).eq('message_id', refusalId);
+      const missing = [chatInsert, staffInsert, chatRead].find((r) => r.error?.code === '42P01' || r.error?.code === 'PGRST205');
+      check(
+        !missing && chatInsert.error?.code === '42501' && !staffInsert.error && !chatRead.error && chatRead.data.length === 0
+          && !staffRead.error && staffRead.data.length === 1 && !staffDelete.error && staffDelete.count === 1,
+        'auth: resolutions are staff-only',
+        missing
+          ? `${missing.error.message} — run sql/schema-unanswered.sql`
+          : `chat insert ${chatInsert.error?.code ?? 'INSERTED'} · staff insert ${staffInsert.error?.code ?? 'ok'} · chat reads ${chatRead.error?.message ?? chatRead.data.length} · staff reads ${staffRead.error?.message ?? staffRead.data.length} · staff deletes ${staffDelete.error?.message ?? staffDelete.count}`,
+      );
+      // The probe tenant's deletion at the end cascades to these rows too.
+      await supabase.from('conversations').delete().eq('id', conv.id);
+    }
+
     // 45. A minting bug: a member of the probe, with a token claiming VILLA.
     //     app_is_admin() finds no membership for villa, so every write fails,
     //     and bookings (admin-only reads) show nothing. Its chat-level reads

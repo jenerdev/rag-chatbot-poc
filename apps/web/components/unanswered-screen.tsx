@@ -5,7 +5,11 @@
 //
 // Rendered by app/t/[tenant]/admin/unanswered/page.tsx. Its one route is
 // admin-only, so it starts the way the other staff screens do: is there a
-// session for THIS tenant? Read-only: nothing here changes a row.
+// session for THIS tenant?
+//
+// Two tabs, Open and Resolved (D-045). "Mark resolved" is what staff click once
+// the answer is in the knowledge base. It adds a resolution row; the visitor's
+// transcript is never touched, and Reopen undoes it.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -38,6 +42,9 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
   const [auth, setAuth] = useState<Auth>('checking');
   const [questions, setQuestions] = useState<UnansweredQuestion[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [tab, setTab] = useState<'open' | 'resolved'>('open');
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -59,7 +66,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
   const load = useCallback(async () => {
     let response: Response | null = null;
     try {
-      response = await fetch(`${api}/unanswered`);
+      response = await fetch(`${api}/unanswered${tab === 'resolved' ? '?resolved=1' : ''}`);
       if (response.status === 401) return unauthorized();
       if (!response.ok) throw new Error('failed');
       setQuestions(await response.json());
@@ -67,11 +74,32 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
       setQuestions(null);
       setLoadMessage(await describeFailure(error as Error, response));
     }
-  }, [api, unauthorized]);
+  }, [api, tab, unauthorized]);
 
   useEffect(() => {
     if (auth === 'in') void load();
   }, [auth, load]);
+
+  // Resolve (PUT) or reopen (DELETE). On success the row leaves this tab; it
+  // is on the other one now.
+  const toggleResolved = useCallback(
+    async (q: UnansweredQuestion) => {
+      setBusyId(q.id);
+      setError(null);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/unanswered/${q.id}/resolution`, { method: tab === 'open' ? 'PUT' : 'DELETE' });
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        setQuestions((current) => current?.filter((x) => x.id !== q.id) ?? null);
+      } catch (failure) {
+        setError(await describeFailure(failure as Error, response));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [api, tab, unauthorized],
+  );
 
   const logout = useCallback(async () => {
     await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
@@ -115,29 +143,57 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
       <main>
         <section className="card">
           <div className="range-head">
-            <h2>{questions === null ? 'Unanswered questions' : `${questions.length} unanswered`}</h2>
+            <div className="range-nav">
+              <button type="button" className={tab === 'open' ? 'primary' : undefined} onClick={() => setTab('open')}>
+                Open
+              </button>
+              <button
+                type="button"
+                className={tab === 'resolved' ? 'primary' : undefined}
+                onClick={() => setTab('resolved')}
+              >
+                Resolved
+              </button>
+            </div>
             <button type="button" onClick={() => void load()}>
               Refresh
             </button>
           </div>
           <p className="small muted">
-            Questions the assistant answered with “I don&apos;t know based on the documents I have.” Each is a gap
-            to fill in the knowledge base. Partly answered questions are not listed.
+            {tab === 'open'
+              ? 'Questions the assistant answered with “I don’t know based on the documents I have.” Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
+              : 'Questions marked resolved. Reopen one if the assistant still cannot answer it.'}
           </p>
+          {error && <div className="notice error">{error}</div>}
 
           {questions === null ? (
             <div className="small">{loadMessage}</div>
           ) : questions.length === 0 ? (
             <div className="empty-state">
-              <strong>Nothing unanswered</strong>
-              Every question so far was answered from the documents.
+              {tab === 'open' ? (
+                <>
+                  <strong>Nothing unanswered</strong>
+                  Every open question has been answered or resolved.
+                </>
+              ) : (
+                <>
+                  <strong>Nothing resolved yet</strong>
+                  Questions you mark resolved appear here.
+                </>
+              )}
             </div>
           ) : (
             questions.map((q) => (
               // The question is a React child, so a visitor's text is escaped (CLAUDE.md § Conventions).
               <div key={q.id} className="unanswered">
                 <span className="unanswered-question">{q.question}</span>
-                <span className="unanswered-when">{askedLabel(q.askedAt)}</span>
+                <span className="unanswered-when">
+                  {askedLabel(q.askedAt)}
+                  {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
+                </span>
+                <button type="button" disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
+                  {busyId === q.id ? '…' : tab === 'open' ? 'Mark resolved' : 'Reopen'}
+                </button>
               </div>
             ))
           )}

@@ -58,7 +58,7 @@ Fill in `.env`:
 | `TENANT_SIGNING_JWK` | our own signing key, one line of private JWK JSON. See step 4 below |
 | `ADMIN_COOKIE_SECRET` | 32+ random characters that sign admin sessions: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. Changing it logs every admin out |
 
-### 2. Create the schema — five files, in order
+### 2. Create the schema — six files, in order
 
 Paste each into the Supabase SQL editor and run it, one after the other:
 
@@ -86,9 +86,13 @@ Paste each into the Supabase SQL editor and run it, one after the other:
    - dropping the old `admin_key_hash`.
 
    It is idempotent.
+6. [`schema-unanswered.sql`](./packages/db/sql/schema-unanswered.sql) — the
+   `unanswered_resolutions` table (so **eleven tables**), which records the
+   questions staff marked resolved on the Unanswered screen, with staff-only
+   policies (D-045). It is idempotent.
 
 Run them once, in that order, on a fresh project. **Re-running is only safe for
-`schema-tenancy.sql`, `schema-bookings.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
+`schema-tenancy.sql`, `schema-bookings.sql`, `schema-auth.sql`, `schema-unanswered.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
 `create table`, so a second run fails. More importantly, re-running
 `schema.sql` or `schema-hybrid.sql` on a database that already has tenancy
 quietly recreates the old **unscoped** `match_chunks` / `match_chunks_fts`,

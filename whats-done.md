@@ -4772,3 +4772,98 @@ and is not on villa's, and that the two lists share no ids.
   not run.
 - Partial answers are not caught, only the exact refusal.
 - Northwind's 200 are mostly eval and isolation traffic.
+
+---
+
+## Edit a document (D-044) · done 2026-09-27
+
+**What was done:**
+- **`ingest.ts`:** `getDocument(tenant, id)` returns the full original text,
+  or `null` for "not yours or not there". `updateDocument()` checks
+  ownership, runs `ingestDocument()` on the new text, then
+  `deleteDocument()` on the old one.
+- **`documents/[id]/route.ts`:** `GET` (the text, for the form) and `PUT`
+  (the edit). Both use `requireAdmin`, and `PUT` validates with the add
+  form's `createDocumentSchema`.
+- **S-2:** a ✎ button on each row. The add form becomes "Edit “title”", with
+  **Save changes** and **Cancel**, and the row being edited can't be deleted
+  mid-edit.
+- **`tools/isolation.mjs`:** checks 13 and 14. The probe document is now
+  ingested, edited, and then deleted.
+
+**Why it mattered:** filling a gap from the unanswered screen used to mean
+rebuilding the FAQ outside the app. The admin screen shows only overlapping
+chunks, and gluing them back together repeats sentences.
+
+**Trap avoided: delete-then-add.** That order leaves the bot without the
+document while OpenAI embeds, and for good if the call fails. Ingesting first
+means a failure leaves the old version answering.
+
+**Trap avoided: an edit from another tenant creating a document.** Ownership
+is checked before `ingestDocument()`, so northwind's attempt on villa's probe
+returned `null` and wrote nothing. Check 14 asserts that no `hijack` title
+appears in northwind.
+
+**Checked, not assumed:**
+- isolation 14/14 on chat tokens (villa's edit on the operator's staff
+  token): doc 114 → 115, then 116 → 117 filters-only, the old id gone, the
+  new one with 1 chunk and the new word;
+- verify 47/47; tests: pipeline 103, bookings 27, openai 14, chunker 13;
+  typecheck green;
+- over HTTP on `pnpm dev`: `GET` and `PUT /api/t/villa/documents/38` without
+  a session → 401; `/api/t/nope/…` → 404; `/t/villa/admin` and
+  `/t/villa/admin/unanswered` → 200.
+
+**Not done:**
+- The logged-in path in a browser: I have no staff password. The same
+  functions ran on a staff token in isolation.
+- `pnpm build` not re-run, because it replaces the running dev server's
+  `.next`.
+
+---
+
+## Mark unanswered questions resolved (D-045) · done 2026-09-27
+
+**What was done:**
+- **`packages/db/sql/schema-unanswered.sql`** (new, applied by the user):
+  - a `messages (id, tenant_id)` unique key;
+  - the `unanswered_resolutions` table, with a composite FK to that key;
+  - staff-only select, insert and delete policies, no update, and anon
+    revoked.
+- **`unanswered.ts`:** `listUnanswered(tenant, { resolved })` filters in
+  Postgres, open by anti-join and resolved by inner join, so resolved ones
+  never use up the 200-row limit. It also adds `resolveUnanswered` (checks
+  that the id is this tenant's refusal, then an idempotent upsert) and
+  `reopenUnanswered`.
+- **Routes:** `GET /unanswered?resolved=1`, and `PUT` / `DELETE
+  /unanswered/[id]/resolution`, all behind `requireAdmin`.
+- **S-4:** Open / Resolved tabs, **Mark resolved** / **Reopen** per row, and
+  the resolved date on the Resolved tab.
+- **Checks:** verify 48, isolation 15 and 16.
+
+**Why it mattered:** without it, the list only grows. Staff would have to
+remember which questions they had already answered in the knowledge base.
+
+**Trap avoided: deleting to resolve.** The list is derived from the
+transcripts, so a delete would have destroyed chat history.
+
+**Trap caught: the embed's shape.** PostgREST returns the resolution as an
+array of at most one, not an object. The first isolation run failed check 16
+with `in resolved false`. The type is now `isOneToOne: false` and the code
+reads `[0]`.
+
+**Checked, not assumed:**
+- verify 48/48: `chat insert 42501 · staff insert ok · chat reads 0 · staff
+  reads 1 · staff deletes 1`. Before the SQL ran, the same check failed with
+  "run sql/schema-unanswered.sql", so a missing table can't pass;
+- isolation 16/16 on chat and operator staff tokens, and 16/16
+  filters-only. Villa question 1870 was resolved, left the open list, showed
+  up in the resolved list with a date, was reopened, and came back. Northwind's
+  refusal couldn't be resolved or reopened by villa;
+- tests: pipeline 103, bookings 27, openai 14, chunker 13; typecheck green;
+- over HTTP on `pnpm dev`, with no session: `GET ?resolved=1`, `PUT` and
+  `DELETE` → 401, unknown tenant → 404, and the page → 200.
+
+**Not done:** the logged-in browser walk, and `pnpm build`, because it
+replaces the running dev server's `.next`.
+
