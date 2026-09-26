@@ -41,7 +41,8 @@ export {
   updateDocument,
 } from './ingest.js';
 export { buildPrompt } from './prompt.js';
-export { greetingReply, greetingText } from './greeting.js';
+export { classifySmallTalk, greetingReply, greetingText, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
+export type { SmallTalk } from './greeting.js';
 export {
   detectLanguage,
   languageInstructions,

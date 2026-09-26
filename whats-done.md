@@ -5055,3 +5055,57 @@ The lesson: read a tenant's settings before writing them. `tenant:fallback
   - `refused` was true each time, and the stream equalled the JSON;
 - verify 48/48; isolation 16/16 both ways; typecheck green.
 
+---
+
+## Conversational messages (D-049) · done 2026-09-27
+
+**Before:**
+- "Hi" got a long reply about "documents" and "passages";
+- "Salamat po" and "okay" got the refusal;
+- "Kamusta po?" worked only because retrieval happened to find chunks;
+- mixed messages were answered, but "Thanks! Is the resort available
+  tomorrow?" ignored the thanks.
+
+**What was done:**
+- **`greeting.ts`:**
+  - `classifySmallTalk()` covers greeting, thanks, acknowledgment and
+    farewell, in English and Tagalog, and matches only whole messages;
+  - `smallTalkReply()` gives short replies in English, Taglish or Tagalog;
+  - `smallTalkLanguage()` reads the small talk's own Tagalog;
+  - `thanksPrefix()` handles the mixed "Thanks! …" message;
+  - `greetingReply()` is kept for older callers.
+- **`answer.ts`:** `smallTalk()` runs before the pipeline in both paths. It
+  does one tenant-filtered read of the conversation, and only when the
+  message is small talk. From that read it takes the reply language and
+  whether the bot's last message asked a question. The thanks prefix is
+  shown and never saved.
+- **`greeting.test.ts`:** 41 → 101 tests.
+
+**Trap avoided: swallowing a real question.** Every word must be small talk.
+"Hi, what time is check-in?", "Salamat po, may parking ba?" and "sige, bukas
+po" all still reach the pipeline, and the tests pin them.
+
+**Trap avoided: swallowing an answer.** "yes", "oo", "opo" and "sure" are not
+acknowledgments, and "okay" / "sige" right after a bot question goes to the
+pipeline.
+
+**Trap avoided: saving the prefix.** "You're welcome! " + the refusal would
+no longer equal `NO_ANSWER`, and the unanswered list would lose the
+question. The prefix is added only where the reply leaves the server.
+
+**Checked, not assumed:**
+- live on villa:
+  - Hi, Hi po, Kamusta po?, Salamat po, Thank you, okay and Salamat, bye each
+    got the right short reply in the right language, with 0 sources and 0
+    tools;
+  - "Please respond in English." then "hi" stayed English;
+  - "Magkano po ang Overnight?" then "salamat po" gave a Taglish thanks;
+  - "Thanks! Is the resort available tomorrow?" gave "You're welcome! Yes,
+    the resort is open on 28 September 2026…", with the same result in the
+    stream;
+- battery 36/38 (known `antecedent` and `lang-followup`);
+- isolation 16/16 both ways; tests 294/27/14/13; typecheck green.
+
+**Limits:** "sige" answering "Which date?" gets the refusal, as it did
+before, and the lists are English and Tagalog only.
+

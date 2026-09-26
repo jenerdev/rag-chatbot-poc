@@ -96,6 +96,7 @@ packages/
     tools/isolation.mjs    12 cross-tenant checks, no API key
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
+    src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
     src/dates.ts           relative dates ("bukas", "next Friday") resolved in code; availability turns checked up front (D-046)
     tools/prompt-eval.mjs  the battery, 38 cases (10 + 9 tool-* + 10 lang-* + 9 date-*), both tenants; seeds its own bookings

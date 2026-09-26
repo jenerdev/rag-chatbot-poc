@@ -4,7 +4,7 @@ import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } 
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { planDates } from './dates.js';
-import { greetingReply } from './greeting.js';
+import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
@@ -252,6 +252,47 @@ async function toolLoop(
 }
 
 /**
+ * Small talk for this turn (D-049): the reply, and the conversation it
+ * belongs to, or null when the message is not small talk.
+ *
+ * Only a message that IS small talk costs a query: classifySmallTalk() is
+ * pure and runs first. Then one read of this conversation's recent messages,
+ * tenant-filtered like every query here (rule 6), decides two things:
+ *
+ *   - the reply language, by D-043's rules (an explicit "English please"
+ *     still wins), with the small talk's own Tagalog as the tie-breaker on a
+ *     first turn ("Salamat po", "Kamusta");
+ *   - whether the bot's last message was a question. Then "okay" or "sige"
+ *     answers it, and `reply` is null so the pipeline, which has the
+ *     history, handles it. `id` is returned anyway, so the conversation
+ *     created here is the one the pipeline continues.
+ */
+async function smallTalk(
+  tenant: TenantContext,
+  conversationId: string | null,
+  message: string,
+): Promise<{ id: string; reply: string | null } | null> {
+  if (classifySmallTalk(message) === null) return null;
+  const id = await ensureConversation(tenant, conversationId);
+  const { data: recent, error } = await tenant.db
+    .from('messages')
+    .select('role, content')
+    .eq('tenant_id', tenant.id)
+    .eq('conversation_id', id)
+    .order('id', { ascending: false })
+    .limit(LANGUAGE_SCAN_MESSAGES);
+  if (error) throw new Error(`Could not load the conversation: ${error.message}`);
+
+  const choice = replyLanguage([message, ...recent.filter((m) => m.role === 'user').map((m) => m.content)]);
+  const language = choice.asked ? choice.language : (smallTalkLanguage(message) ?? choice.language);
+  const lastBot = recent.find((m) => m.role === 'assistant');
+  const botAsked = lastBot?.content.trim().endsWith('?') ?? false;
+  const reply = smallTalkReply(message, tenant, language, botAsked);
+  console.log(`[query] small talk: ${classifySmallTalk(message)} (${language})${reply === null ? ', answers the bot: to the pipeline' : ''}`);
+  return { id, reply };
+}
+
+/**
  * The tools block for this turn, with the message's relative dates resolved
  * against the TENANT'S today (D-046). "bukas" becomes 2026-09-28 in code, so
  * the model is handed the date instead of being trusted to count to it,
@@ -323,21 +364,25 @@ export async function answerQuestion({
   conversationId: string | null;
   message: string;
 }): Promise<Answer> {
-  // Small talk, answered before anything is retrieved or embedded. A greeting
-  // has nothing to look up, so running it through the pipeline can only end in
-  // the refusal — see greeting.ts for why this is not a document. Neither has
-  // a bare language request ("Please respond in English"), see language.ts.
-  const greeting = greetingReply(message, tenant) ?? requestReply(message);
-  if (greeting !== null) {
-    const id = await ensureConversation(tenant, conversationId);
-    await saveMessages(tenant, id, message, greeting);
-    return { conversationId: id, reply: greeting, refused: false, sources: [], searchQuery: message, toolCalls: [] };
+  // Small talk (greetings, thanks, "okay", goodbyes), answered before anything
+  // is retrieved or embedded: there is nothing to look up, so the pipeline
+  // could only end in the refusal. See greeting.ts. Nor has a bare language
+  // request ("Please respond in English"), see language.ts.
+  const talk = await smallTalk(tenant, conversationId, message);
+  const canned = talk?.reply ?? requestReply(message);
+  if (canned !== null) {
+    const id = talk?.id ?? (await ensureConversation(tenant, conversationId));
+    await saveMessages(tenant, id, message, canned);
+    return { conversationId: id, reply: canned, refused: false, sources: [], searchQuery: message, toolCalls: [] };
   }
 
   const [{ id, history, language, replyIn, searchQuery, matches, sources }, tools] = await Promise.all([
-    prepareAnswer({ tenant, conversationId, message }),
+    prepareAnswer({ tenant, conversationId: talk?.id ?? conversationId, message }),
     toolsFor(tenant),
   ]);
+  // "Thanks! Is it free tomorrow?": the thanks is answered in front of the
+  // answer. Shown, never saved (see thanksPrefix).
+  const prefix = thanksPrefix(message, replyIn) ?? '';
   const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
   // The marker is what is saved; this is what is shown (D-047).
   const friendly = refusalText(tenant, replyIn);
@@ -348,7 +393,7 @@ export async function answerQuestion({
     // model ignoring its instructions and answering from training data anyway.
     if (matches.length === 0) {
       await saveMessages(tenant, id, message, NO_ANSWER);
-      return { conversationId: id, reply: friendly, refused: true, sources: [], searchQuery, toolCalls: [] };
+      return { conversationId: id, reply: prefix + friendly, refused: true, sources: [], searchQuery, toolCalls: [] };
     }
 
     const reply = await chat(buildPrompt(tenant, matches, history, message, null, language));
@@ -358,7 +403,7 @@ export async function answerQuestion({
     // when it differs from what the user typed. Retrieval silently searching for
     // something other than the question is exactly the kind of thing that should
     // be visible rather than hidden (same argument as the sources panel, D-012).
-    return { conversationId: id, reply: displayReply(reply, friendly), refused: isRefusal(reply), sources, searchQuery, toolCalls: [] };
+    return { conversationId: id, reply: prefix + displayReply(reply, friendly), refused: isRefusal(reply), sources, searchQuery, toolCalls: [] };
   }
 
   // With tools the model is called even with zero chunks, because a tool may
@@ -375,7 +420,7 @@ export async function answerQuestion({
   await saveMessages(tenant, id, message, reply);
   return {
     conversationId: id,
-    reply: displayReply(reply, friendly),
+    reply: prefix + displayReply(reply, friendly),
     refused: isRefusal(reply),
     sources,
     searchQuery,
@@ -414,24 +459,28 @@ export async function answerQuestionStream({
   // Same short circuit as the non-streaming path. `meta` still fires, with no
   // sources, so the client's state machine needs no special case: a greeting
   // arrives down exactly the same channel as an answer.
-  const greeting = greetingReply(message, tenant) ?? requestReply(message);
-  if (greeting !== null) {
-    const id = await ensureConversation(tenant, conversationId);
+  const talk = await smallTalk(tenant, conversationId, message);
+  const canned = talk?.reply ?? requestReply(message);
+  if (canned !== null) {
+    const id = talk?.id ?? (await ensureConversation(tenant, conversationId));
     onMeta({ conversationId: id, searchQuery: message, sources: [] });
-    onDelta(greeting);
-    await saveMessages(tenant, id, message, greeting);
-    return greeting;
+    onDelta(canned);
+    await saveMessages(tenant, id, message, canned);
+    return canned;
   }
 
   const [{ id, history, language, replyIn, searchQuery, matches, sources }, tools] = await Promise.all([
-    prepareAnswer({ tenant, conversationId, message }),
+    prepareAnswer({ tenant, conversationId: talk?.id ?? conversationId, message }),
     toolsFor(tenant),
   ]);
+  const prefix = thanksPrefix(message, replyIn) ?? '';
   const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
   // The marker is what is saved; the friendly text is what is streamed (D-047).
   const friendly = refusalText(tenant, replyIn);
 
   onMeta({ conversationId: id, searchQuery, sources });
+  // The thanks goes out first, ahead of whatever the answer turns out to be.
+  if (prefix) onDelta(prefix);
 
   // No tools: the short circuit again, unchanged. Emitted as a single delta so
   // the client needs no special case: a refusal arrives down the same channel
@@ -439,7 +488,7 @@ export async function answerQuestionStream({
   if (tools.definitions.length === 0 && matches.length === 0) {
     onDelta(friendly);
     await saveMessages(tenant, id, message, NO_ANSWER);
-    return friendly;
+    return prefix + friendly;
   }
 
   // Streamed text passes through this, so a model-written refusal is never on
@@ -451,7 +500,7 @@ export async function answerQuestionStream({
       const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), filter.push);
       filter.finish();
       await saveMessages(tenant, id, message, reply);
-      return displayReply(reply, friendly);
+      return prefix + displayReply(reply, friendly);
     }
 
     // With zero chunks the text is HELD, not streamed (plan/bookings.md
@@ -472,7 +521,7 @@ export async function answerQuestionStream({
     if (hold) onDelta(displayReply(reply, friendly));
     else filter.finish();
     await saveMessages(tenant, id, message, reply);
-    return displayReply(reply, friendly);
+    return prefix + displayReply(reply, friendly);
   } catch (error) {
     // The client was handed this conversationId in `meta` and will send it
     // with the next question. If nothing is persisted here, that next turn

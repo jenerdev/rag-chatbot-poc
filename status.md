@@ -56,6 +56,14 @@
 
 ## ▶ Next up (do this next)
 
+~~**Conversational messages (D-049).**~~ **Done 2026-09-27, uncommitted.**
+Greetings, thanks, acknowledgments and goodbyes (English + Tagalog) are
+answered in code, short and in the conversation's language, with no
+retrieval or tool; "Salamat po" and "okay" no longer get the refusal. Mixed
+messages answer the question ("Thanks! …" also gets "You're welcome!").
+Tests 294, battery 36/38, isolation 16/16 both ways. **Next:** commit; the
+browser walk.
+
 ~~**Per-language fallback messages (D-048).**~~ **Done 2026-09-27** (code in
 `c6e360c`, record uncommitted). `tenants.fallback_messages` per reply
 language; villa has all three (English and Taglish as the user wrote them,

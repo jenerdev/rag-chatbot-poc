@@ -1759,6 +1759,69 @@ keys, so nothing visible changed on the day, then drops the old column.
 
 ---
 
+## D-049 · Small talk is answered in code before retrieval; only a WHOLE message of it is claimed · **Added 2026-09-27**
+
+**The failure:** "Salamat po" and "okay" got the refusal ("Sorry po, wala pa
+kaming info…"). Small talk has nothing to look up, so retrieval can only
+fail on it. Only English greetings were handled (`greeting.ts`, plan.md
+Phase 4).
+
+**Decision:**
+- `greeting.ts` now classifies four kinds: greeting, thanks,
+  acknowledgment, farewell. It covers English and Tagalog: "Hi po",
+  "Kamusta", "Magandang umaga", "Salamat po", "Sige", "Ingat po".
+- It uses the same rule as before: every word must belong to a small-talk
+  phrase or a filler ("po", "naman", "there"…). One other word, and the
+  message goes to the pipeline unchanged. That keeps "Hi, what time is
+  check-in?" a question. Mixed small talk resolves to the most final kind, so
+  "Thank you, bye" is a farewell that also answers the thanks.
+- Replies are short and in the conversation's language (D-043's rules, a
+  pinned request included). The small talk's own Tagalog decides a first turn.
+  The greeting still names the assistant and business, but no longer talks
+  about "documents" or "passages", which is D-047's voice change.
+
+**Two guards:**
+- "yes", "oo", "opo" and "sure" are NOT acknowledgments. They answer the
+  bot, and a canned "let me know if you need anything else" would drop a
+  booking.
+- "okay" / "sige" is claimed only when the bot's last message was not a
+  question. After a question it is an answer, and goes to the pipeline with
+  its history. This costs one tenant-filtered read of the conversation, and
+  only for a message that is already small talk.
+
+**Mixed messages (spec § 5):** these already worked, because a partial match
+never claims the message, so the real question was answered. The one gap:
+"Thanks! Is the resort available tomorrow?" ignored the thanks.
+`thanksPrefix()` now puts "You're welcome! " / "Walang anuman po! " in front
+of the answer. It is display only and never saved, so a refusal stays the
+exact `NO_ANSWER` the unanswered list matches.
+
+**Measured:**
+- tests: `greeting.test.ts` 101 (up from 41), 294 in the pipeline;
+- live on villa:
+  - "Hi" → "Hi! 👋 I'm Lia, the assistant for Villa Amihan Private Resort.
+    How can I help you today?";
+  - "Hi po" and "Kamusta po?" → the Taglish greeting;
+  - "Salamat po" → "Walang anuman po! 😊…";
+  - "okay" → "Great! 😊…";
+  - "Salamat, bye" → "Walang anuman po! Ingat po kayo! 😊";
+  - all with 0 sources and 0 tool calls;
+  - the three mixed examples were answered, and the thanks acknowledged
+    (JSON and stream);
+- battery 36/38 (`original 9/10 · tool 9/9 · lang 9/10 · date 9/9`), the
+  `persona` greeting case through the new path; isolation 16/16 both ways.
+
+**Limits:**
+- "sige" in reply to "Which date?" goes to the pipeline and gets the
+  refusal, as before this change. It isn't a date.
+- The phrase lists are English and Tagalog only.
+
+**Reverse if:** small talk needs context the lists can't express. Then let
+the model answer it, with no chunks and no D-035 refusal. That is a prompt
+change, measured on the full battery.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |
