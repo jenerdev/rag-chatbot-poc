@@ -1,0 +1,24 @@
+$ node --conditions=react-server --env-file=../../.env tools/auth-spike.mjs explain
+-- villa (tenant 3), query = chunk 142's embedding, as service_role
+select c.id, c.document_id, 1 - (c.embedding <=> q.e) as similarity from chunks c, (select embedding as e from chunks where id = 142) q where c.tenant_id = 3 and 1 - (c.embedding <=> q.e) >= 0.3 order by c.embedding <=> q.e limit 5
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=391
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> chunks.embedding))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=391
+        ->  Nested Loop (actual rows=29 loops=1)
+              Join Filter: (('1'::double precision - (c.embedding <=> chunks.embedding)) >= '0.3'::double precision)
+              Rows Removed by Join Filter: 1
+              Buffers: shared hit=388
+              ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+                    Index Cond: (id = 142)
+                    Buffers: shared hit=5
+              ->  Seq Scan on chunks c (actual rows=30 loops=1)
+                    Filter: (tenant_id = 3)
+                    Rows Removed by Filter: 4
+                    Buffers: shared hit=8
+Planning:
+  Buffers: shared hit=30
+Planning Time: 0.206 ms
+Execution Time: 0.974 ms

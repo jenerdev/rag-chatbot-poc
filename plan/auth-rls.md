@@ -281,7 +281,7 @@ stop after Phase 2, you know whether the design works and what it costs.
 3. **Baseline**, saved to `plan/baseline/*-pre-auth.txt`:
    - eval, expect 18/19;
    - isolation, expect 11/11;
-   - bookings isolation, expect 13/13;
+   - bookings isolation, expect 12/12 (the plan said 13; the script has 12 checks, see Phase 0 in whats-done.md);
    - verify, expect 28/28;
    - `prompt-snapshot` for northwind;
    - `explain analyze` of `match_chunks` for villa as `service_role`.
@@ -379,7 +379,7 @@ apps packages/*/src` prints nothing.
 3. **Measure, with no change expected:**
    - eval 18/19, the same verdict for each case as Phase 0;
    - isolation 11/11;
-   - bookings isolation 13/13;
+   - bookings isolation 12/12;
    - `prompt-snapshot` byte-identical.
 
    **A single flipped verdict is a policy that is too tight** (Rule 3).

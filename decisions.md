@@ -1280,6 +1280,46 @@ seriously first.
 
 ---
 
+## D-039 · Server-minted, 5-minute tenant tokens, signed ES256 with our own key imported as a Supabase standby key · **Added 2026-09-26 (auth-rls Phase 0)**
+
+**Decision:** every request will reach Postgres with a short-lived token
+that the server signs itself, including anonymous chat:
+`{role: authenticated, tenant_id, iat, exp: +5min}`, with no `sub` (§ 2.4).
+The signature is ES256 over an EC P-256 key that we generated. That key is
+imported into the project's JWT signing keys as a **standby** key, and the
+signing is hand-rolled on `node:crypto` (D-002's spirit). The signer
+refuses any `role` other than `authenticated`. This is option **A** of
+`plan/auth-rls.md` § 2.1. B (the legacy HS256 secret) and C (a direct
+Postgres connection) were not tried, because the plan tries them only if A
+fails.
+
+**Why:** the project uses asymmetric signing keys, so Supabase holds the
+key its own tokens are signed with. PostgREST trusts every key published in
+the project's JWKS. Importing a key as standby publishes it without making
+Supabase Auth sign with it. The result is one trust path for staff tokens
+(signed by Supabase) and chat tokens (signed by us). It also depends on
+nothing that Supabase is retiring, which B does.
+
+**Measured** (`plan/baseline/auth-spike-phase0.txt`):
+- The same claims and code, signed by the same key, before and after the
+  import:
+  - **before:** `401 PGRST301 "No suitable key was found to decode the JWT"`;
+  - **after:** `200` with `{"role": "authenticated", "tenant_id": 3, …}`
+    from `select auth.jwt()`.
+- After the import, the JWKS lists `ea5ce335…` next to Supabase's `cb77f580…`.
+- A Supabase Auth sign-in after the import was still signed with
+  `kid=cb77f580…`. Standby did not take over Auth's signing.
+
+**Reverse if:** Supabase stops publishing standby keys in the JWKS. The
+same signal: chat tokens start failing with PGRST301. Or: a key rotation in
+the dashboard revokes the imported key. If so, fall back to C, not B.
+
+**Caveat:** the spike's key (`ea5ce335…`) had its private half shown in
+the session transcript. Phase 3 generates a fresh key for real use, stores
+it only in `.env`, and deletes `ea5ce335…` from the dashboard (R-19).
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

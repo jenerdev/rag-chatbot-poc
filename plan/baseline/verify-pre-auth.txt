@@ -1,0 +1,33 @@
+$ node --conditions=react-server --env-file=../../.env tools/verify.mjs
+PASS  read documents  — 9 rows
+PASS  read chunks  — 34 rows
+PASS  read conversations  — 438 rows
+PASS  read messages  — 1118 rows
+PASS  embedding arrives as a string  — typeof string
+PASS  parses to 1536 finite numbers  — 1536 dims
+PASS  match_chunks rows match MatchRow
+PASS  a chunk is its own nearest neighbour  — chunk 148, top 148
+PASS  self-similarity is 1  — 1.000000
+PASS  results are ordered most-similar first  — 1.000 > 0.616 > 0.547
+PASS  every row has a tenant_id  — documents 0 · chunks 0 · conversations 0 · messages 0
+PASS  a chunk cannot belong to another tenant's document  — 23503 insert or update on table "chunks" violates foreign key constraint "chunks_document_tenant_fk"
+PASS  match_chunks(own tenant) finds the chunk at 1.000000  — top 148 at 1.000000
+PASS  match_chunks(another tenant) returns zero rows  — 0 rows
+PASS  read the bookings tables  — tenant_applications 1 · units 1 · slots 3 · bookings 3
+PASS  villa has bookings, northwind has none  — villa {"timezone":"Asia/Manila"} · northwind 0 rows
+PASS  an unknown timezone is refused  — 22023 time zone "Mars/Olympus_Mons" not recognized
+PASS  during is computed from slot and timezone  — ["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")
+PASS  a supplied during is overwritten  — ["2026-11-01 06:00:00+00","2026-11-02 04:00:00+00")
+PASS  an Overnight blocks the next day's Day Tour  — 23P01 conflicting key value violates exclusion constraint "bookings_no_overlap"
+PASS  back-to-back slots do not overlap  — ["2026-10-05 00:00:00+00","2026-10-05 09:00:00+00") then ["2026-10-05 09:00:00+00","2026-10-05 13:00:00+00")
+PASS  a cancelled booking frees its slot  — ["2026-10-02 00:00:00+00","2026-10-02 09:00:00+00")
+PASS  a booking cannot use another tenant's unit  — 23503 insert or update on table "bookings" violates foreign key constraint "bookings_unit_tenant_fk"
+PASS  a booking cannot use another tenant's slot  — 23503 Slot 3 does not belong to tenant 27
+PASS  check_availability matches the constraint  — 2026-10-01 Day Tour open, 2026-10-01 Overnight taken, 2026-10-01 Evening open, 2026-10-02 Day Tour taken, 2026-10-02 Overnight taken, 2026-10-02 Evening open
+PASS  check_availability returns no guest data  — keys: booked_date,slot,status,unit
+PASS  check_availability(northwind) returns zero rows  — 0 rows
+PASS  no bookings application, no bookings  — 23503 Tenant 27 does not have the bookings application
+
+documents 9 · chunks 34 · conversations 438 · messages 1118
+
+OK — the database layer is wired correctly.

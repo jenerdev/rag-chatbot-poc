@@ -288,6 +288,12 @@ outlives a request, and `architecture.md` § 9 rules out retry loops and hidden
 in-memory state. **Add it before a public URL**, together with audit logging of
 admin actions.
 
+**Partial answer (auth-rls Phase 0, 2026-09-26):** auth-rls replaces the admin
+key with Supabase Auth passwords, and Supabase throttles those. The dashboard
+shows a limit of **30**, one limit shared by sign-ups and sign-ins. That covers
+password guessing at sign-in. It does not cover what happens after sign-in,
+and there is still no audit log.
+
 ---
 
 ## R-14 · The model states availability without calling the tool · **Re-opened by every tools-block edit**

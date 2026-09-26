@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-24 (bookings complete)
+> Last updated: 2026-09-26 (auth-rls Phase 0 done)
 
 ---
 
@@ -32,9 +32,10 @@
   Both tenants were also walked by hand in the browser.
 - **Working on right now:** the **auth + RLS plan**,
   [`plan/auth-rls.md`](./plan/auth-rls.md) (Phases 0–8, written 2026-09-24, on
-  `feat/auth-rls`). Nothing is built yet. Bookings is complete and merged
+  `feat/auth-rls`). **Phase 0 done 2026-09-26:** option A works (D-039), and
+  the baseline is in `plan/baseline/*-pre-auth.txt`. Next is Phase 1. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
-  bookings isolation 13/13, verify 28/28, tests 99.
+  bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
 ---
 
@@ -101,7 +102,28 @@ R-14–R-18, architecture, flow, notes and README. `todo.md` was left alone,
 because it holds your uncommitted edits. Its tool-call and ask-a-question
 items are done.
 
-**▶ Auth + RLS Phase 0: the signing spike, and the baseline.**
+~~**Auth + RLS Phase 0: the signing spike, and the baseline.**~~ **Done
+2026-09-26.** Option **A** works. A token signed ES256 by our own key,
+imported as a *standby* signing key, gets `200` back from `whoami()` with the
+claims `{"role": "authenticated", "tenant_id": 3}`. Before the import, the same
+token got `401 PGRST301`. B and C were not needed. Recorded as D-039, evidence
+in `plan/baseline/auth-spike-phase0.txt`. Supabase Auth email sign-in works:
+`iss …/auth/v1`, `aud authenticated`, `role authenticated`, uuid `sub`, 3600 s
+tokens, still signed by Supabase's `cb77f580…`. The baseline matches: verify
+28/28, isolation 11/11, bookings isolation 12/12, eval 18/19 (`antecedent`),
+prompt-snapshot byte-identical (`d6337d0f…`), and villa's `explain` is a Seq
+Scan plus top-N sort, 0.974 ms. Sign-up + sign-in rate limit (R-13): **30**,
+shared by both, as shown in the dashboard.
+
+**▶ Auth + RLS Phase 1: policies and memberships.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 1. Write
+`packages/db/sql/schema-auth.sql` (idempotent): `memberships`,
+`app_tenant_id()`/`app_is_admin()`, every policy in § 1.3, `tenant_public`,
+the `check_availability` rewrite, and the grants. The user runs it in the SQL
+editor. It is harmless to the running app, which still uses `service_role`.
+
+<details><summary>Phase 0's original brief</summary>
+
 [`plan/auth-rls.md`](./plan/auth-rls.md) § 2.1 and § 3. This project uses
 Supabase's asymmetric JWT signing keys (the `.env` has
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL`), so
@@ -111,6 +133,8 @@ Postgres connection. **If none works, stop and re-plan.** Also check that
 Supabase Auth's email+password sign-in works, and save the baseline to
 `plan/baseline/*-pre-auth.txt`. You will need the Supabase dashboard for
 the spike.
+
+</details>
 
 
 ~~**1. Sign off Phase 6**~~ — **done 2026-09-22, checked by hand.** All four
@@ -630,6 +654,30 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8 (auth-rls Phase 0)
+- **Did:**
+  - wrote `plan/auth-phase0-spike.sql` (`whoami()`, plus `auth_explain()`,
+    which only `service_role` can execute) and
+    `packages/db/tools/auth-spike.mjs` (hand-rolled ES256/HS256 on
+    `node:crypto`);
+  - generated an EC P-256 key into `scratch/`, and the user imported it as a
+    standby JWT signing key;
+  - ran the baseline.
+- **Observed:**
+  - **Option A:** `401 PGRST301` before the import, `200` with
+    `{"role":"authenticated","tenant_id":3}` after it.
+  - **Supabase Auth sign-in:** `200` through `whoami`, signed by
+    `cb77f580…`.
+  - **Baseline:** 28/28, 11/11, 12/12, 18/19, and the snapshot is identical.
+- **Found:**
+  - bookings isolation has always had 12 checks. "13" in CLAUDE.md and the
+    plan was a miscount, now corrected there; historical entries are left
+    as written.
+  - The spike key's private half appeared in the transcript. Phase 3 must
+    use a fresh key and delete `ea5ce335…`.
+- **Also:** sign-up + sign-in rate limit is 30 (dashboard), shared.
+- **Next:** Phase 1.
 
 ### 2026-09-24 — session 7, continued (auth + RLS planning)
 - **Did:** branched `feat/auth-rls`, and committed the #27 record there

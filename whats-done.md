@@ -3947,3 +3947,73 @@ It has an explicit stop condition. The design must not quietly fall back to
 ### Status
 
 Nothing is built yet. Next is Phase 0, which needs the Supabase dashboard.
+
+---
+
+## Auth + RLS Phase 0 — the signing spike, and the baseline · done 2026-09-26
+
+**What was done:**
+- Wrote `plan/auth-phase0-spike.sql`: a throwaway `whoami()`, which returns
+  `auth.jwt()`, and `auth_explain()`, which is tenancy's explain helper again,
+  executable by `service_role` only.
+- Wrote `packages/db/tools/auth-spike.mjs`, which signs JWTs by hand on
+  `node:crypto` and calls `whoami()`.
+- Generated an EC P-256 key into the gitignored `scratch/`. The user imported
+  it in the dashboard as a **standby** JWT signing key.
+- Ran the full baseline into `plan/baseline/*-pre-auth.txt`. The spike's
+  evidence is in `plan/baseline/auth-spike-phase0.txt`.
+
+**Why it mattered:** the whole plan rests on the server minting a token that
+PostgREST accepts. The project uses asymmetric signing keys, so Supabase holds
+its own private key, and none of this was guaranteed. The plan had a stop
+condition for exactly that case.
+
+**What each observed value proves:**
+- **`401 PGRST301 "No suitable key was found"` before the import, then `200`
+  with `{"role": "authenticated", "tenant_id": 3}` after it.** The code and the
+  claims were identical and the key was the same key; only its registration
+  changed. So the pass means PostgREST trusts our key, not that it accepts
+  anything, and the claims reach Postgres unchanged. That settles option A
+  (D-039). B and C were not tried.
+- **The JWKS lists `ea5ce335…` (ours) next to `cb77f580…` (Supabase's).**
+  Standby keys are published for verification.
+- **A Supabase Auth sign-in after the import still has `kid=cb77f580…`.**
+  Importing as standby did not change what Auth signs with. Staff tokens stay
+  Supabase's, and chat tokens are ours.
+- **Auth token claims:** `iss https://…supabase.co/auth/v1`, `aud
+  authenticated`, `role authenticated`, a uuid `sub`, a 3600 s lifetime, and
+  `app_metadata.provider email`. There is no tenant claim. Phase 3 will have
+  to derive the tenant from `memberships`, not from the token, as planned.
+- **`{"role": "anon"}` from `whoami` with only the publishable key.** The
+  publishable key is not a JWT, and PostgREST maps it to `anon`.
+- **Anon calling `auth_explain` gets `42501 permission denied`.** The
+  arbitrary-SELECT helper is not reachable from the browser key.
+- **Baseline:**
+  - verify 28/28, isolation 11/11, bookings isolation 12/12;
+  - eval 18/19 (`original 9/10 · tool 9/9`, `antecedent` only);
+  - `prompt-snapshot` is byte-identical to the pre-bookings file (sha256
+    `d6337d0f…`);
+  - villa's inlined `match_chunks` as `service_role` is a `Seq Scan on
+    chunks c, Filter: (tenant_id = 3)` plus a top-N heapsort: 5 rows,
+    0.974 ms. At 34 chunks the planner does not use an index. This is the
+    plan Phase 2 re-runs under a tenant token.
+
+**Deviation:** bookings isolation printed **12** PASS lines, and the docs
+said 13. The script contains 12 `check(` calls, and the Phase 2 baseline file
+(`isolation-bookings-phase2.txt`) also has 12. So nothing regressed; the "13"
+was a miscount from the start. It is corrected in CLAUDE.md and
+`plan/auth-rls.md`, and historical records are left as written.
+
+**Traps avoided:**
+- An ES256 JWT signature must be raw `r||s` (`dsaEncoding: 'ieee-p1363'`),
+  not node's default DER.
+- Importing the key as *active*, or rotating it, would have moved Supabase
+  Auth onto our key.
+- **Not yet safe:** the spike key's private half was shown in the session
+  transcript. Phase 3 generates a fresh key, keeps it only in `.env`, and
+  deletes `ea5ce335…` in the dashboard.
+
+**R-13's partial answer:** the dashboard's rate limit for sign-ups and
+sign-ins is **30**, one limit shared by both. The window was not noted.
+Password guessing against a staff account is throttled by Supabase, not by
+us.

@@ -1,0 +1,38 @@
+auth-rls Phase 0 — the signing spike (plan/auth-rls.md § 2.1), 2026-09-26
+Tool: packages/db/tools/auth-spike.mjs. Helper SQL: plan/auth-phase0-spike.sql.
+Token claims for A: {role: authenticated, tenant_id: 3, iat, exp: iat+300}, no sub (§ 2.4).
+Call: POST /rest/v1/rpc/whoami, apikey = publishable key, Authorization: Bearer <token>.
+
+--- publishable key alone, no Bearer (whoami just created) ---
+{"role": "anon"}
+
+--- anon → auth_explain (the lock-down) ---
+{"code":"42501","details":null,"hint":null,"message":"permission denied for function auth_explain"}
+
+--- Option A, BEFORE importing our key (negative control) ---
+$ node --conditions=react-server --env-file=../../.env tools/auth-spike.mjs a
+[A] JWKS kids: cb77f580-1360-4267-aaba-1278f26d665b (ES256)
+[A] our kid ea5ce335-aea6-4ff5-9c1e-a888f1c6aecc is NOT in the JWKS
+[A] POST /rest/v1/rpc/whoami → 401 Unauthorized
+[A] {"code":"PGRST301","details":"No suitable key was found to decode the JWT","hint":null,"message":"No suitable key or wrong key type"}
+
+--- Option A, AFTER importing it as a STANDBY key (dashboard → JWT Keys) ---
+$ node --conditions=react-server --env-file=../../.env tools/auth-spike.mjs a
+[A] JWKS kids: ea5ce335-aea6-4ff5-9c1e-a888f1c6aecc (ES256), cb77f580-1360-4267-aaba-1278f26d665b (ES256)
+[A] our kid ea5ce335-aea6-4ff5-9c1e-a888f1c6aecc IS in the JWKS
+[A] POST /rest/v1/rpc/whoami → 200 OK
+[A] {"exp": 1790402773, "iat": 1790402473, "role": "authenticated", "tenant_id": 3}
+
+Options B and C: not tried. A passed, and the plan tries them only if A fails.
+
+--- Supabase Auth sign-in (throwaway user, run by the user; email omitted here) ---
+$ node --conditions=react-server --env-file=../../.env tools/auth-spike.mjs auth <email> <password>
+[auth] header alg=ES256 kid=cb77f580-1360-4267-aaba-1278f26d665b
+[auth] iss=https://jkpdxolpydnenxeljmln.supabase.co/auth/v1 aud=authenticated role=authenticated sub=96d824cd-81d3-460f-a26d-ae92c618df0f lifetime=3600s
+[auth] POST /rest/v1/rpc/whoami → 200 OK
+[auth] {"aal": "aal1", "amr": [{"method": "password", ...}], "aud": "authenticated", "exp": 1790406490, "iat": 1790402890,
+        "iss": "https://jkpdxolpydnenxeljmln.supabase.co/auth/v1", "sub": "96d824cd-81d3-460f-a26d-ae92c618df0f",
+        "role": "authenticated", "email": "<omitted>", "phone": "", "session_id": "…",
+        "app_metadata": {"provider": "email", "providers": ["email"]}, "is_anonymous": false,
+        "user_metadata": {"email_verified": true}}
+Email provider: enabled (dashboard). Sign-up + sign-in rate limit: 30 for sign-ups and sign-ins combined (dashboard → Authentication → Rate Limits; the value as reported by the user, window not noted).
