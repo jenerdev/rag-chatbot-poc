@@ -4273,3 +4273,72 @@ routes run on chat tokens.
   leaves a short window in which no tenant token verifies.
 - **Showing the key.** The new key went from the file to the clipboard with
   `clip`, and was never opened, selected or printed.
+
+---
+
+## Auth + RLS Phase 4 — the chat path on chat tokens · done 2026-09-26
+
+**What was done:**
+- Took `SUPABASE_SERVICE_ROLE_KEY` off `apps/web/lib/env.ts`'s REQUIRED
+  list.
+- `admin-auth.ts` now imports `@rag/db/service` lazily, inside
+  `checkAdminKey()`, and throws its own clear error when the key is missing.
+- Wrote `plan/auth-phase4-walk.sh`: nine HTTP checks of the chat path.
+- Ran the walk against `pnpm dev` twice. Run A had the service key set. Run
+  B had it **empty in the web process**. Outputs:
+  `plan/baseline/walk-auth-phase4-{with,no}-key.txt`.
+
+**Why it mattered:** Phase 4's done-when is that no chat code path needs
+the master key. The eval had already shown that chat is correct under RLS.
+It could not show that the web process runs without `service_role`, because
+the eval is a tool, and tools keep the service key for setup.
+
+**What each observed value proves:**
+- **Runs A and B are identical on every chat line**, with ids, delta counts
+  and the admin line excluded from the diff:
+  - `/t/villa` is 200 and `/t/nope` is 404;
+  - the parking answer comes with 5 villa sources;
+  - the transcript has 2 messages;
+  - northwind is refused villa's transcript with a 404, and refuses villa's
+    fact with 0 sources;
+  - availability for 5 November 2026 called `check_availability`, which
+    returned 3 open slots;
+  - the SSE run gives `meta`, then `delta`s, then `done`.
+
+  So the page, retrieval, history, the transcript, the tool (through the
+  security-definer function) and streaming all run on the publishable key
+  plus a chat token.
+- **Admin-key login, run B: `500 "Admin-key login needs
+  SUPABASE_SERVICE_ROLE_KEY until auth-rls Phase 6"`.** The one remaining
+  use of the master key in the web app is exactly where the comment says
+  it is, and it fails with its own message, not a generic one.
+- **The admin page renders (200) in run B.** Importing `admin-auth.ts` no
+  longer constructs the service client, so pages and routes that only call
+  `requireAdmin()` or `readSession()` load without the key.
+- **The Phase 4 measurements come from Phase 3's run:**
+  - eval 18/19, with verdicts identical to `eval-pre-auth.txt`;
+  - isolation 11/11 (and 11/11 `--filters-only`);
+  - bookings isolation 12/12;
+  - snapshot byte-identical.
+
+  Since then, only `apps/web/lib` has changed. No pipeline or package code
+  has.
+
+**Deviation:** removing the key from REQUIRED is a Phase 6 item, done
+early. Without it, `assertEnv()` fails every route when the key is missing,
+chat included, so Phase 4's own done-when could not pass.
+
+**Traps avoided:**
+- **"Unset" means empty, for `next dev`.** The dotenv loader in
+  next.config fills any variable that is not already defined from `.env`, so
+  `env -u` would have quietly put the key back. `SUPABASE_SERVICE_ROLE_KEY=`
+  (empty) counts as defined, and it stays empty.
+- **A top-level import is a startup cost.** With `@rag/db/service` imported
+  at the top of `admin-auth.ts`, every admin route would construct the
+  service client at load, and supabase-js throws on an empty key. The
+  import is lazy now.
+- **Testing the prompt instead of auth.** The walk's first draft asked a
+  question the villa documents do not answer (check-in time), and wrote the
+  date in ISO form, which made the model ask "Which date do you mean?"
+  instead of calling the tool. Neither was an auth effect. The walk now uses
+  the phrasing the passing suites use.

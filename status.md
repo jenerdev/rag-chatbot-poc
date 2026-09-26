@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 3 done)
+> Last updated: 2026-09-26 (auth-rls Phase 4 done)
 
 ---
 
@@ -38,7 +38,8 @@
   unchanged (eval 18/19 verdict for verdict). **Phase 2 done:** RLS costs
   no access path and the ids are identical, so nothing changed. **Phase 3
   done:** every request runs on a tenant token. Admin writes are broken until
-  Phase 5, as planned. Next is Phase 4. Bookings is complete and merged
+  Phase 5, as planned. **Phase 4 done:** chat works with the service key
+  unset in the web process. Next is Phase 5. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -171,14 +172,36 @@ Phase 2").
   context now, and the bookings screen shows empty. Admin login still
   works.
 
-**▶ Auth + RLS Phase 4: the chat path on chat tokens.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 4.
-- The measurements are already in (Phase 3's eval ran on chat tokens).
-- What remains: check in the running app that chat and the availability tool
-  work, then **unset `SUPABASE_SERVICE_ROLE_KEY` in the web process**,
-  restart, and chat must still work.
-- Expect the admin-key login to fail with it unset: that is the one
-  exception, until Phase 6.
+~~**Auth + RLS Phase 4: the chat path on chat tokens.**~~ **Done 2026-09-26.**
+- **Measurements, from Phase 3's run on the same pipeline code:** eval 18/19
+  with identical verdicts, isolation 11/11, bookings isolation 12/12, and
+  the snapshot byte-identical.
+- **In the running app:** `plan/auth-phase4-walk.sh` ran against `pnpm dev`
+  twice, with the service key set and then with it **empty in the web
+  process**. The chat lines are identical:
+  - the page is 200 and `/t/nope` is 404;
+  - the parking answer comes with 5 sources, and the transcript has 2
+    messages;
+  - a cross-tenant transcript is 404, and northwind refuses the villa fact;
+  - `check_availability` is called for 5 November 2026 through the chat
+    token;
+  - the SSE sequence is `meta`, then `delta`s, then `done`.
+- **Admin-key login with the key empty:** a 500 naming the missing key.
+  That is the one exception, until Phase 6.
+- **Done early:** `SUPABASE_SERVICE_ROLE_KEY` left env.ts's REQUIRED list
+  (a Phase 6 item). `admin-auth.ts` now imports the service client lazily,
+  inside `checkAdminKey()`.
+
+**▶ Auth + RLS Phase 5: staff accounts.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 5.
+- Email + password login (Supabase Auth, then a membership check, then our
+  HMAC cookie carrying the user id).
+- `requireAdmin()` re-checks the membership on every request and mints a
+  staff token.
+- The password reset flow.
+- `tools/member.mjs`, and the tools' operator member.
+- The six curl cases in the plan.
+- This is what brings the admin writes back.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -712,6 +735,26 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 4)
+- **Did:**
+  - dropped `SUPABASE_SERVICE_ROLE_KEY` from env.ts's REQUIRED list;
+  - made `admin-auth.ts` import `@rag/db/service` lazily, with its own
+    missing-key error;
+  - wrote `plan/auth-phase4-walk.sh`, and ran it against `pnpm dev` with the
+    key set and with it empty.
+- **Observed:** the chat lines are identical in both runs (the diff excluded
+  only ids, delta counts and the admin line). The admin login gives 401
+  with the key, and a 500 naming the key without it.
+- **Found:**
+  - the walk's first draft asked "What time is check-in?", which the villa
+    documents do not answer, so the refusal was grounded. It also gave an
+    ISO date, and the model asked "Which date do you mean?" and called no
+    tool. Neither was an auth effect. Both were replaced with the phrasing
+    the passing suites use.
+  - Unsetting a key for `next dev` means setting it EMPTY. The dotenv loader
+    in next.config refills a missing variable from `.env`.
+- **Next:** Phase 5.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 3)
 - **Did:**

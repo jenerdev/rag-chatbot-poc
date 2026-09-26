@@ -1,0 +1,34 @@
+# run B: SUPABASE_SERVICE_ROLE_KEY empty in the web process
+
+--- GET /t/villa (page: tenant_public + branding + countDocuments, as a chat token)
+200
+
+--- GET /t/nope (no such tenant)
+404
+
+--- POST /api/t/villa/chat, JSON: a documents question
+reply: Parking fits six cars inside the gate. Additional vehicles can park along Sampaguita Lane on the left side only, as the right side is a fire
+sources: 5 from Villa Amihan — Amenities and Facilities; Villa Amihan Private Resort — Overview; Villa Amihan — Frequently Asked Questions; Villa Amihan — Directions and Getting There
+conversationId: ac0b6f0b-e6bc-48b3-b3ee-5fe71db6a58a
+
+--- GET /api/t/villa/conversations/<id>/messages (the transcript)
+2 messages: user,assistant
+
+--- GET /api/t/northwind/conversations/<villa's id>/messages (cross-tenant)
+{"error":"No conversation with id ac0b6f0b-e6bc-48b3-b3ee-5fe71db6a58a"} [404]
+
+--- POST /api/t/villa/chat, JSON: availability on 5 November 2026 (the tool, on a chat token)
+reply: Yes, the villa is open on 5 November 2026. 
+
+Open: 22-Hour Whole Day, Day Tour, Overnight  
+Taken: None
+tool calls: check_availability {"slots":[{"date":"2026-11-05","unit":"Whole property","slot":"22-Hour Whole Day
+
+--- POST /api/t/northwind/chat, JSON: a villa fact (the leak case)
+reply: I don't know based on the documents I have. | sources: 0
+
+--- POST /api/t/villa/chat, SSE: event names in order
+1x meta 40x delta 1x done 
+
+--- POST /api/t/villa/admin/session with a wrong key (the admin-key login: the one exception)
+{"error":"Admin-key login needs SUPABASE_SERVICE_ROLE_KEY until auth-rls Phase 6 (staff accounts replace it)"} [500]

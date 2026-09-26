@@ -2,12 +2,6 @@ import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { verifyAdminKey } from '@rag/db';
-// ⚠️ THE ONE `@rag/db/service` IMPORT OUTSIDE tools/, until auth-rls Phase 6.
-// checkAdminKey() must read tenants.admin_key_hash, and no token can reach
-// that column: `tenants` has no policies, and tenant_public() leaves it
-// out, on purpose. Phase 6 deletes the admin key, this function, and this
-// import. Nothing else here touches the database.
-import { supabase } from '@rag/db/service';
 import type { TenantContext } from '@rag/pipeline';
 
 // Per-tenant admin sessions (plan.md Phase 6, D-028). Hand-rolled on
@@ -112,6 +106,20 @@ export function requireAdmin(request: Request, tenant: TenantContext): void {
  * a response.
  */
 export async function checkAdminKey(tenant: TenantContext, key: string): Promise<'ok' | 'wrong' | 'unset'> {
+  // ⚠️ THE ONE `@rag/db/service` USE OUTSIDE tools/, until auth-rls Phase 6.
+  // This must read tenants.admin_key_hash, and no token can reach that
+  // column: `tenants` has no policies, and tenant_public() leaves it out, on
+  // purpose. Phase 6 deletes the admin key, this function, and this import.
+  //
+  // Imported HERE, lazily, not at the top of the file. Every admin route
+  // imports this module for requireAdmin(), and a top-level import would
+  // construct the service client, which throws on a missing key, for all of
+  // them. So only the admin-key login needs SUPABASE_SERVICE_ROLE_KEY, and
+  // the web process runs without it otherwise (auth-rls Phase 4).
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Admin-key login needs SUPABASE_SERVICE_ROLE_KEY until auth-rls Phase 6 (staff accounts replace it)');
+  }
+  const { supabase } = await import('@rag/db/service');
   const { data, error } = await supabase
     .from('tenants')
     .select('admin_key_hash')
