@@ -36,6 +36,16 @@ import type { HistoryMessage, TenantContext } from './types.js';
  * never add, say what is missing) apply to it without being restated. The
  * tool-specific lines come from tools.ts, because only that file knows which
  * tools this tenant has.
+ *
+ * LANGUAGE (D-043): one more block, LAST, and only when the reply is not an
+ * unrequested English one. The same shape as the tools block: the lines come
+ * from language.ts, which decides the language in code, so this function
+ * only places them. Last, so they cover every example above them, the tools
+ * block's English one included. An English turn gets no block, so every
+ * English prompt is the string it was before D-043 (the northwind snapshot
+ * is the proof). Without the block, the model mirrored the user: a Tagalog
+ * question got formal, pure Tagalog, and a Taglish one got plain English
+ * (plan/baseline/eval-lang-before.txt).
  */
 export function buildPrompt(
   tenant: Pick<TenantContext, 'assistantName' | 'businessName'>,
@@ -43,6 +53,7 @@ export function buildPrompt(
   history: HistoryMessage[],
   question: string,
   tools: PromptTools | null = null,
+  language: string[] = [],
 ): ChatMessage[] {
   const context = chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
 
@@ -56,6 +67,9 @@ export function buildPrompt(
         `Today is ${tools.today} (${tools.weekday}), ${tools.timezone}.`,
       ]
     : [];
+
+  // Appended last, and only when there is something to say (D-043).
+  const languageBlock = language.length > 0 ? ['', ...language] : [];
 
   return [
     {
@@ -104,6 +118,7 @@ export function buildPrompt(
         context,
         '--- END CONTEXT ---',
         ...toolBlock,
+        ...languageBlock,
       ].join('\n'),
     },
     ...history, // oldest first, so the conversation reads in order

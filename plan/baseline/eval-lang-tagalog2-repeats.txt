@@ -1,0 +1,8 @@
+PASS  [lang-tagalog-2] villa want lang
+      A: Yes po, you can magdala ng small and medium pets sa Villa Amihan. Meron tayong maximum na three pets, at may bayad na ₱500 each. Pero, pets are not allowed sa pools, beds, o inside the bedrooms.  || taglish? true (tl 8, en 8, en-share 0.50); facts kept
+PASS  [lang-tagalog-2] villa want lang
+      A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three. Pero hindi po sila allowed sa pools, beds, o inside the bedrooms.  || taglish? true (tl 6, en 11, en-share 0.65); facts kept
+PASS  [lang-tagalog-2] villa want lang
+      A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three. Pero hindi po sila allowed sa pools, beds, o inside the bedrooms.  || taglish? true (tl 6, en 11, en-share 0.65); facts kept
+PASS  [lang-tagalog-2] villa want lang
+      A: Yes po, you can magdala ng small and medium pets sa Villa Amihan. Ang fee po is ₱500 each, with a maximum of three pets. Pero, pets are not allowed sa pools, beds, or inside the bedrooms.  || taglish? true (tl 7, en 13, en-share 0.65); facts kept

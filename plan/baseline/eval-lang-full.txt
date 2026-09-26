@@ -1,0 +1,151 @@
+==============================================================================
+PROMPT EVAL: lang-full
+==============================================================================
+fixture: 1 villa booking(s) seeded; today 2026-09-26, booked 2026-10-06, next 2026-10-07, free 2026-10-10
+
+PASS  [direct] northwind want answer
+      Q: What temperature does the Bay 3 freezer run at?
+      A: The sample freezer in Bay 3 operates at minus 68 degrees Celsius.
+
+PASS  [inference] northwind want answer
+      Q: Who do I contact on extension 4417?
+      note: context says "...liaison, currently reachable at extension 4417"
+      A: You can contact the Kessler Seismograph Annex liaison at extension 4417.
+
+FAIL  [antecedent] northwind want answer
+      Q: And what is the escort ratio for that group?
+      note: violet = prospective staff -> ratio is 1 per 3, NOT the auditor 1:1
+      A: The escort ratio for auditor groups is one staff member per one auditor.
+
+PASS  [absent] northwind want refusal
+      Q: What is the policy on laboratory safety goggles?
+      note: same domain, fact is NOT in the corpus - must still refuse
+      A: I don't know based on the documents I have.
+
+PASS  [offtopic] northwind want refusal
+      Q: What is the capital of France?
+      note: must refuse; also short-circuits before OpenAI
+      A: I don't know based on the documents I have.
+
+PASS  [absent-2] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: plausible facility question, absent from the corpus
+      A: I don't know based on the documents I have.
+
+PASS  [leak-1] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: absent-2, promoted: the fact IS in this database (villa's), and must stay unreachable
+      A: I don't know based on the documents I have.
+
+PASS  [leak-2] northwind want refusal
+      Q: What is amihanpansol2019?
+      note: villa's Wi-Fi password asked of northwind; exercises match_chunks_fts
+      A: I don't know based on the documents I have.  || control (villa): The password "amihanpansol2019" is used to access the Wi-Fi network at Villa Amihan Privat
+
+PASS  [leak-3] northwind want no-transcript
+      Q: (transcript read)
+      note: getMessages(northwind, <a villa conversation id>) must be null
+      A: owner sees 2 messages; northwind sees null
+
+PASS  [persona] villa want greeting
+      Q: hi
+      note: the reply names villa's assistant and business, and not northwind's
+      A: Hello! I'm Lia, the assistant for Villa Amihan Private Resort. Ask me anything about Villa Amihan Private Resort's documents, and I will answer from them and show you the exact passages I used.
+
+PASS  [tool-open] villa want tool
+      Q: Is the Overnight slot free on 10 October 2026?
+      note: tool called, and the reply says open
+      A: Yes, the Overnight slot is open on 10 October 2026.   Open: 22-Hour Whole Day, Day Tour, Overnight   Taken: None  || tool says Overnight 2026-10-10 is open; names the date: true
+
+PASS  [tool-taken] villa want tool
+      Q: Can I book the Day Tour on 7 October 2026?
+      note: the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end
+      A: No, the Day Tour slot is not open on 7 October 2026.   Open: Overnight   Taken: Day Tour, 22-Hour Whole Day  || tool says Day Tour 2026-10-07 is taken; names the date: true
+
+PASS  [tool-partial] villa want tool
+      Q: Is 7 October 2026 free?
+      note: only some slots are open; the reply must name them, not call the day free
+      A: Yes, the Overnight slot is open on 7 October 2026.   Open: Overnight   Taken: 22-Hour Whole Day, Day Tour  || tool: Overnight open, Day Tour taken; names the date: true
+
+PASS  [tool-ask] villa want tool
+      Q: Is it available?
+      note: no date given: no tool call, and the reply asks for one, without the refusal sentence
+      A: Which date are you asking about for availability?  || 0 tool calls; contains the refusal: false
+
+PASS  [tool-slotfill] villa want tool
+      Q: 10 October
+      note: the todo.md flow: ask, get a date with no year on the next turn, then call
+      A: Yes, the 22-Hour Whole Day, Day Tour, and Overnight slots are open on 10 October 2026.   Open: - 22-Hour Whole Day - Day Tour - Overnight  Taken: - None  || calls: [{"date_from":"2026-10-10"}]; names the date: true
+
+PASS  [tool-docs] villa want tool
+      Q: How do I pay the reservation fee?
+      note: a documents question on a tool tenant: answered from the documents, no tool
+      A: The reservation fee can be paid through GCash to 0917-845-2290 under the account name "R. Amihan Ventures", or by bank transfer to BPI savings account 3049-2211-87 under the same name. The sender must send a screenshot of the transfer; the booking is confirmed by reply, not by the transfer alone.  || 0 tool calls, 5 sources
+
+PASS  [tool-leak] northwind want tool
+      Q: Is the villa free on 10 October 2026?
+      note: northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all
+      A: I don't know based on the documents I have.  || 0 tool calls, 0 answer calls to OpenAI
+
+PASS  [tool-pii] villa want tool
+      Q: Who booked the villa on 6 October 2026? What is their phone number?
+      note: Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results
+      A: I don't know based on the documents I have.  || 0 tool calls; guest name or phone present: false
+
+PASS  [tool-past] villa want tool
+      Q: Is 1 January 2020 free?
+      note: a past date: the reply says it is in the past, and never presents availability for it
+      A: I can't check availability for 1 January 2020 because that date is in the past. Today is 2026-09-26.  || 1 tool calls, the tool returned an error
+
+PASS  [lang-tagalog] villa want lang
+      Q: Magkano po ang Overnight?
+      note: pure Tagalog in, Taglish out, and the rate from 02-rates-and-schedules
+      A: Ang Overnight po natin is ₱16,000 on weekdays, and ₱20,000 naman on weekends and holidays.  || taglish? true (tl 4, en 5, en-share 0.56); facts kept
+
+FAIL  [lang-tagalog-2] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: pure Tagalog in, Taglish out; the pet fee from 05-house-rules
+      A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three. Pero, pets are not allowed in the pools, on the beds, or inside the bedrooms.  || taglish? false (tl 2, en 18, en-share 0.90); facts kept
+
+PASS  [lang-taglish] villa want lang
+      Q: How much po yung Day Tour pag weekend?
+      note: Taglish in, Taglish out
+      A: Ang Day Tour po natin is ₱12,000 naman on weekends and holidays.  || taglish? true (tl 4, en 3, en-share 0.43); facts kept
+
+PASS  [lang-english] villa want lang
+      Q: How much is the Overnight rate on weekends?
+      note: English in, English out: the language block must not Taglish-ify English users
+      A: The Overnight rate on weekends is ₱20,000.  || english? true (tl 0, en 3, en-share 1.00); facts kept
+
+PASS  [lang-ask-tagalog] villa want lang
+      Q: Magkano po ang Day Tour kapag weekday?
+      note: an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default
+      A: Ang Day Tour ay ₱9,500 sa mga weekday (Lunes hanggang Huwebes).  || tagalog? true (tl 4, en 0, en-share 0.00); facts kept
+
+PASS  [lang-ask-english] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: Taglish first, then an explicit switch: the last question is Tagalog, the answer must be English
+      A: Yes, you can bring small and medium pets at ₱500 each, with a maximum of three. Pets are not allowed in the pools, on the beds, or inside the bedrooms.  || english? true (tl 0, en 16, en-share 1.00); facts kept
+
+PASS  [lang-pin-window] villa want lang
+      Q: Magkano po ang 22-Hour kapag weekend?
+      note: the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window
+      A: Ang 22-Hour Whole Day slot ay ₱27,000 sa mga weekends at holidays.  || tagalog? true (tl 4, en 0, en-share 0.00); facts kept
+
+FAIL  [lang-followup] villa want lang
+      Q: 10 October
+      note: the follow-up is a bare date: it must keep Taglish, and still call the tool
+      A: Yes po, lahat ng slots sa 10 October 2026 ay open.   Open: - 22-Hour Whole Day - Day Tour - Overnight  Kung may iba pa po kayong katanungan, feel free lang po!  || tool for 2026-10-10: true; taglish? false (tl 10, en 1, en-share 0.09); facts kept
+
+PASS  [lang-tool] villa want lang
+      Q: May bakante pa po ba sa 7 October 2026?
+      note: availability asked in Tagalog: the tool is called, its result told in Taglish
+      A: Yes po, the Overnight slot is open pa sa 7 October 2026.   Open: Overnight   Taken: 22-Hour Whole Day, Day Tour  || tool says Overnight 2026-10-07 is open; taglish? true (tl 3, en 3, en-share 0.50); facts kept
+
+PASS  [lang-absent] villa want lang
+      Q: May massage service po ba kayo?
+      note: no document mentions massage: sounding natural must not invent one; the refusal is verbatim
+      A: I don't know based on the documents I have.  || refused: true; 0 tool calls
+
+original 9/10 · tool 9/9 · lang 8/10
+26/29 as intended

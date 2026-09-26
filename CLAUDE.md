@@ -94,7 +94,8 @@ packages/
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     tools/isolation.mjs    12 cross-tenant checks, no API key
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
-    tools/prompt-eval.mjs  the battery, 19 cases (10 + 9 tool-*), both tenants; seeds its own bookings
+    src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
+    tools/prompt-eval.mjs  the battery, 29 cases (10 + 9 tool-* + 10 lang-*), both tenants; seeds its own bookings
     tools/isolation.mjs    11 cross-tenant checks through the pipeline
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
@@ -110,7 +111,7 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
 pnpm --filter @rag/db verify    # 47 checks, no API key needed
-pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
+pnpm eval                       # the prompt battery, 29 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code filters alone (RLS bypassed)
@@ -136,9 +137,14 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    northwind *alone*, because Villa describes parking and `absent-2` must refuse
    parking. Tenancy turned that fragile precondition into the feature (plan.md
    § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
-   but in the other tenant, is unreachable. Expect **18/19**, printed as
-   `original 9/10 · tool 9/9`: `antecedent` is the known model limit (D-017).
-   A different number means something moved. The nine `tool-*` cases seed
+   but in the other tenant, is unreachable. Expect **27/29**, printed as
+   `original 9/10 · tool 9/9 · lang 9/10`: `antecedent` is the known model
+   limit (D-017), and `lang-followup` leans Tagalog after a bare date
+   (D-043). `lang-tagalog-2` flips now and then (1 run in 7); repeat it
+   before deciding why. A different number means something moved.
+   **`packages/rag/src/language.ts` is prompt text too**: its lines are
+   appended to `buildPrompt()`, so an edit there means re-running the
+   battery. The nine `tool-*` cases seed
    `fixtures/villa-bookings.json` into villa themselves and hard-delete it
    afterwards (plan/bookings.md Phase 6). Tools also mean a second prompt
    check: `pnpm --silent --filter @rag/pipeline prompt-snapshot` must match

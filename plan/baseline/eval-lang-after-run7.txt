@@ -1,0 +1,57 @@
+==============================================================================
+PROMPT EVAL: lang-after-7
+==============================================================================
+fixture: 1 villa booking(s) seeded; today 2026-09-26, booked 2026-10-06, next 2026-10-07, free 2026-10-10
+
+PASS  [lang-tagalog] villa want lang
+      Q: Magkano po ang Overnight?
+      note: pure Tagalog in, Taglish out, and the rate from 02-rates-and-schedules
+      A: Ang Overnight po natin is ₱16,000 on weekdays, and ₱20,000 naman on weekends and holidays.  || taglish? true (tl 4, en 5, en-share 0.56); facts kept
+
+PASS  [lang-tagalog-2] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: pure Tagalog in, Taglish out; the pet fee from 05-house-rules
+      A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three. Pero hindi po sila pwede sa pools, sa beds, o sa loob ng bedrooms.  || taglish? true (tl 10, en 10, en-share 0.50); facts kept
+
+PASS  [lang-taglish] villa want lang
+      Q: How much po yung Day Tour pag weekend?
+      note: Taglish in, Taglish out
+      A: Ang Day Tour po natin is ₱12,000 naman on weekends and holidays.  || taglish? true (tl 4, en 3, en-share 0.43); facts kept
+
+PASS  [lang-english] villa want lang
+      Q: How much is the Overnight rate on weekends?
+      note: English in, English out: the language block must not Taglish-ify English users
+      A: The Overnight rate on weekends is ₱20,000.  || english? true (tl 0, en 3, en-share 1.00); facts kept
+
+PASS  [lang-ask-tagalog] villa want lang
+      Q: Magkano po ang Day Tour kapag weekday?
+      note: an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default
+      A: Ang Day Tour ay ₱9,500 sa mga weekday (Lunes hanggang Huwebes).  || tagalog? true (tl 4, en 0, en-share 0.00); facts kept
+
+PASS  [lang-ask-english] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: Taglish first, then an explicit switch: the last question is Tagalog, the answer must be English
+      A: Yes, you can bring small and medium pets at ₱500 each, with a maximum of three pets. However, pets are not allowed in the pools, on the beds, or inside the bedrooms.  || english? true (tl 0, en 16, en-share 1.00); facts kept
+
+PASS  [lang-pin-window] villa want lang
+      Q: Magkano po ang 22-Hour kapag weekend?
+      note: the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window
+      A: Ang 22-Hour Whole Day slot ay ₱27,000 sa weekends at holidays.  || tagalog? true (tl 3, en 0, en-share 0.00); facts kept
+
+FAIL  [lang-followup] villa want lang
+      Q: 10 October
+      note: the follow-up is a bare date: it must keep Taglish, and still call the tool
+      A: Yes po, open ang lahat ng slots sa 10 October 2026.   Open: - 22-Hour Whole Day - Day Tour - Overnight  Walang taken na slots sa araw na ito.  || tool for 2026-10-10: true; taglish? false (tl 10, en 1, en-share 0.09); facts kept
+
+PASS  [lang-tool] villa want lang
+      Q: May bakante pa po ba sa 7 October 2026?
+      note: availability asked in Tagalog: the tool is called, its result told in Taglish
+      A: Yes po, the Overnight slot is open pa sa 7 October 2026.   Open: Overnight   Taken: 22-Hour Whole Day, Day Tour  || tool says Overnight 2026-10-07 is open; taglish? true (tl 3, en 3, en-share 0.50); facts kept
+
+PASS  [lang-absent] villa want lang
+      Q: May massage service po ba kayo?
+      note: no document mentions massage: sounding natural must not invent one; the refusal is verbatim
+      A: I don't know based on the documents I have.  || refused: true; 0 tool calls
+
+original 0/0 · tool 0/0 · lang 9/10
+9/10 as intended (only "lang-*")

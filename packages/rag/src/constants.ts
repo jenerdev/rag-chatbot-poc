@@ -56,6 +56,13 @@ export const MIN_SIMILARITY = 0.25;
 // cost grow with the square of conversation length (D-011, costs.md).
 export const MAX_HISTORY = 6;
 
+// How many of the user's own messages are scanned for an explicit language
+// request ("Tagalog lang po", D-043). Scanned in code, never sent to the
+// model, so this costs one small query and no tokens. It is a bound, not a
+// quality dial: it only has to be longer than any real conversation, so that
+// a request made at the start is still found at the end. Not measured.
+export const LANGUAGE_SCAN_MESSAGES = 50;
+
 // Longest a rewritten search query may be. The rewriter should produce one
 // short question; anything longer means it started explaining itself instead,
 // and we fall back to the original rather than searching with prose.

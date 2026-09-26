@@ -4645,3 +4645,82 @@ roles, MFA, SSO or audit log.
 
 **Owed** (R-21's email cap): the northwind invite, walk step 6 in the
 browser, and the "Forgot password?" email.
+
+---
+
+## Taglish replies (D-043) · done 2026-09-26
+
+**What was done:**
+- **`packages/rag/src/language.ts`** (new, pure, no I/O):
+  - `languageRequest` / `languagePreference`: an explicit request, the latest
+    one winning;
+  - `detectLanguage`: Tagalog function words → Tagalog; two English function
+    words → English; a date or "okay" → none;
+  - `replyLanguage`: the choice;
+  - `languageInstructions`: the prompt lines;
+  - `requestReply`: the canned acknowledgement for a message that is only a
+    request.
+- **`prompt.ts`:** `buildPrompt(…, tools, language: string[] = [])`. The lines
+  are appended last, and nothing at all for an unrequested English reply.
+- **`answer.ts`:**
+  - one more tenant-filtered query, the user's last 50 messages, run in
+    parallel with the history query and never sent to the model;
+  - `replyLanguage()` over them;
+  - `requestReply()` beside `greetingReply()` in both answer paths.
+- **`constants.ts`:** `LANGUAGE_SCAN_MESSAGES = 50`, a bound, not measured.
+- **`language.test.ts`** (new) and `prompt.test.ts`: 103 pipeline tests.
+- **`tools/prompt-eval.mjs`:**
+  - 10 `lang-*` cases, a third count (`lang x/10`);
+  - `mix()`, which judges language by function words and reports the English
+    share of every reply.
+
+**Why it mattered:** the prompt had no language rule, so gpt-4o-mini mirrored
+the user. Measured before (`plan/baseline/eval-lang-before.txt`):
+
+| Asked | Got |
+|---|---|
+| "Pwede po bang magdala ng aso?" | "Oo, puwedeng magdala ng maliit at katamtamang laki ng aso…", **0.00** English |
+| "How much po yung Day Tour pag weekend?" (Taglish) | "The rate for the Day Tour on weekends is ₱12,000.", plain English |
+| "May bakante pa po ba sa 7 October 2026?" | "Yes, the Overnight slot is open on 7 October 2026.", the tools block's English example, verbatim |
+
+After, the same questions:
+- "Yes po, you can bring your dog. Small and medium pets are allowed at ₱500
+  each… Pero hindi po sila pwede sa pools…" (0.50);
+- "Ang Day Tour po natin is ₱12,000 naman on weekends and holidays." (0.43);
+- "Yes po, the Overnight slot is open pa sa 7 October 2026." (0.50).
+
+Every fact survived: each `lang-*` case also checks a price or a tool status,
+and `lang-absent` (massage, in no document) still returns the exact refusal.
+
+**Trap avoided: a rule in the prompt that the model must both classify and
+obey.** The prompt-only version made English questions come back in Taglish
+("Ang Overnight rate po natin is ₱20,000 on weekends"). It also read "10
+October" as English and switched a Taglish booking conversation to English.
+Code now classifies, so an English turn carries no language text at all. That
+is also why the northwind snapshot is still byte-identical to
+`northwind-prompt-pre-bookings.txt`.
+
+**Trap avoided: a request lost to `MAX_HISTORY`.** `lang-pin-window` asks
+"Tagalog lang po." and then four questions, which puts the request 8 messages
+back, outside the 6 re-sent. Its last reply is still pure Tagalog, because
+the request is found in the stored messages, not the history.
+
+**Checked, not assumed:**
+- full battery 26/29: `original 9/10 · tool 9/9 · lang 8/10`;
+- `antecedent` is the known D-017 limit;
+- `lang-tagalog-2` failed once and passed 4/4 repeats;
+- isolation 11/11 on chat tokens and 11/11 filters-only, bookings isolation
+  12/12, verify 47/47;
+- the plan.md Phase 3 grep: both new `from('messages')` lines carry
+  `.eq('tenant_id', tenant.id)`;
+- typecheck (with the service-import check), test and build are green.
+
+**Not fixed:**
+- `lang-followup`: the reply after a bare date stays Taglish but leans
+  Tagalog (0.13 English).
+- The refusal is English in every language, on purpose: it is an exact string
+  that D-035 and the UI rely on.
+- The greeting matcher is still English-only ("kumusta" goes through
+  retrieval).
+- The word lists are Tagalog and English only.
+- The mix is judged by counting words; nobody has listened to it yet.

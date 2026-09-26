@@ -1447,6 +1447,64 @@ forgotten.
 
 ---
 
+## D-043 · Tagalog in, Taglish out: the reply language is decided in code, and the prompt carries one directive · **Added 2026-09-26**
+
+**Decision:**
+- **`packages/rag/src/language.ts` decides the reply language**, from the
+  user's own messages, newest first, the current one included:
+  1. an explicit request ("Tagalog lang po", "Please respond in English",
+     "Taglish po") wins and holds until another request;
+  2. otherwise, the latest message that has a language: any Tagalog function
+     word (po, ang, ng, ba, mga…) → **Taglish**; two English function words
+     and no Tagalog → English; a bare date, number, "yes" or "okay" → no
+     language, so the scan carries on to the message before it.
+- **`buildPrompt()` appends that language's lines LAST**, after the tools
+  block. An unrequested English reply appends **nothing**, so every English
+  prompt is byte-identical to the one before (the northwind snapshot still
+  matches `northwind-prompt-pre-bookings.txt`).
+- **A bare request is answered in code**, like a greeting: "Please respond
+  in English" has nothing to retrieve and used to end in the refusal.
+- **The refusal stays the exact English `NO_ANSWER`**, in every language.
+- The scan reads up to `LANGUAGE_SCAN_MESSAGES` (50) stored user messages in
+  one extra query, tenant-filtered, that never reaches the model. So a
+  request outlives `MAX_HISTORY`.
+
+**Why:** there was no language rule at all, so the model mirrored the user.
+Measured before (`plan/baseline/eval-lang-before.txt`, 5/10):
+- a Tagalog question got pure, formal Tagalog ("Oo, puwedeng magdala ng
+  maliit at katamtamang laki ng aso…", 0% English);
+- a Taglish question got plain English;
+- every availability answer was English, word for word the tools block's
+  example sentence, even when asked in Tagalog.
+
+The first fix was prompt only ("English in, English out; Tagalog in, Taglish
+out", plus an example). It measured 5/10, then 7/10, then 9/10, then 7/10.
+The Taglish example pulled ENGLISH questions into Taglish ("Ang Overnight
+rate po natin is ₱20,000 on weekends"), and a bare "10 October" was read as
+English. Asking gpt-4o-mini to classify and to write in the same instruction
+failed both ways, so the classifying moved to code. Code does it the same way
+every time, and the model only writes.
+
+**Measured after:**
+- lang cases 9/10 on two runs in a row;
+- the full battery 26/29: `original 9/10 · tool 9/9 · lang 8/10`, with
+  `lang-tagalog-2` failing once at 0.90 English, and then passing 4 of 4
+  repeats (English share 0.50–0.65);
+- isolation 11/11 both ways, bookings isolation 12/12, verify 47/47, tests
+  103 in the pipeline.
+
+The one steady failure is `lang-followup`. After a bare date, the reply stays
+in Taglish (before the change it switched to English), but it leans Tagalog:
+"Yes po, lahat ng slots ay open sa 10 October 2026", 0.13 English against the
+0.20 floor.
+
+**Reverse if:** a model follows "reply in the user's language, but Taglish
+for Tagalog" reliably by itself. Then the classifying can go back into the
+prompt, and the lang-english case is the one to watch. Or if a tenant's users
+write a third language: the word lists are Tagalog and English only.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPrompt } from './prompt.js';
 import type { PromptTools } from './tools.js';
+import { languageInstructions } from './language.js';
 
 const TENANT = { assistantName: 'Lia', businessName: 'Villa Amihan Private Resort' };
 const CHUNKS = [{ content: 'Check-in is at 2 PM.' }];
@@ -29,9 +30,11 @@ describe('buildPrompt with and without tools', () => {
     const withTools = system(TOOLS);
     const without = system(null);
 
-    // Everything up to and including END CONTEXT is byte-identical.
-    expect(withTools.startsWith(without)).toBe(true);
-    const block = withTools.slice(without.length);
+    // Everything up to END CONTEXT is byte-identical. (Not startsWith any
+    // more: the language block, D-043, comes last in both.)
+    const upToContext = (text: string) => text.slice(0, text.indexOf('--- END CONTEXT ---'));
+    expect(upToContext(withTools)).toBe(upToContext(without));
+    const block = withTools.slice(withTools.indexOf('--- END CONTEXT ---'));
     expect(block).toContain('A tool result is context too');
     expect(block).toContain('ALWAYS call check_availability');
   });
@@ -43,5 +46,30 @@ describe('buildPrompt with and without tools', () => {
   it('the refusal instruction still ends the grounding block, above the tools block', () => {
     const text = system(TOOLS);
     expect(text.indexOf("I don't know based on the documents I have.")).toBeLessThan(text.indexOf('You can also call tools'));
+  });
+});
+
+// The language block (D-043). The lang-* cases measure behaviour; this pins where it sits.
+describe('buildPrompt language block', () => {
+  const TAGLISH = languageInstructions({ language: 'taglish', asked: false });
+  const withLanguage = (tools: PromptTools | null, language: string[]) =>
+    buildPrompt(TENANT, CHUNKS, [], 'Magkano po?', tools, language)[0]!.content as string;
+
+  it('no lines: the same string as before D-043, with and without tools', () => {
+    expect(withLanguage(null, [])).toBe(system(null));
+    expect(withLanguage(TOOLS, [])).toBe(system(TOOLS));
+  });
+
+  it('is LAST, after the context and after the tools block', () => {
+    for (const tools of [null, TOOLS]) {
+      const text = withLanguage(tools, TAGLISH);
+      expect(text.endsWith(TAGLISH.at(-1)!)).toBe(true);
+      expect(text.indexOf('Reply in Taglish')).toBeGreaterThan(text.indexOf('--- END CONTEXT ---'));
+      if (tools) expect(text.indexOf('Reply in Taglish')).toBeGreaterThan(text.indexOf('Today is'));
+    }
+  });
+
+  it('the grounding block and the tools block are untouched by it', () => {
+    expect(withLanguage(TOOLS, TAGLISH).startsWith(system(TOOLS))).toBe(true);
   });
 });

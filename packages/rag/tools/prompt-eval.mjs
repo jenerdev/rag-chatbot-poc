@@ -301,7 +301,159 @@ const CASES = [
     },
     note: 'a past date: the reply says it is in the past, and never presents availability for it',
   },
+
+  // --- language: Taglish (D-043) --------------------------------------------
+  // Asked in Tagalog, the answer should be Taglish, not the pure Tagalog the
+  // model gives when it simply mirrors the user. `mix()` below judges the
+  // language by counting function words; every reply is printed, so a human
+  // reads what the counter could not judge (whether it sounds natural).
+  // Each case also checks a FACT from the documents or a tool, because a
+  // language instruction that costs a fact is a regression, not a style
+  // choice.
+  {
+    id: 'lang-tagalog',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['Magkano po ang Overnight?'],
+    check: (last) => langVerdict(last, 'taglish', ['16,000']),
+    note: 'pure Tagalog in, Taglish out, and the rate from 02-rates-and-schedules',
+  },
+  {
+    id: 'lang-tagalog-2',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['Pwede po bang magdala ng aso?'],
+    check: (last) => langVerdict(last, 'taglish', ['500']),
+    note: 'pure Tagalog in, Taglish out; the pet fee from 05-house-rules',
+  },
+  {
+    id: 'lang-taglish',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['How much po yung Day Tour pag weekend?'],
+    check: (last) => langVerdict(last, 'taglish', ['12,000']),
+    note: 'Taglish in, Taglish out',
+  },
+  {
+    id: 'lang-english',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['How much is the Overnight rate on weekends?'],
+    check: (last) => langVerdict(last, 'english', ['20,000']),
+    note: 'English in, English out: the language block must not Taglish-ify English users',
+  },
+  {
+    id: 'lang-ask-tagalog',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['Tagalog lang po sana ang sagot.', 'Magkano po ang Day Tour kapag weekday?'],
+    check: (last) => langVerdict(last, 'tagalog', ['9,500']),
+    note: 'an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default',
+  },
+  {
+    id: 'lang-ask-english',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['Magkano po ang Overnight?', 'Please respond in English.', 'Pwede po bang magdala ng aso?'],
+    check: (last) => langVerdict(last, 'english', ['500']),
+    note: 'Taglish first, then an explicit switch: the last question is Tagalog, the answer must be English',
+  },
+  {
+    id: 'lang-pin-window',
+    tenant: 'villa',
+    want: 'lang',
+    turns: [
+      'Tagalog lang po.',
+      'Anong oras po ang Day Tour?',
+      'Magkano po ang Overnight?',
+      'Pwede po bang magdala ng aso?',
+      'Magkano po ang 22-Hour kapag weekend?',
+    ],
+    check: (last) => langVerdict(last, 'tagalog', ['27,000']),
+    note: 'the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window',
+  },
+  {
+    id: 'lang-followup',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['Gusto ko po sanang mag-check ng availability.', words(FREE, false)],
+    check: (last) => {
+      const called = callsFor(last).some((c) => c.args?.date_from === FREE);
+      const v = langVerdict(last, 'taglish', []);
+      return { ok: called && v.ok, detail: `tool for ${FREE}: ${called}; ${v.detail}` };
+    },
+    note: 'the follow-up is a bare date: it must keep Taglish, and still call the tool',
+  },
+  {
+    id: 'lang-tool',
+    tenant: 'villa',
+    want: 'lang',
+    turns: [`May bakante pa po ba sa ${words(NEXT)}?`],
+    check: (last) => {
+      const status = slotStatus(last, NEXT, 'Overnight');
+      const v = langVerdict(last, 'taglish', ['overnight']);
+      return { ok: status === 'open' && v.ok, detail: `tool says Overnight ${NEXT} is ${status ?? '(no call)'}; ${v.detail}` };
+    },
+    note: 'availability asked in Tagalog: the tool is called, its result told in Taglish',
+  },
+  {
+    id: 'lang-absent',
+    tenant: 'villa',
+    want: 'lang',
+    turns: ['May massage service po ba kayo?'],
+    check: (last) => ({
+      ok: last.reply.trim() === NO_ANSWER && callsFor(last).length === 0,
+      detail: `refused: ${last.reply.trim() === NO_ANSWER}; ${callsFor(last).length} tool calls`,
+    }),
+    note: 'no document mentions massage: sounding natural must not invent one; the refusal is verbatim',
+  },
 ];
+
+// --- judging the language of a reply (the lang-* cases) ----------------------
+// Function words only. Content words ("rate", "booking", "Overnight") are
+// English in Taglish too, which is the point of it, so they cannot tell the
+// two apart. Grammar can: "ang", "po", "natin" against "the", "you", "can".
+// Deliberately left out: "at" and "may", which are words in both languages.
+const TAGALOG_WORDS = new Set(
+  ('po opo ho ang ng nang mga sa na ay ba ko mo niyo ninyo nyo inyo inyong natin ating namin aming kayo tayo kami ' +
+    'siya sila niya nila ako ikaw ito iyan yan yun yung iyong lang lamang din rin naman pa kung para pero kasi ' +
+    'wala walang meron mayroon hindi oo pong dahil kapag pag kay nasa ano anong saan kailan paano bakit ilan ' +
+    'magkano pwede puwede maaari salamat lahat isang ninyong nito dito doon ngayon pala sige').split(/\s+/),
+);
+const ENGLISH_WORDS = new Set(
+  ('the a an is are was were be been you your we our us i me my it its for and or of to in on with this that ' +
+    'these those can will would could there here please have has do does not but if so from by let they them ' +
+    'their any also just only each which what when how sure yes').split(/\s+/),
+);
+
+function mix(reply) {
+  const words = reply.toLowerCase().match(/[a-z']+/g) ?? [];
+  const tagalog = words.filter((w) => TAGALOG_WORDS.has(w)).length;
+  const english = words.filter((w) => ENGLISH_WORDS.has(w)).length;
+  const share = english + tagalog === 0 ? 0 : english / (english + tagalog);
+  return { tagalog, english, share };
+}
+
+/** Is the reply in `want` ('taglish' | 'tagalog' | 'english'), and does it keep every fact? */
+function langVerdict(last, want, facts) {
+  const m = mix(last.reply);
+  const inLanguage = {
+    // Both grammars present, neither swamping the other. The target is about
+    // half and half; the band is wide on purpose, because natural beats exact.
+    // Two of each, not three: a one-sentence answer ("Yes po, the Overnight
+    // slot is still open sa …") has only a handful of function words.
+    taglish: m.tagalog >= 2 && m.english >= 2 && m.share >= 0.2 && m.share <= 0.8,
+    // "Entirely in Tagalog", with room for the odd English word in a name.
+    tagalog: m.tagalog >= 2 && m.share <= 0.12,
+    english: m.tagalog <= 1,
+  }[want];
+  const refused = last.reply.trim() === NO_ANSWER;
+  const factsKept = facts.every((f) => last.reply.toLowerCase().includes(f.toLowerCase()));
+  return {
+    ok: inLanguage && factsKept && !refused,
+    detail: `${want}? ${inLanguage} (tl ${m.tagalog}, en ${m.english}, en-share ${m.share.toFixed(2)}); facts ${factsKept ? 'kept' : `MISSING ${JSON.stringify(facts)}`}${refused ? '; REFUSED' : ''}`,
+  };
+}
 
 console.log('='.repeat(78));
 console.log('PROMPT EVAL:', label);
@@ -383,6 +535,9 @@ async function ask(tenant, turns) {
 const RUN = only ? CASES.filter((x) => x.id.startsWith(only)) : CASES;
 let pass = 0;
 let basePass = 0;
+let langPass = 0;
+/** Three groups, counted apart, because each has its own baseline to match. */
+const GROUP = (c) => (c.id.startsWith('tool-') ? 'tool' : c.id.startsWith('lang-') ? 'lang' : 'original');
 await seedFixture();
 try {
 for (const c of RUN) {
@@ -391,7 +546,7 @@ for (const c of RUN) {
   let reply;
   answerCalls = 0;
 
-  if (c.want === 'tool') {
+  if (c.want === 'tool' || c.want === 'lang') {
     const last = await ask(tenant, c.turns);
     const verdict = c.check(last, { answerCalls });
     ok = verdict.ok;
@@ -425,7 +580,8 @@ for (const c of RUN) {
     }
   }
   if (ok) pass++;
-  if (ok && !c.id.startsWith('tool-')) basePass++;
+  if (ok && GROUP(c) === 'original') basePass++;
+  if (ok && GROUP(c) === 'lang') langPass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
@@ -441,6 +597,8 @@ for (const c of RUN) {
 // verdicts must match plan/baseline/eval-pre-bookings.txt one by one.
 // Totals are over the cases that RAN, so a `--only` run cannot print a
 // misleading "original 0/10".
-const baseTotal = RUN.filter((c) => !c.id.startsWith('tool-')).length;
-console.log(`original ${basePass}/${baseTotal} · tool ${pass - basePass}/${RUN.length - baseTotal}`);
+const total = (g) => RUN.filter((c) => GROUP(c) === g).length;
+console.log(
+  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass}/${total('tool')} · lang ${langPass}/${total('lang')}`,
+);
 console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);

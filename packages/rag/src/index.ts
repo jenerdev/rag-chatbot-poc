@@ -11,6 +11,7 @@
 //   prompt.ts      chunks + history + question -> the messages array
 //   retrieve.ts    question -> standalone query -> two searches -> one list
 //   answer.ts      the whole query pipeline, streaming and not
+//   language.ts    an explicit language request, and the reply to a bare one
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
@@ -24,11 +25,21 @@ export {
   REWRITE_MAX_TOKENS,
   NO_ANSWER,
   MAX_TOOL_ROUNDS,
+  LANGUAGE_SCAN_MESSAGES,
 } from './constants.js';
 
 export { ingestDocument, listDocuments, countDocuments, deleteDocument, getChunks } from './ingest.js';
 export { buildPrompt } from './prompt.js';
 export { greetingReply, greetingText } from './greeting.js';
+export {
+  detectLanguage,
+  languageInstructions,
+  languagePreference,
+  languageRequest,
+  replyLanguage,
+  requestReply,
+} from './language.js';
+export type { LanguageChoice, LanguagePreference } from './language.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';

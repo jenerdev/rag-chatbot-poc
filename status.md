@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-26 (Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -55,6 +55,17 @@
 ---
 
 ## ▶ Next up (do this next)
+
+~~**Taglish replies (D-043).**~~ **Done 2026-09-26, uncommitted.** A question
+in Tagalog or Taglish now gets a Taglish answer. English still gets English,
+and an explicit "Tagalog lang" or "in English" request holds for the whole
+conversation. `language.ts` decides the language in code, and the prompt
+carries one directive. The battery grew from 19 cases to 29 (`lang-*`). The
+full run was 26/29 (`original 9/10 · tool 9/9 · lang 8/10`). isolation 11/11
+both ways, verify 47/47, bookings isolation 12/12, tests 103 in the pipeline.
+The northwind snapshot is unchanged. **Next:** commit it, and walk a Tagalog
+conversation in the browser (villa), because the battery judges the mix by
+counting words, not by ear.
 
 ~~**Bookings Phase 0: baseline.**~~ **Done 2026-09-24.** verify **14/14**,
 isolation **11/11**, eval **9/10** (the known `antecedent` failure only).
@@ -841,6 +852,29 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (Taglish replies, D-043)
+- **Did:** added `packages/rag/src/language.ts` (explicit-request detection,
+  code-side language detection, the prompt lines, and the reply to a bare
+  request). `buildPrompt()` got a sixth parameter: language lines, appended
+  last. `answer.ts` reads the user's messages (≤ `LANGUAGE_SCAN_MESSAGES` =
+  50, tenant-filtered) to decide the language. Added 10 `lang-*` battery
+  cases and unit tests (103 in the pipeline, all passing).
+- **Observed before:** `eval-lang-before.txt` 5/10. Tagalog questions got
+  0.00 English share, a Taglish question got plain English, and tool answers
+  were English.
+- **Deviation:** the first fix was prompt only, and it was abandoned. It
+  measured 5 → 7 → 9 → 7 of 10, and pulled English questions into Taglish.
+  The classifying moved to code (D-043).
+- **Observed after:**
+  - lang 9/10 twice (`eval-lang-after-run7/8.txt`);
+  - the full battery 26/29 (`eval-lang-full.txt`); `lang-tagalog-2` failed
+    once at 0.90 English, then passed 4/4 repeats;
+  - the northwind snapshot is identical, isolation 11/11 both ways, verify
+    47/47, bookings isolation 12/12;
+  - `pnpm typecheck`, `test` and `build` are all green.
+- **Known:** `lang-followup` keeps Taglish after a bare date, but at 0.13
+  English, below the 0.20 floor.
 
 ### 2026-09-26 — session 8, continued (merge)
 - **Did:** fast-forwarded `master` to `feat/auth-rls` (`git merge --ff-only`).

@@ -2,8 +2,9 @@
 
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn } from '@rag/openai';
-import { MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
+import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { greetingReply } from './greeting.js';
+import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import { buildPrompt } from './prompt.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import { executeTool, toolsFor } from './tools.js';
@@ -61,6 +62,8 @@ async function ensureConversation(
 interface Prepared {
   id: string;
   history: HistoryMessage[];
+  /** The language block's lines for this turn, from language.ts; [] for an English reply. */
+  language: string[];
   searchQuery: string;
   matches: RetrievedChunk[];
   sources: Source[];
@@ -92,15 +95,39 @@ async function prepareAnswer({
   //    "the last 6" needs a descending query but the model needs chronological
   //    order. Ordered by id rather than created_at — two rows written in the
   //    same millisecond would otherwise have no defined order.
-  const { data: recent, error: historyError } = await tenant.db
-    .from('messages')
-    .select('role, content')
-    .eq('tenant_id', tenant.id)
-    .eq('conversation_id', id)
-    .order('id', { ascending: false })
-    .limit(MAX_HISTORY);
+  //
+  //    Alongside it, the user's own messages, further back than the history
+  //    window, for the reply language (D-043): an explicit request ("Tagalog
+  //    lang po") must outlive MAX_HISTORY, and a bare "10 October" takes the
+  //    language of the message before it. Read by language.ts in code and
+  //    never sent to the model, so they cost no token.
+  const [
+    { data: recent, error: historyError },
+    { data: asked, error: askedError },
+  ] = await Promise.all([
+    tenant.db
+      .from('messages')
+      .select('role, content')
+      .eq('tenant_id', tenant.id)
+      .eq('conversation_id', id)
+      .order('id', { ascending: false })
+      .limit(MAX_HISTORY),
+    tenant.db
+      .from('messages')
+      .select('content')
+      .eq('tenant_id', tenant.id)
+      .eq('conversation_id', id)
+      .eq('role', 'user')
+      .order('id', { ascending: false })
+      .limit(LANGUAGE_SCAN_MESSAGES),
+  ]);
   if (historyError) throw new Error(`Could not load history: ${historyError.message}`);
+  if (askedError) throw new Error(`Could not load the language preference: ${askedError.message}`);
   const history = recent.reverse();
+  // Newest first, the current message ahead of the stored ones.
+  const choice = replyLanguage([message, ...asked.map((m) => m.content)]);
+  console.log(`[query] reply language: ${choice.language}${choice.asked ? ' (asked for)' : ''}`);
+  const language = languageInstructions(choice);
 
   // 3. Resolve the question against the conversation before searching (D-016).
   //    The model gets the user's original words; only the search uses this.
@@ -123,7 +150,7 @@ async function prepareAnswer({
   );
 
   // 6. Nothing cleared the threshold: no sources to describe.
-  if (matches.length === 0) return { id, history, searchQuery, matches, sources: [] };
+  if (matches.length === 0) return { id, history, language, searchQuery, matches, sources: [] };
 
   // 7. Attach document titles. match_chunks returns document_id but not the
   //    title, and the sources panel needs a human-readable label. One extra
@@ -151,7 +178,7 @@ async function prepareAnswer({
     foundBy: m.foundBy,
   }));
 
-  return { id, history, searchQuery, matches, sources };
+  return { id, history, language, searchQuery, matches, sources };
 }
 
 /**
@@ -245,15 +272,16 @@ export async function answerQuestion({
 }): Promise<Answer> {
   // Small talk, answered before anything is retrieved or embedded. A greeting
   // has nothing to look up, so running it through the pipeline can only end in
-  // the refusal — see greeting.ts for why this is not a document.
-  const greeting = greetingReply(message, tenant);
+  // the refusal — see greeting.ts for why this is not a document. Neither has
+  // a bare language request ("Please respond in English"), see language.ts.
+  const greeting = greetingReply(message, tenant) ?? requestReply(message);
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     await saveMessages(tenant, id, message, greeting);
     return { conversationId: id, reply: greeting, sources: [], searchQuery: message, toolCalls: [] };
   }
 
-  const [{ id, history, searchQuery, matches, sources }, tools] = await Promise.all([
+  const [{ id, history, language, searchQuery, matches, sources }, tools] = await Promise.all([
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
@@ -267,7 +295,7 @@ export async function answerQuestion({
       return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery, toolCalls: [] };
     }
 
-    const reply = await chat(buildPrompt(tenant, matches, history, message));
+    const reply = await chat(buildPrompt(tenant, matches, history, message, null, language));
     await saveMessages(tenant, id, message, reply);
 
     // searchQuery is returned so the UI can show what was actually searched for
@@ -282,7 +310,7 @@ export async function answerQuestion({
   // allowed out.
   const { text, records } = await toolLoop(
     tenant,
-    buildPrompt(tenant, matches, history, message, tools.prompt),
+    buildPrompt(tenant, matches, history, message, tools.prompt, language),
     (messages) => chat(messages, { tools: tools.definitions }),
   );
   const reply = acceptReply(matches, records, text);
@@ -321,7 +349,7 @@ export async function answerQuestionStream({
   // Same short circuit as the non-streaming path. `meta` still fires, with no
   // sources, so the client's state machine needs no special case: a greeting
   // arrives down exactly the same channel as an answer.
-  const greeting = greetingReply(message, tenant);
+  const greeting = greetingReply(message, tenant) ?? requestReply(message);
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     onMeta({ conversationId: id, searchQuery: message, sources: [] });
@@ -330,7 +358,7 @@ export async function answerQuestionStream({
     return greeting;
   }
 
-  const [{ id, history, searchQuery, matches, sources }, tools] = await Promise.all([
+  const [{ id, history, language, searchQuery, matches, sources }, tools] = await Promise.all([
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
@@ -348,7 +376,7 @@ export async function answerQuestionStream({
 
   try {
     if (tools.definitions.length === 0) {
-      const reply = await chatStream(buildPrompt(tenant, matches, history, message), onDelta);
+      const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), onDelta);
       await saveMessages(tenant, id, message, reply);
       return reply;
     }
@@ -361,7 +389,7 @@ export async function answerQuestionStream({
     const hold = matches.length === 0;
     const { text, records } = await toolLoop(
       tenant,
-      buildPrompt(tenant, matches, history, message, tools.prompt),
+      buildPrompt(tenant, matches, history, message, tools.prompt, language),
       (messages) => chatStream(messages, onDelta, { tools: tools.definitions, holdContent: hold }),
       onTool,
     );
