@@ -1,0 +1,44 @@
+$ rm -rf apps/web/.next && SUPABASE_SERVICE_ROLE_KEY= pnpm --filter web build
+$ next build
+   ▲ Next.js 15.5.25
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 5.7s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/4) ...
+   Generating static pages (1/4) 
+   Generating static pages (2/4) 
+   Generating static pages (3/4) 
+ ✓ Generating static pages (4/4)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                         Size  First Load JS
+┌ ○ /                                              159 B         103 kB
+├ ○ /_not-found                                    994 B         104 kB
+├ ƒ /api/t/[tenant]/admin/password                 159 B         103 kB
+├ ƒ /api/t/[tenant]/admin/password-reset           159 B         103 kB
+├ ƒ /api/t/[tenant]/admin/session                  159 B         103 kB
+├ ƒ /api/t/[tenant]/bookings                       159 B         103 kB
+├ ƒ /api/t/[tenant]/bookings/[id]                  159 B         103 kB
+├ ƒ /api/t/[tenant]/bookings/availability          159 B         103 kB
+├ ƒ /api/t/[tenant]/bookings/setup                 159 B         103 kB
+├ ƒ /api/t/[tenant]/chat                           159 B         103 kB
+├ ƒ /api/t/[tenant]/conversations/[id]/messages    159 B         103 kB
+├ ƒ /api/t/[tenant]/documents                      159 B         103 kB
+├ ƒ /api/t/[tenant]/documents/[id]                 159 B         103 kB
+├ ƒ /api/t/[tenant]/documents/[id]/chunks          159 B         103 kB
+├ ƒ /t/[tenant]                                  3.36 kB         109 kB
+├ ƒ /t/[tenant]/admin                            3.44 kB         109 kB
+├ ƒ /t/[tenant]/admin/bookings                   3.79 kB         110 kB
+└ ƒ /t/[tenant]/admin/reset                      2.04 kB         108 kB
++ First Load JS shared by all                     103 kB
+  ├ chunks/750-38b0c2e40295c675.js               46.3 kB
+  ├ chunks/eef6ccc4-1bda36817e895cc2.js          54.2 kB
+  └ other shared chunks (total)                     2 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

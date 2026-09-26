@@ -63,8 +63,6 @@ export interface Database {
           logo_url: string | null;
           banner_url: string | null;
           theme: Json;
-          /** scrypt hash. null means nobody can administer this tenant. NEVER select it casually. */
-          admin_key_hash: string | null;
           created_at: string;
         };
         Insert: {
@@ -75,7 +73,6 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           theme?: Json;
-          admin_key_hash?: string | null;
           created_at?: string;
         };
         Update: {
@@ -86,7 +83,6 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           theme?: Json;
-          admin_key_hash?: string | null;
           created_at?: string;
         };
         Relationships: [];

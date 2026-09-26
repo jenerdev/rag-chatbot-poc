@@ -275,6 +275,13 @@ grant execute on function tenant_public(text)                           to anon,
 grant execute on function match_chunks(vector, bigint, int, float)      to authenticated, service_role;
 grant execute on function match_chunks_fts(text, vector, bigint, int)   to authenticated, service_role;
 
+-- 7. The shared admin key is gone (auth-rls Phase 6). Staff log in with
+--    Supabase Auth and a membership (D-040). No code reads or writes this
+--    column any more, and a column that holds nothing still has to be
+--    guarded (`select('*')` would fetch it), so it is dropped, not kept.
+--    schema-tenancy.sql still creates it on a fresh install; this removes it.
+alter table tenants drop column if exists admin_key_hash;
+
 -- PostgREST caches the schema: without this, memberships and tenant_public
 -- stay invisible to .from() and .rpc() until the cache refreshes on its own.
 notify pgrst, 'reload schema';

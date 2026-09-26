@@ -10,7 +10,7 @@ import { withRoute } from './route';
  *
  * Wrapped in React `cache()`, so one request that needs it three times costs
  * one query. The column list lives in `loadTenant()`, which never selects
- * `admin_key_hash`.
+ * anything but public columns (it goes through tenant_public).
  */
 export const getTenant = cache(async (slug: string): Promise<TenantContext | null> => loadTenant(slug));
 

@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 5 done)
+> Last updated: 2026-09-26 (auth-rls Phase 6 done)
 
 ---
 
@@ -41,7 +41,9 @@
   Phase 5, as planned. **Phase 4 done:** chat works with the service key
   unset in the web process. **Phase 5 done:** staff log in with Supabase
   Auth, admin writes work again, and the web app no longer imports the
-  service client at all. Next is Phase 6. Bookings is complete and merged
+  service client at all. **Phase 6 done:** the admin key and its column
+  are gone, and `pnpm typecheck` enforces the service-import rule. Next is
+  Phase 7. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -219,15 +221,38 @@ Phase 2").
 - **Deviation:** the admin-key login is gone NOW, not in Phase 6. The way back
   in is `member:add`.
 
-**▶ Auth + RLS Phase 6: remove the old.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 6.
-- Drop `tenants.admin_key_hash`.
-- Delete `admin-key.ts`, `tenant:key`, and the key half of `tenant.mjs`.
-- Add the import check (a script in `pnpm typecheck` that fails on
-  `@rag/db/service` under apps/ or packages/*/src).
-- `next build` with no service key in its environment.
-- Already done early: the service key is off the REQUIRED list (Phase 4), and
-  the key login is gone (Phase 5).
+~~**Auth + RLS Phase 6: remove the old.**~~ **Done 2026-09-26.**
+- **Removed:**
+  - `admin-key.ts`, and its exports;
+  - `tenant:key`, and the key half of `tenant.mjs` (`tenant:add` stays,
+    keyless);
+  - `admin_key_hash` from the types;
+  - the column itself: `schema-auth.sql` § 7 was run by the user, and a
+    select of it now fails with `42703`.
+- **Added:** `scripts/check-service-imports.mjs`, run first by
+  `pnpm typecheck`. Two planted imports (`apps/web/lib`, and `./service.js`
+  inside `packages/db/src`) → exit 1 naming both; removed → exit 0.
+- **Fresh `next build` with `SUPABASE_SERVICE_ROLE_KEY` empty:** passes.
+- **After the drop:**
+  - verify 47/47;
+  - isolation 11/11 + 11/11, bookings isolation 12/12 + 12/12;
+  - snapshot identical, unit tests pass;
+  - staff cases all pass, against a keyless dev server.
+- **Not re-run:** the eval. No pipeline or prompt code changed.
+
+**▶ Auth + RLS Phase 7: the walk, and the bundle.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 7.
+- The browser walk:
+  1. log in to villa as a member;
+  2. add and delete a document;
+  3. book a slot and cancel it;
+  4. ask an availability question;
+  5. log out;
+  6. a northwind-only member at villa's admin page must get 401;
+  7. the reset flow. The "Forgot password?" email is still owed from Phase 5
+     (R-21).
+- `grep -ri "service_role\|SUPABASE_SECRET\|TENANT_SIGNING_JWK\|guest_phone"
+  apps/web/.next/static/` must return nothing.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -761,6 +786,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 6)
+- **Did:**
+  - deleted `admin-key.ts`, `tenant:key` and the key half of `tenant.mjs`;
+  - `schema-auth.sql` § 7 drops `admin_key_hash`, and the user ran it;
+  - wrote `scripts/check-service-imports.mjs`, now in the root `typecheck`.
+- **Observed:**
+  - the column is gone (`42703`), and `tenants` has 8 columns;
+  - the guard caught both planted imports, then passed;
+  - fresh `next build` passes without the service key;
+  - all suites and staff cases pass after the drop.
+- **Found (my mistake):** removing the planted import with `git checkout --
+  packages/db/src/index.ts` also reverted my uncommitted edit to that file,
+  which brought the deleted admin-key export back. Caught by the diff check
+  straight after, and re-applied. Remove a plant by editing it out, never by
+  checking out a file that has other uncommitted work.
+- **Next:** Phase 7.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 5)
 - **Did:**

@@ -72,7 +72,7 @@ export function themeVars(theme: unknown): CSSProperties {
  *
  * Through `tenant_public(slug)`, the same function loadTenant() uses: no token
  * can read `tenants` directly (auth-rls Phase 1), and that function's column
- * list has no `admin_key_hash` in it to fetch into a Client Component's props.
+ * list is the whole boundary: only public columns can reach a Client Component's props.
  */
 export async function loadBranding(tenant: TenantContext): Promise<Branding> {
   const { data: rows, error } = await anonClient().rpc('tenant_public', { p_slug: tenant.slug });

@@ -1,0 +1,13 @@
+$ … tools/staff-cases.mjs   (web process: SUPABASE_SERVICE_ROLE_KEY empty; admin_key_hash dropped)
+PASS  1. right password, as a member → 200  — 200, cookie 4 parts
+PASS  2. wrong password → 401  — 401 "That email and password do not match a staff account for this workspace."
+PASS  3. unknown email → 401, same message  — 401, same: true
+PASS  4. a valid user who is not a member → 401, same message  — 401, same: true
+PASS  the session lists documents  — 200, 8 documents
+PASS  a member can add and delete a document  — add 201, delete 200
+PASS  a member can book, and list the booking with its guest name  — book 201 #184, list 200 (1 on 2027-06-03)
+PASS  6. another tenant's cookie sent by hand → 401  — northwind login 200, at villa 401 "Admin login required for "villa""
+PASS  5. removed mid-session, next request → 401  — 401 "This account is no longer a member of "villa". Log in again.", session says admin false
+PASS  password-reset for an unknown email: the generic answer  — 200: If that email has a staff account, a reset link is on its way. It expires in an hour.
+
+ALL STAFF CASES PASS

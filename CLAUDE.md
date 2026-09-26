@@ -77,9 +77,8 @@ packages/
     src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
-    src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey — unused since auth-rls Phase 5, deleted in Phase 6
     tools/verify.mjs     47 checks (19 through tenant tokens: RLS), no API key
-    tools/tenant.mjs     tenant:add / tenant:key — prints a key once (the key opens nothing since Phase 5)
+    tools/tenant.mjs     tenant:add — a new tenant has no members until member:add
     tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
     tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
@@ -92,21 +91,21 @@ fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
 plan/                    the migration plan and its evidence; plan.md is tenancy; plan/bookings.md is bookings
 fixtures/villa-bookings.json  the battery's booking fixture, seeded and removed by pnpm eval
+scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/service under apps/ or packages/*/src
 ```
 
 ## Commands
 
 ```sh
 pnpm dev                        # http://localhost:3000
-pnpm build · typecheck · test
+pnpm build · typecheck · test   # typecheck runs the service-import check first
 pnpm --filter @rag/db verify    # 47 checks, no API key needed
 pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, no API key
-pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # key printed ONCE
-pnpm --filter @rag/db tenant:key -- <slug>                              # new key; old one dies
+pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db member:add -- <slug> <email>        # invites a new account; the link sets a password
 pnpm --filter @rag/db member:remove -- <slug> <email>     # effective on their NEXT request
 pnpm --filter @rag/db member:list -- <slug>

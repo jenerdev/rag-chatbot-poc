@@ -7,7 +7,8 @@
 export { anonClient, mintTenantToken, scopedClient, TENANT_TOKEN_SECONDS } from './tenant-client.js';
 export type { DbClient } from './tenant-client.js';
 export { requestPasswordReset, setPasswordWithToken, signInStaff, staffClient, StaffAuthError } from './staff-auth.js';
-export { generateAdminKey, hashAdminKey, verifyAdminKey } from './admin-key.js';
+// (admin-key.ts, the per-tenant shared key, was deleted in auth-rls Phase 6.
+// Staff log in with Supabase Auth: staff-auth.ts.)
 export type { Database, Json, StoredVector, VectorInput } from './database.types.js';
 
 /** The expected dimensions, coupled to the embedding model by `vector(1536)` (D-004). */

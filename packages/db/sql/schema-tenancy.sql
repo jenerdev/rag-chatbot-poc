@@ -34,7 +34,7 @@ create table if not exists tenants (
   logo_url        text,                          -- https only, validated on write
   banner_url      text,
   theme           jsonb       not null default '{}'::jsonb,
-  admin_key_hash  text,                          -- scrypt; null = nobody can admin it
+  admin_key_hash  text,                          -- scrypt; dropped by schema-auth.sql § 7 (auth-rls Phase 6)
   created_at      timestamptz not null default now(),
 
   -- The slug is in a URL, so the database constrains it rather than trusting

@@ -8,9 +8,9 @@
 // '@rag/db'` no longer compiles, and `@rag/db/service` under apps/ or
 // packages/*/src is something a grep can find (plan/auth-rls.md Rule 2).
 //
-// The one exception until auth-rls Phase 6 is apps/web/lib/admin-auth.ts. It
-// reads tenants.admin_key_hash, which no token can reach by design, and the
-// admin key it checks is removed in Phase 6.
+// There is no exception. A check run by `pnpm typecheck`
+// (tools/check-service-imports.mjs) fails the build if anything under apps/
+// or packages/*/src imports this entry point (auth-rls Phase 6).
 
 // ⚠️ THE GUARD. This import is the whole reason this is a separate package.
 //

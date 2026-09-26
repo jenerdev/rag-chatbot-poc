@@ -1,0 +1,51 @@
+PASS  read documents  — 9 rows
+PASS  read chunks  — 34 rows
+PASS  read conversations  — 548 rows
+PASS  read messages  — 1362 rows
+PASS  embedding arrives as a string  — typeof string
+PASS  parses to 1536 finite numbers  — 1536 dims
+PASS  match_chunks rows match MatchRow
+PASS  a chunk is its own nearest neighbour  — chunk 148, top 148
+PASS  self-similarity is 1  — 1.000000
+PASS  results are ordered most-similar first  — 1.000 > 0.616 > 0.547
+PASS  every row has a tenant_id  — documents 0 · chunks 0 · conversations 0 · messages 0
+PASS  a chunk cannot belong to another tenant's document  — 23503 insert or update on table "chunks" violates foreign key constraint "chunks_document_tenant_fk"
+PASS  match_chunks(own tenant) finds the chunk at 1.000000  — top 148 at 1.000000
+PASS  match_chunks(another tenant) returns zero rows  — 0 rows
+PASS  read the bookings tables  — tenant_applications 1 · units 1 · slots 3 · bookings 3
+PASS  villa has bookings, northwind has none  — villa {"timezone":"Asia/Manila"} · northwind 0 rows
+PASS  an unknown timezone is refused  — 22023 time zone "Mars/Olympus_Mons" not recognized
+PASS  during is computed from slot and timezone  — ["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")
+PASS  a supplied during is overwritten  — ["2026-11-01 06:00:00+00","2026-11-02 04:00:00+00")
+PASS  an Overnight blocks the next day's Day Tour  — 23P01 conflicting key value violates exclusion constraint "bookings_no_overlap"
+PASS  back-to-back slots do not overlap  — ["2026-10-05 00:00:00+00","2026-10-05 09:00:00+00") then ["2026-10-05 09:00:00+00","2026-10-05 13:00:00+00")
+PASS  a cancelled booking frees its slot  — ["2026-10-02 00:00:00+00","2026-10-02 09:00:00+00")
+PASS  a booking cannot use another tenant's unit  — 23503 insert or update on table "bookings" violates foreign key constraint "bookings_unit_tenant_fk"
+PASS  a booking cannot use another tenant's slot  — 23503 Slot 1 does not belong to tenant 40
+PASS  check_availability matches the constraint  — 2026-10-01 Day Tour open, 2026-10-01 Overnight taken, 2026-10-01 Evening open, 2026-10-02 Day Tour taken, 2026-10-02 Overnight taken, 2026-10-02 Evening open
+PASS  check_availability returns no guest data  — keys: booked_date,slot,status,unit
+PASS  check_availability(northwind) returns zero rows  — 0 rows
+PASS  no bookings application, no bookings  — 23503 Tenant 40 does not have the bookings application
+PASS  auth: schema-auth.sql is applied  — villa's token sees 30 chunks
+PASS  auth: anon reads 0 chunks and cannot call match_chunks  — 0 rows · 42501 permission denied for function match_chunks
+PASS  auth: RLS alone, documents under villa's token  — 8 rows, 0 foreign, villa has 8
+PASS  auth: RLS alone, chunks under villa's token  — 30 rows, 0 foreign, villa has 30
+PASS  auth: RLS alone, conversations under villa's token  — 188 rows, 0 foreign, villa has 188
+PASS  auth: RLS alone, messages under villa's token  — 468 rows, 0 foreign, villa has 468
+PASS  auth: match_chunks under its own token finds the chunk  — top 148, want 148
+PASS  auth: match_chunks naming another tenant returns 0 under RLS  — 0 rows
+PASS  auth: a chat token reads 0 bookings  — 0 rows, the probe has 5
+PASS  auth: a chat token cannot insert a booking  — 42501 new row violates row-level security policy for table "bookings"
+PASS  auth: check_availability under its own token  — Day Tour open, Overnight taken, Evening open, Day Tour taken, Overnight taken, Evening open
+PASS  auth: check_availability refuses another tenant's id  — 42501 check_availability: tenant 3 is not the token's tenant
+PASS  auth: app_is_admin() is false for a chat token  — false
+PASS  auth: a chat token reads 0 tenants rows  — 0 rows
+PASS  auth: tenant_public('villa') has only public columns  — keys: assistant_name,banner_url,business_name,id,logo_url,slug,theme
+PASS  auth: staff without a membership cannot insert  — 42501 new row violates row-level security policy for table "documents"
+PASS  auth: a member can insert and delete a document  — deleted 1
+PASS  auth: a token for the wrong tenant cannot write or read bookings  — document 42501 · booking 42501 · bookings read 0
+PASS  auth: a Supabase Auth token alone reads 0 chunks  — 0 rows
+
+documents 9 · chunks 34 · conversations 548 · messages 1362
+
+OK — the database layer is wired correctly.

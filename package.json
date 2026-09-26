@@ -10,7 +10,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck",
+    "typecheck": "node scripts/check-service-imports.mjs && turbo typecheck",
     "test": "turbo test",
     "eval": "turbo eval",
     "scores": "turbo scores"

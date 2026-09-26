@@ -4456,3 +4456,63 @@ brings back the admin writes that Phases 3–4 had knowingly broken.
   exit by itself.
 - **A token in the address bar.** The reset page wipes the `#access_token`
   from history as soon as it has read it.
+
+---
+
+## Auth + RLS Phase 6 — remove the old · done 2026-09-26
+
+**What was done:**
+- Deleted `packages/db/src/admin-key.ts` and its three exports.
+- Deleted the `tenant:key` script and the key half of `tenant.mjs`.
+  `tenant:add` stays, and now points at `member:add` for a new tenant's first
+  admin.
+- Removed `admin_key_hash` from `database.types.ts`.
+- `schema-auth.sql` gained § 7, `alter table tenants drop column if exists
+  admin_key_hash`, which the user ran.
+- Added `scripts/check-service-imports.mjs`. The root `typecheck` runs it
+  before turbo.
+- Two items the plan lists here were done early: the service key left the
+  REQUIRED list in Phase 4, and the key login was removed in Phase 5.
+
+**Why it mattered:** Rule 2 said `service_role` leaves the request path, and
+until now nothing enforced it but a grep someone had to remember to run. A
+column that holds nothing still has to be guarded: `select('*')` would fetch
+it into whatever object it lands in. Dropped, it cannot be fetched.
+
+**What each observed value proves:**
+- **`select admin_key_hash` → `42703 column tenants.admin_key_hash does not
+  exist`, and `tenants` now has 8 columns** (`id, slug, business_name,
+  assistant_name, logo_url, banner_url, theme, created_at`). The last way to
+  a shared admin secret is gone.
+- **The guard, planted:**
+  - `apps/web/lib/planted-service-import.ts` and `./service.js` inside
+    `packages/db/src/index.ts` → exit 1, naming both lines;
+  - with them removed → `OK … (6 roots)`, exit 0.
+
+  It catches the package-internal path, not just the public specifier.
+- **A fresh `next build` with `SUPABASE_SERVICE_ROLE_KEY` empty passes**:
+  `✓ Compiled successfully`, and all four `/t/[tenant]` routes built
+  (`plan/baseline/next-build-auth-phase6.txt`). The web app neither builds
+  with the master key nor needs it.
+- **After the drop:**
+  - verify 47/47;
+  - rag isolation 11/11 and 11/11 `--filters-only`;
+  - bookings isolation 12/12 and 12/12 `--filters-only`;
+  - snapshot byte-identical; unit tests 13 + 14 + 27 + 45;
+  - staff cases all pass, against a dev server with no service key.
+
+  Nothing still depended on the column.
+- **`tenant.mjs key` → `the command is "add" (tenant:key was removed …; use
+  member:add)`.** A stale habit gets pointed at the replacement.
+
+**Not re-run:** the eval. This phase changed no pipeline, prompt or
+retrieval code, and CLAUDE.md rule 1 ties the eval to `buildPrompt()`
+edits. The Phase 5 run (18/19, identical verdicts) stands.
+
+**Trap hit, and caught:**
+- To remove the planted import I ran `git checkout --
+  packages/db/src/index.ts`. That also reverted an uncommitted edit to the
+  same file, so the deleted admin-key export came back.
+- The diff check straight after showed it, and the edit was re-applied.
+- The lesson: remove a planted line by editing it out, never by checking out
+  a file that has other uncommitted work in it.
