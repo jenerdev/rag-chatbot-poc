@@ -41,9 +41,9 @@ check(gX === null && gV?.id === vdoc && gV.content.length > 0, 'getDocument cros
 check((await deleteDocument(nw, vdoc)) === false && (await listDocuments(villa)).length === 8, 'deleteDocument cross-tenant refused', `doc ${vdoc} survives`);
 const q = 'How many parking spaces does the building have?';
 const aN = await answerQuestion({ tenant: nw, conversationId: null, message: q });
-check(aN.reply.trim() === NO_ANSWER, 'northwind refuses the villa fact', aN.reply);
+check(aN.refused, 'northwind refuses the villa fact', aN.reply);
 const aV = await answerQuestion({ tenant: villa, conversationId: null, message: 'How many cars can park at the resort?' });
-check(aV.reply.trim() !== NO_ANSWER && aV.sources.every(s => dv.some(d => d.id === s.documentId)), 'villa answers from villa sources only', `${aV.reply.slice(0,90)} | ${[...new Set(aV.sources.map(s=>s.documentTitle))].join('; ')}`);
+check(!aV.refused && aV.sources.every(s => dv.some(d => d.id === s.documentId)), 'villa answers from villa sources only', `${aV.reply.slice(0,90)} | ${[...new Set(aV.sources.map(s=>s.documentTitle))].join('; ')}`);
 const hijack = await answerQuestion({ tenant: nw, conversationId: aV.conversationId, message: 'hi' });
 check(hijack.conversationId !== aV.conversationId, 'a villa conversation id is not reused by northwind', `${aV.conversationId.slice(0,8)} -> ${hijack.conversationId.slice(0,8)}`);
 const mX = await getMessages(nw, aV.conversationId), mV = await getMessages(villa, aV.conversationId);

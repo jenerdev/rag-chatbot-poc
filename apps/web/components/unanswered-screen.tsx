@@ -161,7 +161,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
           </div>
           <p className="small muted">
             {tab === 'open'
-              ? 'Questions the assistant answered with “I don’t know based on the documents I have.” Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
+              ? 'Questions the assistant could not answer from the documents (the visitor saw your “no answer” message). Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
               : 'Questions marked resolved. Reopen one if the assistant still cannot answer it.'}
           </p>
           {error && <div className="notice error">{error}</div>}

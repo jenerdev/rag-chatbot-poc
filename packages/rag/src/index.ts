@@ -12,6 +12,7 @@
 //   retrieve.ts    question -> standalone query -> two searches -> one list
 //   answer.ts      the whole query pipeline, streaming and not
 //   language.ts    an explicit language request, and the reply to a bare one
+//   refusal.ts     the refusal marker swapped for the tenant's friendly words (D-047)
 //   dates.ts       relative dates ("bukas", "next Friday") resolved in code
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
@@ -54,6 +55,7 @@ export { addDays, asksAvailability, dateInstructions, isDateOnly, MAX_DATE_CHECK
 export type { DateMention, DatePlan } from './dates.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
+export { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { executeTool, toolsFor } from './tools.js';

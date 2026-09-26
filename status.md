@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+~~**Friendly refusal (D-047).**~~ **Done 2026-09-27, uncommitted.** Visitors
+no longer see "I don't know based on the documents I have." It stays the
+internal marker; the chat shows `tenants.fallback_message` (villa: Viber/SMS
+0917-845-2290, set with `tenant:fallback`) or a friendly default in the
+reply's language. `schema-auth.sql` re-run by the user. Tests 233 in the
+pipeline, battery 36/38, verify 48/48, isolation 16/16 both ways, snapshot
+identical. D-046's tools-rule edit reverted (lang-tagalog-2). **Next:**
+commit; browser walk.
+
 ~~**Relative dates (D-046).**~~ **Done 2026-09-27, uncommitted.** "bukas",
 "tomorrow", "sa makalawa", "sa Friday", "next week" were 6/6 "Which date?";
 now resolved in code (`dates.ts`) and, on an availability turn, checked up

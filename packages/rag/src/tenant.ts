@@ -40,6 +40,7 @@ export async function loadTenant(slug: string): Promise<TenantContext | null> {
     slug: row.slug,
     businessName: row.business_name,
     assistantName: row.assistant_name,
+    fallbackMessage: row.fallback_message,
     db: scopedClient(mintTenantToken({ tenantId: row.id })),
   };
 }

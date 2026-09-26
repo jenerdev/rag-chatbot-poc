@@ -4891,8 +4891,9 @@ date po?" with no tool call (6/6).
   `executeTool()` before the model's first turn. It works in both the
   streaming and non-streaming paths.
 - **`prompt.ts`:** the lines go right after "Today is …".
-- **`tools.ts`:** the ask-for-date rule now reads "without giving any date or
-  day at all".
+- **`tools.ts`:** the ask-for-date rule was narrowed to "without giving any
+  date or day at all". Reverted with D-047: it bought nothing, and
+  `lang-tagalog-2` failed more often with it.
 - **Tests:** `dates.test.ts` (98) and `tools.test.ts` (13, with
   `@rag/bookings` mocked).
 - **Battery:** 9 `date-*` cases, counted as `date x/9`.
@@ -4939,5 +4940,73 @@ non-availability turns now get nothing at all.
 - An availability question phrased without an availability word ("Pwede ba
   kami bukas?") isn't checked up front, so the model gets the unchanged
   prompt.
+- Not walked in the browser.
+
+---
+
+## Friendly refusal (D-047) · done 2026-09-27
+
+**What was done:**
+- **SQL (`schema-auth.sql`, re-run by the user):** added
+  `tenants.fallback_message` (nullable, 1–500 chars); dropped and recreated
+  `tenant_public()` to return it. A return type can't be changed in place,
+  and the grants are re-applied later in the same file.
+- **`refusal.ts`** (new):
+  - `DEFAULT_REFUSALS`: English, Taglish and Tagalog;
+  - `refusalText()`: the tenant's own message, or the default in the reply's
+    language;
+  - `isRefusal()` / `displayReply()`;
+  - `refusalFilter()`: the stream guard.
+- **`answer.ts`:** saves `NO_ANSWER` as before and returns and streams the
+  friendly text. `Answer.refused` is new. `getMessages()` swaps stored
+  refusals too.
+- **`tenant.ts` / `types.ts`:** `TenantContext.fallbackMessage`.
+- **`tenant.mjs`:** `tenant:fallback -- <slug> "<message>" | --clear`.
+- **Eval, isolation:** a refusal is `last.refused`, and the pure-refusal
+  cases also check that the marker never reached the visitor.
+- **`verify.mjs`:** check 42's public column list now includes
+  `fallback_message`.
+- **The Unanswered screen's** explanation no longer quotes the marker.
+- **villa's message:** "Pasensya na po, wala pa kaming info tungkol diyan.
+  Pwede po kayong mag-message sa amin sa Viber o SMS, 0917-845-2290, para
+  matulungan namin kayo." The number and channels come from villa's own
+  documents (01, 04), not invented.
+
+**Why it mattered:** the refusal was the one sentence every tenant's
+visitors saw that sounded like a system talking about its files.
+
+**Trap avoided: rewording the constant.** It is load-bearing: grounding,
+D-008, D-035, the unanswered list and the eval all match it exactly. Swapping
+it only at the edge left every measured behaviour alone. The northwind
+snapshot is identical.
+
+**Trap avoided: the stream shows the marker before anyone can replace it.**
+The filter holds only what is still a prefix of the marker, so a real
+answer is delayed by at most the few characters it shares with "I don't
+know…".
+
+**Found on the way: D-046's rule edit.** `lang-tagalog-2` failed in every
+full run today (en-share 0.84 against a 0.80 limit, facts kept). The only
+change that reached its prompt was D-046's narrowed ask-for-date rule, which
+bought nothing, so it was reverted:
+- with it, 4 of 9 runs failed; without it, 1 of 6 on repeat;
+- the date cases still pass 9/9;
+- in the full run after the revert, the lang group's one failure was
+  `lang-tagalog-2` again, which is within CLAUDE.md's expected lang 9/10.
+  Worth watching.
+
+**Checked, not assumed:**
+- live, before and after the SQL: Taglish refusal → Taglish default, then
+  villa's message; English → English default; northwind → default. JSON and
+  stream were identical;
+- `tenant:fallback -- nosuch` is refused;
+- tests: pipeline 233 (19 new), bookings 27, openai 14, chunker 13;
+  typecheck green;
+- battery 36/38; verify 48/48; isolation 16/16 both ways; northwind snapshot
+  identical.
+
+**Limits:**
+- A tenant message is one string for every language.
+- A reloaded transcript shows the English default.
 - Not walked in the browser.
 

@@ -97,6 +97,12 @@ const namesDate = (reply, date) => {
   );
 };
 
+// A refusal is `last.refused` (D-047): the visitor now sees the tenant's own
+// friendly words, so the reply text no longer identifies one. The saved
+// message is still NO_ANSWER, and `refused` is true exactly when it is.
+// tool-ask still checks the TEXT for the marker: glued to a question, it is
+// not a refusal, so it is not swapped, and it must never be written.
+
 // Each case says what SHOULD happen, so the output can be read at a glance.
 const CASES = [
   {
@@ -274,7 +280,7 @@ const CASES = [
     want: 'tool',
     turns: [`Is the villa free on ${words(FREE)}?`],
     check: (last, log) => ({
-      ok: last.reply.trim() === NO_ANSWER && callsFor(last).length === 0 && log.answerCalls === 0,
+      ok: last.refused && callsFor(last).length === 0 && log.answerCalls === 0,
       detail: `${callsFor(last).length} tool calls, ${log.answerCalls} answer calls to OpenAI`,
     }),
     note: 'northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all',
@@ -412,8 +418,8 @@ const CASES = [
     want: 'lang',
     turns: ['May massage service po ba kayo?'],
     check: (last) => ({
-      ok: last.reply.trim() === NO_ANSWER && callsFor(last).length === 0,
-      detail: `refused: ${last.reply.trim() === NO_ANSWER}; ${callsFor(last).length} tool calls`,
+      ok: last.refused && callsFor(last).length === 0,
+      detail: `refused: ${last.refused}; ${callsFor(last).length} tool calls`,
     }),
     note: 'no document mentions massage: sounding natural must not invent one; the refusal is verbatim',
   },
@@ -483,7 +489,7 @@ const CASES = [
     want: 'date',
     turns: ['May available room ba bukas?', 'How about overnight?'],
     check: (last) => ({
-      ok: namesDate(last.reply, plus(1)) && says(last.reply, ['overnight']) && last.reply.trim() !== NO_ANSWER,
+      ok: namesDate(last.reply, plus(1)) && says(last.reply, ['overnight']) && !last.refused,
       detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names ${plus(1)}: ${namesDate(last.reply, plus(1))}`,
     }),
     note: 'only the slot changes: the date from the first turn is kept, not asked for again',
@@ -505,8 +511,8 @@ const CASES = [
     want: 'date',
     turns: ['Available ba kahapon?'],
     check: (last) => ({
-      ok: last.reply.trim() !== NO_ANSWER && says(last.reply, PAST_WORDS),
-      detail: `refused: ${last.reply.trim() === NO_ANSWER}; says past: ${says(last.reply, PAST_WORDS)}`,
+      ok: !last.refused && says(last.reply, PAST_WORDS),
+      detail: `refused: ${last.refused}; says past: ${says(last.reply, PAST_WORDS)}`,
     }),
     note: 'a past date is explained, not refused (Taglish once answered the bare refusal)',
   },
@@ -516,7 +522,7 @@ const CASES = [
     want: 'date',
     turns: ['What time is check-in bukas?'],
     check: (last) => ({
-      ok: callsFor(last).length === 0 && last.reply.includes('2:00') && last.reply.trim() !== NO_ANSWER,
+      ok: callsFor(last).length === 0 && last.reply.includes('2:00') && !last.refused,
       detail: `${callsFor(last).length} tool calls; has 2:00: ${last.reply.includes('2:00')}`,
     }),
     note: 'trap 10: a documents question with a date gets no date line and no availability check',
@@ -561,7 +567,7 @@ function langVerdict(last, want, facts) {
     tagalog: m.tagalog >= 2 && m.share <= 0.12,
     english: m.tagalog <= 1,
   }[want];
-  const refused = last.reply.trim() === NO_ANSWER;
+  const refused = last.refused;
   const factsKept = facts.every((f) => last.reply.toLowerCase().includes(f.toLowerCase()));
   return {
     ok: inLanguage && factsKept && !refused,
@@ -676,10 +682,11 @@ for (const c of RUN) {
     reply = `owner sees ${own?.length ?? 'null'} messages; ${c.tenant} sees ${leaked === null ? 'null' : leaked.length}`;
   } else {
     const last = await ask(tenant, c.turns);
-    const refused = last.reply.trim() === NO_ANSWER;
+    const refused = last.refused;
     reply = last.reply.replace(/\n/g, ' ');
 
-    if (c.want === 'refusal') ok = refused;
+    // Refused, AND the visitor saw the friendly words, never the marker (D-047).
+    if (c.want === 'refusal') ok = refused && last.reply.trim() !== NO_ANSWER;
     else if (c.want === 'greeting') {
       const others = Object.values(tenants).filter((t) => t.id !== tenant.id);
       ok =

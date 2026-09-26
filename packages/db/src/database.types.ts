@@ -63,6 +63,8 @@ export interface Database {
           logo_url: string | null;
           banner_url: string | null;
           theme: Json;
+          /** what the chat shows when the documents cannot answer (D-047); null = the built-in default */
+          fallback_message: string | null;
           created_at: string;
         };
         Insert: {
@@ -73,6 +75,7 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           theme?: Json;
+          fallback_message?: string | null;
           created_at?: string;
         };
         Update: {
@@ -83,6 +86,7 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           theme?: Json;
+          fallback_message?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -446,6 +450,7 @@ export interface Database {
           logo_url: string | null;
           banner_url: string | null;
           theme: Json;
+          fallback_message: string | null;
         }[];
       };
       /** plan/auth-phase0-spike.sql — TEMPORARY: returns auth.jwt(). Dropped after auth-rls Phase 2. */

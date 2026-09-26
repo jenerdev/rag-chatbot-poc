@@ -24,6 +24,12 @@ export interface TenantContext {
   businessName: string;
   assistantName: string;
   /**
+   * What the chat shows when the documents cannot answer, in place of the
+   * internal refusal marker NO_ANSWER (D-047). Null means the built-in
+   * friendly default, in the reply's language (refusal.ts).
+   */
+  fallbackMessage: string | null;
+  /**
    * The database, AS this tenant: a client holding a token minted for it
    * (auth-rls Phase 3, D-039). Postgres's RLS policies compare every row
    * against that token, so this is the second wall behind every
@@ -91,7 +97,14 @@ export interface ToolCallRecord {
 /** The non-streaming reply. */
 export interface Answer {
   conversationId: string;
+  /** What the user sees. A refusal is the tenant's friendly message here, never the marker (D-047). */
   reply: string;
+  /**
+   * True when the documents (and tools) could not answer: the saved reply is
+   * NO_ANSWER and `reply` is the friendly message. How callers tell a refusal
+   * apart now that its wording is per tenant.
+   */
+  refused: boolean;
   sources: Source[];
   /** Empty for a tenant with no tools, and for any turn where the model called none. */
   toolCalls: ToolCallRecord[];

@@ -1645,9 +1645,75 @@ from the documents with no call (compared on a stash of the change).
   language mix;
 - the northwind snapshot is identical.
 
+**Amended 2026-09-27 (with D-047):** D-046 also narrowed the tools block's
+ask-for-date rule to "without giving any date or day at all". That did not
+fix the relative-date case (the up-front check did), and `lang-tagalog-2`, a
+pet question with no date in it, failed 4 of 9 runs with it. The rule is back
+to its measured wording, and `lang-tagalog-2` failed 1 of 6 on repeat. The date
+cases still pass 9/9 without it.
+
 **Reverse if:** a model reliably calls the tool for relative dates by itself.
 Or if tenants need dates this doesn't cover (Christmas, "end of the month",
 day-only "the 12th"). Extend the rules, not the prompt.
+
+---
+
+## D-047 · "I don't know based on the documents I have." stays the internal marker; visitors see the tenant's own words · **Added 2026-09-27**
+
+**The problem:** the refusal reads like a system message ("the documents I
+have"), not a person.
+
+**Decision:**
+- `NO_ANSWER` is unchanged everywhere upstream. The grounding prompt still
+  makes the model write it verbatim, D-008 and D-035 still produce it,
+  `messages` still stores it, and the unanswered list still finds refusals by
+  it (D-045).
+- `packages/rag/src/refusal.ts` swaps it at the last moment, where a reply
+  leaves the server: the JSON answer, the stream, and `getMessages()`.
+- The words shown are `tenants.fallback_message` (nullable, 1–500 chars, set
+  with `tenant:fallback`, and served through `tenant_public()`, since every
+  visitor sees it). When a tenant hasn't set one, a built-in friendly default
+  in the reply's language (English, Taglish or Tagalog) is used.
+
+**Why not just reword the constant (option 1):** one sentence can't be right
+for every business, and each tenant has its own contact channel. It would
+also have changed the text the grounding prompt was measured with (Phase
+5.5).
+
+**The streaming detail:** with chunks, the model's text streams as it's
+written, so a refusal would show up word by word before anything could
+replace it. `refusalFilter()` holds deltas back only while the text so far is
+still a prefix of the marker. It passes them the moment the text diverges,
+and sends the friendly text at the end if the whole reply was the marker.
+
+**Callers:**
+- `Answer.refused` tells callers it was a refusal, now that the words vary
+  by tenant.
+- The eval and isolation checks use it.
+- The battery's pure-refusal cases also assert that the visitor's reply is
+  not the marker.
+
+**Measured:**
+- tests: 19 in `refusal.test.ts` (the filter over delta sizes 1–100, answers
+  that start like the marker, and the marker followed by more text), 233 in
+  the pipeline;
+- live: a Taglish refusal got the Taglish default, then villa's own message
+  once set; an English one got the English default; northwind's short
+  circuit got the default. JSON and stream matched;
+- battery 36/38 (`original 9/10 · tool 9/9 · lang 9/10 · date 9/9`);
+- verify 48/48 (check 42 now lists `fallback_message`), isolation 16/16 both
+  ways, the northwind snapshot identical.
+
+**Limits:**
+- A tenant's own message is one string for every language. Only the default
+  follows the reply language.
+- A reloaded transcript shows the English default, because there is no reply
+  language at hand.
+- A partial answer that ends with the marker is shown as written.
+
+**Reverse if:** tenants need a message per language (make the column jsonb
+keyed by language), or the refusal needs to carry a link or button, which
+would be a UI change, not text.
 
 ---
 

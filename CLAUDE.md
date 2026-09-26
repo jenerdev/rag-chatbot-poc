@@ -96,6 +96,7 @@ packages/
     tools/isolation.mjs    12 cross-tenant checks, no API key
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
+    src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_message or a default (D-047)
     src/dates.ts           relative dates ("bukas", "next Friday") resolved in code; availability turns checked up front (D-046)
     tools/prompt-eval.mjs  the battery, 38 cases (10 + 9 tool-* + 10 lang-* + 9 date-*), both tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
@@ -122,6 +123,7 @@ pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, on ope
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 12, code filters alone
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
+pnpm --filter @rag/db tenant:fallback -- <slug> "<message>"   # what the chat says when it cannot answer; --clear = default (D-047)
 pnpm --filter @rag/db member:add -- <slug> <email>        # invites a new account; the link sets a password
 pnpm --filter @rag/db member:remove -- <slug> <email>     # effective on their NEXT request
 pnpm --filter @rag/db member:list -- <slug>
@@ -241,7 +243,8 @@ All are expanded in `risks.md`.
    row is inserted, delete that row in the `catch`, or you get a document with
    zero chunks that can never be retrieved (R-7).
 6. **Short-circuit the empty retrieval.** When nothing clears the threshold,
-   return the refusal string directly — do not call OpenAI (D-008). For a
+   return the refusal string (NO_ANSWER, the internal marker; the visitor
+   sees the tenant's friendly words, D-047) directly — do not call OpenAI (D-008). For a
    tenant **with tools** the model is called anyway, and its reply is kept
    only if it called a tool; otherwise it becomes the refusal (D-035). The
    text is held, not streamed, until that is decided.

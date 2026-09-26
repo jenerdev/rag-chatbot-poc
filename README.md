@@ -83,7 +83,9 @@ Paste each into the Supabase SQL editor and run it, one after the other:
    - the RLS policies;
    - `tenant_public`, and the security-definer `check_availability`;
    - the EXECUTE grants;
-   - dropping the old `admin_key_hash`.
+   - dropping the old `admin_key_hash`;
+   - `tenants.fallback_message`, what the chat says when it cannot answer
+     (D-047, set with `tenant:fallback`).
 
    It is idempotent.
 6. [`schema-unanswered.sql`](./packages/db/sql/schema-unanswered.sql) — the

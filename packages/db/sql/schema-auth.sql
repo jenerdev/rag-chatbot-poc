@@ -231,21 +231,34 @@ $$;
 -- the table. The server resolves a slug BEFORE it knows the tenant, so before
 -- it can mint a token for it, which is why anon may call this one (plan
 -- Phase 3 step 3). Everything returned is already shown on the public page.
-create or replace function tenant_public(p_slug text)
+--
+-- fallback_message (D-047, added 2026-09-27): what the chat shows instead of
+-- the internal refusal marker when the documents cannot answer. Shown to
+-- every visitor, so it belongs in this public list. Null means the built-in
+-- friendly default. The column is added here, next to the function that
+-- returns it, so a fresh database gets both in one file.
+alter table tenants add column if not exists fallback_message text
+  constraint tenants_fallback_message_length check (char_length(fallback_message) between 1 and 500);
+
+-- The return type changed (fallback_message), and `create or replace` cannot
+-- change a return type, so drop first. Step 6 below grants EXECUTE again.
+drop function if exists tenant_public(text);
+create function tenant_public(p_slug text)
 returns table (
-  id             bigint,
-  slug           text,
-  business_name  text,
-  assistant_name text,
-  logo_url       text,
-  banner_url     text,
-  theme          jsonb
+  id               bigint,
+  slug             text,
+  business_name    text,
+  assistant_name   text,
+  logo_url         text,
+  banner_url       text,
+  theme            jsonb,
+  fallback_message text
 )
 language sql stable
 security definer
 set search_path = ''
 as $$
-  select t.id, t.slug, t.business_name, t.assistant_name, t.logo_url, t.banner_url, t.theme
+  select t.id, t.slug, t.business_name, t.assistant_name, t.logo_url, t.banner_url, t.theme, t.fallback_message
   from public.tenants t
   where t.slug = p_slug
 $$;

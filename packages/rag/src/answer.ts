@@ -6,7 +6,9 @@ import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from 
 import { planDates } from './dates.js';
 import { greetingReply } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
+import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
+import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import { executeTool, toolsFor } from './tools.js';
 import type { PromptTools } from './tools.js';
@@ -66,6 +68,8 @@ interface Prepared {
   history: HistoryMessage[];
   /** The language block's lines for this turn, from language.ts; [] for an English reply. */
   language: string[];
+  /** The reply language itself, for the friendly refusal's default wording (D-047). */
+  replyIn: LanguagePreference;
   searchQuery: string;
   matches: RetrievedChunk[];
   sources: Source[];
@@ -152,7 +156,7 @@ async function prepareAnswer({
   );
 
   // 6. Nothing cleared the threshold: no sources to describe.
-  if (matches.length === 0) return { id, history, language, searchQuery, matches, sources: [] };
+  if (matches.length === 0) return { id, history, language, replyIn: choice.language, searchQuery, matches, sources: [] };
 
   // 7. Attach document titles. match_chunks returns document_id but not the
   //    title, and the sources panel needs a human-readable label. One extra
@@ -180,7 +184,7 @@ async function prepareAnswer({
     foundBy: m.foundBy,
   }));
 
-  return { id, history, language, searchQuery, matches, sources };
+  return { id, history, language, replyIn: choice.language, searchQuery, matches, sources };
 }
 
 /**
@@ -327,14 +331,16 @@ export async function answerQuestion({
   if (greeting !== null) {
     const id = await ensureConversation(tenant, conversationId);
     await saveMessages(tenant, id, message, greeting);
-    return { conversationId: id, reply: greeting, sources: [], searchQuery: message, toolCalls: [] };
+    return { conversationId: id, reply: greeting, refused: false, sources: [], searchQuery: message, toolCalls: [] };
   }
 
-  const [{ id, history, language, searchQuery, matches, sources }, tools] = await Promise.all([
+  const [{ id, history, language, replyIn, searchQuery, matches, sources }, tools] = await Promise.all([
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
   const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
+  // The marker is what is saved; this is what is shown (D-047).
+  const friendly = refusalText(tenant, replyIn);
 
   // No tools: the path is exactly what it was before tools existed.
   if (tools.definitions.length === 0) {
@@ -342,7 +348,7 @@ export async function answerQuestion({
     // model ignoring its instructions and answering from training data anyway.
     if (matches.length === 0) {
       await saveMessages(tenant, id, message, NO_ANSWER);
-      return { conversationId: id, reply: NO_ANSWER, sources: [], searchQuery, toolCalls: [] };
+      return { conversationId: id, reply: friendly, refused: true, sources: [], searchQuery, toolCalls: [] };
     }
 
     const reply = await chat(buildPrompt(tenant, matches, history, message, null, language));
@@ -352,7 +358,7 @@ export async function answerQuestion({
     // when it differs from what the user typed. Retrieval silently searching for
     // something other than the question is exactly the kind of thing that should
     // be visible rather than hidden (same argument as the sources panel, D-012).
-    return { conversationId: id, reply, sources, searchQuery, toolCalls: [] };
+    return { conversationId: id, reply: displayReply(reply, friendly), refused: isRefusal(reply), sources, searchQuery, toolCalls: [] };
   }
 
   // With tools the model is called even with zero chunks, because a tool may
@@ -367,7 +373,14 @@ export async function answerQuestion({
   );
   const reply = acceptReply(matches, records, text);
   await saveMessages(tenant, id, message, reply);
-  return { conversationId: id, reply, sources, searchQuery, toolCalls: records };
+  return {
+    conversationId: id,
+    reply: displayReply(reply, friendly),
+    refused: isRefusal(reply),
+    sources,
+    searchQuery,
+    toolCalls: records,
+  };
 }
 
 /**
@@ -410,11 +423,13 @@ export async function answerQuestionStream({
     return greeting;
   }
 
-  const [{ id, history, language, searchQuery, matches, sources }, tools] = await Promise.all([
+  const [{ id, history, language, replyIn, searchQuery, matches, sources }, tools] = await Promise.all([
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
   const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
+  // The marker is what is saved; the friendly text is what is streamed (D-047).
+  const friendly = refusalText(tenant, replyIn);
 
   onMeta({ conversationId: id, searchQuery, sources });
 
@@ -422,16 +437,21 @@ export async function answerQuestionStream({
   // the client needs no special case: a refusal arrives down the same channel
   // as any other answer.
   if (tools.definitions.length === 0 && matches.length === 0) {
-    onDelta(NO_ANSWER);
+    onDelta(friendly);
     await saveMessages(tenant, id, message, NO_ANSWER);
-    return NO_ANSWER;
+    return friendly;
   }
+
+  // Streamed text passes through this, so a model-written refusal is never on
+  // screen as the marker: see refusalFilter.
+  const filter = refusalFilter(onDelta, friendly);
 
   try {
     if (tools.definitions.length === 0) {
-      const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), onDelta);
+      const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), filter.push);
+      filter.finish();
       await saveMessages(tenant, id, message, reply);
-      return reply;
+      return displayReply(reply, friendly);
     }
 
     // With zero chunks the text is HELD, not streamed (plan/bookings.md
@@ -443,14 +463,16 @@ export async function answerQuestionStream({
     const { text, records } = await toolLoop(
       tenant,
       buildPrompt(tenant, matches, history, message, promptTools, language),
-      (messages) => chatStream(messages, onDelta, { tools: tools.definitions, holdContent: hold }),
+      (messages) => chatStream(messages, filter.push, { tools: tools.definitions, holdContent: hold }),
       onTool,
       precheck,
     );
     const reply = acceptReply(matches, records, text);
-    if (hold) onDelta(reply);
+    // Held text was never streamed, so it goes out whole, already swapped.
+    if (hold) onDelta(displayReply(reply, friendly));
+    else filter.finish();
     await saveMessages(tenant, id, message, reply);
-    return reply;
+    return displayReply(reply, friendly);
   } catch (error) {
     // The client was handed this conversationId in `meta` and will send it
     // with the next question. If nothing is persisted here, that next turn
@@ -525,5 +547,8 @@ export async function getMessages(
     .eq('conversation_id', conversationId)
     .order('id', { ascending: true });
   if (error) throw new Error(`Could not load messages: ${error.message}`);
-  return data;
+  // Stored refusals are the marker; the reader sees the tenant's words (D-047).
+  // English, as a reloaded transcript has no reply language to hand.
+  const friendly = refusalText(tenant);
+  return data.map((m) => (m.role === 'assistant' ? { ...m, content: displayReply(m.content, friendly) } : m));
 }
