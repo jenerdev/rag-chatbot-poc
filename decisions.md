@@ -107,7 +107,13 @@ production checklist in `README.md`.
 
 ---
 
-## D-006 · `service_role` key, no RLS · **Settled for the POC**
+## D-006 · `service_role` key, no RLS · **Superseded 2026-09-26 by D-038 and D-039**
+
+> **Superseded.** Requests no longer use `service_role`: they reach Postgres
+> on a tenant token under RLS policies (D-039), with the code filters kept as
+> a second wall (D-038). `service_role` remains, at `@rag/db/service`, for
+> tools only. The original decision is kept below as the record of why it
+> was right for a one-user local POC.
 
 **Decision:** The Express server uses Supabase's `service_role` key. No Row
 Level Security policies are written.
@@ -919,7 +925,13 @@ rather than wrong.
 
 ---
 
-## D-028 · Per-tenant admin key, scrypt-hashed, behind a path-scoped signed cookie, hand-rolled · **Added 2026-09-23 (tenancy Phase 6)**
+## D-028 · Per-tenant admin key, scrypt-hashed, behind a path-scoped signed cookie, hand-rolled · **Added 2026-09-23 (tenancy Phase 6). Key superseded 2026-09-26 by D-040; the cookie kept**
+
+> **The key is gone; the cookie stays.** Staff log in with Supabase Auth and
+> a membership (D-040). The HMAC cookie, its `/api/t/<slug>` path and its
+> slug check are kept, now carrying the user id:
+> `<slug>.<userId>.<expiry>.<mac>`. `admin-key.ts`, `tenant:key` and
+> `tenants.admin_key_hash` were deleted in auth-rls Phases 5–6.
 
 **Decision:** each tenant has one admin key.
 - `tools/tenant.mjs` generates 32 random bytes, prints the key **once**, and
@@ -1280,6 +1292,31 @@ seriously first.
 
 ---
 
+## D-038 · Two walls between tenants, code filters and RLS, and each is tested alone · **Added 2026-09-26 (auth-rls Phases 1, 3, 5)**
+
+**Decision:** every `tenant_id` filter in application code stays, and RLS
+policies keyed on the token's `tenant_id` claim sit behind them. Neither is
+accepted as proof of the other.
+
+**Why:** a wall that is only ever tested alongside another one might not be
+there. The filters were the only wall for three days (R-11). The policies are
+new, and a refactor that trusts one wall tends to delete the other.
+
+**Measured:**
+- **RLS alone.** Villa's chat token with NO filter reads 8/8 documents,
+  30/30 chunks, 141/141 conversations and 368/368 messages, with 0 foreign
+  rows. `match_chunks` naming another tenant's id returns 0 rows (verify
+  checks 28–46).
+- **Filters alone.** `isolation --filters-only` runs every context on the
+  service client: 11/11, and bookings 12/12.
+- **Both.** On tokens: 11/11 and 12/12. The eval gives 18/19, with verdicts
+  identical to the pre-auth baseline.
+
+**Reverse if:** never, as a principle. The day a filter looks redundant is
+the day to run `--filters-only`, not to delete it.
+
+---
+
 ## D-039 · Server-minted, 5-minute tenant tokens, signed ES256 with our own key imported as a Supabase standby key · **Added 2026-09-26 (auth-rls Phase 0)**
 
 **Decision:** every request will reach Postgres with a short-lived token
@@ -1328,6 +1365,85 @@ the JWKS lists only `45345cbc…` and Supabase's `cb77f580…`.
 time**. Replacing ours means removing the old standby first, which is a
 short window in which no tenant token verifies. At a real deployment, that
 is a rotation to schedule, not a click.
+
+---
+
+## D-040 · Supabase Auth authenticates staff; our HMAC cookie carries the session; the membership is re-checked on every request · **Added 2026-09-26 (auth-rls Phase 5). Supersedes D-028's key**
+
+**Decision:**
+- **Login:** `POST /api/t/<slug>/admin/session {email, password}` runs:
+  1. `signInWithPassword` (the Supabase session is revoked at once);
+  2. then the membership, read through a staff token;
+  3. then our cookie, `<slug>.<userId>.<expiry>.<mac>`.
+- **Every admin request:** `requireAdmin()` re-checks the membership and
+  returns a STAFF context, which the handler swaps in for its chat context.
+- **Password resets and invites:** Supabase emails them. The link lands on
+  `/t/<slug>/admin/reset`, which reads the token from the #fragment, wipes
+  it, and posts it once to `…/admin/password`, a raw
+  `PUT /auth/v1/user`.
+
+**Why:** password storage, reset tokens and email verification are the parts
+where a readable hand-rolled version is also the dangerous one. That is the
+one deliberate exception to D-001/D-028's "hand-roll it". Who administers
+which tenant stays ours: `memberships`, which Postgres checks again on every
+write (`app_is_admin()`). Re-checking on every request makes a removal take
+effect at the member's next click.
+
+**Measured** (`staff-cases.mjs`, with the web process holding no service key):
+- a right password gives 200;
+- a wrong password, an unknown email and a non-member each give 401, with
+  byte-identical messages;
+- another tenant's cookie gives 401;
+- a member removed mid-session gets 401 on the same cookie.
+
+A member books a slot and reads it back with its guest name. In the browser,
+the invite link, setting a password, logging in and logging out all work.
+
+**Reverse if:** SSO or MFA is needed. Both sit in Supabase Auth, and the
+cookie and membership check stay.
+
+---
+
+## D-041 · One role: a membership row is admin · **Added 2026-09-26 (auth-rls Phase 1)**
+
+**Decision:** `memberships (user_id, tenant_id)` with no role column. A
+member can manage the tenant's documents and bookings. Rows are written only
+by `member:add|remove`, on `service_role`, in a tool.
+
+**Why:** it is the smallest policy set that works. `app_is_admin()` is one
+`exists`. A `role` column added later gives every existing row the meaning
+"admin", which is what they already mean, so it needs no data migration.
+
+**Reverse if:** a tenant needs staff who can see bookings but not edit
+documents, or the reverse. Add `role`, and make `app_is_admin()` role-aware.
+
+---
+
+## D-042 · `security definer` for exactly two functions, `tenant_public` and `check_availability`, both with `search_path = ''` · **Added 2026-09-26 (auth-rls Phase 1)**
+
+**Decision:**
+- **`tenant_public(slug)`** returns the seven public tenant columns, and anon
+  may call it: the server needs it before it knows which tenant to mint for.
+- **`check_availability`** runs as its owner, so a chat token can ask about
+  availability without SELECT on `bookings`. It raises `42501` unless
+  `p_tenant_id` is the token's tenant (or the caller is `service_role`).
+- **Everything else is security invoker, so RLS applies inside it.** That
+  includes `app_is_admin()`, a deliberate deviation from the plan's sketch.
+
+**Why:** each of the two needs to see a table the caller must not: the tenants
+row, and guest-holding bookings rows. A definer function bypasses RLS, so it
+must enforce the tenant itself, and `search_path = ''` stops a caller putting
+their own `bookings` in front of ours.
+
+**Measured:**
+- a chat token reads 0 of 5 bookings, yet gets 6 availability rows;
+- `check_availability` with another tenant's id gives `42501`;
+- `tenant_public('villa')` returns exactly
+  `assistant_name,banner_url,business_name,id,logo_url,slug,theme`.
+
+**Reverse if:** a third function seems to need definer. Try a policy first,
+because every definer function is another place the tenant check can be
+forgotten.
 
 ---
 

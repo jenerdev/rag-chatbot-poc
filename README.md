@@ -53,10 +53,12 @@ Fill in `.env`:
 | `OPENAI_CHAT_MODEL` | `gpt-4o-mini` |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` — **must match `vector(1536)`** |
 | `SUPABASE_URL` | Supabase → Project Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY` | same page — the **`service_role`** key, not `anon` |
+| `SUPABASE_PUBLISHABLE_KEY` | same page, the **publishable** key. Every request uses it with a server-minted tenant token |
+| `SUPABASE_SERVICE_ROLE_KEY` | same page, the **`service_role`** key. **Tools only**: the web app never reads it |
+| `TENANT_SIGNING_JWK` | our own signing key, one line of private JWK JSON. See step 4 below |
 | `ADMIN_COOKIE_SECRET` | 32+ random characters that sign admin sessions: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. Changing it logs every admin out |
 
-### 2. Create the schema — four files, in order
+### 2. Create the schema — five files, in order
 
 Paste each into the Supabase SQL editor and run it, one after the other:
 
@@ -68,13 +70,22 @@ Paste each into the Supabase SQL editor and run it, one after the other:
 3. [`schema-tenancy.sql`](./packages/db/sql/schema-tenancy.sql) — the
    `tenants` table (so **five tables** in all), `tenant_id` on the other four,
    the composite foreign keys, and tenant-scoped versions of both search
-   functions. It also seeds one tenant, `northwind`, with no admin key yet.
+   functions. It also seeds one tenant, `northwind`.
 4. [`schema-bookings.sql`](./packages/db/sql/schema-bookings.sql) — the
    bookings application: `tenant_applications`, `units`, `slots`, `bookings`
    (so **nine tables**), the no-overlap constraint and `check_availability`.
    Needs `btree_gist`, which it enables. If a `villa` tenant exists, it seeds
    villa's unit and three slots, so run it **after** step 3 of the next
    section, or run it again once villa exists. It is idempotent.
+5. [`schema-auth.sql`](./packages/db/sql/schema-auth.sql) — Postgres
+   enforces the tenant:
+   - the `memberships` table (so **ten tables**);
+   - the RLS policies;
+   - `tenant_public`, and the security-definer `check_availability`;
+   - the EXECUTE grants;
+   - dropping the old `admin_key_hash`.
+
+   It is idempotent.
 
 Run them once, in that order, on a fresh project. **Re-running is only safe for
 `schema-tenancy.sql`, `schema-bookings.sql`** (and `schema-hybrid.sql`). `schema.sql` uses plain
@@ -89,7 +100,7 @@ Verify:
 ```sql
 select * from pg_extension where extname = 'vector';          -- one row
 select tablename, rowsecurity from pg_tables
-  where schemaname = 'public';                                -- nine rows, all true
+  where schemaname = 'public';                                -- ten rows, all true
 select slug from tenants;                                     -- northwind
 ```
 
@@ -101,27 +112,62 @@ select slug from tenants;                                     -- northwind
 Then, with no OpenAI key needed:
 
 ```bash
-pnpm --filter @rag/db verify     # 28 checks, including cross-tenant ones
+pnpm --filter @rag/db verify     # 47 checks: cross-tenant ones, and 19 through tenant tokens (needs step 4)
 ```
 
-### 3. Create tenants and their admin keys — before adding any document
+### 3. Create tenants and their staff
 
-A tenant's knowledge base can only be edited with its admin key. Keys are
-printed **once** and only their scrypt hash is stored; there is no way to read
-one back.
+A tenant is edited by its **members**: Supabase Auth accounts with a
+`memberships` row. There is no shared key.
 
 ```bash
-# northwind already exists (schema-tenancy.sql seeded it) — give it a key:
-pnpm --filter @rag/db tenant:key -- northwind
-
-# every other tenant: slug, business name, assistant name
+# every tenant but northwind (schema-tenancy.sql seeded it): slug, business name, assistant name
 pnpm --filter @rag/db tenant:add -- villa "Villa Amihan Private Resort" "Lia"
+
+# the first admin of a tenant. A new email gets Supabase's invite; its link sets a password.
+pnpm --filter @rag/db member:add -- villa someone@example.org
+pnpm --filter @rag/db member:list -- villa
+pnpm --filter @rag/db member:remove -- villa someone@example.org   # refused on their NEXT request
+
+# the tools' own member, which eval and isolation need for staff work (no email is sent)
+pnpm --filter @rag/db member:operator -- villa
+pnpm --filter @rag/db member:operator -- northwind
 ```
 
-Store each key as it is printed. A lost key is replaced by running
-`tenant:key -- <slug>` again, which invalidates the old one. A slug is 3–32
-characters of lower-case letters, digits and hyphens; the database rejects
-anything else.
+Before the invite and reset links work:
+- **Allow the redirect.** In Authentication → URL Configuration → Redirect
+  URLs, add `http://localhost:3000/**`, or your real origin.
+- **Set up custom SMTP before inviting real staff.** Supabase's built-in
+  sender allows only a few emails an hour (R-21). An invite plus two resets
+  used it up in testing. Set `APP_URL` for `member:add` when the app is not at
+  `http://localhost:3000`.
+
+A slug is 3–32 characters of lower-case letters, digits and hyphens. The
+database rejects anything else.
+
+### 4. The signing key — once per project
+
+Every request reaches Postgres on a short-lived token that the server signs
+itself (D-039), so the project has to trust our key.
+
+1. **Generate** an EC P-256 private key as one line of JWK JSON with a
+   `kid`, into the gitignored `scratch/`. Print only the kid:
+   ```bash
+   node -e "const c=require('node:crypto');const {privateKey}=c.generateKeyPairSync('ec',{namedCurve:'P-256'});const j={...privateKey.export({format:'jwk'}),kid:c.randomUUID(),alg:'ES256',use:'sig'};require('fs').writeFileSync('scratch/tenant-signing-key.private.jwk.json',JSON.stringify(j));console.log('kid',j.kid)"
+   ```
+2. **Import it** in the dashboard: Project Settings → JWT Keys → create a
+   **standby** key → import a private key.
+   - Copy it without displaying it: `clip < scratch/…` on Windows, or
+     `pbcopy <` on macOS.
+   - **Never rotate it to active.** That would make Supabase Auth sign with
+     it.
+3. **Put the same line in `.env`** as `TENANT_SIGNING_JWK=`. Never `. ./.env`
+   in a shell that runs the tools: bash strips the JSON's quotes.
+4. **Check it:** `pnpm --filter @rag/db verify` passes its 19 token checks.
+
+Rotating it follows the same steps (R-19). The dashboard holds one standby key
+at a time, so remove the old standby first, then revoke the old key once
+`verify` passes.
 
 ## Running it
 
@@ -132,7 +178,7 @@ pnpm build      # then: pnpm --filter web start
 
 | Page | What to do |
 |---|---|
-| `/t/<slug>/admin` | Log in with that tenant's admin key. Paste a document, watch the live chunk estimate, then add it. |
+| `/t/<slug>/admin` | Log in with a member's email and password. Paste a document, watch the live chunk estimate, then add it. "Forgot password?" emails a reset link. |
 | `/t/<slug>` | Ask a question. Expand the sources under the answer. On villa, ask "is 8 October free?": a **Checked availability** box shows what the tool said. |
 | `/t/<slug>/admin/bookings` | Staff bookings, for a tenant with the bookings application (villa). 404 otherwise. |
 | `/` | A static page. It does not list tenants or redirect to one — each tenant is reached by its own address. |
@@ -252,11 +298,11 @@ answer comes out wrong.
 |---|---|
 | `packages/chunker` | `chunkText()` — pure, **zero dependencies**. Runs in Node **and** the browser |
 | `packages/openai` | `embed()`, `chat()`, `chatStream()` — raw `fetch`, no SDK |
-| `packages/db` | One configured client, the schema (three SQL files), the `server-only` guard, admin-key hashing, and the `verify` / `tenant:add` / `tenant:key` tools |
+| `packages/db` | The tenant-token clients and the signer, staff sign-in, the schema (five SQL files), the `server-only` guard, `@rag/db/service` for tools, and the `verify` / `tenant:add` / `member:*` / `staff-cases` tools |
 | `packages/rag` | Both pipelines — `ingestDocument()` and `answerQuestion()` — every one taking a required `tenant`; plus the `eval`, `scores` and `isolation` tools |
 | `apps/web/app/api/t/[tenant]` | Six Route Handlers, all behind `withTenantRoute()`; `lib/route.ts` holds the one error → status map |
 | `apps/web/app/t/[tenant]` | The two pages as Server Components that resolve the tenant; the screens themselves are in `apps/web/components` |
-| `apps/web/lib` | `tenant.ts` (slug → tenant), `admin-auth.ts` (signed session cookie), `branding.ts` (the theme allowlist) |
+| `apps/web/lib` | `tenant.ts` (slug → a chat-token tenant), `admin-auth.ts` (the staff session, the membership re-check), `branding.ts` (the theme allowlist) |
 
 ## ⚠️ Before you put this in production
 
@@ -305,19 +351,19 @@ fine and far cheaper. See D-017.
 
 - **R-1 — the OpenAI key.** It stays server-side. It is already only in `.env`
   and `.env` is gitignored; keep it that way, and set a spending limit.
-- **R-2 — RLS has no policies.** RLS is enabled on all four tables but the
-  server uses the `service_role` key, which bypasses it entirely. That is safe
-  for one trusted local server and **is not safe once the database is reachable
-  from anywhere else**. Write policies and move browser-facing reads to the
-  `anon` key before deploying. See `decisions.md` D-006.
-- **R-11 — tenant isolation is application code.** Because `service_role`
-  bypasses RLS, the only thing between two tenants' data is a `tenant_id`
-  filter in every query. The composite foreign keys protect writes; reads are
-  protected only by filters someone remembered. `pnpm eval`'s `leak-*` cases
-  and `pnpm --filter @rag/pipeline isolation` are what catch a regression —
-  RLS policies are what would make it impossible.
-- **R-13 — no rate limit on admin logins.** A 32-byte key cannot be guessed,
-  but nothing throttles or logs failed attempts. Add both before a public URL.
+- **R-2, R-11: closed for requests (auth-rls).**
+  - Every request reaches Postgres on a tenant token, under RLS policies, and
+    the `tenant_id` filters stay as a second wall (D-038).
+  - The web app holds no `service_role` key, and `pnpm typecheck` fails if
+    anything it runs imports the client that bypasses RLS.
+- **R-19 — the signing key is a master key.** `TENANT_SIGNING_JWK` can mint
+  any token. Keep it server-only, never print it, and rotate it with the
+  procedure in `risks.md`.
+- **R-21 — email.** Invites and resets need custom SMTP before real staff
+  are invited.
+- **R-13 — our own endpoints have no rate limit.** Staff sign-in is throttled
+  by Supabase Auth (30 per window). The open chat, and our other routes, are
+  not.
 
 ### 4. Re-run the battery after ANY prompt edit
 
@@ -355,7 +401,7 @@ code. A version that works but cannot be explained has failed.
 
 | Page | What happens |
 |---|---|
-| **Knowledge base** (`/t/<slug>/admin`) | Log in with the tenant's admin key, then paste a document. The server splits it into ~1000-character chunks with overlap, gets an embedding for each from OpenAI in one batched call, and stores chunk + vector in Supabase. |
+| **Knowledge base** (`/t/<slug>/admin`) | Log in as a member of the tenant (email + password), then paste a document. The server splits it into ~1000-character chunks with overlap, gets an embedding for each from OpenAI in one batched call, and stores chunk + vector in Supabase. |
 | **Chat** (`/t/<slug>`) | Ask a question. The server embeds it, finds the nearest chunks by cosine distance in Postgres, pastes them into the prompt as context, and asks OpenAI to answer **using only that context** — showing you which chunks it used and how well they matched. Only that tenant's chunks are ever searched, and the assistant introduces itself by the tenant's assistant name. |
 
 ## The success criterion

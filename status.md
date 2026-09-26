@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 7 done, two email items owed)
+> Last updated: 2026-09-26 (auth-rls complete, Phases 0–8; three email checks owed)
 
 ---
 
@@ -44,7 +44,9 @@
   service client at all. **Phase 6 done:** the admin key and its column
   are gone, and `pnpm typecheck` enforces the service-import rule. **Phase 7
   done:** the browser walk and a clean bundle. The northwind invite and the
-  reset email are owed to the email cap. Next is Phase 8. Bookings is complete and merged
+  reset email are owed to the email cap. **Phase 8 done:** the record.
+  **The auth + RLS plan is complete**, apart from three checks that wait on
+  Supabase's email cap. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -267,18 +269,43 @@ email items owed.
   - step 6 in the browser;
   - the "Forgot password?" email.
 
-**▶ Auth + RLS Phase 8: the record.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 8.
-- CLAUDE.md rules 2 and 6 for the two walls, the plan's Rule 2, and the § 2
-  traps.
-- decisions.md: D-038–D-042 (D-039 is already written); D-006 and D-028
-  marked superseded.
-- risks.md: R-2, R-11 and R-13 amended; R-19, R-20 and R-22 added (R-21 is
-  already written).
-- architecture.md, flow.md (the token step), README (the signing key,
-  members, SMTP).
-- When the email cap allows: the northwind invite, step 6 and the reset
-  email.
+~~**Auth + RLS Phase 8: the record.**~~ **Done 2026-09-26.**
+- **CLAUDE.md:**
+  - the header names the auth plan;
+  - rule 2 is "no request holds an RLS-bypassing key", with the import check
+    and the bundle grep;
+  - rule 6 is the two walls, each tested alone;
+  - a new rule 8 covers the signer as a master key;
+  - traps 11–14 (measure as a token; zero-row checks; `.env` sourcing and
+    `next dev` unset; the email cap and the one-standby limit);
+  - the layout, commands and conventions are updated.
+- **decisions.md:**
+  - D-038, D-040, D-041 and D-042 are added (D-039 was written in Phase 0);
+  - D-006 is marked superseded;
+  - D-028's key is marked superseded, with the cookie kept.
+- **risks.md:**
+  - R-2, R-11 and R-13 are amended;
+  - R-19 (with the rotation procedure), R-20 and R-22 are added, next to
+    Phase 5's R-21.
+- **architecture.md** has a new "Auth" subsection with the policy table, the
+  staff routes in the API table, a rewritten env section and overview, and
+  updated module rows.
+- **flow.md** has the token step in the query diagram and the new routes.
+- **README.md** covers the five schema files, the new env vars, "Create
+  tenants and their staff", "The signing key" (including rotation), and a
+  rewritten security section.
+- **plan/auth-rls.md** carries a status line.
+
+**▶ Next up: the three email checks, then merge `feat/auth-rls`.**
+- When Supabase's email cap has reset (R-21), do these three in one sitting:
+  1. `pnpm --filter @rag/db member:add -- northwind northwind-staff-test@yopmail.com`;
+  2. walk step 6: log in as that member at `/t/villa/admin`. It must refuse;
+  3. log out and click "Forgot password?" for `villa-staff-test`. Follow the
+     email and log in with the new password.
+- Then merge `feat/auth-rls` into `master`, as the earlier plans were (by
+  fast-forward).
+- Before any real staff: custom SMTP (R-21). Before a public URL: a rate
+  limit on our own endpoints (R-13).
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -812,6 +839,21 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 8, the record)
+- **Did:**
+  - CLAUDE.md: rules 2 and 6 rewritten, rule 8 and traps 11–14 added;
+  - decisions: D-038, D-040, D-041 and D-042 added, D-006 superseded, and
+    D-028's key superseded;
+  - risks: R-2, R-11 and R-13 amended, and R-19, R-20 and R-22 added;
+  - architecture.md, flow.md and README.md updated for tokens, policies,
+    staff and the signing key;
+  - a status line on the plan.
+- **Checked:**
+  - no doc still tells a reader to use an admin key or `tenant:key`;
+  - the architecture overview no longer says the server holds the
+    service_role key.
+- **Next:** the three email checks, then the merge.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 7)
 - **Did:**

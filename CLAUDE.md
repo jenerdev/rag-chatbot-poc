@@ -12,14 +12,23 @@
 >
 > **It is multi-tenant** since 2026-09-23 ([`plan.md`](./plan.md), Phases 0–8,
 > all done): one database, many businesses, each at `/t/<slug>` with its own
-> documents, assistant name, theme and admin key. Read `plan.md` § 0 before
-> touching any query.
+> documents, assistant name and theme. Read `plan.md` § 0 before touching any
+> query.
 >
 > **It has applications** since 2026-09-24 ([`plan/bookings.md`](./plan/bookings.md),
 > Phases 0–8, all done): `villa` has **bookings**, a staff screen at
 > `/t/<slug>/admin/bookings`, and the chatbot's first tool,
 > `check_availability`. Read that plan's § 0 before touching the prompt or a
 > tool.
+>
+> **Postgres enforces the tenant, and staff have accounts,** since 2026-09-26
+> ([`plan/auth-rls.md`](./plan/auth-rls.md), Phases 0–8, all done).
+> - Every request reaches the database on a server-minted, 5-minute **tenant
+>   token**, under RLS policies, and never as `service_role`.
+> - Staff log in with **Supabase Auth**, and a `memberships` row decides who
+>   may administer which tenant.
+> - Read that plan's § 0 (two walls, each tested alone) before touching a
+>   query, a policy or a token.
 
 ## What this is
 
@@ -60,12 +69,13 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/page.tsx        S-1 chat — Server Component, resolves the tenant
   app/t/[tenant]/admin/page.tsx  S-2 knowledge base — same
   app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
+  app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
   app/t/[tenant]/not-found.tsx   "No such workspace"
-  app/api/t/[tenant]/**/route.ts the endpoints + admin/session; chat/ does JSON and SSE
-  components/                    chat-screen, admin-screen, bookings-screen, admin-login (Client), brand-header, sources-panel
+  app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
+  components/                    chat-screen, admin-screen, bookings-screen, admin-login, reset-password (Client), brand-header, sources-panel
   lib/route.ts           withRoute(): validation + the ONE error→status map
-  lib/tenant.ts          getTenant() + withTenantRoute(): slug → TenantContext, 404 on a miss
-  lib/admin-auth.ts      signed session cookie, requireAdmin()
+  lib/tenant.ts          getTenant() + withTenantRoute(): slug → a CHAT TenantContext, 404 on a miss
+  lib/admin-auth.ts      the staff session cookie; requireAdmin() re-checks the membership → a STAFF context
   lib/applications.ts    requireApplication(): 404 unless the tenant has it switched on
   lib/branding.ts        the five-key theme allowlist, https-only image URLs
   lib/env.ts             fail-fast config (D-023)
@@ -104,7 +114,9 @@ pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code filters alone (RLS bypassed)
-pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, no API key
+pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 12, code filters alone
+node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db member:add -- <slug> <email>        # invites a new account; the link sets a password
 pnpm --filter @rag/db member:remove -- <slug> <email>     # effective on their NEXT request
@@ -131,10 +143,19 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    afterwards (plan/bookings.md Phase 6). Tools also mean a second prompt
    check: `pnpm --silent --filter @rag/pipeline prompt-snapshot` must match
    `plan/baseline/northwind-prompt-pre-bookings.txt` (`diff --strip-trailing-cr`).
-2. **The service-role key never reaches the browser.** `@rag/db` imports
-   `server-only`, so a Client Component importing it is a build error. Before
-   shipping: `grep -ri "service_role" apps/web/.next/static/` must return
-   nothing.
+2. **No request holds a key that bypasses RLS, and no secret reaches the
+   browser** (plan/auth-rls.md Rule 2).
+   - Requests use `tenant.db`: the publishable key plus a tenant token.
+   - The RLS-bypassing client lives only at `@rag/db/service`, for `tools/`.
+     `pnpm typecheck` runs `scripts/check-service-imports.mjs` first, and it
+     fails on any import of it under `apps/` or `packages/*/src`.
+   - The web app neither needs nor reads `SUPABASE_SERVICE_ROLE_KEY`. It is
+     off env.ts's REQUIRED list, and `next build` passes without it.
+   - `@rag/db` imports `server-only`, so a Client Component importing it is a
+     build error.
+   - Before shipping, `grep -ri "service_role\|SUPABASE_SECRET\|TENANT_SIGNING_JWK\|guest_phone"
+     apps/web/.next/static/` must return nothing. Grep for the key VALUES too,
+     on a build that had them (Phase 7).
 3. **Every Route Handler is wrapped in `withTenantRoute()`**, which resolves the
    slug (404 on a miss, never a fallback) and wraps `withRoute()`. Nothing
    enforces it. An unwrapped handler answers with a generic 500 instead of the
@@ -143,17 +164,28 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    That is the cost of rule 2. Every script in `package.json` carries it already.
 5. **`@rag/chunker` has no dependencies and no I/O.** That is what lets the same
    code run in Node and the browser, and what keeps the file readable alone.
-6. **The only thing between two tenants is a `tenant_id` filter.** `service_role`
-   bypasses RLS (D-006, R-2, R-11), so isolation is application code. Every
-   query on `documents`, `chunks`, `conversations` or `messages` filters on
-   `tenant_id`, every insert sets it, every search `.rpc()` sends `p_tenant_id`.
+6. **Two walls stand between tenants, and each must hold ALONE** (D-038).
+   - **Wall 1, the code:** every query on `documents`, `chunks`,
+     `conversations` or `messages` filters on `tenant_id`, every insert sets
+     it, and every search `.rpc()` sends `p_tenant_id`.
+   - **Wall 2, Postgres:** RLS policies (`sql/schema-auth.sql`) compare every
+     row with the token's `tenant_id` claim.
+   - **Proving each wall alone:** `verify.mjs` checks 28–46 run unfiltered
+     queries under a token (RLS alone). `isolation -- --filters-only` runs
+     every query on the service client, with RLS bypassed (filters alone).
+   - **Neither wall may be dropped because the other exists.** A filter
+     removed "because RLS covers it" is a wall nobody tests any more.
    `tenant` is a **required** parameter with **no default** — no ambient
    "current tenant", no fallback slug (D-027); a forgotten one should be a
-   compile error, not a silent read. The composite FKs stop cross-tenant
-   *writes*; nothing but your filter stops a cross-tenant *read*. After any
-   change to a query, run `pnpm --filter @rag/pipeline isolation` and
-   `pnpm eval` — the `leak-*` cases must stay green — and re-run plan.md
-   Phase 3's grep: every line it prints must carry a tenant. The same applies
+   compile error, not a silent read, and since auth-rls it also means no
+   database at all: `tenant.db` is the only client a request has.
+   - After any change to a query, run:
+     - `pnpm --filter @rag/pipeline isolation`, both ways;
+     - `pnpm --filter @rag/db verify`;
+     - `pnpm eval`, where the `leak-*` cases must stay green.
+   - Then re-run plan.md Phase 3's grep: every line it prints must carry a
+     tenant.
+   - A new table needs its own policy, or tokens read nothing from it (R-22). The same applies
    to `tenant_applications`, `units`, `slots` and `bookings`
    (`pnpm --filter @rag/bookings isolation`, 12 checks). **The model never
    supplies a tenant.** No tool's argument schema has a tenant, unit or
@@ -166,6 +198,19 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    route is open, so a write tool is an unauthenticated write (D-037). A
    tool's result is shown to the user as "Checked availability", open,
    because it is what the answer was built from.
+8. **The token signer is a master key too** (D-039, R-19). `TENANT_SIGNING_JWK`
+   can mint any claim, so it is read in ONE function, `mintTenantToken()`,
+   which mints one shape:
+   - the role is always `authenticated`. There is no role parameter, so it
+     cannot mint `service_role`;
+   - it carries a tenant;
+   - it lasts five minutes.
+
+   Chat tokens carry **no `sub`**. Staff tokens carry the user and
+   `app_admin`, and Postgres's `app_is_admin()` still demands a
+   `memberships` row for that tenant on every write. Only two functions
+   are `security definer` (`tenant_public`, `check_availability`, D-042),
+   and each checks the tenant itself.
 
 ## Traps that will actually cost you time
 
@@ -204,6 +249,24 @@ All are expanded in `risks.md`.
     sentence that names the date" passed every tool case and made a Wi-Fi
     question refuse 2 runs in 3. Run the full battery, not `--only`, and when a
     verdict flips, repeat that case before deciding why (R-18).
+11. **Measure RLS as a token, never as `service_role`.** `service_role`
+    bypasses RLS, so an `explain` run as it measures nothing
+    (`plan/auth-phase2-explain.sql`). The policies call the helpers as
+    `(select public.app_tenant_id())`, which makes an InitPlan evaluated once.
+    Bare, it would be a function call per row.
+12. **A check that passes on zero rows proves nothing.** Before schema-auth
+    ran, a token read 0 chunks, and "every row is villa's" was vacuously true.
+    A chat token also gets `200 []` from the bookings list. Every RLS check
+    needs its positive twin: the count matches, or a real row comes back.
+13. **`. ./.env` in bash breaks the signing key.** Bash strips the JSON's
+    quotes, and `node --env-file` never overrides a variable that is already
+    set. For `next dev`, "unset a key" means setting it EMPTY
+    (`SUPABASE_SERVICE_ROLE_KEY=`), because next.config's dotenv refills a
+    missing one.
+14. **Supabase's email is capped** (R-21). The built-in sender allows a few
+    emails an hour, and an invite plus two resets used it up. Custom SMTP
+    comes before real staff. The dashboard also holds ONE standby signing
+    key at a time, so rotating ours has a gap (R-19).
 
 ## Conventions
 
@@ -213,6 +276,10 @@ All are expanded in `risks.md`.
   that enforces them.
 - Validate at the route boundary, throw in the pipeline, map errors to status
   codes in exactly one place (`apps/web/lib/route.ts`).
+- Staff are managed with `member:add|remove|list` (removal takes effect on
+  their next request). Tools that do staff work run as the tenant's
+  **operator** member (`member:operator`), on a staff token, not as
+  `service_role` (plan/auth-rls.md § 2.7).
 - Every Route Handler lives under `app/api/t/[tenant]/` and is wrapped in
   `withTenantRoute()` (which wraps `withRoute()`), which hands it a CHAT
   context. Admin-only handlers start with `tenant = await requireAdmin(request,
@@ -223,11 +290,11 @@ All are expanded in `risks.md`.
 - Every tenant-owned query carries `.eq('tenant_id', tenant.id)` — rule 6.
   "Not yours" and "not there" must look identical (`[]`, `null`, 404), or ids
   can be enumerated across tenants.
-- Select `tenants` columns **explicitly**, never `select('*')`: that is how
-  `admin_key_hash` ends up in a `TenantContext`, a prop, or a response.
-  `TenantContext` has no hash field on purpose.
-- Errors surface the real message. No swallowing, no generic "something went
-  wrong", no retry loops (`architecture.md` § 9).
+- Tokens read `tenants` only through `tenant_public(slug)`: the table has no
+  policies, and that function's column list is the boundary. Tools on the
+  service client still select `tenants` columns **explicitly**, never
+  `select('*')`. A `TenantContext` carries `db`, a live token, so it never
+  goes to a Client Component: pages pass named props.
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
   markdown rendering is what would take it away. Tenant branding follows the

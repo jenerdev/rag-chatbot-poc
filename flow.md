@@ -137,6 +137,8 @@ sequenceDiagram
     A->>E: POST /api/t/:slug/chat<br/>Accept: text/event-stream
     E->>P: resolve tenant — withTenantRoute → getTenant(slug)
     Note over E: unknown slug → 404. There is no default tenant.
+    E->>E: mint a CHAT token for that tenant (5 min, no sub): tenant.db
+    Note over E,P: every query below reaches Postgres as that token, under RLS (auth-rls)
     E->>E: validate, then choose stream vs JSON
     E->>R: answerQuestionStream({ tenant, … })
 
@@ -281,14 +283,20 @@ return 404, with no redirect.
 | `GET` | `/t/<slug>/admin` | knowledge base page | `app/t/[tenant]/admin/page.tsx` → `AdminScreen` | public page, admin data |
 | `POST` | `/api/t/<slug>/chat` | ask — SSE or JSON | `answerQuestionStream` / `answerQuestion` | open |
 | `GET` | `/api/t/<slug>/conversations/:id/messages` | reload a transcript (404 if not this tenant's) | `getMessages` | open |
-| `POST` / `GET` / `DELETE` | `/api/t/<slug>/admin/session` | log in / status / log out | `lib/admin-auth.ts` | open |
+| `GET` | `/t/<slug>/admin/reset` | set a password from an invite or reset link | `app/t/[tenant]/admin/reset/page.tsx` → `ResetPassword` | public |
+| `POST` / `GET` / `DELETE` | `/api/t/<slug>/admin/session` | log in (email + password) / status / log out | `lib/admin-auth.ts` | open |
+| `POST` | `/api/t/<slug>/admin/password-reset`, `…/admin/password` | email a reset link / set the new password | `@rag/db` `staff-auth.ts` | open |
 | `POST` | `/api/t/<slug>/documents` | chunk → embed → store | `ingestDocument` | admin |
 | `GET` | `/api/t/<slug>/documents` | list with chunk counts | `listDocuments` | admin |
 | `GET` | `/api/t/<slug>/documents/:id/chunks` | expand a row to show its chunks | `getChunks` | admin |
 | `DELETE` | `/api/t/<slug>/documents/:id` | delete; chunks cascade | `deleteDocument` | admin |
 
-"Admin" means `requireAdmin()`: the request must carry this tenant's signed
-session cookie, or it gets a 401.
+"Admin" means `tenant = await requireAdmin(request, tenant)`.
+- The request must carry this tenant's signed session cookie, and its user
+  must still be a member.
+- The handler then runs on a **staff** token, so Postgres checks the
+  membership again on every write (`app_is_admin()`).
+- Otherwise the request gets a 401.
 
 ---
 

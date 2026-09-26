@@ -4574,3 +4574,74 @@ value checks were repeated on a build with the full `.env`.
 **Housekeeping:** booking #185 is a real, cancelled row in villa's history,
 from the walk. That is what the admin screen's cancel does, by design (it is
 a status change, not a delete).
+
+---
+
+## Auth + RLS Phase 8 — the record · done 2026-09-26 · **auth-rls complete**
+
+**What was done:**
+- **CLAUDE.md:**
+  - Rule 2 is "no request holds a key that bypasses RLS, and no secret
+    reaches the browser", with the import check and the bundle grep (for
+    values too).
+  - Rule 6 is the two walls, each tested alone, and how to prove each.
+  - A new rule 8: the signer is a master key, it mints one shape, and exactly
+    two functions are security definer.
+  - Traps 11–14:
+    - measure RLS as a token;
+    - a check that passes on zero rows;
+    - `. ./.env` breaks the JWK, and unsetting a key for `next dev` means
+      setting it empty;
+    - the email cap and the one-standby-key limit.
+  - The header, layout, commands and conventions (operator members,
+    `tenant_public`, `db` never to a Client Component).
+- **decisions.md:**
+  - D-038 (two walls), D-040 (Supabase Auth + our cookie + a per-request
+    membership check), D-041 (one role) and D-042 (the two definer
+    functions), each with what was measured;
+  - D-006 marked superseded by D-038/D-039;
+  - D-028 marked "key superseded, cookie kept".
+- **risks.md:**
+  - R-2 is closed for requests; R-11 gains its second wall; R-13 has the key
+    gone and Supabase's 30-per-window limit;
+  - R-19, the signing key, with the rotation procedure as Phase 3 measured it;
+  - R-20, transcripts are readable within a tenant by uuid;
+  - R-22, a policy that is too tight looks like a wrong answer.
+- **architecture.md:**
+  - an "Auth: tenant tokens, policies, memberships" subsection, with the
+    per-table policy table;
+  - the staff routes in the API table;
+  - a rewritten "Admin" paragraph, env section and system overview;
+  - updated module rows.
+- **flow.md:** the chat-token step in the query sequence diagram, the reset
+  and password routes, and a new meaning for "Admin".
+- **README.md:**
+  - five schema files and ten tables;
+  - the new env vars;
+  - "Create tenants and their staff" (`member:*`, the operator, the redirect
+    URL, SMTP);
+  - "The signing key" (generate without printing, import as standby, never
+    rotate to active, and rotation);
+  - a rewritten security section.
+- **plan/auth-rls.md:** a status line naming what is owed.
+
+**Why it mattered:** this plan changed what isolation MEANS. It used to be
+"every query remembered its filter", and it is now "Postgres refuses, and the
+filter is still there". The docs that told readers the service key was the
+server's only key, or that a tenant is administered with a shared key, would
+now be wrong in the way that costs most: a new session trusting them.
+
+**Checked, not assumed:**
+- A grep over README, architecture, flow and CLAUDE.md for `admin key`,
+  `tenant:key` and `admin_key_hash` finds only the historical mentions that
+  say they were removed.
+- A grep for `service_role` claims in the docs finds none that still says the
+  web app holds it.
+
+**What the plan does not fix** (R-13, R-19, R-20, R-21, and plan § 6): no
+rate limit on our own endpoints, the signing key as a master key, transcripts
+readable by uuid within a tenant, email deliverability, and no guest accounts,
+roles, MFA, SSO or audit log.
+
+**Owed** (R-21's email cap): the northwind invite, walk step 6 in the
+browser, and the "Forgot password?" email.

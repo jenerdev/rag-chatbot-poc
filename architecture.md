@@ -59,8 +59,9 @@ computes exactly that distance inside the database.
 │                                                          │
 │   • Server Component pages resolve the tenant (404 miss) │
 │   • Route Handlers: withTenantRoute → withRoute          │
-│   • owns ALL secrets (OpenAI key, service_role key,      │
+│   • owns ALL secrets (OpenAI key, the token signing key, │
 │     ADMIN_COOKIE_SECRET); @rag/db is server-only         │
+│   • mints a 5-min tenant token per request (RLS)         │
 │   • @rag/pipeline runs ingest and query, per tenant      │
 └──────────┬──────────────────────────────┬───────────────┘
            │                              │
@@ -77,10 +78,11 @@ computes exactly that distance inside the database.
 ```
 
 **The browser never talks to OpenAI or Supabase directly.** Everything goes
-through the Next.js server. That is not ceremony: it is the only thing keeping
-the API key and the `service_role` key out of the page source (see `risks.md`
-§ R-1, R-2). `@rag/db` imports `server-only`, so a Client Component that tried
-to import it would fail the build.
+through the Next.js server. That is not ceremony: it is what keeps the API key
+and the token signing key out of the page source (see `risks.md` § R-1, R-19).
+`@rag/db` imports `server-only`, so a Client Component that tried to import it
+would fail the build. The server itself reaches Postgres as a tenant token,
+under RLS, not as `service_role` (D-039). That key is for tools only.
 
 **Every request names its tenant in the URL**, and nothing picks one for it.
 The slug is resolved once, on the server, into a `TenantContext` that every
@@ -243,7 +245,7 @@ create table if not exists tenants (
   logo_url        text,                          -- https only, validated on write
   banner_url      text,
   theme           jsonb       not null default '{}'::jsonb,
-  admin_key_hash  text,                          -- scrypt; null = nobody can admin it
+  -- admin_key_hash was here until auth-rls Phase 6 (dropped by schema-auth.sql § 7)
   created_at      timestamptz not null default now(),
   constraint tenants_slug_shape check (slug ~ '^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$'),
   constraint tenants_slug_reserved check (
@@ -372,6 +374,45 @@ guest data**: whatever it returns reaches a prompt (D-037). Like
 `match_chunks`, `p_tenant_id` has no default. The details and the measured
 ranges are in D-034.
 
+### Auth: tenant tokens, policies, memberships (auth-rls, `schema-auth.sql`)
+
+Postgres enforces the tenant. The code's `tenant_id` filters stay as the
+first wall (D-038).
+
+- **Every request is a token.** `loadTenant(slug)` calls `tenant_public(slug)`
+  with no token (the anon role), then mints a **chat token**,
+  `{role: authenticated, tenant_id, exp: +5 min}`, with no `sub`. The request's
+  `tenant.db` is the publishable key plus that token.
+- **Staff tokens.** `requireAdmin()` re-checks the membership and swaps in a
+  staff token, which adds the user's uuid as `sub` and `app_admin: true`.
+- **The signer.** Tokens are signed ES256 by `mintTenantToken()` with our own
+  key, which the project trusts as a standby JWT signing key (D-039).
+- **`memberships (user_id → auth.users, tenant_id)`.** A row IS admin
+  (D-041). It is written only by `member:add|remove`.
+- **`app_tenant_id()`** reads the claim. **`app_is_admin()`** requires the
+  claim AND a membership row for this user and this tenant. Both are invoker
+  functions.
+
+| Table | A token may read | A token may write |
+|---|---|---|
+| `tenants` | nothing (only through `tenant_public`) | nothing |
+| `documents` | its tenant's rows | insert/delete: its tenant, if admin |
+| `chunks` | its tenant's rows | insert: its tenant, if admin |
+| `conversations`, `messages` | its tenant's rows | insert: its tenant (the open chat) |
+| `tenant_applications`, `units`, `slots` | its tenant's rows | nothing |
+| `bookings` | its tenant's rows, **if admin**. A chat token reads none | insert/update: its tenant, if admin |
+| `memberships` | its own user's rows | nothing |
+
+Every policy calls `(select public.app_tenant_id())`, which is evaluated once,
+as an InitPlan (measured in auth-rls Phase 2: same access paths and same
+ids as service_role). **Exactly two functions are `security definer`**
+(D-042):
+- `tenant_public`, whose column list is the boundary;
+- `check_availability`, which refuses any tenant but the token's.
+
+`match_chunks` and `match_chunks_fts` stay invoker, so RLS applies inside
+them.
+
 ---
 
 ## 5. API surface
@@ -389,9 +430,12 @@ named "<slug>"`.
 | `GET` | `/t/<slug>/admin` | — | S-2 knowledge base; a login form until a session exists | public page, admin data |
 | `POST` | `/api/t/<slug>/chat` | `{ conversationId?, message }` | `{ conversationId, reply, sources[], searchQuery, toolCalls[] }`, or SSE (`meta`, `tool`, `delta`, `done`, `error`) with `Accept: text/event-stream` | **open** |
 | `GET` | `/api/t/<slug>/conversations/:id/messages` | — | `[{ role, content, created_at }]`, or 404 if not this tenant's | **open** |
-| `POST` | `/api/t/<slug>/admin/session` | `{ key }` | `{ admin: true }` and the session cookie | open (it is the login) |
-| `GET` | `/api/t/<slug>/admin/session` | — | `{ admin: boolean }` | open |
+| `GET` | `/t/<slug>/admin/reset` | `#access_token=…&type=recovery\|invite` | set a password, from an invite or reset email | public |
+| `POST` | `/api/t/<slug>/admin/session` | `{ email, password }` | `{ admin: true }` and the session cookie; `401` with ONE message for a wrong password, an unknown email or a non-member | open (it is the login) |
+| `GET` | `/api/t/<slug>/admin/session` | — | `{ admin: boolean }`, with the membership re-checked | open |
 | `DELETE` | `/api/t/<slug>/admin/session` | — | `{ admin: false }`; the cookie is cleared | open |
+| `POST` | `/api/t/<slug>/admin/password-reset` | `{ email }` | the same message whether or not the email has an account; `429` when Supabase's email cap is used up | open |
+| `POST` | `/api/t/<slug>/admin/password` | `{ accessToken, password }` | sets the password (`PUT /auth/v1/user`); `401` for an expired link | open (the token is the proof) |
 | `POST` | `/api/t/<slug>/documents` | `{ title, source?, content }` | `{ id, title, chunkCount }` | **admin** |
 | `GET` | `/api/t/<slug>/documents` | — | `[{ id, title, source, chunkCount, created_at }]` | **admin** |
 | `DELETE` | `/api/t/<slug>/documents/:id` | — | `{ deleted: true }` (chunks cascade) | **admin** |
@@ -403,11 +447,17 @@ named "<slug>"`.
 | `POST` | `/api/t/<slug>/bookings` | `{ unitId, slotId, date, guestName, guestPhone?, guestCount?, notes? }` | the booking, `201`. `409` if the span is taken | **admin** + app |
 | `DELETE` | `/api/t/<slug>/bookings/:id` | — | `{ cancelled: true }`; the row stays, as `cancelled` | **admin** + app |
 
-**Admin** means `requireAdmin()` in `apps/web/lib/admin-auth.ts`: the request
-must carry this tenant's session cookie. That is an HMAC-signed
-`<slug>.<expiry>.<mac>`, httpOnly, SameSite=lax, with its path set to
-`/api/t/<slug>`. Without one, the route answers `401 Admin login required`
-(D-028). The chat stays open, because it is the product.
+**Admin** means `tenant = await requireAdmin(request, tenant)` in
+`apps/web/lib/admin-auth.ts`.
+- The request must carry this tenant's session cookie: an HMAC-signed
+  `<slug>.<userId>.<expiry>.<mac>`, httpOnly, SameSite=lax, with its path set
+  to `/api/t/<slug>`.
+- The user must still be a member. The membership is checked on every
+  request, so a removal takes effect on the next one.
+- The handler then runs on a staff token.
+- Without a session, the route answers `401 Admin login required`. A removed
+  member gets `401 …no longer a member` (D-040).
+- The chat stays open, because it is the product.
 
 **+ app** means `requireApplication(tenant, 'bookings')` as well, which is a
 `404` for a tenant without it. It runs after the admin check, so a stranger gets
@@ -515,16 +565,17 @@ to build.
 | Package / file | Responsibility | Must NOT contain |
 |---|---|---|
 | `@rag/openai` | Three `fetch` calls. Reads `OPENAI_API_KEY`. Throws `OpenAIError` carrying the upstream status. | Any knowledge of chunks, documents or prompts |
-| `@rag/db` | One client, the hand-written types, `sql/`, the `server-only` guard, and `admin-key.ts` (scrypt hash and verify for `tenants.admin_key_hash`) | Query logic |
-| `@rag/db` `tools/tenant.mjs` | `tenant:add` / `tenant:key`: print a new admin key once, store only its hash | Any way to read a key back |
+| `@rag/db` | `mintTenantToken` / `scopedClient` / `anonClient` (`tenant-client.ts`), `staff-auth.ts` (Supabase Auth sign-in, the membership check, reset), the hand-written types, `sql/`, the `server-only` guard | Query logic; a client that bypasses RLS |
+| `@rag/db/service` | The `service_role` client and the tools' operator helpers. **tools/ only**: `pnpm typecheck` fails on an import under apps/ or packages/*/src | Anything a request runs |
+| `@rag/db` `tools/tenant.mjs`, `tools/member.mjs` | `tenant:add`; `member:add\|remove\|list\|operator` | Any password or token in the output |
 | `@rag/chunker` | Pure text → array of strings. No async, **no dependencies**. | Any I/O or API call |
 | `@rag/pipeline` | The two pipelines from § 3, orchestrating the packages above. Every function that touches the database takes a required `TenantContext` first (D-027). | HTTP handling, `req`/`res`; any default tenant |
-| `@rag/pipeline` `src/tenant.ts` | `loadTenant(slug)`: the one place a `tenants` row becomes a `TenantContext`, selecting four named columns | `admin_key_hash` |
+| `@rag/pipeline` `src/tenant.ts` | `loadTenant(slug)`: `tenant_public(slug)`, then a chat token. The one place a slug becomes a `TenantContext` | Any column `tenant_public` does not return |
 | `@rag/pipeline` `tools/isolation.mjs` | 11 cross-tenant checks run through the pipeline (`pnpm --filter @rag/pipeline isolation`) | — |
 | `apps/web/app/api/t/[tenant]` | Route Handlers: validation, and the response shape | Business logic |
 | `apps/web/lib/route.ts` | `withRoute()`, the ONE error → status map | Anything route-specific |
 | `apps/web/lib/tenant.ts` | `getTenant()` (cached) and `withTenantRoute()`: slug → `TenantContext`, 404 on a miss | A fallback tenant |
-| `apps/web/lib/admin-auth.ts` | The session cookie (sign, read), `requireAdmin()`, `checkAdminKey()` | Plaintext keys, logging of keys |
+| `apps/web/lib/admin-auth.ts` | The session cookie (sign, read), `requireAdmin()` (membership → staff context), `checkStaffLogin()` | Passwords in any log; `@rag/db/service` |
 | `apps/web/lib/branding.ts` | `loadBranding()` and `themeVars()`: a five-key colour allowlist, https-only image URLs | `dangerouslySetInnerHTML`, free-form CSS |
 | `apps/web/components/*-screen.tsx` | The two Client Components. They get the tenant as props from a Server Component page, never from `window.location` | `@rag/db`, secrets |
 
@@ -532,7 +583,8 @@ The point of the split is unchanged, and is now enforced rather than agreed:
 `@rag/chunker` declares no dependencies, so it can be read with no network in
 sight; `@rag/pipeline` reads top-to-bottom as the pipeline diagram; and
 `@rag/db` is the only package that may import `server-only`, which is what
-keeps the service-role key out of the browser bundle.
+keeps the signing key out of the browser bundle. `scripts/check-service-imports.mjs`,
+run by `pnpm typecheck`, keeps the RLS-bypassing client out of every request.
 
 ---
 
@@ -545,26 +597,33 @@ OPENAI_CHAT_MODEL=gpt-4o-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 SUPABASE_URL=https://xxxxxxxx.supabase.co
+# Every request: this key plus a tenant token. On its own it is the anon role,
+# which reads no table.
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+# Our own EC P-256 private key as one line of JWK JSON with a kid, imported
+# as a STANDBY JWT signing key (D-039). Server-only: it can mint any claim (R-19).
+TENANT_SIGNING_JWK={"kty":"EC","crv":"P-256","kid":"…","d":"…",...}
+# Tools only (fixtures, probes, member:*). The web app never reads it.
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# Signs the per-tenant admin session cookie. ≥ 32 random characters.
-# Rotating it logs every admin out. It is NOT an admin key.
+# Signs the staff session cookie. ≥ 32 random characters.
+# Rotating it logs every member out.
 ADMIN_COOKIE_SECRET=...
 
 PORT=3000
 ```
 
-Admin keys are not environment variables. There is one per tenant, issued by
-`pnpm --filter @rag/db tenant:key -- <slug>` and stored only as a hash.
-
 Where to find the Supabase values: Supabase dashboard → your project →
-**Project Settings → API**. Use the **`service_role`** key, not the `anon` key —
-the server needs to write and RLS is not configured in the POC (D-006).
+**Project Settings → API** (the URL, and the publishable and `service_role`
+keys), and **Project Settings → JWT Keys**, where the signing key is imported
+as a standby key. Staff accounts are not environment variables. They are
+Supabase Auth users with a `memberships` row, managed with `member:*`.
 
-**Fail fast:** `apps/web/lib/env.ts` checks every required variable (including
-`ADMIN_COOKIE_SECRET`). It logs one line naming the missing ones at import, and
-throws that same message on every request (D-023). A missing key should be a
-one-line error, not a confusing 401 twenty minutes later.
+**Fail fast:** `apps/web/lib/env.ts` checks every variable the web app needs.
+That includes `SUPABASE_PUBLISHABLE_KEY`, `TENANT_SIGNING_JWK` and
+`ADMIN_COOKIE_SECRET`, and deliberately **not** the service key. It logs one
+line naming the missing ones at import, and throws that same message on every
+request (D-023).
 
 ---
 

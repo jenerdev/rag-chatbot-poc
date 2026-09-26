@@ -1,5 +1,11 @@
 # Auth + RLS plan — make the database enforce the tenant
 
+> **Status: Phases 0–8 done, 2026-09-26** (commits `6a48801` … Phase 8).
+> Three email-dependent checks are owed to Supabase's built-in sender cap
+> (R-21): the northwind invite, walk step 6 in the browser (proven over HTTP
+> by `staff-cases.mjs`), and the "Forgot password?" email. The record is in
+> `whats-done.md` § "Auth + RLS Phase 0" onwards.
+
 > Replace "every query uses a master key and remembers a filter" with "every
 > request reaches Postgres as a narrow identity that can only see one tenant",
 > and replace the shared per-tenant admin key with real staff accounts.

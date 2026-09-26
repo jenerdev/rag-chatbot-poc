@@ -62,6 +62,16 @@ read the one knowledge base". Now it also means "one tenant's reads are held
 apart from another's only by application code". See R-11 and the D-006
 amendment.
 
+**Amended 2026-09-26, auth-rls: the hole this describes is closed for
+requests.**
+- The web app no longer holds `service_role` at all: it is off the REQUIRED
+  list, `next build` passes without it, and `pnpm typecheck` fails on any
+  import of `@rag/db/service` under apps/ or packages/*/src.
+- Requests use the publishable key plus a tenant token, under RLS policies
+  on all ten tables (D-038, D-039).
+- `service_role` remains in `.env` for tools. A leak of it is still a full
+  compromise, and so is a leak of the signing key (R-19).
+
 ---
 
 ## R-3 · Silent retrieval failure — the answer looks right and isn't · **Most likely to actually happen**
@@ -255,6 +265,15 @@ because it returns rows.
 The real fix is RLS policies that carry the tenant (R-2). Until then, those
 suites are the only things that will catch a regression.
 
+**Amended 2026-09-26, auth-rls: reads now have a second wall (D-038).**
+- A missed filter under a token now returns only the token's tenant's rows.
+  Measured: villa's chat token with NO filter reads 30/30 of villa's chunks
+  and 0 foreign rows, and `match_chunks` naming another tenant returns 0.
+- The filters stay, and `isolation -- --filters-only` proves they still hold
+  alone (11/11, bookings 12/12).
+- What is left of this risk: a query run on `@rag/db/service` (tools only),
+  and a table added without a policy (R-22).
+
 ---
 
 ## R-12 · A persona erodes refusals over time · **Re-opened by every prompt edit**
@@ -294,6 +313,15 @@ shows a limit of **30**, one limit shared by sign-ups and sign-ins. That covers
 password guessing at sign-in. It does not cover what happens after sign-in,
 and there is still no audit log.
 
+
+**Amended 2026-09-26, auth-rls Phases 5–6: the admin key is gone.**
+- Staff log in with Supabase Auth, which throttles sign-ups and sign-ins
+  together at **30** per window (dashboard, Phase 0).
+- Our login gives one message for a wrong password, an unknown email and a
+  non-member, so failures reveal nothing.
+- Still missing: a rate limit on our own endpoints (the open chat, the reset
+  request, which Supabase's email cap throttles hard, R-21) and an audit
+  log.
 ---
 
 ## R-14 · The model states availability without calling the tool · **Re-opened by every tools-block edit**
@@ -372,6 +400,52 @@ say which.
 
 ---
 
+## R-19 · The token signing key is a master key · **A leak is a full compromise**
+
+**The risk:** `TENANT_SIGNING_JWK` is the private half of a key Supabase
+trusts (D-039). Whoever holds it can mint any token, `role: service_role`
+included, and PostgREST will accept it. That is the same blast radius as the
+service key.
+
+**What limits it:**
+- It is read in ONE function, `mintTenantToken()`, which has no role
+  parameter and mints only `authenticated`, a tenant, and five minutes.
+- It is server-only: `server-only` guards `@rag/db`, and the Phase 7 bundle
+  grep found neither its name, its kid nor its private `d` in 36 static
+  files.
+- It is never printed. The Phase 3 key went from a file to the dashboard
+  through the clipboard.
+
+**Rotating it (the procedure):**
+1. Generate a new P-256 JWK with a kid into `scratch/`, printing only the kid.
+2. The dashboard holds ONE standby key at a time, so remove the old standby
+   first. From here until step 4, no tenant token verifies: schedule it.
+3. Import the new private JWK as a **standby** key. Never rotate it to
+   active, or Supabase Auth would start signing with it.
+4. Put the one-line JWK in `.env` as `TENANT_SIGNING_JWK`, restart, and run
+   `pnpm --filter @rag/db verify`.
+5. Revoke the old key, then check that a token it signs gets `401 PGRST301`.
+
+That is what Phase 3 did, measured.
+
+---
+
+## R-20 · A transcript is readable by anyone holding its conversation uuid, within the tenant · **Unchanged by RLS**
+
+**The risk:** `GET /api/t/<slug>/conversations/:id/messages` is open, like
+chat. Anyone with a conversation's uuid can read it back. RLS isolates
+tenants, not visitors, so villa's chat token can read every villa
+transcript.
+
+**Why it is tolerable today:** the uuid is random (122 bits) and appears
+only in the visitor's own browser. The route does not list conversations.
+
+**What would fix it:** a per-visitor claim on the chat token, which needs a
+guest identity. That is out of scope (plan/auth-rls.md § 6), and it is the
+same prerequisite as `request_booking`.
+
+---
+
 ## R-21 · Supabase's built-in email sender caps staff email · **Blocks real staff; configuration fixes it**
 
 **The risk:** invites and password resets go by email. Supabase's built-in
@@ -393,6 +467,24 @@ with `Email address … is invalid`.
 
 **What fixes it:** custom SMTP (plan/auth-rls.md § 2.6), before any real staff
 are invited.
+
+---
+
+## R-22 · A policy that is too tight looks like a wrong answer, not an error · **Caught by the battery**
+
+**The risk:** RLS denies by returning nothing. A chat token that cannot read
+`documents` makes the sources panel say "(deleted document)". One that cannot
+read `slots` gives a tool with no slot names, and one that cannot read
+`chunks` gives a polite refusal. None of these errors, and all of them look
+like the model or the data.
+
+**What catches it:**
+- **The eval, verdict by verdict** (auth-rls Rule 3): 18/19, identical to
+  the pre-auth baseline, on chat tokens.
+- **verify's count matches:** every table's row count under a token equals
+  the service-role count for that tenant.
+- **A new table needs its policy in `schema-auth.sql`** in the same change,
+  or every token reads 0 rows from it.
 
 ---
 
