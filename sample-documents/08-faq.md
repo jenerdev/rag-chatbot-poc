@@ -71,3 +71,10 @@ covers residential use only. Small wedding after-parties are fine.
 **Do you sell charcoal and ice?**
 No. The sari-sari store at the corner of Sampaguita Lane sells charcoal at around
 ₱80 a bag and ice in blocks.
+
+
+**What time is check-in?**
+Check-in times depend on your booking type:
+Overnight Stay: 2:00 PM
+Day Tour: 8:00 AM
+22-Hour Whole Day: 8:00 AM
