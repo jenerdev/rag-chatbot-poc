@@ -1,13 +1,11 @@
--. convert to a nextjs app, check if can integrate in facebook messenger.
--. convert this to a tenant base design
+-. check if can integrate in facebook messenger.
 -. add tool calls for dynamic data
-
--.tenant base
-    - business name
-    - ai assistant name
-    - theme
-    - logo/image banner
+-. chatbot can ask question. like 
+    - user: i want to check room availability
+    - ai: what date are you checking
+    - user: date 1 - 2
+    - ai: will call api using tool calling
 
 - google analytics
 - record all questions that are not answered
-- fix greetings, should understand tagalog
+- set up custom SMTP in Supabase before inviting real staff (R-21): pick a provider (Resend, Postmark, SendGrid, SES…), verify a sending domain (SPF/DKIM), enter host/port/user/password + sender in Supabase Auth SMTP settings, raise the email rate limit. Supabase doesn't charge; the provider may (most have a free tier).
