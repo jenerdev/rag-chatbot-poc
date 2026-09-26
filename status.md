@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls complete, Phases 0–8; three email checks owed)
+> Last updated: 2026-09-26 (auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -30,9 +30,11 @@
   theme and admin key. Measured on the final code: eval 9/10 (the known
   `antecedent` model limit), isolation 11/11, verify 14/14, and tests 41 + 13.
   Both tenants were also walked by hand in the browser.
-- **Working on right now:** the **auth + RLS plan**,
-  [`plan/auth-rls.md`](./plan/auth-rls.md) (Phases 0–8, written 2026-09-24, on
-  `feat/auth-rls`). **Phase 0 done 2026-09-26:** option A works (D-039), and
+- **Working on right now:** nothing new. The **auth + RLS plan**,
+  [`plan/auth-rls.md`](./plan/auth-rls.md) (Phases 0–8, written 2026-09-24), is
+  complete and was **merged into `master` by fast-forward on 2026-09-26**:
+  `master` is at `f3ea70b`, 11 commits from `feat/auth-rls`, and there is no
+  merge commit. `feat/auth-rls` still exists. **Phase 0 done 2026-09-26:** option A works (D-039), and
   the baseline is in `plan/baseline/*-pre-auth.txt`. **Phase 1 done
   2026-09-26:** `schema-auth.sql` applied, verify 47/47, and the app is
   unchanged (eval 18/19 verdict for verdict). **Phase 2 done:** RLS costs
@@ -296,14 +298,14 @@ email items owed.
   rewritten security section.
 - **plan/auth-rls.md** carries a status line.
 
-**▶ Next up: the three email checks, then merge `feat/auth-rls`.**
+**▶ Next up: the three email checks.**
+- `feat/auth-rls` was merged into `master` BEFORE these checks, by the user's
+  choice. So they are owed on `master`.
 - When Supabase's email cap has reset (R-21), do these three in one sitting:
   1. `pnpm --filter @rag/db member:add -- northwind northwind-staff-test@yopmail.com`;
   2. walk step 6: log in as that member at `/t/villa/admin`. It must refuse;
   3. log out and click "Forgot password?" for `villa-staff-test`. Follow the
      email and log in with the new password.
-- Then merge `feat/auth-rls` into `master`, as the earlier plans were (by
-  fast-forward).
 - Before any real staff: custom SMTP (R-21). Before a public URL: a rate
   limit on our own endpoints (R-13).
 
@@ -839,6 +841,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (merge)
+- **Did:** fast-forwarded `master` to `feat/auth-rls` (`git merge --ff-only`).
+  `master` was an ancestor, so 11 commits came across (the plan, then Phases
+  0–8), with no merge commit. `master` is at `f3ea70b`. Nothing is pushed.
+- **Owed on `master`:** the three email checks (R-21).
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 8, the record)
 - **Did:**
