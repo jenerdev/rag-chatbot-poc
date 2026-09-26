@@ -15,8 +15,14 @@
 // and delete it again. Deleting a tenant cascades, so nothing is left behind
 // even when a check fails.
 //
+// Checks 28–46 are auth-rls Phase 1: the RLS policies, seen through tenant
+// tokens. They need TENANT_SIGNING_JWK in .env, and create and delete their
+// own probe user in Supabase Auth.
+//
 // Run:  pnpm --filter @rag/db verify
 
+import { createPrivateKey, randomBytes, sign } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 import { supabase, parseStoredVector, VECTOR_DIMENSIONS } from '../dist/index.js';
 
 let failures = 0;
@@ -357,6 +363,265 @@ async function bookingChecks(probeId) {
   }
 }
 
+// 28–46 are auth-rls Phase 1 (plan/auth-rls.md § 1.3, § 3 Phase 1). Every
+// other check in this file runs as service_role, which bypasses RLS, so none
+// of them can see a policy. These mint tenant tokens and query through
+// PostgREST with the publishable key, exactly as the app will from Phase 3.
+//
+// Rule 1 says each wall must stop a leak ALONE. So the RLS checks run
+// queries with NO tenant_id filter, or with a filter naming the WRONG tenant,
+// and pass only if the policy still confines the result.
+//
+// The signer is Phase 0's (D-039): ES256 over our own key, which Supabase
+// trusts as a standby signing key. Phase 3 moves it into @rag/db as
+// mintTenantToken(). Until then it is repeated here, in a dozen lines.
+
+function mintToken(claims) {
+  const jwkText = process.env.TENANT_SIGNING_JWK;
+  if (!jwkText) throw new Error('TENANT_SIGNING_JWK is not set (the private JWK imported in auth-rls Phase 0)');
+  const jwk = JSON.parse(jwkText);
+  // The same refusal Phase 3's signer will have (§ 2.2): whoever holds this
+  // key can mint anything, so the one function that uses it mints one shape.
+  if (claims.role !== undefined) throw new Error('mintToken sets role itself');
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const input = `${b64({ alg: 'ES256', typ: 'JWT', kid: jwk.kid })}.${b64({ ...claims, role: 'authenticated', iat: now, exp: now + 300 })}`;
+  // JWTs carry ES256 signatures as raw r||s (IEEE P1363), not node's DER.
+  const signature = sign('sha256', Buffer.from(input), {
+    key: createPrivateKey({ key: jwk, format: 'jwk' }),
+    dsaEncoding: 'ieee-p1363',
+  });
+  return `${input}.${signature.toString('base64url')}`;
+}
+
+// A client that is exactly what a request will hold after Phase 3: the
+// publishable key, plus one token. No service key anywhere near it.
+const asToken = (token) =>
+  createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : {}),
+  });
+const chatToken = (tenantId) => mintToken({ tenant_id: tenantId }); // no sub (§ 2.4)
+const staffToken = (tenantId, userId) => mintToken({ tenant_id: tenantId, sub: userId, app_admin: true });
+
+async function authChecks(probeId, anyChunk) {
+  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
+  const idOf = Object.fromEntries((tenants ?? []).map((t) => [t.slug, t.id]));
+  const villa = idOf.villa;
+  if (!villa) {
+    check(false, 'auth: villa exists', 'the RLS checks read villa, which is missing');
+    return;
+  }
+  const villaChat = asToken(chatToken(villa));
+  const probeChat = asToken(chatToken(probeId));
+
+  // 28. Before anything else: is schema-auth.sql applied at all? Without it a
+  //     chat token reads NOTHING (RLS on, no policies), which would make every
+  //     "only villa's rows" check below pass vacuously on zero rows.
+  {
+    const { error } = await supabase.from('memberships').select('user_id', { count: 'exact', head: true });
+    const { count } = await villaChat.from('chunks').select('id', { count: 'exact', head: true });
+    const applied = !error && typeof count === 'number' && count > 0;
+    check(applied, 'auth: schema-auth.sql is applied', applied ? `villa's token sees ${count} chunks` : `${error?.message ?? `villa's token sees ${count} chunks`} — run sql/schema-auth.sql`);
+    if (!applied) return;
+  }
+
+  // 29. anon, the publishable key with no token, gets nothing: no rows, and
+  //     no search function to call.
+  {
+    const anon = asToken(null);
+    const rows = await anon.from('chunks').select('id');
+    const rpc = await anon.rpc('match_chunks', { query_embedding: parseStoredVector(anyChunk.embedding), p_tenant_id: anyChunk.tenant_id });
+    check(
+      !rows.error && rows.data.length === 0 && rpc.error?.code === '42501',
+      'auth: anon reads 0 chunks and cannot call match_chunks',
+      `${rows.error?.message ?? `${rows.data.length} rows`} · ${rpc.error ? `${rpc.error.code} ${rpc.error.message}` : 'match_chunks CALLABLE'}`,
+    );
+  }
+
+  // 30–33. THE RLS-ALONE CHECK (Rule 1). Villa's chat token, NO filter: every
+  //        row is villa's, AND it is all of villa's rows. The count match is
+  //        the other half: a policy that is too strict would pass "every row
+  //        is villa's" on fewer rows, and then flip eval verdicts in Phase 4.
+  for (const table of ['documents', 'chunks', 'conversations', 'messages']) {
+    const { data, error } = await villaChat.from(table).select('tenant_id');
+    const { count: truth } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq('tenant_id', villa);
+    const foreign = (data ?? []).filter((r) => r.tenant_id !== villa).length;
+    check(
+      !error && foreign === 0 && data.length === truth,
+      `auth: RLS alone, ${table} under villa's token`,
+      error ? error.message : `${data.length} rows, ${foreign} foreign, villa has ${truth}`,
+    );
+  }
+
+  // 34–35. Inside a search function. match_chunks is security invoker, so RLS
+  //        applies within it. Own token, own tenant: finds the chunk at 1.
+  //        Another tenant's token asking for THIS tenant by p_tenant_id: the
+  //        filter says yes, RLS says no, and RLS alone must win.
+  {
+    const vector = parseStoredVector(anyChunk.embedding);
+    const args = { query_embedding: vector, p_tenant_id: anyChunk.tenant_id, match_count: 3, min_similarity: 0 };
+    const own = await asToken(chatToken(anyChunk.tenant_id)).rpc('match_chunks', args);
+    check(
+      !own.error && own.data[0]?.id === anyChunk.id,
+      'auth: match_chunks under its own token finds the chunk',
+      own.error ? own.error.message : `top ${own.data[0]?.id}, want ${anyChunk.id}`,
+    );
+    const stolen = await probeChat.rpc('match_chunks', args);
+    check(
+      !stolen.error && stolen.data.length === 0,
+      "auth: match_chunks naming another tenant returns 0 under RLS",
+      stolen.error ? stolen.error.message : `${stolen.data.length} rows`,
+    );
+  }
+
+  // The probe's bookings setup, after bookingChecks: check 27 removed the
+  // application, and its live bookings are still there.
+  await supabase
+    .from('tenant_applications')
+    .insert({ tenant_id: probeId, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+  const { data: probeUnit } = await supabase.from('units').select('id').eq('tenant_id', probeId).limit(1).single();
+  const { data: probeSlot } = await supabase.from('slots').select('id').eq('tenant_id', probeId).eq('name', 'Evening').single();
+  const newBooking = (tenantId) => ({
+    tenant_id: tenantId,
+    unit_id: probeUnit?.id,
+    slot_id: probeSlot?.id,
+    booked_date: '2027-03-01',
+    guest_name: 'verify.mjs: this row must never exist',
+  });
+
+  // 36. A chat token cannot read ONE booking, though bookings exist (§ 2.5).
+  {
+    const { count: truth } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('tenant_id', probeId);
+    const { data, error } = await probeChat.from('bookings').select('id, guest_name');
+    check(
+      truth > 0 && !error && data.length === 0,
+      "auth: a chat token reads 0 bookings",
+      `${error?.message ?? `${data.length} rows`}, the probe has ${truth}`,
+    );
+  }
+
+  // 37. ...nor write one.
+  {
+    const { data, error } = await probeChat.from('bookings').insert(newBooking(probeId)).select('id');
+    if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
+    check(error?.code === '42501', 'auth: a chat token cannot insert a booking', error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED');
+  }
+
+  // 38–39. check_availability works for the token's own tenant, through
+  //        security definer, and refuses any other tenant id.
+  {
+    const own = await probeChat.rpc('check_availability', { p_tenant_id: probeId, p_from: '2026-10-01', p_to: '2026-10-02' });
+    check(
+      !own.error && own.data.length === 6 && own.data.some((r) => r.status === 'taken'),
+      'auth: check_availability under its own token',
+      own.error ? own.error.message : own.data.map((r) => `${r.slot} ${r.status}`).join(', '),
+    );
+    const other = await probeChat.rpc('check_availability', { p_tenant_id: villa, p_from: '2026-10-01', p_to: '2026-10-02' });
+    check(
+      other.error?.code === '42501',
+      "auth: check_availability refuses another tenant's id",
+      other.error ? `${other.error.code} ${other.error.message}` : `${other.data.length} rows RETURNED`,
+    );
+  }
+
+  // 40. app_is_admin() under a chat token is false, not an error. A chat token
+  //     has no `sub`; with a non-uuid sub, auth.uid() would raise (§ 2.4).
+  {
+    const { data, error } = await villaChat.rpc('app_is_admin');
+    check(!error && data === false, 'auth: app_is_admin() is false for a chat token', error ? `${error.code} ${error.message}` : String(data));
+  }
+
+  // 41. tenants has no policies, so a token reads nothing from it directly...
+  // 42. ...and tenant_public() returns exactly the public columns, to anon.
+  {
+    const { data, error } = await villaChat.from('tenants').select('id');
+    check(!error && data.length === 0, 'auth: a chat token reads 0 tenants rows', error ? error.message : `${data.length} rows`);
+    const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
+    const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
+    check(
+      !pub.error && keys === 'assistant_name,banner_url,business_name,id,logo_url,slug,theme',
+      "auth: tenant_public('villa') has only public columns",
+      pub.error ? pub.error.message : `keys: ${keys}`,
+    );
+  }
+
+  // 43–46 need a real user in auth.users: memberships references it, and
+  // app_is_admin() looks the `sub` up there.
+  const email = `verify-probe-${Date.now()}@example.com`;
+  const password = randomBytes(24).toString('base64url');
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+  if (createError) {
+    check(false, 'auth: create a probe user', createError.message);
+    return;
+  }
+  const userId = created.user.id;
+  try {
+    const document = (tenantId) => ({ tenant_id: tenantId, title: 'verify.mjs probe', content: 'verify.mjs: auth probe' });
+
+    // 43. A staff token for a user with NO membership cannot write.
+    {
+      const { data, error } = await asToken(staffToken(probeId, userId)).from('documents').insert(document(probeId)).select('id');
+      if (!error) await supabase.from('documents').delete().in('id', data.map((r) => r.id));
+      check(error?.code === '42501', 'auth: staff without a membership cannot insert', error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED');
+    }
+
+    // 44. With a membership, it can insert, and delete what it inserted.
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: probeId });
+    {
+      const staff = asToken(staffToken(probeId, userId));
+      const inserted = await staff.from('documents').insert(document(probeId)).select('id').single();
+      const removed = inserted.error
+        ? null
+        : await staff.from('documents').delete({ count: 'exact' }).eq('tenant_id', probeId).eq('id', inserted.data.id);
+      check(
+        !inserted.error && !removed.error && removed.count === 1,
+        'auth: a member can insert and delete a document',
+        inserted.error ? `insert: ${inserted.error.code} ${inserted.error.message}` : removed.error ? `delete: ${removed.error.message}` : `deleted ${removed.count}`,
+      );
+    }
+
+    // 45. A minting bug: a member of the probe, with a token claiming VILLA.
+    //     app_is_admin() finds no membership for villa, so every write fails,
+    //     and bookings (admin-only reads) show nothing. Its chat-level reads
+    //     would see villa's documents, which villa's public chat already can.
+    {
+      const forged = asToken(staffToken(villa, userId));
+      const doc = await forged.from('documents').insert(document(villa)).select('id');
+      if (!doc.error) await supabase.from('documents').delete().in('id', doc.data.map((r) => r.id));
+      // Villa's OWN unit and slot, so the row is valid in every other way. With
+      // the probe's unit, a trigger refuses it with 23503 before RLS is even
+      // asked (observed on the first run), and the check would prove nothing.
+      const { data: villaUnit } = await supabase.from('units').select('id').eq('tenant_id', villa).limit(1).single();
+      const { data: villaSlot } = await supabase.from('slots').select('id').eq('tenant_id', villa).limit(1).single();
+      const booking = await forged
+        .from('bookings')
+        .insert({ ...newBooking(villa), unit_id: villaUnit?.id, slot_id: villaSlot?.id, booked_date: '2031-01-15' })
+        .select('id');
+      if (!booking.error) await supabase.from('bookings').delete().in('id', booking.data.map((r) => r.id));
+      const reads = await forged.from('bookings').select('id');
+      check(
+        doc.error?.code === '42501' && booking.error?.code === '42501' && !reads.error && reads.data.length === 0,
+        'auth: a token for the wrong tenant cannot write or read bookings',
+        `document ${doc.error?.code ?? 'INSERTED'} · booking ${booking.error?.code ?? 'INSERTED'} · bookings read ${reads.error?.message ?? reads.data.length}`,
+      );
+    }
+
+    // 46. A real Supabase Auth session, signed by Supabase, carries no
+    //     tenant_id. So on its own it reads nothing, member or not.
+    {
+      const client = asToken(null);
+      const { error: signInError } = await client.auth.signInWithPassword({ email, password });
+      const { data, error } = signInError ? { data: null, error: signInError } : await client.from('chunks').select('id');
+      check(!error && data.length === 0, 'auth: a Supabase Auth token alone reads 0 chunks', error ? error.message : `${data.length} rows`);
+    }
+  } finally {
+    // Deleting the user cascades to its memberships.
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) console.log(`WARN  could not delete the probe user ${email}: ${error.message}`);
+  }
+}
+
 // 12–14 need a chunk to work with, and a second tenant that owns nothing.
 if (chunk && typeof chunk.tenant_id === 'number') {
   const { data: probe, error: probeError } = await supabase
@@ -422,6 +687,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       );
 
       await bookingChecks(probe.id);
+      await authChecks(probe.id, chunk);
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);

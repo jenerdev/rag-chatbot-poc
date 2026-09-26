@@ -371,9 +371,63 @@ export interface Database {
           },
         ];
       };
+      /**
+       * sql/schema-auth.sql § 1 — who may administer which tenant. A row IS admin
+       * (one role). Written only by the CLI with service_role; a token sees only
+       * its own user's rows.
+       */
+      memberships: {
+        Row: {
+          user_id: string;
+          tenant_id: number;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          tenant_id: number;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          tenant_id?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
+      /** sql/schema-auth.sql § 2 — the token's tenant_id claim, or null. */
+      app_tenant_id: {
+        Args: Record<never, never>;
+        Returns: number | null;
+      };
+      /** sql/schema-auth.sql § 2 — app_admin claim AND a membership for the token's tenant. */
+      app_is_admin: {
+        Args: Record<never, never>;
+        Returns: boolean;
+      };
+      /**
+       * sql/schema-auth.sql § 5 — the ONLY way a token reads a tenants row. The
+       * column list is the boundary: no admin_key_hash. Callable by anon.
+       */
+      tenant_public: {
+        Args: { p_slug: string };
+        Returns: {
+          id: number;
+          slug: string;
+          business_name: string;
+          assistant_name: string;
+          logo_url: string | null;
+          banner_url: string | null;
+          theme: Json;
+        }[];
+      };
+      /** plan/auth-phase0-spike.sql — TEMPORARY: returns auth.jwt(). Dropped after auth-rls Phase 2. */
+      whoami: {
+        Args: Record<never, never>;
+        Returns: Json;
+      };
       /**
        * sql/schema-bookings.sql § 7 — open or taken, per (date, unit, slot), for ONE tenant.
        * Returns no guest data, by design (plan/bookings.md Rule 3).

@@ -127,6 +127,9 @@ as $$ select nullif(auth.jwt() ->> 'tenant_id', '')::bigint $$;
 -- row is not there.
 create function app_is_admin() returns boolean
 language sql stable security definer set search_path = ''
+-- (Built as security INVOKER in Phase 1, to match D-042's "exactly two
+-- definer functions": the memberships policy already lets a user read
+-- their own rows. See whats-done.md, auth-rls Phase 1.)
 as $$
   select coalesce((auth.jwt() ->> 'app_admin')::boolean, false)
      and exists (
@@ -150,7 +153,7 @@ unchanged.
 | Table | Read | Write | Notes |
 |---|---|---|---|
 | `tenants` | **no direct access** | none | chat and pages resolve a slug through `tenant_public(slug)`, a `security definer` function returning only the public columns (id, slug, names, logo, banner, theme). The column list is in the function, so no token can ever read `admin_key_hash` |
-| `documents` | `tenant_id = app_tenant_id()` | insert/delete: `app_is_admin()` | chat reads titles for the sources panel |
+| `documents` | `tenant_id = app_tenant_id()` | insert/delete: `app_is_admin()` (as built: **and** the tenant match, on every write policy) | chat reads titles for the sources panel |
 | `chunks` | `tenant_id = app_tenant_id()` | insert: `app_is_admin()` | deletes cascade from `documents`. FK actions do not go through RLS |
 | `conversations`, `messages` | tenant match | insert: tenant match | the open chat writes these |
 | `tenant_applications`, `units`, `slots` | tenant match | none (seeded by SQL) | the tool description reads slot names |

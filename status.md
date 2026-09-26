@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 0 done)
+> Last updated: 2026-09-26 (auth-rls Phase 1 done)
 
 ---
 
@@ -33,7 +33,9 @@
 - **Working on right now:** the **auth + RLS plan**,
   [`plan/auth-rls.md`](./plan/auth-rls.md) (Phases 0–8, written 2026-09-24, on
   `feat/auth-rls`). **Phase 0 done 2026-09-26:** option A works (D-039), and
-  the baseline is in `plan/baseline/*-pre-auth.txt`. Next is Phase 1. Bookings is complete and merged
+  the baseline is in `plan/baseline/*-pre-auth.txt`. **Phase 1 done
+  2026-09-26:** `schema-auth.sql` applied, verify 47/47, and the app is
+  unchanged (eval 18/19 verdict for verdict). Next is Phase 2. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -115,12 +117,30 @@ prompt-snapshot byte-identical (`d6337d0f…`), and villa's `explain` is a Seq
 Scan plus top-N sort, 0.974 ms. Sign-up + sign-in rate limit (R-13): **30**,
 shared by both, as shown in the dashboard.
 
-**▶ Auth + RLS Phase 1: policies and memberships.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 1. Write
-`packages/db/sql/schema-auth.sql` (idempotent): `memberships`,
-`app_tenant_id()`/`app_is_admin()`, every policy in § 1.3, `tenant_public`,
-the `check_availability` rewrite, and the grants. The user runs it in the SQL
-editor. It is harmless to the running app, which still uses `service_role`.
+~~**Auth + RLS Phase 1: policies and memberships.**~~ **Done 2026-09-26.**
+`packages/db/sql/schema-auth.sql` was run in the SQL editor by the user.
+- **verify 47/47** (28 + 19 through tenant tokens):
+  - the RLS-alone reads under villa's chat token: documents 8/8, chunks
+    30/30, conversations 141/141, messages 368/368, 0 foreign;
+  - a chat token reads 0 of the probe's 5 bookings;
+  - `check_availability` with another tenant's id: `42501`;
+  - a wrong-tenant staff token: `42501` on both writes, 0 of villa's 3
+    bookings read.
+- **The app is unchanged:** isolation 11/11, bookings isolation 12/12,
+  eval 18/19 with identical verdicts, snapshot byte-identical.
+- **Two deviations from the plan's sketch,** both in whats-done.md:
+  - `app_is_admin()` is security invoker;
+  - every write policy also checks the tenant.
+
+**▶ Auth + RLS Phase 2: measure the index under RLS.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 2.3, § 3 Phase 2.
+- Run `explain analyze` of `match_chunks` and `match_chunks_fts` for villa
+  **as a chat token**, and compare it with
+  `plan/baseline/explain-pre-auth.txt` and its chunk ids.
+- `auth_explain()` is service_role-only, so measuring as a token needs
+  either a token-callable variant or `set local role authenticated` plus
+  `request.jwt.claims` inside it.
+- Write both plans into `notes.md`.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -654,6 +674,28 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 1)
+- **Did:**
+  - wrote `packages/db/sql/schema-auth.sql`: `memberships`, the two
+    helpers, 17 policies on 9 tables (none on `tenants`), a
+    security-definer `check_availability` with a tenant check,
+    `tenant_public()`, and the EXECUTE grants;
+  - added checks 28–46 to `verify.mjs`, which mint ES256 tokens with
+    `TENANT_SIGNING_JWK`, newly in `.env`;
+  - added the auth types to `database.types.ts`.
+- **Observed:**
+  - verify 47/47;
+  - eval 18/19 with the same verdicts;
+  - isolation 11/11 and 12/12; snapshot identical.
+- **Found:**
+  - the first run failed the wrong-tenant booking check with `23503`. A
+    trigger refused the probe's unit before RLS ran, so the test used villa's
+    own unit and slot, and then got `42501`.
+  - Both service keys reach Postgres as `role: service_role` in
+    `auth.jwt()`. The legacy service_role JWT is still accepted, so the
+    legacy secret is still live.
+- **Next:** Phase 2.
 
 ### 2026-09-26 — session 8 (auth-rls Phase 0)
 - **Did:**

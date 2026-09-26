@@ -4017,3 +4017,105 @@ was a miscount from the start. It is corrected in CLAUDE.md and
 sign-ins is **30**, one limit shared by both. The window was not noted.
 Password guessing against a staff account is throttled by Supabase, not by
 us.
+
+---
+
+## Auth + RLS Phase 1 — policies and memberships · done 2026-09-26
+
+**What was done:**
+- Wrote `packages/db/sql/schema-auth.sql`, which is idempotent. The user ran
+  it in the SQL editor. It adds:
+  - `memberships (user_id → auth.users, tenant_id → tenants)`;
+  - `app_tenant_id()` and `app_is_admin()`;
+  - 17 policies across `documents`, `chunks`, `conversations`, `messages`,
+    `tenant_applications`, `units`, `slots`, `bookings` and `memberships`.
+    `tenants` has none, on purpose;
+  - `check_availability` rewritten as `security definer` with
+    `search_path = ''` and a tenant check;
+  - `tenant_public(slug)`;
+  - EXECUTE revoked from `public`/`anon`/`authenticated`, then granted back
+    exactly: `tenant_public` to anon, the rest to authenticated, and
+    service_role explicitly on every function.
+- `verify.mjs` gained 19 checks, which mint tenant tokens with the Phase 0
+  key (`TENANT_SIGNING_JWK` in `.env`). They run through the publishable key
+  and create and delete their own probe tenant and Supabase Auth user.
+- `database.types.ts` gained `memberships`, the helpers, `tenant_public` and
+  `whoami`.
+
+**Why it mattered:** these policies are the second wall (Rule 1). Every
+check before this ran as service_role, which bypasses RLS, so no policy had
+ever been observed. The app still runs as service_role, so this phase could
+be applied, and proved, with nothing in the app changed.
+
+**What each observed value proves:**
+- **villa's chat token, NO filter: documents 8/8, chunks 30/30,
+  conversations 141/141, messages 368/368, and 0 foreign rows each.** RLS
+  alone confines reads to the token's tenant. The equal counts show it is
+  not too strict either. A too-strict policy would pass "no foreign rows"
+  on fewer rows, and flip eval verdicts in Phase 4.
+- **A probe token calling `match_chunks` with another tenant's
+  `p_tenant_id`: 0 rows.** The code filter said yes and RLS said no, and
+  RLS won inside a security-invoker function. The same call under the
+  chunk's own tenant token finds the chunk first (148).
+- **Anon: 0 chunks, and `42501` on `match_chunks`.** The publishable key
+  alone gets nothing, not even the search function.
+- **A chat token reads 0 of the probe's 5 bookings and cannot insert one
+  (`42501`), but `check_availability` gives it 6 rows with "taken" in
+  them.** Availability works without row access to guest data (§ 2.5).
+- **`check_availability` with villa's id under the probe's token:
+  `42501 … tenant 3 is not the token's tenant`.** The definer function
+  enforces the tenant itself, since RLS does not apply inside it.
+- **`app_is_admin()` under a chat token: `false`, not an error.** A chat
+  token has no `sub`, as § 2.4 intended.
+- **A chat token reads 0 `tenants` rows. `tenant_public('villa')` keys are
+  exactly `assistant_name,banner_url,business_name,id,logo_url,slug,theme`.**
+  `admin_key_hash` has no path to a token.
+- **Staff with no membership: `42501`. With a membership: insert, then
+  `deleted 1`.** Admin needs the database's agreement, not only the claim.
+- **A member of the probe with a token claiming villa: `42501` on the
+  document insert, `42501` on the booking insert, 0 of villa's 3 bookings
+  read.** A minting bug that names the wrong tenant cannot write, and cannot
+  read guest data.
+- **A real Supabase Auth token: 0 chunks.** A staff login alone carries no
+  tenant, so it reaches nothing until the server mints a tenant token.
+- **The app is unchanged:**
+  - verify's original 28 checks still pass;
+  - isolation 11/11, bookings isolation 12/12;
+  - eval 18/19 (`original 9/10 · tool 9/9`), with PASS/FAIL lines identical
+    to `eval-pre-auth.txt`;
+  - `prompt-snapshot` byte-identical.
+
+  Files: `plan/baseline/*-auth-phase1.txt`.
+- **Both service keys reach `auth.jwt()` with `role: service_role`**
+  (checked with `whoami`). That is what `check_availability` lets through.
+  The legacy service_role JWT is still accepted, so the legacy HS256 secret
+  is live. That is not needed now (D-039 is option A), but it is a second
+  master key that still exists.
+
+**Deviations from the plan, with the reasoning:**
+1. **`app_is_admin()` is security invoker, not definer.** The plan's § 1.2
+   sketch said definer, which contradicts D-042's "exactly two definer
+   functions". Invoker is enough: the `memberships` policy lets a user read
+   their own rows, and that is all the function reads. It also leaves
+   `memberships` under RLS. The plan now notes this at the sketch.
+2. **Every write policy checks the tenant AND admin.** The plan's § 1.3
+   table lists only `app_is_admin()` for writes. That proves "admin of the
+   token's tenant", not "writing into the token's tenant", so on its own
+   it would let an admin of A insert a row carrying B's id.
+3. **`tenant_public` is granted to anon.** It is called before the server
+   knows the tenant, which is Phase 3 step 3 of the plan itself. Everything
+   it returns is already on the public page.
+
+**Traps avoided:**
+- **A check that passes on zero rows.** Before the SQL was run, a chat
+  token read 0 chunks, so every "only villa's rows" check would have passed
+  vacuously. Check 28 fails unless the token sees more than 0, and it did
+  fail before the run: `villa's token sees 0 chunks`.
+- **A check refused by the wrong guard.** The first wrong-tenant booking
+  insert got `23503` from the slot trigger, which fires before RLS. It
+  proved nothing about RLS. With villa's own unit and slot, only RLS could
+  refuse the insert, and it did (`42501`).
+- **Per-row policy functions.** Every policy calls
+  `(select public.app_tenant_id())`, which runs once as an InitPlan and
+  makes the qual `tenant_id = $1`. Whether the plan really is unchanged is
+  Phase 2's measurement.

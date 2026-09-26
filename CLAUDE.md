@@ -73,9 +73,9 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — the client, the types, sql/ (4 files), and server-only
+  db/                  @rag/db — the client, the types, sql/ (5 files), and server-only
     src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
-    tools/verify.mjs     28 checks, no API key
+    tools/verify.mjs     47 checks (19 through tenant tokens: RLS), no API key
     tools/tenant.mjs     tenant:add / tenant:key — prints a key once
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     tools/isolation.mjs    12 cross-tenant checks, no API key
@@ -94,7 +94,7 @@ fixtures/villa-bookings.json  the battery's booking fixture, seeded and removed 
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test
-pnpm --filter @rag/db verify    # 28 checks, no API key needed
+pnpm --filter @rag/db verify    # 47 checks, no API key needed
 pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6
