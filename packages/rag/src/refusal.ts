@@ -30,9 +30,14 @@ export const DEFAULT_REFUSALS: Record<LanguagePreference, string> = {
     'Paumanhin po, wala pa akong impormasyon tungkol diyan. Maaari po kayong magpadala ng mensahe sa amin para matulungan namin kayo.',
 };
 
-/** The words this tenant shows for a refusal: its own, or the default in this reply's language. */
-export function refusalText(tenant: Pick<TenantContext, 'fallbackMessage'>, language: LanguagePreference = 'english'): string {
-  return tenant.fallbackMessage ?? DEFAULT_REFUSALS[language];
+/**
+ * The words this tenant shows for a refusal in this reply's language: its own
+ * for that language if it wrote one, otherwise the built-in default in that
+ * language (D-048). Never another language's custom text: a Taglish message
+ * shown to an English question is exactly what D-048 fixed.
+ */
+export function refusalText(tenant: Pick<TenantContext, 'fallbackMessages'>, language: LanguagePreference = 'english'): string {
+  return tenant.fallbackMessages[language] ?? DEFAULT_REFUSALS[language];
 }
 
 /** Is this reply the refusal marker? Exact, after trimming: a partial answer that mentions it is an answer. */

@@ -4,7 +4,7 @@
 // eval battery, the score probe) goes through here.
 
 import { anonClient, mintTenantToken, scopedClient } from '@rag/db';
-import type { TenantContext } from './types.js';
+import type { FallbackMessages, TenantContext } from './types.js';
 
 /**
  * The tenant for a slug, as a CHAT context, or null when there is no such
@@ -40,7 +40,24 @@ export async function loadTenant(slug: string): Promise<TenantContext | null> {
     slug: row.slug,
     businessName: row.business_name,
     assistantName: row.assistant_name,
-    fallbackMessage: row.fallback_message,
+    fallbackMessages: fallbackMessagesOf(row.fallback_messages),
     db: scopedClient(mintTenantToken({ tenantId: row.id })),
   };
 }
+
+/**
+ * The per-language refusal wording from its jsonb column, keeping only the
+ * three known keys with string values. Postgres already enforces that shape
+ * (tenants_fallback_messages_shape); checking again here means a bad row can
+ * only lose its custom wording, never put something odd on screen.
+ */
+function fallbackMessagesOf(value: unknown): FallbackMessages {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: FallbackMessages = {};
+  for (const key of ['english', 'taglish', 'tagalog'] as const) {
+    const text = (value as Record<string, unknown>)[key];
+    if (typeof text === 'string' && text.trim() !== '') out[key] = text;
+  }
+  return out;
+}
+

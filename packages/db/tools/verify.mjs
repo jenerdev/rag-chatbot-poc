@@ -525,7 +525,7 @@ async function authChecks(probeId, anyChunk) {
     const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
     const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
     check(
-      !pub.error && keys === 'assistant_name,banner_url,business_name,fallback_message,id,logo_url,slug,theme',
+      !pub.error && keys === 'assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,theme',
       "auth: tenant_public('villa') has only public columns",
       pub.error ? pub.error.message : `keys: ${keys}`,
     );

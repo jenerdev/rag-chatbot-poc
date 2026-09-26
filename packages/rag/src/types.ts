@@ -25,10 +25,11 @@ export interface TenantContext {
   assistantName: string;
   /**
    * What the chat shows when the documents cannot answer, in place of the
-   * internal refusal marker NO_ANSWER (D-047). Null means the built-in
-   * friendly default, in the reply's language (refusal.ts).
+   * internal refusal marker NO_ANSWER, one per reply language (D-047,
+   * D-048). A missing language is the built-in default in that language
+   * (refusal.ts).
    */
-  fallbackMessage: string | null;
+  fallbackMessages: FallbackMessages;
   /**
    * The database, AS this tenant: a client holding a token minted for it
    * (auth-rls Phase 3, D-039). Postgres's RLS policies compare every row
@@ -44,6 +45,9 @@ export interface TenantContext {
    */
   db: DbClient;
 }
+
+/** A tenant's refusal wording per reply language. Keys match LanguagePreference (language.ts). */
+export type FallbackMessages = Partial<Record<'english' | 'taglish' | 'tagalog', string>>;
 
 /** Which search found a chunk. Rendered as a badge in the sources panel (D-015). */
 export type FoundBy = 'vector' | 'keyword' | 'both';

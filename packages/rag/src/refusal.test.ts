@@ -20,16 +20,31 @@ function stream(pieces: string[], friendly = FRIENDLY): string {
 const deltas = (text: string, n: number) => text.match(new RegExp(`[\\s\\S]{1,${n}}`, 'g')) ?? [];
 
 describe('refusalText', () => {
-  it("uses the tenant's own message when it has one, in every language", () => {
-    for (const language of ['english', 'taglish', 'tagalog'] as const) {
-      expect(refusalText({ fallbackMessage: FRIENDLY }, language)).toBe(FRIENDLY);
-    }
+  const VILLA = {
+    fallbackMessages: {
+      english: 'Sorry, message us on Viber.',
+      taglish: 'Pasensya na po, message us sa Viber.',
+      tagalog: 'Paumanhin po, magpadala ng mensahe sa Viber.',
+    },
+  };
+
+  it("uses the tenant's own message for the reply's language (D-048)", () => {
+    expect(refusalText(VILLA, 'english')).toBe(VILLA.fallbackMessages.english);
+    expect(refusalText(VILLA, 'taglish')).toBe(VILLA.fallbackMessages.taglish);
+    expect(refusalText(VILLA, 'tagalog')).toBe(VILLA.fallbackMessages.tagalog);
   });
 
-  it('falls back to the built-in default in the reply language', () => {
-    expect(refusalText({ fallbackMessage: null }, 'english')).toBe(DEFAULT_REFUSALS.english);
-    expect(refusalText({ fallbackMessage: null }, 'taglish')).toBe(DEFAULT_REFUSALS.taglish);
-    expect(refusalText({ fallbackMessage: null })).toBe(DEFAULT_REFUSALS.english);
+  it("a language the tenant did not write gets the DEFAULT in that language, never another language's custom text", () => {
+    const onlyTaglish = { fallbackMessages: { taglish: FRIENDLY } };
+    expect(refusalText(onlyTaglish, 'taglish')).toBe(FRIENDLY);
+    expect(refusalText(onlyTaglish, 'english')).toBe(DEFAULT_REFUSALS.english);
+    expect(refusalText(onlyTaglish, 'tagalog')).toBe(DEFAULT_REFUSALS.tagalog);
+  });
+
+  it('no custom wording at all: the built-in default in the reply language', () => {
+    expect(refusalText({ fallbackMessages: {} }, 'english')).toBe(DEFAULT_REFUSALS.english);
+    expect(refusalText({ fallbackMessages: {} }, 'taglish')).toBe(DEFAULT_REFUSALS.taglish);
+    expect(refusalText({ fallbackMessages: {} })).toBe(DEFAULT_REFUSALS.english);
   });
 
   it('no default is the marker, or technical about "documents"', () => {

@@ -30,7 +30,7 @@ import { planDates } from './dates.js';
 import { executeTool } from './tools.js';
 import type { TenantContext } from './types.js';
 
-const TENANT = { id: 3, slug: 'villa', businessName: 'Villa Amihan', assistantName: 'Lia', db: {} } as unknown as TenantContext;
+const TENANT = { id: 3, slug: 'villa', businessName: 'Villa Amihan', assistantName: 'Lia', fallbackMessages: {}, db: {} } as unknown as TenantContext;
 const check = vi.mocked(checkAvailability);
 const SLOTS = [{ date: '2026-09-28', unit: 'Villa', slot: 'Overnight', status: 'open' }];
 

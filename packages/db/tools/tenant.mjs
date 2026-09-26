@@ -1,8 +1,10 @@
 // tenant.mjs — create a tenant, or set what its chat says when it cannot answer.
 //
 //   pnpm --filter @rag/db tenant:add -- <slug> "<business name>" "<assistant name>"
-//   pnpm --filter @rag/db tenant:fallback -- <slug> "<message>"    (D-047)
-//   pnpm --filter @rag/db tenant:fallback -- <slug> --clear          back to the built-in default
+//   pnpm --filter @rag/db tenant:fallback -- <slug> <english|taglish|tagalog> "<message>"   (D-047, D-048)
+//   pnpm --filter @rag/db tenant:fallback -- <slug> <language> --clear    that language back to the default
+//   pnpm --filter @rag/db tenant:fallback -- <slug> --clear               every language back to the default
+//   pnpm --filter @rag/db tenant:fallback -- <slug>                       show what is set
 //
 // A new tenant has no members, so nobody can administer it yet. Add the first
 // one with `pnpm --filter @rag/db member:add -- <slug> <email>`. Until auth-rls
@@ -23,22 +25,39 @@ const fail = (message) => {
 };
 
 if (command === 'fallback') {
-  // The message a visitor sees instead of the internal refusal marker. It is
-  // shown as plain text (React escapes it), so any wording is safe; the
-  // length is capped by the tenants_fallback_message_length constraint.
-  const message = args[2];
-  if (!slug || !message) {
-    fail('usage: tenant:fallback -- <slug> "<message>"   or   tenant:fallback -- <slug> --clear');
+  // The message a visitor sees instead of the internal refusal marker, one
+  // per reply language. It is shown as plain text (React escapes it), so any
+  // wording is safe; the shape and the 500-character cap are enforced by the
+  // tenants_fallback_messages_shape constraint.
+  const LANGUAGES = ['english', 'taglish', 'tagalog'];
+  const [, , language, message] = args;
+  const show = (m) =>
+    LANGUAGES.map((l) => `  ${l.padEnd(8)} ${m?.[l] ?? '(built-in default)'}`).join('\n');
+
+  const { data: rows, error: readError } = await supabase.from('tenants').select('fallback_messages').eq('slug', slug ?? '');
+  if (!slug) {
+    fail('usage: tenant:fallback -- <slug> [<english|taglish|tagalog> "<message>" | <language> --clear | --clear]');
+  } else if (readError) {
+    fail(`could not read "${slug}": ${readError.message}`);
+  } else if (rows.length === 0) {
+    fail(`no tenant "${slug}"`);
+  } else if (language === undefined) {
+    console.log(`"${slug}" fallback messages:\n${show(rows[0].fallback_messages)}`);
+  } else if (language !== '--clear' && (!LANGUAGES.includes(language) || !message)) {
+    fail(`the language is one of ${LANGUAGES.join(', ')}, followed by a message or --clear`);
   } else {
-    const value = message === '--clear' ? null : message.trim();
+    const current = { ...(rows[0].fallback_messages ?? {}) };
+    if (language === '--clear') for (const l of LANGUAGES) delete current[l];
+    else if (message === '--clear') delete current[language];
+    else current[language] = message.trim();
+    const next = Object.keys(current).length === 0 ? null : current;
     const { data, error } = await supabase
       .from('tenants')
-      .update({ fallback_message: value })
+      .update({ fallback_messages: next })
       .eq('slug', slug)
-      .select('slug, fallback_message');
+      .select('fallback_messages');
     if (error) fail(`could not update "${slug}": ${error.message}`);
-    else if (data.length === 0) fail(`no tenant "${slug}"`);
-    else console.log(value === null ? `"${slug}" now uses the built-in default.` : `"${slug}" now says: ${data[0].fallback_message}`);
+    else console.log(`"${slug}" fallback messages:\n${show(data[0].fallback_messages)}`);
   }
 } else if (command !== 'add') {
   fail('the command is "add" or "fallback" (tenant:key was removed in auth-rls Phase 6; use member:add)');

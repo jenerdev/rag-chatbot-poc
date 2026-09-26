@@ -232,33 +232,64 @@ $$;
 -- it can mint a token for it, which is why anon may call this one (plan
 -- Phase 3 step 3). Everything returned is already shown on the public page.
 --
--- fallback_message (D-047, added 2026-09-27): what the chat shows instead of
--- the internal refusal marker when the documents cannot answer. Shown to
--- every visitor, so it belongs in this public list. Null means the built-in
--- friendly default. The column is added here, next to the function that
--- returns it, so a fresh database gets both in one file.
-alter table tenants add column if not exists fallback_message text
-  constraint tenants_fallback_message_length check (char_length(fallback_message) between 1 and 500);
+-- fallback_messages (D-047, D-048): what the chat shows instead of the
+-- internal refusal marker when the documents cannot answer, ONE PER REPLY
+-- LANGUAGE: {"english": "...", "taglish": "...", "tagalog": "..."}. Any key
+-- may be missing; a missing one is the built-in default in that language.
+-- Shown to every visitor, so it belongs in this public list. Added here, next
+-- to the function that returns it, so a fresh database gets both in one file.
+alter table tenants add column if not exists fallback_messages jsonb;
 
--- The return type changed (fallback_message), and `create or replace` cannot
+-- D-047 shipped a single `fallback_message text`. Carry it over into all three
+-- languages, so what visitors see does not change until someone translates
+-- it, then drop the old column. Skipped once the old column is gone.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'tenants' and column_name = 'fallback_message') then
+    update tenants
+       set fallback_messages = jsonb_build_object('english', fallback_message, 'taglish', fallback_message, 'tagalog', fallback_message)
+     where fallback_message is not null and fallback_messages is null;
+    alter table tenants drop column fallback_message;
+  end if;
+end $$;
+
+-- The shape, enforced by Postgres: an object, only the three language keys,
+-- each a string of 1 to 500 characters. (No subqueries in a check, hence one
+-- clause per key.)
+alter table tenants drop constraint if exists tenants_fallback_messages_shape;
+alter table tenants add constraint tenants_fallback_messages_shape check (
+  fallback_messages is null or (
+    jsonb_typeof(fallback_messages) = 'object'
+    and fallback_messages - array['english', 'taglish', 'tagalog'] = '{}'::jsonb
+    and coalesce(jsonb_typeof(fallback_messages -> 'english'), 'string') = 'string'
+    and coalesce(jsonb_typeof(fallback_messages -> 'taglish'), 'string') = 'string'
+    and coalesce(jsonb_typeof(fallback_messages -> 'tagalog'), 'string') = 'string'
+    and coalesce(char_length(fallback_messages ->> 'english'), 1) between 1 and 500
+    and coalesce(char_length(fallback_messages ->> 'taglish'), 1) between 1 and 500
+    and coalesce(char_length(fallback_messages ->> 'tagalog'), 1) between 1 and 500
+  )
+);
+
+-- The return type changed (fallback_messages), and `create or replace` cannot
 -- change a return type, so drop first. Step 6 below grants EXECUTE again.
 drop function if exists tenant_public(text);
 create function tenant_public(p_slug text)
 returns table (
-  id               bigint,
-  slug             text,
-  business_name    text,
-  assistant_name   text,
-  logo_url         text,
-  banner_url       text,
-  theme            jsonb,
-  fallback_message text
+  id                bigint,
+  slug              text,
+  business_name     text,
+  assistant_name    text,
+  logo_url          text,
+  banner_url        text,
+  theme             jsonb,
+  fallback_messages jsonb
 )
 language sql stable
 security definer
 set search_path = ''
 as $$
-  select t.id, t.slug, t.business_name, t.assistant_name, t.logo_url, t.banner_url, t.theme, t.fallback_message
+  select t.id, t.slug, t.business_name, t.assistant_name, t.logo_url, t.banner_url, t.theme, t.fallback_messages
   from public.tenants t
   where t.slug = p_slug
 $$;

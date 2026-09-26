@@ -67,6 +67,7 @@ export type {
   Answer,
   ChunkSummary,
   DocumentDetail,
+  FallbackMessages,
   DocumentSummary,
   FoundBy,
   HistoryMessage,
