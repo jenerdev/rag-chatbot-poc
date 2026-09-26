@@ -1582,6 +1582,75 @@ still not a reason to touch `messages`.
 
 ---
 
+## D-046 · Relative dates are resolved in code, and an availability question with one is checked before the model is asked · **Added 2026-09-27**
+
+**The failure:** "Is the resort available tomorrow?", "Available ba kayo
+bukas?", "sa makalawa", "sa Friday", "sa susunod na linggo": 6 questions out
+of 6 got "Which date do you mean?" with no tool call. The tools block already
+stated `Today is 2026-09-27 (Sunday), Asia/Manila.` The model knew today; it
+didn't count from it. Its rule "If the user asks about availability without
+giving a date, … ask which date" won.
+
+**Decision:**
+- `packages/rag/src/dates.ts` is pure: a `(message, today)` in, and no clock.
+  It resolves English, Tagalog and Taglish relative dates against the
+  TENANT'S today (`localDate(timezone)`; villa's is Asia/Manila).
+- On an **availability turn** (availability or booking words, or a bare date
+  after an earlier availability question), `answer.ts` runs
+  `check_availability` itself with each unambiguous resolved date, through
+  `executeTool()`, before the model's first turn. One line per date goes after
+  "Today is …" ("bukas" means 2026-09-28 (Monday); check_availability was
+  already called; answer from its result and name the date).
+- Every other turn gets nothing, and its prompt is byte-identical to
+  before.
+
+**Why code, measured step by step:**
+1. The prompt line alone ("bukas" means 2026-09-28, use it) fixed 5 of 6.
+2. The exact tool arguments in the line fixed the range case in Tagalog. But
+   "Available ba kayo next week?" still asked, 3 runs of 3, and "sa Friday"
+   asked once. The model follows a prompt line most of the time, and this has
+   to happen every time.
+3. The up-front check makes it every time.
+
+**Why only availability turns (trap 10):** with even the bare fact line
+("bukas" means 2026-09-28), "What time is check-in bukas?" made the model
+check availability and open with "Yes po". The unchanged code answered it
+from the documents with no call (compared on a stash of the change).
+
+**The rules, pinned in `dates.test.ts`:**
+- Weeks run Monday to Sunday.
+- "Friday" and "this Friday" mean the coming one, today included.
+- "next Friday" is AMBIGUOUS while this week's Friday is still ahead, so both
+  dates are given and the model asks. It is not checked. Once this week's has
+  passed, both readings agree.
+- "next week" is next Monday to Sunday. "this weekend" is Saturday to Sunday,
+  from today.
+- Tagalog: "bukas" also means "open" (not a date before ba, pa, ang, kayo…,
+  or next to another date). "linggo" also means "week" (the week phrases are
+  matched first). "may" also means "there is" (the month only as "5 May" or
+  "May 5, 2027").
+- Past dates are still checked, so the tool can say they're past, and the
+  line says so too. Once, in Taglish, the model answered the refusal instead
+  of passing the tool's error on.
+
+**Measured:**
+- tests: 98 in `dates.test.ts` and 13 in `tools.test.ts` (the resolved date is
+  what `checkAvailability()` receives; failures are handled), 214 in the
+  pipeline;
+- battery 36/38, `original 9/10 · tool 9/9 · lang 9/10 · date 9/9`. The new
+  date cases check the date the tool RECEIVED, computed in the battery
+  independently of `dates.ts`;
+- `lang-tagalog-2` failed once and passed 3/3 on repeat. `lang-followup`,
+  whose bare "11 October" is now checked up front, still fails only on the
+  language mix;
+- the northwind snapshot is identical.
+
+**Reverse if:** a model reliably calls the tool for relative dates by itself.
+Or if tenants need dates this doesn't cover (Christmas, "end of the month",
+day-only "the 12th"). Extend the rules, not the prompt.
+
+---
+
 ## Open questions
 
 | # | Question | Resolve by |

@@ -421,14 +421,21 @@ async function authChecks(probeId, anyChunk) {
   //        row is villa's, AND it is all of villa's rows. The count match is
   //        the other half: a policy that is too strict would pass "every row
   //        is villa's" on fewer rows, and then flip eval verdicts in Phase 4.
+  //
+  //        Counted in Postgres, not by fetching rows: PostgREST returns at most
+  //        1000 rows, and once villa had 1236 messages the fetched page could
+  //        never match the count (2026-09-27). `seen` is the token's own count
+  //        with NO filter, so RLS alone decides it; `foreign` asks the token
+  //        for any row that is not villa's, across every row, not one page.
   for (const table of ['documents', 'chunks', 'conversations', 'messages']) {
-    const { data, error } = await villaChat.from(table).select('tenant_id');
+    const seen = await villaChat.from(table).select('*', { count: 'exact', head: true });
+    const other = await villaChat.from(table).select('*', { count: 'exact', head: true }).neq('tenant_id', villa);
     const { count: truth } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq('tenant_id', villa);
-    const foreign = (data ?? []).filter((r) => r.tenant_id !== villa).length;
+    const error = seen.error ?? other.error;
     check(
-      !error && foreign === 0 && data.length === truth,
+      !error && other.count === 0 && seen.count === truth && truth > 0,
       `auth: RLS alone, ${table} under villa's token`,
-      error ? error.message : `${data.length} rows, ${foreign} foreign, villa has ${truth}`,
+      error ? error.message : `${seen.count} rows, ${other.count} foreign, villa has ${truth}`,
     );
   }
 

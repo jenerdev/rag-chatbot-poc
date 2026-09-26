@@ -12,6 +12,7 @@
 //   retrieve.ts    question -> standalone query -> two searches -> one list
 //   answer.ts      the whole query pipeline, streaming and not
 //   language.ts    an explicit language request, and the reply to a bare one
+//   dates.ts       relative dates ("bukas", "next Friday") resolved in code
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
@@ -49,6 +50,8 @@ export {
   requestReply,
 } from './language.js';
 export type { LanguageChoice, LanguagePreference } from './language.js';
+export { addDays, asksAvailability, dateInstructions, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+export type { DateMention, DatePlan } from './dates.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { loadTenant } from './tenant.js';

@@ -59,6 +59,16 @@ const BOOKED = plus(10); // the fixture: Overnight from 14:00 on this date to 12
 const NEXT = plus(11); // Day Tour and 22-Hour overlap the fixture's morning; Overnight is open
 const FREE = plus(14); // nothing booked anywhere near
 
+// For the date-* cases (D-046): computed here independently of dates.ts, from
+// the calendar alone, so a bug in the resolver cannot also bless its answer.
+const DOW = (new Date(`${TODAY}T00:00:00Z`).getUTCDay() + 6) % 7; // 0 = Monday
+const COMING_FRIDAY = plus((4 - DOW + 7) % 7);
+const NEXT_MONDAY = plus(7 - DOW);
+const NEXT_SUNDAY = plus(13 - DOW);
+const checked = (last, from, to) =>
+  callsFor(last).some((c) => c.args?.date_from === from && (to === undefined || c.args?.date_to === to));
+const PAST_WORDS = ['past', 'passed', 'nakaraan', 'lumipas', 'tapos na', 'nakalipas'];
+
 /** Did a tool call for this date happen, and what did it say about a slot? */
 const callsFor = (last) => last.toolCalls ?? [];
 const slotStatus = (last, date, slot) =>
@@ -407,6 +417,110 @@ const CASES = [
     }),
     note: 'no document mentions massage: sounding natural must not invent one; the refusal is verbatim',
   },
+
+  // --- relative dates (D-046) -------------------------------------------------
+  // Before D-046 every one of the first five asked "Which date do you mean?"
+  // with no tool call. Each asserts the DATE THE TOOL RECEIVED, not only the
+  // reply, and that the reply names the date so the user can see it.
+  {
+    id: 'date-tomorrow',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['Is the resort available tomorrow?'],
+    check: (last) => ({
+      ok: checked(last, plus(1)) && namesDate(last.reply, plus(1)),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names ${plus(1)}: ${namesDate(last.reply, plus(1))}`,
+    }),
+    note: '"tomorrow" is resolved in code and checked, not asked about',
+  },
+  {
+    id: 'date-bukas',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['Available ba kayo bukas?'],
+    check: (last) => ({
+      ok: checked(last, plus(1)) && namesDate(last.reply, plus(1)),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names ${plus(1)}: ${namesDate(last.reply, plus(1))}`,
+    }),
+    note: '"bukas" is the same date as "tomorrow"',
+  },
+  {
+    id: 'date-makalawa',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['May vacant rooms ba kayo sa makalawa?'],
+    check: (last) => ({
+      ok: checked(last, plus(2)) && namesDate(last.reply, plus(2)),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names ${plus(2)}: ${namesDate(last.reply, plus(2))}`,
+    }),
+    note: '"sa makalawa" is the day after tomorrow',
+  },
+  {
+    id: 'date-weekday',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['May available ba kayo sa Friday?'],
+    check: (last) => ({
+      ok: checked(last, COMING_FRIDAY) && namesDate(last.reply, COMING_FRIDAY),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; wants ${COMING_FRIDAY}`,
+    }),
+    note: '"sa Friday" is the coming Friday, today included',
+  },
+  {
+    id: 'date-week',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['Available ba kayo next week?'],
+    check: (last) => ({
+      ok: checked(last, NEXT_MONDAY, NEXT_SUNDAY),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; wants ${NEXT_MONDAY}..${NEXT_SUNDAY}`,
+    }),
+    note: 'the case the prompt line alone lost 3 runs of 3: a range, next Monday to Sunday',
+  },
+  {
+    id: 'date-followup-slot',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['May available room ba bukas?', 'How about overnight?'],
+    check: (last) => ({
+      ok: namesDate(last.reply, plus(1)) && says(last.reply, ['overnight']) && last.reply.trim() !== NO_ANSWER,
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names ${plus(1)}: ${namesDate(last.reply, plus(1))}`,
+    }),
+    note: 'only the slot changes: the date from the first turn is kept, not asked for again',
+  },
+  {
+    id: 'date-followup-change',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['Available ba kayo bukas?', 'What about the day after tomorrow?'],
+    check: (last) => ({
+      ok: checked(last, plus(2)) && namesDate(last.reply, plus(2)),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; wants ${plus(2)}`,
+    }),
+    note: 'a bare date after an availability question is one too, and the NEW date is checked',
+  },
+  {
+    id: 'date-past',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['Available ba kahapon?'],
+    check: (last) => ({
+      ok: last.reply.trim() !== NO_ANSWER && says(last.reply, PAST_WORDS),
+      detail: `refused: ${last.reply.trim() === NO_ANSWER}; says past: ${says(last.reply, PAST_WORDS)}`,
+    }),
+    note: 'a past date is explained, not refused (Taglish once answered the bare refusal)',
+  },
+  {
+    id: 'date-docs',
+    tenant: 'villa',
+    want: 'date',
+    turns: ['What time is check-in bukas?'],
+    check: (last) => ({
+      ok: callsFor(last).length === 0 && last.reply.includes('2:00') && last.reply.trim() !== NO_ANSWER,
+      detail: `${callsFor(last).length} tool calls; has 2:00: ${last.reply.includes('2:00')}`,
+    }),
+    note: 'trap 10: a documents question with a date gets no date line and no availability check',
+  },
 ];
 
 // --- judging the language of a reply (the lang-* cases) ----------------------
@@ -536,8 +650,10 @@ const RUN = only ? CASES.filter((x) => x.id.startsWith(only)) : CASES;
 let pass = 0;
 let basePass = 0;
 let langPass = 0;
-/** Three groups, counted apart, because each has its own baseline to match. */
-const GROUP = (c) => (c.id.startsWith('tool-') ? 'tool' : c.id.startsWith('lang-') ? 'lang' : 'original');
+let datePass = 0;
+/** Four groups, counted apart, because each has its own baseline to match. */
+const GROUP = (c) =>
+  c.id.startsWith('tool-') ? 'tool' : c.id.startsWith('lang-') ? 'lang' : c.id.startsWith('date-') ? 'date' : 'original';
 await seedFixture();
 try {
 for (const c of RUN) {
@@ -546,7 +662,7 @@ for (const c of RUN) {
   let reply;
   answerCalls = 0;
 
-  if (c.want === 'tool' || c.want === 'lang') {
+  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date') {
     const last = await ask(tenant, c.turns);
     const verdict = c.check(last, { answerCalls });
     ok = verdict.ok;
@@ -582,6 +698,7 @@ for (const c of RUN) {
   if (ok) pass++;
   if (ok && GROUP(c) === 'original') basePass++;
   if (ok && GROUP(c) === 'lang') langPass++;
+  if (ok && GROUP(c) === 'date') datePass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
@@ -599,6 +716,6 @@ for (const c of RUN) {
 // misleading "original 0/10".
 const total = (g) => RUN.filter((c) => GROUP(c) === g).length;
 console.log(
-  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass}/${total('tool')} · lang ${langPass}/${total('lang')}`,
+  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')}`,
 );
 console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);

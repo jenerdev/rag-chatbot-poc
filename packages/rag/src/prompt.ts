@@ -37,6 +37,11 @@ import type { HistoryMessage, TenantContext } from './types.js';
  * tool-specific lines come from tools.ts, because only that file knows which
  * tools this tenant has.
  *
+ * DATES (D-046): on a turn whose message has a relative date in it, the
+ * tools block's last lines state what it resolves to ("bukas" means
+ * 2026-09-28). The lines come from dates.ts, which does the arithmetic in
+ * code; a message with no date adds nothing.
+ *
  * LANGUAGE (D-043): one more block, LAST, and only when the reply is not an
  * unrequested English one. The same shape as the tools block: the lines come
  * from language.ts, which decides the language in code, so this function
@@ -65,6 +70,8 @@ export function buildPrompt(
         'above applies to it.',
         ...tools.instructions,
         `Today is ${tools.today} (${tools.weekday}), ${tools.timezone}.`,
+        // Right after today, and only on a turn with a date in it (D-046).
+        ...(tools.dates ?? []),
       ]
     : [];
 

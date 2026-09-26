@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+~~**Relative dates (D-046).**~~ **Done 2026-09-27, uncommitted.** "bukas",
+"tomorrow", "sa makalawa", "sa Friday", "next week" were 6/6 "Which date?";
+now resolved in code (`dates.ts`) and, on an availability turn, checked up
+front with the resolved date. Battery 36/38 (`original 9/10 · tool 9/9 ·
+lang 9/10 · date 9/9`), tests 214 in the pipeline, northwind snapshot
+identical, isolation 16/16, verify 48/48 (checks 30–33 now count in Postgres:
+villa passed PostgREST's 1000-row cap). **Next:** commit; walk it in the
+browser in Taglish (the battery judges the words, not the ear).
+
 ~~**Mark unanswered questions resolved (D-045).**~~ **Done 2026-09-27.** S-4
 has Open / Resolved tabs; **Mark resolved** and **Reopen** add or remove a
 row in `unanswered_resolutions` (new `schema-unanswered.sql`, applied by the

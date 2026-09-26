@@ -4867,3 +4867,77 @@ reads `[0]`.
 **Not done:** the logged-in browser walk, and `pnpm build`, because it
 replaces the running dev server's `.next`.
 
+---
+
+## Relative dates (D-046) · done 2026-09-27
+
+**The root cause:** the model had today's date, since the tools block's
+last line was `Today is 2026-09-27 (Sunday), Asia/Manila.`, but it didn't
+count from it. The block's "without giving a date, ask which date" rule won.
+The questions "Is the resort available tomorrow?", "Available ba kayo
+bukas?", "May available room ba bukas?", "sa makalawa", "Paano kung sa
+Friday?" and "sa susunod na linggo" all got "Which date do you mean?" / "Anong
+date po?" with no tool call (6/6).
+
+**What was done:**
+- **`packages/rag/src/dates.ts`** (new, pure):
+  - `resolveDates(message, today)`: English, Tagalog and Taglish; named days,
+    counted days, weekdays with this/next, weeks, weekends, explicit dates;
+  - `planDates()`: on an availability turn, the prompt lines plus the
+    `check_availability` arguments; on any other turn, nothing;
+  - `dateInstructions()`: the lines, in three shapes: ambiguous (ask), past
+    (say so), or checked (answer from the result and name the date).
+- **`answer.ts`:** `withDates()` feeds `toolLoop()` a `precheck`, run through
+  `executeTool()` before the model's first turn. It works in both the
+  streaming and non-streaming paths.
+- **`prompt.ts`:** the lines go right after "Today is …".
+- **`tools.ts`:** the ask-for-date rule now reads "without giving any date or
+  day at all".
+- **Tests:** `dates.test.ts` (98) and `tools.test.ts` (13, with
+  `@rag/bookings` mocked).
+- **Battery:** 9 `date-*` cases, counted as `date x/9`.
+- **`packages/db/tools/verify.mjs`:** checks 30–33 now count in Postgres
+  instead of fetching rows. Villa reached 1,236 messages, and PostgREST caps
+  a fetch at 1,000, so check 33 failed on data growth, not on RLS.
+
+**Trap avoided: trusting a prompt line.** Stating the resolved date fixed 5
+of 6 questions. Adding the exact tool arguments fixed the Tagalog range, but
+"Available ba kayo next week?" still asked 3/3, and "sa Friday" asked once.
+The up-front check is what makes the date reach the API every time.
+
+**Trap avoided: trap 10.** With only a fact line ("bukas" means …), "What
+time is check-in bukas?" called the tool and began "Yes po". On a stash of
+the change, the same question got a clean documents answer with no call. So
+non-availability turns now get nothing at all.
+
+**Trap avoided: Tagalog double meanings:**
+- "Bukas ba ang pool?" means "open", not "tomorrow";
+- "sa Linggo" is Sunday, but "sa susunod na linggo" is next week;
+- "May 2 rooms ba?" is "there are 2 rooms", not 2 May.
+
+**Checked, not assumed:**
+- live, villa, with today 2026-09-27:
+  - tomorrow / bukas → `{"date_from":"2026-09-28"}`;
+  - sa makalawa → 2026-09-29;
+  - sa Friday → 2026-10-02;
+  - next week / sa susunod na linggo → 2026-09-28..2026-10-04;
+  - "How about overnight?" kept 2026-09-28;
+  - "What about the day after tomorrow?" → 2026-09-29;
+  - "Available ba kahapon?" → "Ang 26 September 2026 po is in the past…";
+- battery 36/38, `original 9/10 · tool 9/9 · lang 9/10 · date 9/9`:
+  - `antecedent` is known (D-017);
+  - `lang-tagalog-2` failed once, then passed 3/3;
+  - `lang-followup` passed in the full run and failed 2 of 3 repeats, on the
+    language mix only, with its date correctly checked;
+- the northwind prompt snapshot is identical;
+- tests 214/27/14/13, typecheck green, isolation 16/16, verify 48/48.
+
+**Not done / limits:**
+- A day-of-month alone ("the 12th") and holidays ("Christmas") are left to
+  the model.
+- The weekday rules are a choice (weeks run Monday to Sunday).
+- An availability question phrased without an availability word ("Pwede ba
+  kami bukas?") isn't checked up front, so the model gets the unchanged
+  prompt.
+- Not walked in the browser.
+

@@ -44,6 +44,12 @@ export interface PromptTools {
   today: string;
   weekday: string;
   timezone: string;
+  /**
+   * This turn's relative dates, already resolved ("bukas" means 2026-09-28),
+   * from dates.ts (D-046). Filled per message in answer.ts, because this
+   * function never sees the message. Absent or [] adds nothing.
+   */
+  dates?: string[];
 }
 
 export interface TenantTools {
@@ -145,9 +151,13 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
         'is open.',
         // Phase 6 (tool-ask): "I don't know based on the documents I have.
         // Please provide a specific date…", the refusal glued to the question.
-        'If the user asks about availability without giving a date, your whole',
-        'reply is one question asking which date they mean. Call the tool once',
-        'they give one.',
+        // D-046: "without giving a date" made the model ask about "Available
+        // ba kayo next week?" 3 runs of 3, even with the resolved range stated
+        // below. A day or a week IS a date for this rule, and dates.ts turns
+        // it into one.
+        'If the user asks about availability without giving any date or day at',
+        'all, your whole reply is one question asking which date they mean.',
+        'Call the tool once they give one.',
         // Phase 6 (tool-past): the tool said the date was in the past, and the
         // model answered with the bare refusal instead of saying so.
         'If a tool result has an "error", tell the user what it says, for',

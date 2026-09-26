@@ -1,13 +1,15 @@
 // answer.ts — the query pipeline, from a typed question to a grounded answer.
 
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
-import type { ChatMessage, ChatTurn } from '@rag/openai';
+import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
+import { planDates } from './dates.js';
 import { greetingReply } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import { buildPrompt } from './prompt.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import { executeTool, toolsFor } from './tools.js';
+import type { PromptTools } from './tools.js';
 import type {
   Answer,
   HistoryMessage,
@@ -203,10 +205,26 @@ async function toolLoop(
   prompt: ChatMessage[],
   complete: (messages: ChatMessage[]) => Promise<ChatTurn>,
   onTool?: (record: ToolCallRecord) => void,
+  precheck: ToolCall[] = [],
 ): Promise<{ text: string; records: ToolCallRecord[] }> {
   const messages = [...prompt];
   const records: ToolCallRecord[] = [];
   let text = '';
+
+  // D-046: calls the pipeline makes itself, before the model's first turn, for
+  // a date resolved in code. Written into the conversation exactly as if the
+  // model had asked for them, and run through the same executeTool(), so the
+  // enablement check, the validation and the "Checked availability" record
+  // are the ones every call gets.
+  if (precheck.length > 0) {
+    messages.push(assistantToolCallMessage({ content: null, toolCalls: precheck }));
+    for (const call of precheck) {
+      const { record, content } = await executeTool(tenant, call);
+      records.push(record);
+      onTool?.(record);
+      messages.push(toolResultMessage(call.id, content));
+    }
+  }
 
   for (let round = 0; ; round++) {
     const turn = await complete(messages);
@@ -227,6 +245,37 @@ async function toolLoop(
       messages.push(toolResultMessage(call.id, content));
     }
   }
+}
+
+/**
+ * The tools block for this turn, with the message's relative dates resolved
+ * against the TENANT'S today (D-046). "bukas" becomes 2026-09-28 in code, so
+ * the model is handed the date instead of being trusted to count to it,
+ * which it did not do: six relative-date questions out of six came back as
+ * "Which date do you mean?" with no tool call.
+ *
+ * Only tenants with tools get dates: without check_availability there is
+ * nothing to pass a date to, and the northwind prompt stays byte-identical.
+ */
+function withDates(
+  prompt: PromptTools | null,
+  message: string,
+  history: HistoryMessage[],
+): { prompt: PromptTools | null; precheck: ToolCall[] } {
+  if (!prompt) return { prompt: null, precheck: [] };
+  // The user's earlier questions, so a bare "What about the day after
+  // tomorrow?" after an availability question counts as one.
+  const earlier = history.filter((h) => h.role === 'user').map((h) => h.content);
+  const plan = planDates(message, prompt.today, earlier);
+  if (plan.lines.length === 0) return { prompt, precheck: [] };
+
+  const precheck: ToolCall[] = plan.calls.map((args, i) => ({
+    id: `call_resolved_date_${i}`,
+    name: 'check_availability',
+    arguments: JSON.stringify(args),
+  }));
+  console.log(`[query] dates: ${plan.calls.map((c) => JSON.stringify(c)).join(', ') || 'ambiguous, asking'}`);
+  return { prompt: { ...prompt, dates: plan.lines }, precheck };
 }
 
 /**
@@ -285,6 +334,7 @@ export async function answerQuestion({
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
+  const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
 
   // No tools: the path is exactly what it was before tools existed.
   if (tools.definitions.length === 0) {
@@ -310,8 +360,10 @@ export async function answerQuestion({
   // allowed out.
   const { text, records } = await toolLoop(
     tenant,
-    buildPrompt(tenant, matches, history, message, tools.prompt, language),
+    buildPrompt(tenant, matches, history, message, promptTools, language),
     (messages) => chat(messages, { tools: tools.definitions }),
+    undefined,
+    precheck,
   );
   const reply = acceptReply(matches, records, text);
   await saveMessages(tenant, id, message, reply);
@@ -362,6 +414,7 @@ export async function answerQuestionStream({
     prepareAnswer({ tenant, conversationId, message }),
     toolsFor(tenant),
   ]);
+  const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
 
   onMeta({ conversationId: id, searchQuery, sources });
 
@@ -389,9 +442,10 @@ export async function answerQuestionStream({
     const hold = matches.length === 0;
     const { text, records } = await toolLoop(
       tenant,
-      buildPrompt(tenant, matches, history, message, tools.prompt, language),
+      buildPrompt(tenant, matches, history, message, promptTools, language),
       (messages) => chatStream(messages, onDelta, { tools: tools.definitions, holdContent: hold }),
       onTool,
+      precheck,
     );
     const reply = acceptReply(matches, records, text);
     if (hold) onDelta(reply);
