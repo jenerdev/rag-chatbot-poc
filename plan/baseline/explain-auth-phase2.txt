@@ -1,0 +1,243 @@
+$ node --conditions=react-server --env-file=../../.env tools/auth-spike.mjs phase2
+
+=== match_chunks (inlined body)
+select c.id, c.document_id, 1 - (c.embedding <=> q.e) as similarity from chunks c, (select embedding as e from chunks where id = 142) q where c.tenant_id = 3 and 1 - (c.embedding <=> q.e) >= 0.3 order by c.embedding <=> q.e limit 5
+
+--- as service_role, planner default
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=396
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> chunks.embedding))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=396
+        ->  Nested Loop (actual rows=29 loops=1)
+              Join Filter: (('1'::double precision - (c.embedding <=> chunks.embedding)) >= '0.3'::double precision)
+              Rows Removed by Join Filter: 1
+              Buffers: shared hit=393
+              ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+                    Index Cond: (id = 142)
+                    Buffers: shared hit=5
+              ->  Seq Scan on chunks c (actual rows=30 loops=1)
+                    Filter: (tenant_id = 3)
+                    Rows Removed by Filter: 4
+                    Buffers: shared hit=8
+Planning:
+  Buffers: shared hit=183
+Planning Time: 1.904 ms
+Execution Time: 1.868 ms
+
+--- as villa's token, planner default
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=367
+  InitPlan 1
+    ->  Result (actual rows=1 loops=1)
+          Buffers: shared hit=5
+  InitPlan 2
+    ->  Result (actual rows=1 loops=1)
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> chunks.embedding))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=367
+        ->  Result (actual rows=29 loops=1)
+              One-Time Filter: ((InitPlan 1).col1 = 3)
+              Buffers: shared hit=367
+              ->  Nested Loop (actual rows=29 loops=1)
+                    Join Filter: (('1'::double precision - (c.embedding <=> chunks.embedding)) >= '0.3'::double precision)
+                    Rows Removed by Join Filter: 1
+                    Buffers: shared hit=130
+                    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+                          Index Cond: (id = 142)
+                          Filter: (tenant_id = (InitPlan 2).col1)
+                          Buffers: shared hit=2
+                    ->  Seq Scan on chunks c (actual rows=30 loops=1)
+                          Filter: (tenant_id = 3)
+                          Rows Removed by Filter: 4
+                          Buffers: shared hit=8
+Planning:
+  Buffers: shared hit=12
+Planning Time: 0.192 ms
+Execution Time: 1.161 ms
+
+--- as service_role, enable_seqscan off
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=360
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> chunks.embedding))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=360
+        ->  Nested Loop (actual rows=29 loops=1)
+              Join Filter: (('1'::double precision - (c.embedding <=> chunks.embedding)) >= '0.3'::double precision)
+              Rows Removed by Join Filter: 1
+              Buffers: shared hit=360
+              ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+                    Index Cond: (id = 142)
+                    Buffers: shared hit=2
+              ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=30 loops=1)
+                    Index Cond: (tenant_id = 3)
+                    Buffers: shared hit=6
+Planning Time: 0.124 ms
+Execution Time: 0.749 ms
+
+--- as villa's token, enable_seqscan off
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=360
+  InitPlan 1
+    ->  Result (actual rows=1 loops=1)
+  InitPlan 2
+    ->  Result (actual rows=1 loops=1)
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> chunks.embedding))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=360
+        ->  Result (actual rows=29 loops=1)
+              One-Time Filter: ((InitPlan 1).col1 = 3)
+              Buffers: shared hit=360
+              ->  Nested Loop (actual rows=29 loops=1)
+                    Join Filter: (('1'::double precision - (c.embedding <=> chunks.embedding)) >= '0.3'::double precision)
+                    Rows Removed by Join Filter: 1
+                    Buffers: shared hit=128
+                    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+                          Index Cond: (id = 142)
+                          Filter: (tenant_id = (InitPlan 2).col1)
+                          Buffers: shared hit=2
+                    ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=30 loops=1)
+                          Index Cond: (tenant_id = 3)
+                          Buffers: shared hit=6
+Planning Time: 0.171 ms
+Execution Time: 1.008 ms
+
+=== match_chunks_fts (inlined body)
+select c.id, ts_rank(to_tsvector('english', c.content), to_or_tsquery('What time is check-in?')) as rank from chunks c where c.tenant_id = 3 and to_tsvector('english', c.content) @@ to_or_tsquery('What time is check-in?') order by rank desc limit 5
+
+--- as service_role, planner default
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=15
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, content), '''check'' | ''check-in'' | ''time'''::tsquery)) DESC
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=15
+        ->  Seq Scan on chunks c (actual rows=11 loops=1)
+              Filter: ((tenant_id = 3) AND (to_tsvector('english'::regconfig, content) @@ '''check'' | ''check-in'' | ''time'''::tsquery))
+              Rows Removed by Filter: 23
+              Buffers: shared hit=12
+Planning:
+  Buffers: shared hit=98
+Planning Time: 6.250 ms
+Execution Time: 7.022 ms
+
+--- as villa's token, planner default
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=8
+  InitPlan 1
+    ->  Result (actual rows=1 loops=1)
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, c.content), '''check'' | ''check-in'' | ''time'''::tsquery)) DESC
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=8
+        ->  Result (actual rows=11 loops=1)
+              One-Time Filter: ((InitPlan 1).col1 = 3)
+              Buffers: shared hit=8
+              ->  Seq Scan on chunks c (actual rows=11 loops=1)
+                    Filter: ((tenant_id = 3) AND (to_tsvector('english'::regconfig, content) @@ '''check'' | ''check-in'' | ''time'''::tsquery))
+                    Rows Removed by Filter: 23
+                    Buffers: shared hit=8
+Planning Time: 0.273 ms
+Execution Time: 7.072 ms
+
+--- as service_role, enable_seqscan off
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=6
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, content), '''check'' | ''check-in'' | ''time'''::tsquery)) DESC
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=6
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=11 loops=1)
+              Index Cond: (tenant_id = 3)
+              Filter: (to_tsvector('english'::regconfig, content) @@ '''check'' | ''check-in'' | ''time'''::tsquery)
+              Rows Removed by Filter: 19
+              Buffers: shared hit=6
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.265 ms
+Execution Time: 6.932 ms
+
+--- as villa's token, enable_seqscan off
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=6
+  InitPlan 1
+    ->  Result (actual rows=1 loops=1)
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: (ts_rank(to_tsvector('english'::regconfig, c.content), '''check'' | ''check-in'' | ''time'''::tsquery)) DESC
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=6
+        ->  Result (actual rows=11 loops=1)
+              One-Time Filter: ((InitPlan 1).col1 = 3)
+              Buffers: shared hit=6
+              ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=11 loops=1)
+                    Index Cond: (tenant_id = 3)
+                    Filter: (to_tsvector('english'::regconfig, content) @@ '''check'' | ''check-in'' | ''time'''::tsquery)
+                    Rows Removed by Filter: 19
+                    Buffers: shared hit=6
+Planning Time: 0.286 ms
+Execution Time: 7.113 ms
+
+=== HNSW forced: (tenant_id + 0) = 3, enable_seqscan off
+select c.id, 1 - (c.embedding <=> (select embedding from chunks where id = 142)) as similarity from chunks c where (c.tenant_id + 0) = 3 order by c.embedding <=> (select embedding from chunks where id = 142) limit 5
+
+--- as service_role
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=133
+  InitPlan 1
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 142)
+          Buffers: shared hit=2
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 142)
+          Buffers: shared hit=2
+  ->  Index Scan using chunks_embedding_idx on chunks c (actual rows=5 loops=1)
+        Order By: (embedding <=> (InitPlan 2).col1)
+        Filter: ((tenant_id + 0) = 3)
+        Buffers: shared hit=133
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.155 ms
+Execution Time: 0.989 ms
+
+--- as villa's token
+Limit (actual rows=5 loops=1)
+  Buffers: shared hit=250
+  InitPlan 2
+    ->  Index Scan using chunks_pkey on chunks (actual rows=1 loops=1)
+          Index Cond: (id = 142)
+          Filter: (tenant_id = (InitPlan 1).col1)
+          Buffers: shared hit=2
+          InitPlan 1
+            ->  Result (actual rows=1 loops=1)
+  InitPlan 4
+    ->  Index Scan using chunks_pkey on chunks chunks_1 (actual rows=1 loops=1)
+          Index Cond: (id = 142)
+          Filter: (tenant_id = (InitPlan 3).col1)
+          Buffers: shared hit=2
+          InitPlan 3
+            ->  Result (actual rows=1 loops=1)
+  InitPlan 5
+    ->  Result (actual rows=1 loops=1)
+  ->  Sort (actual rows=5 loops=1)
+        Sort Key: ((c.embedding <=> (InitPlan 4).col1))
+        Sort Method: top-N heapsort  Memory: 25kB
+        Buffers: shared hit=250
+        ->  Index Scan using chunks_tenant_idx on chunks c (actual rows=30 loops=1)
+              Index Cond: (tenant_id = (InitPlan 5).col1)
+              Filter: ((tenant_id + 0) = 3)
+              Buffers: shared hit=250
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.152 ms
+Execution Time: 0.968 ms
+
+=== ids through the real functions
+service_role   match_chunks: 142 · 162 · 143 · 168 · 149   match_chunks_fts: 149 · 156 · 168 · 161 · 150
+villa's token  match_chunks: 142 · 162 · 143 · 168 · 149   match_chunks_fts: 149 · 156 · 168 · 161 · 150
+
+=== a chat token WITHOUT app_explain → 42501 auth_explain_token needs a token minted with app_explain

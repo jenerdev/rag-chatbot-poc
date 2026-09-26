@@ -115,7 +115,89 @@ if (mode === 'keygen') {
   console.log(`-- villa (tenant 3), query = chunk ${probe.id}'s embedding, as service_role`);
   console.log(query.replace(/\s+/g, ' '));
   console.log(lines.join('\n'));
+} else if (mode === 'phase2') {
+  // auth-rls Phase 2 (§ 2.3): the SAME two queries explained as service_role
+  // (no RLS) and as villa's token (RLS applies), each with the planner's
+  // default and with seq scans off, then the ids each role gets back from
+  // the real functions. Needs plan/auth-phase2-explain.sql.
+  const { supabase } = await import('../dist/index.js');
+  const jwk = JSON.parse(process.env.TENANT_SIGNING_JWK);
+  const key = createPrivateKey({ key: jwk, format: 'jwk' });
+  const now = Math.floor(Date.now() / 1000);
+  // app_explain is the claim auth_explain_token() demands. No real token has it.
+  const token = jwt({ alg: 'ES256', typ: 'JWT', kid: jwk.kid },
+    { role: 'authenticated', tenant_id: 3, app_explain: true, iat: now, exp: now + 300 },
+    (input) => sign('sha256', Buffer.from(input), { key, dsaEncoding: 'ieee-p1363' }));
+  const asToken = createClient(url, publishable, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const probeId = 142; // villa's first chunk, the Phase 0 baseline's query vector
+  const question = 'What time is check-in?';
+  const queries = {
+    'match_chunks (inlined body)': `select c.id, c.document_id, 1 - (c.embedding <=> q.e) as similarity
+      from chunks c, (select embedding as e from chunks where id = ${probeId}) q
+      where c.tenant_id = 3 and 1 - (c.embedding <=> q.e) >= 0.3
+      order by c.embedding <=> q.e limit 5`,
+    'match_chunks_fts (inlined body)': `select c.id, ts_rank(to_tsvector('english', c.content), to_or_tsquery('${question}')) as rank
+      from chunks c
+      where c.tenant_id = 3 and to_tsvector('english', c.content) @@ to_or_tsquery('${question}')
+      order by rank desc limit 5`,
+  };
+  const roles = [
+    ['service_role', supabase, 'auth_explain'],
+    ["villa's token", asToken, 'auth_explain_token'],
+  ];
+  for (const [name, query] of Object.entries(queries)) {
+    console.log(`\n=== ${name}\n${query.replace(/\s+/g, ' ')}`);
+    for (const seqscan of [true, false]) {
+      for (const [role, client, fn] of roles) {
+        const { data, error } = await client.rpc(fn, { query, seqscan });
+        console.log(`\n--- as ${role}, ${seqscan ? 'planner default' : 'enable_seqscan off'}`);
+        console.log(error ? `ERROR ${error.code} ${error.message}` : data.join('\n'));
+      }
+    }
+  }
+
+  // At 34 chunks the planner never picks the HNSW index in either role, so
+  // the default plans cannot show § 2.3's failure. Force it the way tenancy
+  // Phase 2 did: `tenant_id + 0` makes chunks_tenant_idx unusable for OUR
+  // filter, and seq scans are off. What remains to watch is whether the
+  // policy's own qual steals the plan back to chunks_tenant_idx under RLS.
+  {
+    const query = `select c.id, 1 - (c.embedding <=> (select embedding from chunks where id = ${probeId})) as similarity
+      from chunks c where (c.tenant_id + 0) = 3
+      order by c.embedding <=> (select embedding from chunks where id = ${probeId}) limit 5`;
+    console.log(`\n=== HNSW forced: (tenant_id + 0) = 3, enable_seqscan off\n${query.replace(/\s+/g, ' ')}`);
+    for (const [role, client, fn] of roles) {
+      const { data, error } = await client.rpc(fn, { query, seqscan: false });
+      console.log(`\n--- as ${role}`);
+      console.log(error ? `ERROR ${error.code} ${error.message}` : data.join('\n'));
+    }
+  }
+
+  // The ids, through the real functions, as each role. Rule 3: the same rows.
+  const { data: probe } = await supabase.from('chunks').select('embedding').eq('id', probeId).single();
+  const vector = JSON.parse(probe.embedding);
+  console.log('\n=== ids through the real functions');
+  for (const [role, client] of roles) {
+    const vec = await client.rpc('match_chunks', { query_embedding: vector, p_tenant_id: 3, match_count: 5, min_similarity: 0.3 });
+    const fts = await client.rpc('match_chunks_fts', { query_text: question, query_embedding: vector, p_tenant_id: 3, match_count: 5 });
+    const ids = (r) => (r.error ? `ERROR ${r.error.message}` : r.data.map((x) => x.id).join(' · '));
+    console.log(`${role.padEnd(14)} match_chunks: ${ids(vec)}   match_chunks_fts: ${ids(fts)}`);
+  }
+
+  // The guard: a real chat token, without app_explain, is refused.
+  const plain = jwt({ alg: 'ES256', typ: 'JWT', kid: jwk.kid },
+    { role: 'authenticated', tenant_id: 3, iat: now, exp: now + 300 },
+    (input) => sign('sha256', Buffer.from(input), { key, dsaEncoding: 'ieee-p1363' }));
+  const refused = await createClient(url, publishable, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${plain}` } },
+  }).rpc('auth_explain_token', { query: 'select 1' });
+  console.log(`\n=== a chat token WITHOUT app_explain → ${refused.error ? `${refused.error.code} ${refused.error.message}` : 'ALLOWED'}`);
 } else {
-  console.log('usage: auth-spike.mjs keygen | a | b | auth <email> <password> | explain');
+  console.log('usage: auth-spike.mjs keygen | a | b | auth <email> <password> | explain | phase2');
   process.exitCode = 1;
 }

@@ -812,6 +812,71 @@ for it yet.
 
 ---
 
+## Auth-rls Phase 2: the index under RLS (2026-09-26)
+
+**Setup:** the same two tenants (villa, id 3, 30 chunks, among 34). The query
+vector is chunk 142's stored embedding, and the full-text question is "What
+time is check-in?".
+- Each query is explained twice: as `service_role`, which bypasses RLS, and as
+  villa's token, where the Phase 1 policies apply.
+- It goes through two temporary helpers (`plan/auth-phase2-explain.sql`).
+  `auth_explain_token` refuses any token without an `app_explain` claim, and a
+  real chat token got `42501`.
+- Full output: `plan/baseline/explain-auth-phase2.txt`, from
+  `auth-spike.mjs phase2`.
+
+**1. The policy costs no access path.** In every pair, the token's plan
+reads through the same scan as service_role's, and adds only a one-time
+check:
+
+| Query | Setting | service_role | villa's token |
+|---|---|---|---|
+| `match_chunks` body | default | Seq Scan, top-N sort, 1.898 ms | Seq Scan, top-N sort, 0.929 ms |
+| `match_chunks` body | seqscan off | `chunks_tenant_idx`, sort, 0.790 ms | `chunks_tenant_idx`, sort, 0.929 ms |
+| `match_chunks_fts` body | default | Seq Scan, sort, 8.049 ms | Seq Scan, sort, 7.437 ms |
+| `match_chunks_fts` body | seqscan off | `chunks_tenant_idx`, sort, 6.984 ms | `chunks_tenant_idx`, sort, 7.094 ms |
+
+Under the token, the policy appears as `InitPlan 1` (`app_tenant_id()`,
+evaluated **once**), plus `One-Time Filter: ((InitPlan 1).col1 = 3)`. The
+planner combined the policy's `tenant_id = $1` with the query's own
+`tenant_id = 3` into a single constant check, done before any row is read.
+It is not a per-row function call, which is what wrapping the helper in
+`(select …)` was for. The timings are sub-millisecond noise at 34 rows, in
+both directions.
+
+**2. The ids are identical.** These come through the real functions, as each
+role:
+
+| Function | service_role | villa's token |
+|---|---|---|
+| `match_chunks` | 142 · 162 · 143 · 168 · 149 | 142 · 162 · 143 · 168 · 149 |
+| `match_chunks_fts` | 149 · 156 · 168 · 161 · 150 | 149 · 156 · 168 · 161 · 150 |
+
+**3. Forced HNSW: RLS steers the plan to the tenant index, not to a Seq
+Scan.** This uses `(tenant_id + 0) = 3` with seq scans off, the tenancy
+Phase 2 trick.
+- **service_role** walks `chunks_embedding_idx` (`Order By: embedding <=>
+  …`, 5 rows).
+- **villa's token** takes `chunks_tenant_idx` with `Index Cond: (tenant_id =
+  (InitPlan 5).col1)` plus a sort, reading 30 rows.
+- So the policy qual is not blocked by leakproofness: Postgres uses it as an
+  index condition. With that condition available, the tenant B-tree and an
+  exact sort beat the forced HNSW walk. That is the same exact-search shape
+  tenancy Phase 2 found the real query already uses at this size.
+- **What this does not show:** whether HNSW is still chosen under RLS once a
+  tenant is large enough that the B-tree plus sort costs more. That is the
+  same scale question R-10 leaves open, now with RLS in it.
+
+**Chosen: nothing to change.**
+- No Seq Scan appeared where there was an index, and the ids are identical.
+- The policies stay as written: `(select public.app_tenant_id())`, with no
+  `leakproof` marking. Nothing needs it.
+
+**Re-measure with R-10's re-measurement** (ten tenants, fifty), and do it
+**as a token**. From Phase 4 on, that is how every search runs.
+
+---
+
 ## Before using any of this on real documents
 
 **Every number in this file was measured on one invented 2,607-character

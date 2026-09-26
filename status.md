@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 1 done)
+> Last updated: 2026-09-26 (auth-rls Phase 2 done)
 
 ---
 
@@ -35,7 +35,9 @@
   `feat/auth-rls`). **Phase 0 done 2026-09-26:** option A works (D-039), and
   the baseline is in `plan/baseline/*-pre-auth.txt`. **Phase 1 done
   2026-09-26:** `schema-auth.sql` applied, verify 47/47, and the app is
-  unchanged (eval 18/19 verdict for verdict). Next is Phase 2. Bookings is complete and merged
+  unchanged (eval 18/19 verdict for verdict). **Phase 2 done:** RLS costs
+  no access path and the ids are identical, so nothing changed. Next is
+  Phase 3. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -132,15 +134,27 @@ shared by both, as shown in the dashboard.
   - `app_is_admin()` is security invoker;
   - every write policy also checks the tenant.
 
-**▶ Auth + RLS Phase 2: measure the index under RLS.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 2.3, § 3 Phase 2.
-- Run `explain analyze` of `match_chunks` and `match_chunks_fts` for villa
-  **as a chat token**, and compare it with
-  `plan/baseline/explain-pre-auth.txt` and its chunk ids.
-- `auth_explain()` is service_role-only, so measuring as a token needs
-  either a token-callable variant or `set local role authenticated` plus
-  `request.jwt.claims` inside it.
-- Write both plans into `notes.md`.
+~~**Auth + RLS Phase 2: measure the index under RLS.**~~ **Done 2026-09-26.**
+`plan/auth-phase2-explain.sql` was run by the user. Both search bodies were
+explained as service_role and as villa's token (`notes.md` § "Auth-rls
+Phase 2").
+- **Same access path in every pair.** The policy shows up as one
+  `InitPlan` plus a `One-Time Filter`, not a per-row call.
+- **Identical ids:** `match_chunks` 142 · 162 · 143 · 168 · 149 and
+  `match_chunks_fts` 149 · 156 · 168 · 161 · 150.
+- **With HNSW forced,** the token's plan takes `chunks_tenant_idx` (the
+  policy qual as its Index Cond) rather than a Seq Scan.
+- **Chosen:** nothing to change, and no `leakproof`.
+- **Still to drop:** `whoami`, `auth_explain` and `auth_explain_token`
+  (statements at the bottom of the file).
+
+**▶ Auth + RLS Phase 3: tenant tokens and scoped clients.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 3.
+- `mintTenantToken()` in `@rag/db`, on a **fresh** key. Import it as
+  standby, and delete the spike key `ea5ce335…` from the dashboard (D-039
+  caveat).
+- Scoped clients per request.
+- `loadTenant` switches to `tenant_public(slug)`.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -674,6 +688,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 2)
+- **Did:**
+  - wrote `plan/auth-phase2-explain.sql`: `auth_explain(query, seqscan)`
+    for service_role, and `auth_explain_token`, which needs an
+    `app_explain` claim;
+  - added `auth-spike.mjs phase2`;
+  - wrote the result into `notes.md`.
+- **Observed:**
+  - every pair has the same scan, and the token adds `InitPlan` plus
+    `One-Time Filter: ((InitPlan 1).col1 = 3)`;
+  - the ids are identical for both functions;
+  - with HNSW forced, service_role walks `chunks_embedding_idx` while the
+    token uses `chunks_tenant_idx` with the policy qual as its Index Cond;
+  - a chat token without `app_explain` gets `42501`.
+- **Chosen:** no change.
+- **Next:** Phase 3.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 1)
 - **Did:**

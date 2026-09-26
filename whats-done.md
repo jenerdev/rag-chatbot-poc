@@ -4119,3 +4119,57 @@ be applied, and proved, with nothing in the app changed.
   `(select public.app_tenant_id())`, which runs once as an InitPlan and
   makes the qual `tenant_id = $1`. Whether the plan really is unchanged is
   Phase 2's measurement.
+
+---
+
+## Auth + RLS Phase 2 — the index under RLS, measured · done 2026-09-26
+
+**What was done:**
+- Explained the bodies of `match_chunks` and `match_chunks_fts` for villa
+  twice: as service_role, which has no RLS, and as villa's tenant token,
+  under the Phase 1 policies.
+- Each was run with the planner's default and with seq scans off. There was
+  also a forced-HNSW pair.
+- Compared the ids each role gets from the real functions.
+- The helpers are in `plan/auth-phase2-explain.sql`, the runner is
+  `auth-spike.mjs phase2`, the output is
+  `plan/baseline/explain-auth-phase2.txt`, and the write-up is in `notes.md`.
+
+**Why it mattered:** RLS applies policies as security-barrier quals, which
+can quietly change what the planner is willing to do with an index. The
+results stay correct and the plan gets slower (§ 2.3). The only way to see
+it is to explain AS a token. The Phase 0 baseline was service_role and could
+not show it.
+
+**What each observed value proves:**
+- **Every token plan uses the same scan as its service_role twin.** Seq Scan
+  for Seq Scan, `chunks_tenant_idx` for `chunks_tenant_idx`, in all four
+  pairs. The policy adds no access path and removes none.
+- **`InitPlan 1` plus `One-Time Filter: ((InitPlan 1).col1 = 3)`.** The
+  policy's `app_tenant_id()` is evaluated once per query, not per row, and
+  folded against the query's own `tenant_id = 3`. That is the
+  `(select …)` wrapping from Phase 1 working as intended.
+- **Identical ids** (`142 · 162 · 143 · 168 · 149`, and `149 · 156 · 168 ·
+  161 · 150`). Under the policies, the searches return the same rows. That
+  is Rule 3's precondition for Phase 4 moving chat onto tokens.
+- **Forced HNSW: service_role walks `chunks_embedding_idx`, while the token
+  takes `chunks_tenant_idx` with `Index Cond: (tenant_id = (InitPlan
+  5).col1)`.** The policy qual is usable as an index condition, so
+  leakproofness is not blocking it. The planner prefers an exact tenant-scoped
+  sort to the forced walk. That is not a regression: it is the plan tenancy
+  Phase 2 found the real query already uses at this size.
+- **A chat token without `app_explain` → `42501`.** The token-callable
+  explain helper is unreachable with any real token.
+
+**Chosen:** nothing to change. There is no `leakproof` marking and no policy
+rewrite.
+
+**What this does not settle:** whether HNSW is still picked under RLS for a
+tenant large enough that the B-tree plus sort costs more. That is R-10's
+scale question. It is now written down to be re-measured as a token, since
+from Phase 4 that is how searches run.
+
+**Trap avoided:** my first forced-HNSW attempt ran from `scratch/`, where
+`@supabase/supabase-js` does not resolve, and its error text was appended to
+the results file. The pair was moved into `auth-spike.mjs phase2` and the
+file regenerated, so the evidence is one clean, reproducible run.
