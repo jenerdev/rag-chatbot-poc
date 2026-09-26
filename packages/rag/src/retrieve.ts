@@ -1,7 +1,6 @@
 // retrieve.ts — question -> standalone query -> two searches -> one ranked list.
 
 import { chat } from '@rag/openai';
-import { supabase } from '@rag/db';
 import type { FtsRow, MatchRow } from '@rag/db';
 import { CANDIDATE_COUNT, MATCH_COUNT, MIN_SIMILARITY, REWRITE_MAX_TOKENS, RRF_K } from './constants.js';
 import type { FoundBy, HistoryMessage, RetrievedChunk, TenantContext } from './types.js';
@@ -134,13 +133,13 @@ export async function retrieve(
   // The two searches are independent, so run them at the same time. Both are
   // Postgres round trips; doing them in sequence would just be slower.
   const [vectorResult, keywordResult] = await Promise.all([
-    supabase.rpc('match_chunks', {
+    tenant.db.rpc('match_chunks', {
       query_embedding: questionVector,
       p_tenant_id: tenant.id,
       match_count: CANDIDATE_COUNT,
       min_similarity: MIN_SIMILARITY,
     }),
-    supabase.rpc('match_chunks_fts', {
+    tenant.db.rpc('match_chunks_fts', {
       query_text: question,
       query_embedding: questionVector,
       p_tenant_id: tenant.id,

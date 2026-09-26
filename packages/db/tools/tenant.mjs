@@ -11,7 +11,8 @@
 // Carries --conditions=react-server like every script that touches @rag/db
 // (CLAUDE.md rule 4). The flag is in package.json.
 
-import { generateAdminKey, hashAdminKey, supabase } from '../dist/index.js';
+import { generateAdminKey, hashAdminKey } from '../dist/index.js';
+import { supabase } from '../dist/service.js';
 
 const [command, slug, businessName, assistantName] = process.argv.slice(2).filter((a) => a !== '--');
 

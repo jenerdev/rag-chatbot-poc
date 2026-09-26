@@ -11,7 +11,6 @@
 // requests race (plan/bookings.md § 2.2). The insert is attempted, and
 // Postgres says no.
 
-import { supabase } from '@rag/db';
 import {
   MAX_AVAILABILITY_DAYS,
   MAX_GUEST_NAME,
@@ -41,7 +40,7 @@ import { isIsoDate, localDate, optionalText, requireText, validateRange } from '
  * "today in UTC" below.
  */
 export async function bookingsConfig(tenant: BookingTenant): Promise<BookingsConfig | null> {
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('tenant_applications')
     .select('config')
     .eq('tenant_id', tenant.id)
@@ -85,7 +84,7 @@ export async function checkAvailability(
     allowPast: false,
   });
 
-  const { data, error } = await supabase.rpc('check_availability', {
+  const { data, error } = await tenant.db.rpc('check_availability', {
     p_tenant_id: tenant.id,
     p_from: from,
     p_to: to,
@@ -104,7 +103,7 @@ export async function checkAvailability(
 /** This tenant's units, by name. */
 export async function listUnits(tenant: BookingTenant): Promise<UnitSummary[]> {
   await requireConfig(tenant);
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('units')
     .select('id, name')
     .eq('tenant_id', tenant.id)
@@ -116,7 +115,7 @@ export async function listUnits(tenant: BookingTenant): Promise<UnitSummary[]> {
 /** This tenant's slots, in the order they start in a day. */
 export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
   await requireConfig(tenant);
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('slots')
     .select('id, name, start_time, duration')
     .eq('tenant_id', tenant.id)
@@ -151,7 +150,7 @@ export async function listBookings(
     allowPast: true,
   });
 
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('bookings')
     .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, created_at')
     .eq('tenant_id', tenant.id)
@@ -219,7 +218,7 @@ export async function createBooking(tenant: BookingTenant, input: NewBooking): P
       : positiveInt(input.guestCount, 'Guest count');
   const status = input.status === undefined ? 'confirmed' : bookableStatus(input.status);
 
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('bookings')
     .insert({
       tenant_id: tenant.id,
@@ -262,7 +261,7 @@ export async function cancelBooking(tenant: BookingTenant, id: unknown): Promise
   await requireConfig(tenant);
   const bookingId = positiveInt(id, 'Booking id');
 
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('bookings')
     .update({ status: 'cancelled' })
     .eq('tenant_id', tenant.id)

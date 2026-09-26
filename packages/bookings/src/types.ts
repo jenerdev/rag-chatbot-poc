@@ -6,6 +6,8 @@
 // and is returned only by listBookings, which the admin routes call behind
 // requireAdmin().
 
+import type { DbClient } from '@rag/db';
+
 /**
  * The part of a tenant this package needs.
  *
@@ -19,6 +21,13 @@
 export interface BookingTenant {
   id: number;
   slug: string;
+  /**
+   * The database as this tenant (auth-rls Phase 3). Pipeline's TenantContext
+   * carries the same field. RLS behind every tenant_id filter here: a chat
+   * token reads no `bookings` row at all, and check_availability, which is
+   * security definer, checks the token's tenant itself.
+   */
+  db: DbClient;
 }
 
 /**

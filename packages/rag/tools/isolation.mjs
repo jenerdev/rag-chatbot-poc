@@ -8,11 +8,27 @@
 // It writes, and cleans up after itself: two conversations, and one probe
 // document ingested into villa and then deleted.
 //
-// Run:  pnpm --filter @rag/pipeline isolation
+// TWO WALLS (plan/auth-rls.md Rule 1). By default every context is what the
+// app gets from loadTenant(): a CHAT token, so both the code filters and RLS
+// stand between the tenants. With --filters-only, every context's db is the
+// service client instead. RLS is bypassed, and only the `.eq('tenant_id', …)`
+// filters are left. The suite must pass BOTH ways. Passing only the first
+// would mean nobody knows whether the filters still hold.
+//
+// Admin writes (the probe ingest and its delete) run on the service client in
+// both modes, until auth-rls Phase 5 gives the tools an operator member to
+// mint a staff token for. That is setup, not the thing under test.
+//
+// Run:  pnpm --filter @rag/pipeline isolation [-- --filters-only]
+import { supabase as service } from '@rag/db/service';
 import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
-const nw = await loadTenant('northwind'), villa = await loadTenant('villa');
+const filtersOnly = process.argv.includes('--filters-only');
+const as = (t) => (t && filtersOnly ? { ...t, db: service } : t);
+console.log(filtersOnly ? 'WALL: code filters alone (service client, RLS bypassed)' : 'WALL: filters + RLS (chat tokens, as the app)');
+const nw = as(await loadTenant('northwind')), villa = as(await loadTenant('villa'));
+const villaAdmin = { ...villa, db: service }; // until Phase 5's operator member
 check(nw && villa && (await loadTenant('nope')) === null, 'loadTenant', `northwind ${nw?.id}, villa ${villa?.id}, nope null`);
 check(!('adminKeyHash' in nw) && !('admin_key_hash' in nw), 'no admin hash in TenantContext', Object.keys(nw).join(','));
 const dn = await listDocuments(nw), dv = await listDocuments(villa);
@@ -29,8 +45,8 @@ const hijack = await answerQuestion({ tenant: nw, conversationId: aV.conversatio
 check(hijack.conversationId !== aV.conversationId, 'a villa conversation id is not reused by northwind', `${aV.conversationId.slice(0,8)} -> ${hijack.conversationId.slice(0,8)}`);
 const mX = await getMessages(nw, aV.conversationId), mV = await getMessages(villa, aV.conversationId);
 check(mX === null && mV?.length === 2, 'getMessages cross-tenant is null', `northwind ${mX}, villa ${mV?.length} messages`);
-const r = await ingestDocument({ tenant: villa, title: 'isolation probe', content: 'The probe word is zanzibarquartz.' });
+const r = await ingestDocument({ tenant: villaAdmin, title: 'isolation probe', content: 'The probe word is zanzibarquartz.' });
 const inV = (await listDocuments(villa)).some(d => d.id === r.id && d.chunkCount === 1), inN = (await listDocuments(nw)).some(d => d.id === r.id);
 check(inV && !inN, 'ingest lands in the right tenant, chunks and all', `doc ${r.id}, ${r.chunkCount} chunk`);
-check(await deleteDocument(villa, r.id), 'probe document removed', `doc ${r.id}`);
+check(await deleteDocument(villaAdmin, r.id), 'probe document removed', `doc ${r.id}`);
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');

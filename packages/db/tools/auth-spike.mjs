@@ -100,7 +100,7 @@ if (mode === 'keygen') {
     await whoami(token, 'auth');
   }
 } else if (mode === 'explain') {
-  const { supabase } = await import('../dist/index.js');
+  const { supabase } = await import('../dist/service.js');
   // A villa chunk's own embedding as the query, as in tenancy Phase 2: no API
   // key, and a known nearest neighbour. This is match_chunks' body inlined,
   // because explaining the function call shows only "Function Scan".
@@ -120,7 +120,7 @@ if (mode === 'keygen') {
   // (no RLS) and as villa's token (RLS applies), each with the planner's
   // default and with seq scans off, then the ids each role gets back from
   // the real functions. Needs plan/auth-phase2-explain.sql.
-  const { supabase } = await import('../dist/index.js');
+  const { supabase } = await import('../dist/service.js');
   const jwk = JSON.parse(process.env.TENANT_SIGNING_JWK);
   const key = createPrivateKey({ key: jwk, format: 'jwk' });
   const now = Math.floor(Date.now() / 1000);

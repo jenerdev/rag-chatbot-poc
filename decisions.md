@@ -1314,9 +1314,20 @@ nothing that Supabase is retiring, which B does.
 same signal: chat tokens start failing with PGRST301. Or: a key rotation in
 the dashboard revokes the imported key. If so, fall back to C, not B.
 
-**Caveat:** the spike's key (`ea5ce335…`) had its private half shown in
-the session transcript. Phase 3 generates a fresh key for real use, stores
-it only in `.env`, and deletes `ea5ce335…` from the dashboard (R-19).
+**Caveat, resolved in Phase 3 (2026-09-26):** the spike's key
+(`ea5ce335…`) had its private half shown in the session transcript. Phase 3
+replaced it with `45345cbc…`:
+- generated straight into `scratch/`, with only its kid printed;
+- copied to the dashboard with `clip`, never displayed;
+- stored in `.env` as `TENANT_SIGNING_JWK`.
+
+`ea5ce335…` was then revoked. A token it signs now gets `401 PGRST301`, and
+the JWKS lists only `45345cbc…` and Supabase's `cb77f580…`.
+
+**Found while swapping:** the dashboard allows **one standby key at a
+time**. Replacing ours means removing the old standby first, which is a
+short window in which no tenant token verifies. At a real deployment, that
+is a rotation to schedule, not a click.
 
 ---
 

@@ -13,7 +13,8 @@
 //
 // Run:  pnpm --filter @rag/bookings isolation
 
-import { supabase } from '@rag/db';
+import { mintTenantToken, scopedClient } from '@rag/db';
+import { supabase } from '@rag/db/service';
 import {
   BookingConflictError,
   BookingInputError,
@@ -47,8 +48,16 @@ const { data: tenants, error: tenantError } = await supabase
   .select('id, slug')
   .in('slug', ['villa', 'northwind']);
 if (tenantError) throw new Error(tenantError.message);
-const villa = tenants.find((t) => t.slug === 'villa');
-const northwind = tenants.find((t) => t.slug === 'northwind');
+// Staff work (list, book, cancel) runs on the service client. RLS is
+// bypassed, so every check below is the CODE FILTERS' wall, alone (auth-rls
+// Rule 1). Until Phase 5 there is no member to mint a staff token for anyway.
+// Availability is what the chatbot asks, so it runs on a CHAT token, as the
+// tool executor's does. That also puts the security-definer
+// check_availability's own tenant check in the path.
+const withDb = (t) => t && { id: t.id, slug: t.slug, db: supabase };
+const chat = (t) => ({ ...t, db: scopedClient(mintTenantToken({ tenantId: t.id })) });
+const villa = withDb(tenants.find((t) => t.slug === 'villa'));
+const northwind = withDb(tenants.find((t) => t.slug === 'northwind'));
 if (!villa || !northwind) throw new Error('Needs tenants villa and northwind');
 
 // 300 days out, in villa's timezone: far enough that no real booking is there.
@@ -65,7 +74,7 @@ const { data: probeRow, error: probeError } = await supabase
   .select('id, slug')
   .single();
 if (probeError) throw new Error(`Could not create the probe tenant: ${probeError.message}`);
-const probe = { id: probeRow.id, slug: probeRow.slug };
+const probe = { id: probeRow.id, slug: probeRow.slug, db: supabase };
 
 let villaBookingId = null;
 try {
@@ -79,7 +88,7 @@ try {
   //    error, the same answer "no such route" would give.
   {
     const errors = await Promise.all([
-      thrown(() => checkAvailability(northwind, { from: probeDate })),
+      thrown(() => checkAvailability(chat(northwind), { from: probeDate })),
       thrown(() => listBookings(northwind, { from: probeDate })),
       thrown(() => cancelBooking(northwind, 1)),
     ]);
@@ -121,7 +130,7 @@ try {
 
   // 4. Villa's availability shows it, and carries no guest data.
   {
-    const rows = await checkAvailability(villa, { from: probeDate });
+    const rows = await checkAvailability(chat(villa), { from: probeDate });
     const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))].sort().join(',');
     const text = JSON.stringify(rows);
     check(
@@ -144,7 +153,7 @@ try {
       "probe: listBookings does not include villa's booking",
       `${probeList.length} rows`,
     );
-    const probeAvailability = await checkAvailability(probe, { from: probeDate });
+    const probeAvailability = await checkAvailability(chat(probe), { from: probeDate });
     check(
       probeAvailability.every((r) => r.unit === 'Probe unit' && r.status === 'open'),
       "probe: availability shows only its own unit, all open",
@@ -187,7 +196,7 @@ try {
 
   // 8. A past date is refused, measured against the tenant's today.
   {
-    const past = await thrown(() => checkAvailability(villa, { from: day(-1) }));
+    const past = await thrown(() => checkAvailability(chat(villa), { from: day(-1) }));
     check(
       past instanceof BookingInputError && past.message.includes('is in the past'),
       'villa: yesterday is refused',

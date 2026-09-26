@@ -1,7 +1,7 @@
 import 'server-only';
 import type { CSSProperties } from 'react';
 import { z } from 'zod';
-import { supabase } from '@rag/db';
+import { anonClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
 
 // Per-tenant branding: server data becoming markup (plan.md § 2.4).
@@ -70,16 +70,14 @@ export function themeVars(theme: unknown): CSSProperties {
 /**
  * Load a tenant's branding, validated on READ as well as on write.
  *
- * The three columns are named explicitly. Never `select('*')`, which would
- * fetch `admin_key_hash` into an object bound for a Client Component's props.
+ * Through `tenant_public(slug)`, the same function loadTenant() uses: no token
+ * can read `tenants` directly (auth-rls Phase 1), and that function's column
+ * list has no `admin_key_hash` in it to fetch into a Client Component's props.
  */
 export async function loadBranding(tenant: TenantContext): Promise<Branding> {
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('logo_url, banner_url, theme')
-    .eq('id', tenant.id)
-    .single();
-  if (error) throw new Error(`Could not load branding for "${tenant.slug}": ${error.message}`);
+  const { data: rows, error } = await anonClient().rpc('tenant_public', { p_slug: tenant.slug });
+  const data = rows?.[0];
+  if (error || !data) throw new Error(`Could not load branding for "${tenant.slug}": ${error?.message ?? 'no such tenant'}`);
 
   return {
     businessName: tenant.businessName,

@@ -4,7 +4,7 @@
 // have, documented in a JSDoc block and enforced by nothing. They are the API
 // between the pipeline and the two screens, so they get names.
 
-import type { MatchRow } from '@rag/db';
+import type { DbClient, MatchRow } from '@rag/db';
 
 /**
  * What the pipeline needs to know about a tenant.
@@ -23,6 +23,20 @@ export interface TenantContext {
   slug: string;
   businessName: string;
   assistantName: string;
+  /**
+   * The database, AS this tenant: a client holding a token minted for it
+   * (auth-rls Phase 3, D-039). Postgres's RLS policies compare every row
+   * against that token, so this is the second wall behind every
+   * `.eq('tenant_id', …)` below, which all stay (Rule 1).
+   *
+   * D-027 said a forgotten tenant should not compile. Now a forgotten tenant
+   * also means no database at all: there is no module-level client left to
+   * reach for.
+   *
+   * NEVER pass a TenantContext to a Client Component. Pages pass named props.
+   * The token in here is five minutes of this tenant's database.
+   */
+  db: DbClient;
 }
 
 /** Which search found a chunk. Rendered as a badge in the sources panel (D-015). */

@@ -2,7 +2,6 @@
 
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn } from '@rag/openai';
-import { supabase } from '@rag/db';
 import { MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { greetingReply } from './greeting.js';
 import { buildPrompt } from './prompt.js';
@@ -39,7 +38,7 @@ async function ensureConversation(
   conversationId: string | null,
 ): Promise<string> {
   if (conversationId) {
-    const { data: owned, error } = await supabase
+    const { data: owned, error } = await tenant.db
       .from('conversations')
       .select('id')
       .eq('tenant_id', tenant.id)
@@ -50,7 +49,7 @@ async function ensureConversation(
     console.log(`[query] ${tenant.slug}: conversation ${conversationId} is not this tenant's; starting a new one`);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('conversations')
     .insert({ tenant_id: tenant.id })
     .select('id')
@@ -93,7 +92,7 @@ async function prepareAnswer({
   //    "the last 6" needs a descending query but the model needs chronological
   //    order. Ordered by id rather than created_at — two rows written in the
   //    same millisecond would otherwise have no defined order.
-  const { data: recent, error: historyError } = await supabase
+  const { data: recent, error: historyError } = await tenant.db
     .from('messages')
     .select('role, content')
     .eq('tenant_id', tenant.id)
@@ -132,7 +131,7 @@ async function prepareAnswer({
   //    too: a title is not a secret, but another tenant's title in this
   //    tenant's sources panel is a leak.
   const documentIds = [...new Set(matches.map((m) => m.document_id))];
-  const { data: docs, error: titleError } = await supabase
+  const { data: docs, error: titleError } = await tenant.db
     .from('documents')
     .select('id, title')
     .eq('tenant_id', tenant.id)
@@ -408,7 +407,7 @@ async function saveMessages(
   // tenant_id on each row is checked by the composite foreign key against the
   // conversation's own tenant_id. A message cannot land in another tenant's
   // conversation even if this code were wrong.
-  const { error } = await supabase.from('messages').insert([
+  const { error } = await tenant.db.from('messages').insert([
     { tenant_id: tenant.id, conversation_id: conversationId, role: 'user', content: userMessage },
     { tenant_id: tenant.id, conversation_id: conversationId, role: 'assistant', content: assistantMessage },
   ]);
@@ -428,7 +427,7 @@ export async function getMessages(
   tenant: TenantContext,
   conversationId: string,
 ): Promise<{ role: 'user' | 'assistant'; content: string; created_at: string }[] | null> {
-  const { data: owned, error: ownError } = await supabase
+  const { data: owned, error: ownError } = await tenant.db
     .from('conversations')
     .select('id')
     .eq('tenant_id', tenant.id)
@@ -437,7 +436,7 @@ export async function getMessages(
   if (ownError) throw new Error(`Could not load the conversation: ${ownError.message}`);
   if (!owned) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('messages')
     .select('role, content, created_at')
     .eq('tenant_id', tenant.id)

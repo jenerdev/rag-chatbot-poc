@@ -29,7 +29,7 @@
 // offsets from today, and hard-deleted at the end so it never sits in villa's
 // real calendar.
 import { readFileSync } from 'node:fs';
-import { supabase } from '@rag/db';
+import { supabase } from '@rag/db/service';
 import { createBooking, listSlots, listUnits, localDate } from '@rag/bookings';
 import { answerQuestion, getMessages, loadTenant, NO_ANSWER } from '../dist/index.js';
 
@@ -314,6 +314,11 @@ for (const slug of ['northwind', 'villa']) {
   tenants[slug] = await loadTenant(slug);
   if (!tenants[slug]) throw new Error(`No "${slug}" tenant. Both must be loaded (plan.md Phase 2).`);
 }
+// Every question below goes through tenants[slug], a CHAT token context,
+// exactly as the chat route's does. So the battery runs under RLS (auth-rls
+// Rule 3: same verdicts). Seeding the fixture is staff work, and until Phase
+// 5's operator member it runs on the service client, as setup.
+const villaAdmin = { ...tenants.villa, db: supabase };
 
 // --- the villa bookings fixture ----------------------------------------------
 const fixture = JSON.parse(readFileSync(new URL('../../../fixtures/villa-bookings.json', import.meta.url), 'utf8'));
@@ -330,14 +335,14 @@ async function removeFixture() {
 
 async function seedFixture() {
   await removeFixture(); // a crashed earlier run may have left one behind
-  const [units, slots] = await Promise.all([listUnits(tenants.villa), listSlots(tenants.villa)]);
+  const [units, slots] = await Promise.all([listUnits(villaAdmin), listSlots(villaAdmin)]);
   for (const b of fixture.bookings) {
     const slot = slots.find((s) => s.name === b.slot);
     if (!slot) throw new Error(`villa has no slot "${b.slot}" — was schema-bookings.sql run?`);
     // createBooking, not a raw insert: the same path staff use. A real booking
     // on the same span is a 409 here, which stops the battery loudly rather
     // than letting the tool cases run against a calendar they did not expect.
-    await createBooking(tenants.villa, {
+    await createBooking(villaAdmin, {
       unitId: units[0].id,
       slotId: slot.id,
       date: plus(b.offsetDays),

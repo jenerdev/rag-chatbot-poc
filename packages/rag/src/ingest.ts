@@ -2,7 +2,6 @@
 
 import { chunkText } from '@rag/chunker';
 import { embed } from '@rag/openai';
-import { supabase } from '@rag/db';
 import type { ChunkSummary, DocumentSummary, IngestResult, TenantContext } from './types.js';
 
 /**
@@ -36,7 +35,7 @@ export async function ingestDocument({
   console.log(`[ingest] ${tenant.slug} "${title}": ${content.length} chars -> ${chunks.length} chunks`);
 
   // 2. Insert the parent row. We need its id before the chunks can reference it.
-  const { data: doc, error: docError } = await supabase
+  const { data: doc, error: docError } = await tenant.db
     .from('documents')
     .insert({ tenant_id: tenant.id, title, source: source || null, content })
     .select('id, title')
@@ -65,7 +64,7 @@ export async function ingestDocument({
     }));
 
     // Every row carries tenant_id (set above), and the composite FK checks it.
-    const { error: chunkError } = await supabase.from('chunks').insert(rows);
+    const { error: chunkError } = await tenant.db.from('chunks').insert(rows);
     if (chunkError) throw new Error(`Could not save the chunks: ${chunkError.message}`);
 
     return { id: doc.id, title: doc.title, chunkCount: chunks.length };
@@ -74,7 +73,7 @@ export async function ingestDocument({
     // did land, so this is safe whether the failure happened before or after
     // the chunk insert.
     console.error(`[ingest] failed after creating document ${doc.id} — cleaning up`);
-    await supabase.from('documents').delete().eq('tenant_id', tenant.id).eq('id', doc.id);
+    await tenant.db.from('documents').delete().eq('tenant_id', tenant.id).eq('id', doc.id);
     throw error;
   }
 }
@@ -97,7 +96,7 @@ export async function ingestDocument({
  * badge stays: a symptom you can see beats one you cannot.
  */
 export async function listDocuments(tenant: TenantContext): Promise<DocumentSummary[]> {
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('documents')
     .select('id, title, source, created_at, chunks!chunks_document_tenant_fk(count)')
     .eq('tenant_id', tenant.id)
@@ -122,7 +121,7 @@ export async function listDocuments(tenant: TenantContext): Promise<DocumentSumm
  * anything to ask about?" is something any visitor may know.
  */
 export async function countDocuments(tenant: TenantContext): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await tenant.db
     .from('documents')
     .select('id', { count: 'exact', head: true })
     .eq('tenant_id', tenant.id);
@@ -143,7 +142,7 @@ export async function countDocuments(tenant: TenantContext): Promise<number> {
  * would let anyone enumerate other tenants' document ids.
  */
 export async function deleteDocument(tenant: TenantContext, id: number): Promise<boolean> {
-  const { error, count } = await supabase
+  const { error, count } = await tenant.db
     .from('documents')
     .delete({ count: 'exact' })
     .eq('tenant_id', tenant.id)
@@ -166,7 +165,7 @@ export async function deleteDocument(tenant: TenantContext, id: number): Promise
  * does not exist.
  */
 export async function getChunks(tenant: TenantContext, documentId: number): Promise<ChunkSummary[]> {
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('chunks')
     .select('id, chunk_index, content')
     .eq('tenant_id', tenant.id)

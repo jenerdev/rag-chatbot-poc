@@ -4173,3 +4173,103 @@ from Phase 4 that is how searches run.
 `@supabase/supabase-js` does not resolve, and its error text was appended to
 the results file. The pair was moved into `auth-spike.mjs phase2` and the
 file regenerated, so the evidence is one clean, reproducible run.
+
+---
+
+## Auth + RLS Phase 3 — tenant tokens and scoped clients · done 2026-09-26
+
+**What was done:**
+- **`@rag/db`:**
+  - `src/tenant-client.ts` holds `mintTenantToken({ tenantId, userId?,
+    admin? })`, hand-rolled ES256 on `node:crypto` in about 30 lines.
+  - It has no `role` parameter, so it cannot mint `service_role`. The token
+    lasts 5 minutes. It validates the tenant id and the uuid, and an admin
+    token requires a user.
+  - The same file holds `scopedClient(token)` and `anonClient()`.
+  - The service client moved to the `@rag/db/service` entry point, and the
+    main entry no longer exports `supabase`, so every old import stopped
+    compiling.
+- **Pipeline and bookings:**
+  - `TenantContext` and `BookingTenant` gained `db`.
+  - All 22 `supabase.` calls in `@rag/pipeline` and `@rag/bookings` became
+    `tenant.db.`, and every `tenant_id` filter stayed.
+  - `loadTenant(slug)` calls `tenant_public` with no token, then mints a
+    **chat** token for the tenant it found.
+- **Web app:**
+  - `loadBranding` uses `tenant_public`.
+  - `env.ts` requires `SUPABASE_PUBLISHABLE_KEY` and `TENANT_SIGNING_JWK`.
+- **Tools:**
+  - they use `@rag/db/service` for setup only: the fixture, the probe
+    tenants, and the admin writes until Phase 5;
+  - `verify.mjs` now uses the shipped `mintTenantToken`;
+  - rag isolation gained `--filters-only`.
+- **Key swap:**
+  - generated a fresh key (`45345cbc…`) without displaying it, and the user
+    imported it as standby;
+  - swapped `.env`;
+  - the spike key `ea5ce335…` is revoked.
+
+**Why it mattered:** this is the step where Postgres starts enforcing the
+tenant on real requests. Until now the policies existed, but everything
+bypassed them. It is also where a forgotten tenant stops meaning "a query
+without a filter" and starts meaning "no database at all": there is no
+module-level client left to reach for.
+
+**What each observed value proves:**
+- **Eval 18/19 (`original 9/10 · tool 9/9`), PASS/FAIL identical to
+  `eval-pre-auth.txt`, with every question on a chat token.** The whole chat
+  path runs under RLS and returns the same answers and refusals: retrieval,
+  history, the transcript and the `check_availability` tool. No policy is too
+  tight (Rule 3).
+- **rag isolation 11/11 on chat tokens, AND 11/11 with `--filters-only`.**
+  - The first run has both walls up.
+  - The second has the service client under every context, so RLS is
+    bypassed and only the code filters stand.
+  - That is Rule 1's "filters alone" half, still true after the refactor.
+    (Phase 1's verify checks are the "RLS alone" half.)
+- **bookings isolation 12/12.** Staff operations run on the service client,
+  which is filters alone. Availability runs on chat tokens, through the
+  security-definer function's own tenant check.
+- **verify 47/47 with the shipped signer, then again on the new key.** The
+  19 RLS checks now test the code the app mints with, not a copy.
+- **The token header now carries `kid 45345cbc…`.**
+  - A token from the revoked spike key gets `401 PGRST301`.
+  - A `mintTenantToken` token gets `200` from `whoami`, with
+    `{"role":"authenticated","tenant_id":3}`.
+  - The JWKS lists only `45345cbc…` and `cb77f580…`.
+  - The key whose private half was in the transcript no longer opens
+    anything.
+- **`grep -rn "@rag/db/service" apps packages/*/src`** prints the one
+  documented exception (`apps/web/lib/admin-auth.ts`) plus comments.
+
+**Deviations from the plan, with the reasoning:**
+1. **The done-when grep has one hit, not zero.** `checkAdminKey()` must read
+   `tenants.admin_key_hash`, and by design no token can. The admin key is
+   the plan's own "way back in" until Phase 6, which deletes it. So the
+   exception is commented at the import and ends in Phase 6, whose REQUIRED
+   list already drops the service key.
+2. **Phase 4's step 1 happened here.** `loadTenant` mints the chat token, so
+   `withTenantRoute` attaches a chat context to every route already. There
+   was no way to keep apps/ off the service client (this phase's grep)
+   without it.
+3. **The tools' admin writes use the service client, labelled**, until
+   Phase 5's operator member. § 2.7 wants staff tokens there. That needs a
+   real member, which Phase 5 creates.
+
+**Consequence, known and temporary:** between now and Phase 5, the admin
+routes run on chat tokens.
+- Ingest, delete and booking writes are refused (`42501`).
+- The bookings screen shows **no bookings** rather than an error, because
+  "not yours" and "not there" look the same, by design.
+- Admin login still works.
+
+**Traps avoided:**
+- **Sourcing `.env` in bash** strips the quotes out of the JWK JSON.
+  `node --env-file` never overrides a variable that is already set, so verify
+  read the mangled copy: `SyntaxError … at position 1`. It was diagnosed
+  without printing the key, and re-run with the variable unset.
+- **One standby key at a time.** The dashboard hides "create standby" while
+  one exists. The old one had to be removed before the new import, which
+  leaves a short window in which no tenant token verifies.
+- **Showing the key.** The new key went from the file to the clipboard with
+  `clip`, and was never opened, selected or printed.

@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 2 done)
+> Last updated: 2026-09-26 (auth-rls Phase 3 done)
 
 ---
 
@@ -36,8 +36,9 @@
   the baseline is in `plan/baseline/*-pre-auth.txt`. **Phase 1 done
   2026-09-26:** `schema-auth.sql` applied, verify 47/47, and the app is
   unchanged (eval 18/19 verdict for verdict). **Phase 2 done:** RLS costs
-  no access path and the ids are identical, so nothing changed. Next is
-  Phase 3. Bookings is complete and merged
+  no access path and the ids are identical, so nothing changed. **Phase 3
+  done:** every request runs on a tenant token. Admin writes are broken until
+  Phase 5, as planned. Next is Phase 4. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -148,13 +149,36 @@ Phase 2").
 - **Still to drop:** `whoami`, `auth_explain` and `auth_explain_token`
   (statements at the bottom of the file).
 
-**▶ Auth + RLS Phase 3: tenant tokens and scoped clients.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 3.
-- `mintTenantToken()` in `@rag/db`, on a **fresh** key. Import it as
-  standby, and delete the spike key `ea5ce335…` from the dashboard (D-039
-  caveat).
-- Scoped clients per request.
-- `loadTenant` switches to `tenant_public(slug)`.
+~~**Auth + RLS Phase 3: tenant tokens and scoped clients.**~~ **Done 2026-09-26.**
+- **`@rag/db`:**
+  - `mintTenantToken`, `scopedClient` and `anonClient` are in
+    `src/tenant-client.ts`;
+  - the service client moved to `@rag/db/service`;
+  - `TenantContext` and `BookingTenant` carry `db`, and every call site uses
+    it;
+  - `loadTenant` goes through `tenant_public`, and so does `loadBranding`.
+- **One exception:** `admin-auth.ts` imports `@rag/db/service` to read
+  `admin_key_hash`, until Phase 6.
+- **Fresh key `45345cbc…`:** the spike key `ea5ce335…` is revoked and now
+  gets `401`.
+- **Measured:**
+  - verify 47/47 on the new key;
+  - isolation 11/11 on chat tokens AND 11/11 `--filters-only`;
+  - bookings isolation 12/12;
+  - **eval 18/19, every question on a chat token, verdicts identical**;
+  - snapshot byte-identical.
+- **⚠ Admin writes are refused until Phase 5.** Every request is a chat
+  context now, and the bookings screen shows empty. Admin login still
+  works.
+
+**▶ Auth + RLS Phase 4: the chat path on chat tokens.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 4.
+- The measurements are already in (Phase 3's eval ran on chat tokens).
+- What remains: check in the running app that chat and the availability tool
+  work, then **unset `SUPABASE_SERVICE_ROLE_KEY` in the web process**,
+  restart, and chat must still work.
+- Expect the admin-key login to fail with it unset: that is the one
+  exception, until Phase 6.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -688,6 +712,31 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 3)
+- **Did:**
+  - `@rag/db`: `tenant-client.ts`, the `./service` entry, and `supabase`
+    removed from the main entry;
+  - `TenantContext.db` and `BookingTenant.db`, with all 22 call sites on
+    `tenant.db`;
+  - `loadTenant` and `loadBranding` on `tenant_public`;
+  - `env.ts` requires `SUPABASE_PUBLISHABLE_KEY` and `TENANT_SIGNING_JWK`;
+  - the tools moved to `@rag/db/service` for setup;
+  - rag isolation gained `--filters-only`;
+  - verify uses the shipped signer.
+- **Key swap:** a fresh key `45345cbc…` was imported as standby. The
+  dashboard allows only one standby at a time, so `ea5ce335…` had to go
+  first, and it is now revoked (`401`).
+- **Observed:**
+  - build and typecheck clean, unit tests pass;
+  - verify 47/47;
+  - isolation 11/11 and 11/11 `--filters-only`, bookings isolation 12/12;
+  - eval 18/19 with identical verdicts; snapshot identical.
+- **Found:** sourcing `.env` into bash strips the quotes from the JWK JSON,
+  and `--env-file` does not override an existing variable, so verify then
+  failed with a JSON parse error. Never `. ./.env` in a shell that runs the
+  tools.
+- **Next:** Phase 4.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 2)
 - **Did:**

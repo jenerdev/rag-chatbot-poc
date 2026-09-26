@@ -1,7 +1,13 @@
 import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { supabase, verifyAdminKey } from '@rag/db';
+import { verifyAdminKey } from '@rag/db';
+// ⚠️ THE ONE `@rag/db/service` IMPORT OUTSIDE tools/, until auth-rls Phase 6.
+// checkAdminKey() must read tenants.admin_key_hash, and no token can reach
+// that column: `tenants` has no policies, and tenant_public() leaves it
+// out, on purpose. Phase 6 deletes the admin key, this function, and this
+// import. Nothing else here touches the database.
+import { supabase } from '@rag/db/service';
 import type { TenantContext } from '@rag/pipeline';
 
 // Per-tenant admin sessions (plan.md Phase 6, D-028). Hand-rolled on

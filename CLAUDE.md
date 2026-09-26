@@ -73,7 +73,9 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — the client, the types, sql/ (5 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (5 files), and server-only
+    src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
+    src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/admin-key.ts     scrypt hashAdminKey / verifyAdminKey
     tools/verify.mjs     47 checks (19 through tenant tokens: RLS), no API key
     tools/tenant.mjs     tenant:add / tenant:key — prints a key once
@@ -97,7 +99,8 @@ pnpm build · typecheck · test
 pnpm --filter @rag/db verify    # 47 checks, no API key needed
 pnpm eval                       # the prompt battery, 19 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation   # 11 cross-tenant checks, on chat tokens  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 11, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 12 cross-tenant booking checks, no API key
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # key printed ONCE
 pnpm --filter @rag/db tenant:key -- <slug>                              # new key; old one dies

@@ -10,7 +10,6 @@
 // schema-bookings.sql list the same names. Adding an application means one
 // entry here, one value in that check, and one package.
 
-import { supabase } from '@rag/db';
 import type { TenantContext } from './types.js';
 
 export const APPLICATIONS = {
@@ -37,7 +36,7 @@ function isApplicationKey(key: string): key is ApplicationKey {
  * an application must never offer it, whatever the database says.
  */
 export async function enabledApplications(tenant: TenantContext): Promise<ApplicationKey[]> {
-  const { data, error } = await supabase
+  const { data, error } = await tenant.db
     .from('tenant_applications')
     .select('application_key')
     .eq('tenant_id', tenant.id);

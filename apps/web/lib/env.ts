@@ -17,6 +17,13 @@ const REQUIRED = [
   'OPENAI_CHAT_MODEL',
   'OPENAI_EMBEDDING_MODEL',
   'SUPABASE_URL',
+  // Every request reaches Postgres with this plus a tenant token (auth-rls
+  // Phase 3). On its own it is the `anon` role, which reads no table.
+  'SUPABASE_PUBLISHABLE_KEY',
+  // Signs those tenant tokens (D-039). SERVER-ONLY, like the service key: it
+  // can mint any claim.
+  'TENANT_SIGNING_JWK',
+  // Only lib/admin-auth.ts's admin-key check, until auth-rls Phase 6.
   'SUPABASE_SERVICE_ROLE_KEY',
   // Signs the admin session cookie (lib/admin-auth.ts). Without it, no admin
   // could ever log in, so a missing one gets the same one-clear-sentence

@@ -6,7 +6,7 @@
 // then chosen from this evidence rather than guessed (Q-1, roadmap 3.2).
 // Requires --conditions=react-server, as prompt-eval.mjs explains.
 import { embed } from '@rag/openai';
-import { supabase } from '@rag/db';
+import { supabase } from '@rag/db/service';
 
 const QUESTIONS = [
   ['direct hit  ', 'What time is the Quiet Hour?'],

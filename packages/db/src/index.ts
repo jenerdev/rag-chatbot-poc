@@ -1,7 +1,11 @@
-// @rag/db — the configured client, the database's shape, and the two RPC row
-// types the retrieval step reads.
+// @rag/db — how a request reaches the database, the database's shape, and
+// the two RPC row types the retrieval step reads.
+//
+// There is no client here that bypasses RLS. That one is `@rag/db/service`,
+// for tools only (plan/auth-rls.md Rule 2).
 
-export { supabase } from './client.js';
+export { anonClient, mintTenantToken, scopedClient, TENANT_TOKEN_SECONDS } from './tenant-client.js';
+export type { DbClient } from './tenant-client.js';
 export { generateAdminKey, hashAdminKey, verifyAdminKey } from './admin-key.js';
 export type { Database, Json, StoredVector, VectorInput } from './database.types.js';
 

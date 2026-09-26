@@ -21,9 +21,9 @@
 //
 // Run:  pnpm --filter @rag/db verify
 
-import { createPrivateKey, randomBytes, sign } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
-import { supabase, parseStoredVector, VECTOR_DIMENSIONS } from '../dist/index.js';
+import { randomBytes } from 'node:crypto';
+import { anonClient, mintTenantToken, parseStoredVector, scopedClient, VECTOR_DIMENSIONS } from '../dist/index.js';
+import { supabase } from '../dist/service.js';
 
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -372,37 +372,15 @@ async function bookingChecks(probeId) {
 // queries with NO tenant_id filter, or with a filter naming the WRONG tenant,
 // and pass only if the policy still confines the result.
 //
-// The signer is Phase 0's (D-039): ES256 over our own key, which Supabase
-// trusts as a standby signing key. Phase 3 moves it into @rag/db as
-// mintTenantToken(). Until then it is repeated here, in a dozen lines.
+// The tokens come from mintTenantToken() in @rag/db, the same function the
+// app mints every request's token with (D-039). So these checks test the
+// shipped signer, not a copy of it.
 
-function mintToken(claims) {
-  const jwkText = process.env.TENANT_SIGNING_JWK;
-  if (!jwkText) throw new Error('TENANT_SIGNING_JWK is not set (the private JWK imported in auth-rls Phase 0)');
-  const jwk = JSON.parse(jwkText);
-  // The same refusal Phase 3's signer will have (§ 2.2): whoever holds this
-  // key can mint anything, so the one function that uses it mints one shape.
-  if (claims.role !== undefined) throw new Error('mintToken sets role itself');
-  const now = Math.floor(Date.now() / 1000);
-  const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const input = `${b64({ alg: 'ES256', typ: 'JWT', kid: jwk.kid })}.${b64({ ...claims, role: 'authenticated', iat: now, exp: now + 300 })}`;
-  // JWTs carry ES256 signatures as raw r||s (IEEE P1363), not node's DER.
-  const signature = sign('sha256', Buffer.from(input), {
-    key: createPrivateKey({ key: jwk, format: 'jwk' }),
-    dsaEncoding: 'ieee-p1363',
-  });
-  return `${input}.${signature.toString('base64url')}`;
-}
-
-// A client that is exactly what a request will hold after Phase 3: the
-// publishable key, plus one token. No service key anywhere near it.
-const asToken = (token) =>
-  createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    ...(token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : {}),
-  });
-const chatToken = (tenantId) => mintToken({ tenant_id: tenantId }); // no sub (§ 2.4)
-const staffToken = (tenantId, userId) => mintToken({ tenant_id: tenantId, sub: userId, app_admin: true });
+// A client that is exactly what a request holds: the publishable key plus
+// one token, or no token at all (anon). No service key anywhere near it.
+const asToken = (token) => (token ? scopedClient(token) : anonClient());
+const chatToken = (tenantId) => mintTenantToken({ tenantId }); // no sub (§ 2.4)
+const staffToken = (tenantId, userId) => mintTenantToken({ tenantId, userId, admin: true });
 
 async function authChecks(probeId, anyChunk) {
   const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
