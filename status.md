@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (auth-rls Phase 6 done)
+> Last updated: 2026-09-26 (auth-rls Phase 7 done, two email items owed)
 
 ---
 
@@ -42,8 +42,9 @@
   unset in the web process. **Phase 5 done:** staff log in with Supabase
   Auth, admin writes work again, and the web app no longer imports the
   service client at all. **Phase 6 done:** the admin key and its column
-  are gone, and `pnpm typecheck` enforces the service-import rule. Next is
-  Phase 7. Bookings is complete and merged
+  are gone, and `pnpm typecheck` enforces the service-import rule. **Phase 7
+  done:** the browser walk and a clean bundle. The northwind invite and the
+  reset email are owed to the email cap. Next is Phase 8. Bookings is complete and merged
   (`master` at `23a84cd`). On that code: eval 18/19, isolation 11/11,
   bookings isolation 12/12 (it was always 12; "13" was a miscount), verify 28/28, tests 99.
 
@@ -240,19 +241,44 @@ Phase 2").
   - staff cases all pass, against a keyless dev server.
 - **Not re-run:** the eval. No pipeline or prompt code changed.
 
-**▶ Auth + RLS Phase 7: the walk, and the bundle.**
-[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 7.
-- The browser walk:
-  1. log in to villa as a member;
-  2. add and delete a document;
-  3. book a slot and cancel it;
-  4. ask an availability question;
-  5. log out;
-  6. a northwind-only member at villa's admin page must get 401;
-  7. the reset flow. The "Forgot password?" email is still owed from Phase 5
-     (R-21).
-- `grep -ri "service_role\|SUPABASE_SECRET\|TENANT_SIGNING_JWK\|guest_phone"
-  apps/web/.next/static/` must return nothing.
+~~**Auth + RLS Phase 7: the walk, and the bundle.**~~ **Done 2026-09-26**, with two
+email items owed.
+- **Browser walk, steps 1–5, by the user as `villa-staff-test@yopmail.com`.**
+  All worked, and the server log agrees:
+  - login 200;
+  - document #90 added (201) and deleted (200);
+  - booking #185 made (201) and cancelled (200);
+  - the chat's availability question called `check_availability` (3 slots,
+    3 open);
+  - logout 200.
+- **Step 6** (a northwind member at villa → 401) is proven over HTTP by
+  `staff-cases.mjs` case 6 (`401 "Admin login required for villa"`). In the
+  browser it waits for the northwind invite.
+- **Bundle:** two fresh production builds, one with the service key empty and
+  one with the full `.env`. In both, 36 static files have **0 hits** for:
+  - `service_role`, `SUPABASE_SECRET`, `SUPABASE_SERVICE_ROLE`,
+    `TENANT_SIGNING_JWK`, `guest_phone`, `@rag/db/service`, `admin_key_hash`;
+  - the signing key's kid and private `d`;
+  - the service, secret, OpenAI and cookie-secret VALUES.
+  A positive control (`Checked availability`, `Forgot password?`) does hit.
+- **Owed to the email cap (R-21):**
+  - `member:add -- northwind northwind-staff-test@yopmail.com` (got `email
+    rate limit exceeded`, and no account was created);
+  - step 6 in the browser;
+  - the "Forgot password?" email.
+
+**▶ Auth + RLS Phase 8: the record.**
+[`plan/auth-rls.md`](./plan/auth-rls.md) § 3 Phase 8.
+- CLAUDE.md rules 2 and 6 for the two walls, the plan's Rule 2, and the § 2
+  traps.
+- decisions.md: D-038–D-042 (D-039 is already written); D-006 and D-028
+  marked superseded.
+- risks.md: R-2, R-11 and R-13 amended; R-19, R-20 and R-22 added (R-21 is
+  already written).
+- architecture.md, flow.md (the token step), README (the signing key,
+  members, SMTP).
+- When the email cap allows: the northwind invite, step 6 and the reset
+  email.
 
 <details><summary>Phase 0's original brief</summary>
 
@@ -786,6 +812,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-26 — session 8, continued (auth-rls Phase 7)
+- **Did:**
+  - the user walked steps 1–5 in the browser as `villa-staff-test`;
+  - the northwind invite failed on the email cap (no account was created);
+  - two fresh production builds, with the bundle grepped each time.
+- **Observed:**
+  - the dev log confirms the walk (doc #90, booking #185, a tool call,
+    login and logout);
+  - the bundle has 0 hits for every name and every secret value, across 36
+    files, in both builds, and the positive control hits.
+- **Found:** grepping for a secret's VALUE only proves something on a build
+  that HAD the secret, so the grep was re-run on a full-`.env` build.
+- **Owed:** the northwind invite, step 6 in the browser, and the reset
+  email, all waiting on R-21's cap.
+- **Next:** Phase 8.
 
 ### 2026-09-26 — session 8, continued (auth-rls Phase 6)
 - **Did:**

@@ -4516,3 +4516,61 @@ edits. The Phase 5 run (18/19, identical verdicts) stands.
 - The diff check straight after showed it, and the edit was re-applied.
 - The lesson: remove a planted line by editing it out, never by checking out
   a file that has other uncommitted work in it.
+
+---
+
+## Auth + RLS Phase 7 — the walk, and the bundle · done 2026-09-26 (email items owed)
+
+**What was done:**
+- The user walked steps 1–5 in a real browser as `villa-staff-test@yopmail.com`
+  (a member of villa since Phase 5): log in, add and delete a document, book
+  and cancel a slot, ask the chat about availability, log out.
+- Two fresh production builds were grepped for secrets: one with
+  `SUPABASE_SERVICE_ROLE_KEY` empty, and one with the full `.env`.
+- The walk's own record is the dev server log. The grep's is
+  `plan/baseline/bundle-grep-auth-phase7.txt`.
+
+**Why it mattered:** everything before this was HTTP and scripts. This is the
+same path a person takes, through the real screens, on staff and chat
+tokens. The grep checks the one thing no server-side test can see: what the
+browser downloads.
+
+**What each observed value proves:**
+- **The walk, in the log:**
+  - `POST …/admin/session 200`;
+  - `POST …/documents 201`, then `DELETE …/documents/90 200`;
+  - `POST …/bookings 201`, then `DELETE …/bookings/185 200`;
+  - two `POST …/chat 200`, with `[tool] villa check_availability … -> 3
+    slots, 3 open`;
+  - `DELETE …/admin/session 200`.
+
+  Staff writes on staff tokens, and the chatbot's tool on a chat token, both
+  work from the real screens.
+- **The bundle:**
+  - The patterns: `service_role`, `SUPABASE_SECRET`, `SUPABASE_SERVICE_ROLE`,
+    `TENANT_SIGNING_JWK`, `guest_phone`, `@rag/db/service`, `admin_key_hash`.
+  - The values: the signing key's kid and private `d`, and the values of the
+    service-role, secret, OpenAI and cookie-secret keys.
+  - Result: **0 files of 36, in both builds.**
+  - The values matter on the full-`.env` build, where every secret existed
+    at build time and could have been inlined.
+  - The positive control finds `Checked availability` (1), `Forgot
+    password?` (3) and `access_token` (1, the fragment's key name read by the
+    reset page), so the grep does see the bundle.
+- **Step 6 (a northwind member at villa → 401)** stands on `staff-cases.mjs`
+  case 6, over HTTP: northwind login 200, then villa's documents `401 "Admin
+  login required for villa"`.
+
+**Owed, all to R-21's email cap:**
+- `member:add -- northwind northwind-staff-test@yopmail.com` got `email rate
+  limit exceeded`. No half-made account was left behind (checked).
+- Step 6 in the browser, which needs that account.
+- The "Forgot password?" email from Phase 5.
+
+**Trap avoided:** a clean grep for a secret's value on a build made WITHOUT
+that secret proves nothing, because it could not have been inlined. So the
+value checks were repeated on a build with the full `.env`.
+
+**Housekeeping:** booking #185 is a real, cancelled row in villa's history,
+from the walk. That is what the admin screen's cancel does, by design (it is
+a status change, not a delete).

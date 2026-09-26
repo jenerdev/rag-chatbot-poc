@@ -1,0 +1,34 @@
+$ grep -rli <pattern> apps/web/.next/static/   (fresh build, SUPABASE_SERVICE_ROLE_KEY empty)
+service_role: 0 files
+SUPABASE_SECRET: 0 files
+SUPABASE_SERVICE_ROLE: 0 files
+TENANT_SIGNING_JWK: 0 files
+guest_phone: 0 files
+@rag/db/service: 0 files
+admin_key_hash: 0 files
+signing key kid: 0 files
+signing key private d: 0 files
+service_role key value (first 40 chars): 0 files
+secret key value (first 20 chars): 0 files
+static files scanned: 36
+
+$ same grep, on a fresh build WITH the full .env (every secret present at build time)
+service_role: 0 files
+SUPABASE_SECRET: 0 files
+SUPABASE_SERVICE_ROLE: 0 files
+TENANT_SIGNING_JWK: 0 files
+guest_phone: 0 files
+@rag/db/service: 0 files
+admin_key_hash: 0 files
+signing key kid: 0 files
+signing key private d: 0 files
+service_role key value: 0 files
+secret key value: 0 files
+OpenAI key value: 0 files
+cookie secret value: 0 files
+static files scanned: 36
+
+$ positive control: strings that ARE in the browser code
+Checked availability: 1 files
+Forgot password?: 3 files
+access_token: 1 files
