@@ -36,6 +36,7 @@ import {
   MAX_IMAGE_BYTES,
   PerRoomOnlyError,
   quote,
+  moveImage,
   removeImage,
   setRates,
   updateAccommodation,
@@ -332,6 +333,27 @@ try {
         && badStandard instanceof BookingInputError,
       "extra guests: no guest count is a 400; another tenant's room still says 'No such unit'; standard above the maximum refused",
       `${described(noCount)} | ${described(foreignNoCount)} | ${described(badStandard)}`,
+    );
+  }
+
+  // 19. Photo order (code review, 2026-09-28). New photos take the next
+  //     place, 0, 1, 2; "move right" on the first swaps it with the second
+  //     (p2, p1, p3), not to the end, and a move past the end is false.
+  {
+    const photos = [];
+    for (let i = 0; i < 3; i++) photos.push(await addImage(probe, quad.id, PNG));
+    const label = (list) => list.map((img) => `p${photos.findIndex((x) => x.id === img.id) + 1}`).join(',');
+    const orders = photos.map((img) => img.sortOrder).join(',');
+    const moved = await moveImage(probe, quad.id, photos[0].id, 1);
+    const afterRight = await listImages(probe, quad.id);
+    const pastEnd = await moveImage(probe, quad.id, photos[2].id, 1);
+    const back = await moveImage(probe, quad.id, photos[0].id, -1);
+    const afterLeft = await listImages(probe, quad.id);
+    check(
+      orders === '0,1,2' && moved && label(afterRight) === 'p2,p1,p3' && afterRight.map((i) => i.sortOrder).join(',') === '0,1,2'
+        && pastEnd === false && back && label(afterLeft) === 'p1,p2,p3',
+      'photos: new ones take the next place; a move swaps neighbours',
+      `orders on upload ${orders} · → ${label(afterRight)} (${afterRight.map((i) => i.sortOrder).join(',')}) · past the end ${pastEnd} · ← ${label(afterLeft)}`,
     );
   }
 

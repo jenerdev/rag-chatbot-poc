@@ -76,6 +76,22 @@ export async function addImage(tenant: BookingTenant, unitId: unknown, bytes: Ui
   if (unitError) throw new Error(`Could not load the room: ${unitError.message}`);
   if (!unit) return null;
 
+  // A new photo goes AFTER the room's last one. Every upload used to get 0,
+  // so the order was "0, then id", and the screen's move (which assumed order
+  // = position) could send a photo to the end (code review, 2026-09-28). Two
+  // uploads at the same instant can share a number; the order then falls
+  // back to id, and the next move renumbers the room (moveImage).
+  const { data: last, error: lastError } = await tenant.db
+    .from('unit_images')
+    .select('sort_order')
+    .eq('tenant_id', tenant.id)
+    .eq('unit_id', room)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastError) throw new Error(`Could not read the photo order: ${lastError.message}`);
+  const sortOrder = last ? last.sort_order + 1 : 0;
+
   // Wall 1: the path comes from the server's tenant and the checked room id.
   const path = `${tenant.id}/${room}/${randomUUID()}.${type.ext}`;
   const bucket = tenant.db.storage.from(IMAGE_BUCKET);
@@ -84,7 +100,7 @@ export async function addImage(tenant: BookingTenant, unitId: unknown, bytes: Ui
 
   const { data, error } = await tenant.db
     .from('unit_images')
-    .insert({ tenant_id: tenant.id, unit_id: room, path, sort_order: 0 })
+    .insert({ tenant_id: tenant.id, unit_id: room, path, sort_order: sortOrder })
     .select('id, unit_id, path, sort_order')
     .single();
   if (error) {
@@ -132,6 +148,40 @@ export async function removeImage(tenant: BookingTenant, unitId: unknown, imageI
     console.log(`[bookings] ${tenant.slug} WARN photo #${id} row removed, object not: ${row.path} (${removed.error?.message ?? '0 removed'})`);
   } else {
     console.log(`[bookings] ${tenant.slug} removed photo #${id}: ${row.path}`);
+  }
+  return true;
+}
+
+/**
+ * Move a photo one place left (-1) or right (+1) in the order staff see.
+ * `false`: not yours, not there, or already at that end.
+ *
+ * It swaps POSITIONS in the displayed order, then writes 0, 1, 2… to the
+ * room's photos, so a stored order and a position can never disagree again.
+ * Swapping the two photos' stored numbers instead was the bug: with every
+ * photo at 0, "move right" sent the first photo to the end.
+ */
+export async function moveImage(tenant: BookingTenant, unitId: unknown, imageId: unknown, direction: unknown): Promise<boolean> {
+  await requirePerRoom(tenant);
+  const room = positiveInt(unitId, 'Room');
+  const id = positiveInt(imageId, 'Photo');
+  if (direction !== -1 && direction !== 1) throw new BookingInputError('Move a photo by -1 (left) or 1 (right).');
+
+  const photos = await listImagesFor(tenant, room);
+  const from = photos.findIndex((p) => p.id === id);
+  const to = from + direction;
+  if (from === -1 || to < 0 || to >= photos.length) return false;
+  [photos[from], photos[to]] = [photos[to]!, photos[from]!];
+
+  for (const [index, photo] of photos.entries()) {
+    if (photo.sortOrder === index) continue;
+    const { error } = await tenant.db
+      .from('unit_images')
+      .update({ sort_order: index })
+      .eq('tenant_id', tenant.id)
+      .eq('unit_id', room)
+      .eq('id', photo.id);
+    if (error) throw new Error(`Could not reorder the photos: ${error.message}`);
   }
   return true;
 }

@@ -245,7 +245,10 @@ begin
       and u.active
       and (p_slot   is null or s.name = p_slot)
       and (p_unit   is null or u.name = p_unit)
-      and (p_guests is null or u.capacity >= p_guests)
+      -- A null capacity is "no maximum", so it fits any party. `capacity >=
+      -- p_guests` alone is null for it, and dropped the room (code review,
+      -- 2026-09-28).
+      and (p_guests is null or u.capacity is null or u.capacity >= p_guests)
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
 $$;

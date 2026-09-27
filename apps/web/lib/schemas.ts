@@ -166,10 +166,16 @@ export const setRatesSchema = z.object({
   ),
 });
 
-/** A photo's place in the order. */
-export const imageOrderSchema = z.object({
-  sortOrder: z.number({ required_error: 'An order is required', invalid_type_error: 'Order must be a number' }),
-});
+/**
+ * Move a photo: `{ move: -1 }` (left) or `{ move: 1 }` (right), which the
+ * screen sends, or `{ sortOrder }` for a direct place. One of the two.
+ */
+export const imageOrderSchema = z
+  .object({
+    move: z.union([z.literal(-1), z.literal(1)], { invalid_type_error: 'move is -1 or 1' }).optional(),
+    sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
+  })
+  .refine((v) => (v.move === undefined) !== (v.sortOrder === undefined), { message: 'Send either move or sortOrder' });
 
 /**
  * The first error message from a failed parse.

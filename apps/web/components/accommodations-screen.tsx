@@ -190,15 +190,15 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
     });
   };
 
-  // Swap two neighbours' places. The order is shown by sort_order, then id.
+  // One place left or right. The SERVER swaps positions and renumbers the
+  // room (moveImage), so this screen never has to know the stored numbers.
+  // It used to set them to positions itself, which broke when every upload
+  // had sort order 0 (code review, 2026-09-28).
   const movePhoto = (index: number, by: -1 | 1) => {
-    const a = room.images[index];
-    const b = room.images[index + by];
-    if (!a || !b) return;
+    const image = room.images[index];
+    if (!image || !room.images[index + by]) return;
     void run(async () => {
-      const place = (image: ImageSummary, sortOrder: number) =>
-        call(`/accommodations/${room.id}/images/${image.id}`, { method: 'PATCH', body: JSON.stringify({ sortOrder }) });
-      await Promise.all([place(a, index + by), place(b, index)]);
+      await call(`/accommodations/${room.id}/images/${image.id}`, { method: 'PATCH', body: JSON.stringify({ move: by }) });
       return null;
     });
   };

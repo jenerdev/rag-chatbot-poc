@@ -60,7 +60,7 @@ export {
   setRates,
   updateAccommodation,
 } from './accommodations.js';
-export { addImage, listImages, removeImage, setImageOrder } from './images.js';
+export { addImage, listImages, moveImage, removeImage, setImageOrder } from './images.js';
 export { isIsoDate, localDate, sniffImageType, validateRange } from './validate.js';
 
 export type {

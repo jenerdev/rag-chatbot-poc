@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { removeImage, setImageOrder } from '@rag/bookings';
+import { moveImage, removeImage, setImageOrder } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest, parseId } from '@/lib/route';
@@ -26,7 +26,11 @@ export const DELETE = withTenantRoute<Params>(async (request, { tenant, params }
   return (await removeImage(tenant, id, imageId)) ? NextResponse.json({ removed: true }) : notFound(imageId);
 });
 
-/** Move a photo in the order: `{ sortOrder }`. Only the order can change; a photo is replaced, not edited. */
+/**
+ * Move a photo: `{ move: -1 | 1 }` swaps it with its neighbour in the order
+ * staff see (and renumbers the room), or `{ sortOrder }` sets a place. Only
+ * the order can change; a photo is replaced, not edited.
+ */
 export const PATCH = withTenantRoute<Params>(async (request, { tenant, params }) => {
   tenant = await requireAdmin(request, tenant);
   await requireApplication(tenant, 'bookings');
@@ -37,5 +41,8 @@ export const PATCH = withTenantRoute<Params>(async (request, { tenant, params })
   const parsed = imageOrderSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
+  if (parsed.data.move !== undefined) {
+    return (await moveImage(tenant, id, imageId, parsed.data.move)) ? NextResponse.json({ moved: parsed.data.move }) : notFound(imageId);
+  }
   return (await setImageOrder(tenant, id, imageId, parsed.data.sortOrder)) ? NextResponse.json({ sortOrder: parsed.data.sortOrder }) : notFound(imageId);
 });

@@ -2,6 +2,8 @@
 --
 -- Run in the Supabase SQL editor AFTER schema-auth.sql. Idempotent: every
 -- step can run again harmlessly, so the file is re-run whole as it grows.
+-- Also after schema-extra-guests.sql: the two definitions that file replaces
+-- (steps 6 and 8) are guarded, and skipped once it has run.
 --
 -- THE ONE THING TO KNOW
 -- ---------------------
@@ -209,6 +211,14 @@ $$;
 --    The price an insert or update SENDS is never kept. On an update that
 --    does not move the booking (same unit, slot and date), the OLD price is
 --    kept, so a later rate change never reprices history.
+--    GUARDED (code review, 2026-09-28): schema-extra-guests.sql replaces this
+--    with a newer version. Once that file has run (unit_quote() exists),
+--    re-running THIS file must not put the older one back, so the definition
+--    is skipped. On a fresh database, before extra-guests, it runs as normal.
+do $guard$
+begin
+  if to_regprocedure('public.unit_quote(bigint, bigint, bigint, date, int)') is null then
+    execute $ddl$
 create or replace function bookings_compute_during() returns trigger
 language plpgsql
 as $$
@@ -271,14 +281,19 @@ begin
 
   return new;
 end;
-$$;
-
---    Now also fires when the unit, the guest count or the price is written.
---    A status change alone (cancelling) still fires nothing.
-drop trigger if exists bookings_compute_during on bookings;
+$$
+    $ddl$;
+    -- Now also fires when the unit, the guest count or the price is written.
+    -- A status change alone (cancelling) still fires nothing.
+    execute 'drop trigger if exists bookings_compute_during on bookings';
+    execute $ddl$
 create trigger bookings_compute_during
   before insert or update of tenant_id, unit_id, slot_id, booked_date, guest_count, price on bookings
-  for each row execute function bookings_compute_during();
+  for each row execute function bookings_compute_during()
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 7. check_availability: the schema-auth.sql body, with ONE change, `and
 --    u.active`. An inactive room must not be offered as open. Villa's one
@@ -364,6 +379,14 @@ $$;
 --
 --    Zero rows for a whole_resort tenant, the same answer as a tenant with no
 --    rooms, so the result says nothing about how another tenant is set up.
+--    GUARDED (code review, 2026-09-28): schema-extra-guests.sql replaces this
+--    with a newer version. Once that file has run (unit_quote() exists),
+--    re-running THIS file must not put the older one back, so the definition
+--    is skipped. On a fresh database, before extra-guests, it runs as normal.
+do $guard$
+begin
+  if to_regprocedure('public.unit_quote(bigint, bigint, bigint, date, int)') is null then
+    execute $ddl$
 create or replace function check_room_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -434,10 +457,17 @@ begin
       and r.price is not null
       and (p_slot   is null or s.name = p_slot)
       and (p_unit   is null or u.name = p_unit)
-      and (p_guests is null or u.capacity >= p_guests)
+      -- A null capacity is "no maximum", so it fits any party. `capacity >=
+      -- p_guests` alone is null for it, and dropped the room (code review,
+      -- 2026-09-28).
+      and (p_guests is null or u.capacity is null or u.capacity >= p_guests)
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 9. RLS, and EXECUTE grants.
 --

@@ -952,6 +952,22 @@ async function bookingTypeChecks(probeId) {
       );
     }
 
+    // 75. A room with NO maximum (capacity null) fits any party: it must be
+    //     returned for 5 guests, not dropped by `capacity >= 5` being null
+    //     (code review, 2026-09-28).
+    {
+      const { data: open } = await supabase
+        .from('units')
+        .insert({ tenant_id: roomsId, name: 'No Limit', capacity: null, standard_capacity: null, extra_person_rate: null, sort_order: 10, active: true })
+        .select('id')
+        .single();
+      await supabase.from('unit_rates').insert({ tenant_id: roomsId, unit_id: open.id, slot_id: night.id, weekday_price: 100000, weekend_price: 100000 });
+      const { data } = await supabase.rpc('check_room_availability', { p_tenant_id: roomsId, p_from: '2026-11-16', p_to: '2026-11-16', p_slot: null, p_unit: null, p_guests: 5 });
+      const names = (data ?? []).map((r) => r.unit);
+      check(names.includes('No Limit') && !names.includes('Garden Room'), 'extra guests: a room with no maximum fits 5 guests; a 2-guest room does not',
+        names.join(', ') || '(none)');
+    }
+
     // 65–68 are the same rules through tokens (RLS), with a real member.
     const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password: randomBytes(24).toString('base64url'), email_confirm: true });
     if (createError) {
