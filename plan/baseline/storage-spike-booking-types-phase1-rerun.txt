@@ -1,0 +1,11 @@
+PASS  harbor staff uploads to its own folder  — landed at 67/spike/18a4a760-f489-4357-9ff0-57d0255bae14.png
+PASS  the public URL serves it, no token  — 200, 70 bytes, identical: true
+PASS  harbor staff cannot upload into villa's folder  — 403 new row violates row-level security policy; landed: false
+PASS  a chat token cannot upload into its own folder  — 403 new row violates row-level security policy; landed: false
+PASS  a chat token cannot upload into villa's folder  — 403 new row violates row-level security policy; landed: false
+PASS  the bucket refuses SVG, even from staff  — 415 mime type image/svg+xml is not supported; landed: false
+PASS  the bucket refuses a file over 2 MiB  — 413 The object exceeded the maximum allowed size; landed: false
+PASS  villa staff cannot delete harbor's photo  — error: none, removed: 0; still there: true
+PASS  harbor staff deletes its own photo  — error: none, removed: 1; still there: false
+
+ALL STORAGE SPIKE CHECKS PASS

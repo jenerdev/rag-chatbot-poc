@@ -61,7 +61,7 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
 - [x] **Phase 0 — Baseline** (2026-09-27). `harbor` created (tenant 67,
   "Harbor Inn", assistant Marina, operator member), no application, no
   documents, no units. Baselines in `plan/baseline/*-pre-booking-types*`.
-- [ ] Phase 1 — Schema. **In progress.**
+- [x] **Phase 1 — Schema** (2026-09-27).
   - [x] Storage spike (§ 2.8), 9/9 on 2026-09-27: Storage accepts our
     tokens; cross-tenant and chat-token uploads refused (403), SVG 415,
     over 2 MiB 413. A refused delete is silent (0 removed, no error).
@@ -69,9 +69,11 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
     verify **69/69** (21 new: 49–68). Villa's availability, tool
     definitions and prompt, and Northwind's prompt, byte-identical to Phase 0.
     Spike 9/9 again, isolation 16/16 + 12/12 both ways, tests unchanged.
-  - [ ] The file's second run changes nothing. **Next**: the user re-runs
-    it, then verify and the villa diff again.
-- [ ] Phases 2–8.
+  - [x] The file's second run changes nothing: verify 69/69, villa's
+    availability and tools identical, spike 9/9, bucket settings unchanged.
+- [ ] Phase 2 — `@rag/bookings`: types, config, accommodations, rates,
+  quote, multi-room `createBooking`, `checkRoomAvailability`, images. **Next.**
+- [ ] Phases 3–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -950,7 +952,8 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   sends a key missing from one row of a multi-row insert as NULL, not the
   default, so three test rooms had `active = null` (23502). Test data fixed
   (every row, every key); then 69/69. Villa and Northwind diff clean.
-- **Next:** the idempotency re-run, then Phase 2.
+- **Then:** the user re-ran the file; verify 69/69 again, villa identical.
+- **Next:** Phase 2.
 
 ### 2026-09-27 — booking types Phase 1 (Storage spike)
 - **Did:** wrote `schema-booking-types.sql` § 11 (bucket `unit-images`,

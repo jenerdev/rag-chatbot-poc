@@ -424,6 +424,14 @@ nothing; an insert with a forged `price` stores null for villa; a second
 active unit for villa is refused; verify has new RLS checks, each with a
 positive twin, and passes.
 
+> **Done 2026-09-27.** verify 69/69 (checks 49–68 are this phase's), on the
+> first run and again after a second run of the file. Villa's 14-day
+> availability, tool definitions and prompt, and Northwind's prompt, are
+> byte-identical to Phase 0. Found on the way: PostgREST sends a key that one
+> row of a multi-row insert lacks as NULL, not the default (23502 on
+> `units.active`), so Phase 2's multi-room insert must give every row every
+> key.
+
 ### Phase 2 — `@rag/bookings`
 
 Types, config, accommodations, rates, quote, multi-unit `createBooking`,

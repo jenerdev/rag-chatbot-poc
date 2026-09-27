@@ -5175,7 +5175,7 @@ still land, and a delete can report success and remove nothing. The second
 one happened: a refused delete is silent. So `removeImage()` must check how
 many objects were removed, not whether there was an error.
 
-## Booking types, Phase 1: the schema · done 2026-09-27 (idempotency re-run owed)
+## Booking types, Phase 1: the schema · done 2026-09-27
 
 **What:** `packages/db/sql/schema-booking-types.sql` steps 1–10, run by the
 user after schema-auth.sql:
@@ -5220,3 +5220,8 @@ builds one column list for the whole array, so the other three were sent
 `active = null`, and `not null` refused the insert (23502). It is a silent
 trap for Phase 2 too: `createBooking` with several rooms must give every row
 the same keys, or pass `defaultToNull: false`.
+
+**Idempotent, measured:** the user ran the file a second time. verify 69/69
+again, villa's availability and tool definitions still identical to Phase 0,
+the Storage spike 9/9, and the bucket still `public`, 2097152 bytes,
+jpeg/png/webp (`plan/baseline/*-booking-types-phase1-rerun.txt`).
