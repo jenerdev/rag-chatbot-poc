@@ -231,6 +231,12 @@ sequenceDiagram
     appears on screen, and asks the model again with the result. With zero
     chunks, the reply is kept only if a tool was called, and it is held back
     rather than streamed until that is known (D-035).
+11b. **A per_room tenant** (harbor) gets the same tool name with a different
+    description and three optional arguments (`slot`, `room`, `guests`).
+    executeTool picks the branch from the DATABASE, calls
+    `check_room_availability`, and hands the model rows of `date, unit,
+    capacity, slot, status, price`, the price as text ("₱3,500.00"). Villa's
+    branch is unchanged (plan/booking-types.md Phase 6).
 12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 
@@ -290,6 +296,13 @@ return 404, with no redirect.
 | `GET` | `/api/t/<slug>/documents` | list with chunk counts | `listDocuments` | admin |
 | `GET` | `/api/t/<slug>/documents/:id/chunks` | expand a row to show its chunks | `getChunks` | admin |
 | `DELETE` | `/api/t/<slug>/documents/:id` | delete; chunks cascade | `deleteDocument` | admin |
+| `GET` / `POST` | `/api/t/<slug>/bookings` | list (`?unit=` per_room) / book one unit, or `rooms` as one group | `listBookings` / `createBooking(s)` | admin |
+| `POST` | `/api/t/<slug>/bookings/quote` | the price of rooms on a date, from `unit_price()` (per_room) | `quote` | admin |
+| `GET` / `POST` | `/api/t/<slug>/accommodations` | rooms with rates and photos / add a room (per_room; 404 otherwise) | `listAccommodations` / `createAccommodation` | admin |
+| `GET` / `PATCH` | `/api/t/<slug>/accommodations/:id` | one room / change or retire it | `getAccommodation` / `updateAccommodation` | admin |
+| `PUT` | `/api/t/<slug>/accommodations/:id/rates` | set rates, in centavos | `setRates` | admin |
+| `GET` / `POST` | `/api/t/<slug>/accommodations/:id/images` | photos / upload one (multipart) | `listImages` / `addImage` | admin |
+| `PATCH` / `DELETE` | `/api/t/<slug>/accommodations/:id/images/:imageId` | reorder / remove (row, then object) | `setImageOrder` / `removeImage` | admin |
 
 "Admin" means `tenant = await requireAdmin(request, tenant)`.
 - The request must carry this tenant's signed session cookie, and its user

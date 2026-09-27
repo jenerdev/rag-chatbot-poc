@@ -5453,3 +5453,28 @@ reporting the failure.
 same scan finds `admin/accommodations` (the new screen's fetch path) in 1
 file and `image/webp` (resize-image) in 2, so "0 files" is a real zero.
 
+## Booking types, Phase 8: the record · done 2026-09-27
+
+**What:** the plan written into the project's own record, so the next reader
+does not need the plan to understand the code:
+- `decisions.md` D-050–D-056. D-042 ("exactly two definer functions") is
+  amended rather than broken: `check_room_availability` is the third, for
+  the reason `check_availability` is definer.
+- `risks.md` R-23–R-30; R-17 (price from documents) says per_room is now
+  priced by the database and villa, by decision, still is not; R-15 carries
+  the date-range finding.
+- `CLAUDE.md`: the header, layout and commands; rule 1 now needs three
+  tenants and expects 46/48 (`rooms 10/10`); rule 6 lists the new tables and
+  the bucket's policies; rule 8 lists three definer functions; traps 15–17
+  (PostgREST's NULL for a missing key, `next build` under `next dev`, the
+  silent refused delete); the centavos convention.
+- `flow.md`: step 11b and the eight new routes.
+
+**Why it matters:** CLAUDE.md is what the next session reads first. A rule
+that still said "exactly two definer functions" would have made the third
+look like a mistake, or made a fourth look allowed.
+
+**Honest gaps recorded, not hidden:** Phase 4's browser walk; the photo limits
+still provisional; `storage-orphans.mjs` planned and not built (R-30); date
+ranges reaching the tool as their two end dates (R-15).
+

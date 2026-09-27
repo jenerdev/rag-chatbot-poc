@@ -113,8 +113,21 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
   scan of `.next/static` clean on two fresh builds (service key empty, and
   full `.env`), with its positive twin. Dev server stopped for the builds and
   restarted in the background (with the user's OK).
-- [ ] Phase 8 — the record: decisions.md, risks.md, CLAUDE.md, flow.md.
-  **Next.**
+- [x] **Phase 8 — the record** (2026-09-27). D-050–D-056 (D-042 amended:
+  three definer functions), R-23–R-30 (R-17 and R-15 amended), CLAUDE.md
+  (header, layout, commands, rules 1/6/8, traps 15–17, money convention),
+  flow.md (11b, the new routes).
+
+**Booking types is COMPLETE except Phase 4's browser walk.** Owed, by the
+user: villa's screen unchanged; a full-size phone photo (sets MAX_IMAGE_BYTES
+and MAX_IMAGE_EDGE); photo reorder/remove; a two-room booking, the clash,
+the room filter, retiring Family Room; why the second walk round never
+reached the database. Then delete `walk-harbor@example.com`, and merge
+`feat/booking-types` into `master`.
+
+**Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
+date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
+(R-30).
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -982,6 +995,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 8 (the record)
+- **Did:** decisions D-050–D-056, D-042 amended; risks R-23–R-30, R-15 and
+  R-17 amended; CLAUDE.md, flow.md, the plan's status line.
+- **Noticed while writing it:** `storage-orphans.mjs` was in the plan's file
+  list and was never built. Recorded as such in R-30, not claimed.
+- **Numbering:** plan/payments.md already reserved D-057+ and R-31+, so the
+  range finding went onto R-15 instead of a new number.
+- **Next:** the Phase 4 walk, the merge, then payments.
 
 ### 2026-09-27 — booking types Phase 7 (isolation and the bundle)
 - **Did:** 10 checks in `packages/bookings/tools/isolation.mjs` (probes A and

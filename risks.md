@@ -356,6 +356,14 @@ Today is the TENANT'S date. At 01:04 SGT the server's UTC date was still
 not the ones typed, and availability replies must name the date (D-036).
 Nothing stops a wrong resolution; it just cannot be silent.
 
+
+**Found 2026-09-27 (booking-types Phase 6):** a RANGE is not resolved as a
+range. For "which rooms are free from X to Y?", D-046's resolver checked the
+two end dates as two single days, and the model never asked the tool for the
+range: 7, 14 and 31 days all came back as 8 rows. It predates booking types
+and applies to villa too. Not fixed there, because `dates.ts` is prompt text
+and a change to it needs its own battery run.
+
 ---
 
 ## R-16 · Availability is a snapshot · **Harmless while the bot cannot book**
@@ -377,6 +385,11 @@ live data.
 **Why deferred:** a price tool would copy that logic and give it a second
 source of truth. It becomes worth it when prices change often enough that the
 documents go stale.
+
+**2026-09-27, booking types:** a per_room tenant is now priced by the
+database (D-052), and its chatbot quotes from the tool (R-23). A whole-resort
+tenant, villa, is still priced from its documents, by decision
+(plan/booking-types.md § 8 q3).
 
 ---
 
@@ -488,6 +501,73 @@ like the model or the data.
 
 ---
 
+## R-23 · The model quotes a room price without the tool, or from a document · **Guarded by the battery; reopens with every prompt edit**
+
+**The risk:** harbor's documents hold an out-of-date ₱3,000 brochure rate and a
+₱40,000 whole-inn rate. A model that reads them could quote either as a room
+price.
+
+**What guards it:** the per_room tools block ("Quote a room's price only from
+the tool result"), and `rt-price` / `rt-mix`, which compare the reply with
+the TOOL's price for that row. 30/30 over three runs. The same shape as R-14.
+
+---
+
+## R-24 · Base rate only: holidays and surcharges are not modelled · **Accepted (booking-types § 8 q2)**
+
+**The risk:** a per_room tenant with holiday rates gets too low a quote on a
+holiday. **Accepted:** weekday/weekend was enough for the first tenant. The
+tool calls it a base rate; the fix is a `rate_overrides (unit, slot, date)`
+table, read by `unit_price()`.
+
+---
+
+## R-25 · Retiring a room with future bookings · **By design**
+
+The bookings stay valid, keep their room, and block nothing new. The Rooms
+screen counts them in the next 92 days and asks before retiring; it does
+not cancel them.
+
+---
+
+## R-26 · A per_room tool result grows with rooms × slots × days · **Measured and capped**
+
+36.3 input tokens a row (Phase 6); MAX_AVAILABILITY_ROWS 150 ≈ 5,400 tokens;
+a month of harbor's four rooms is 124 rows. Beyond the cap, the tool returns
+an error that says how to narrow the question.
+
+---
+
+## R-27 · Free plan Storage egress is 5 GB a month · **Low while photos are staff-only**
+
+Browser-resized WebP keeps each view small. Showing photos to chat visitors
+would change this sum.
+
+---
+
+## R-28 · Storage might not accept our minted tokens · **Closed 2026-09-27**
+
+The Phase 1 spike: 9/9. Our ES256 tokens are accepted and Storage policies see
+`tenant_id` and `app_admin`.
+
+---
+
+## R-29 · A direct POST can skip the browser resize and keep EXIF/GPS · **Accepted**
+
+Staff-only route. The size and type checks still hold; only the metadata
+stripping is the browser's.
+
+---
+
+## R-30 · Objects can outlive their rows · **Low; invisible**
+
+Deleting a tenant cascades to `unit_images`, not to Storage, and a failed
+object delete is logged, not retried. A leftover object is invisible and
+costs space. The isolation and rooms suites remove their own; there is no
+orphan sweeper yet (plan § 2.8 named one, `storage-orphans.mjs`; not built).
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product
@@ -515,3 +595,9 @@ Ordered. The first two are Phase 1 and take under an hour combined.
    obviously different topics. Proves the search.
 
 If all three pass, nothing significant is left to derisk — the rest is assembly.
+
+**After booking types (2026-09-27):** guests still cannot book (tools stay
+read-only; plan/payments.md is the next plan). No holiday or per-head pricing
+(R-24), no orphaned-photo sweeper (R-30), photos only on the staff screen,
+and date ranges reach the tool as their two end dates (R-15).
+

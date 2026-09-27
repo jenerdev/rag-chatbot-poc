@@ -1445,6 +1445,10 @@ their own `bookings` in front of ours.
 because every definer function is another place the tenant check can be
 forgotten.
 
+**Amended 2026-09-27 by D-054:** a third, `check_room_availability`, for the
+same reason `check_availability` is definer (it must see `bookings`, which a
+chat token cannot read), with the same five properties.
+
 ---
 
 ## D-043 · Tagalog in, Taglish out: the reply language is decided in code, and the prompt carries one directive · **Added 2026-09-26**
@@ -1831,3 +1835,134 @@ change, measured on the full battery.
 | **Q-3** | Is `gpt-4o-mini` still the right cheap model at build time? | Phase 0 — check the model list |
 | **Q-4** | Does `match_count: 5` overflow the context window on long chunks? | Phase 3 — 5 × 1000 chars ≈ 1,250 tokens, comfortably fine. Revisit only if chunk size grows |
 | **Q-5** | Keep the `scratch/` test scripts from Phase 1 or delete them? | Phase 4 — they are useful for debugging; a `scratch/` folder in `.gitignore` is a reasonable compromise |
+
+---
+
+## D-050 · A tenant's booking type lives in its bookings config; absent means `whole_resort` · **Added 2026-09-27 (booking-types Phase 1)**
+
+**Decision:** `tenant_applications.config.booking_type` is `whole_resort` or
+`per_room`. The key being ABSENT means `whole_resort`, so villa's row, and
+every tenant that never chose, needed no migration. Read in one place per
+language: `booking_type_of()` in SQL, `parseConfig()` in TypeScript, with the
+same defaults (weekend Fri–Sun, currency PHP). The existing validate trigger
+refuses an unknown type, bad weekend days and a bad currency.
+
+**Why not a `tenants` column:** a type means nothing without the bookings
+application; Northwind would carry a meaningless value.
+
+**Measured:** verify 54 (`per_bed` 23514, `per_room` accepted); the CLI stores
+whole_resort by removing the key (Phase 5).
+
+**Reverse if:** a third model appears that is not a bookings application.
+
+---
+
+## D-051 · Rooms are `units` rows with new nullable columns, not a `rooms` table · **Added 2026-09-27 (booking-types Phase 1)**
+
+**Decision:** `units` gained `description`, `capacity`, `active`, `sort_order`.
+A room is never deleted by a token, only retired (`active = false`), so the
+bookings that name it keep it. A whole-resort tenant has exactly one active
+unit, enforced by a deferred constraint trigger.
+
+**Why:** plan/bookings.md § 7 left this seam. `bookings_no_overlap` already
+compares `unit_id`, so availability per room needed no new rule, and the
+composite FK already stops a booking naming another tenant's room.
+
+**Measured:** two rooms on one night both land; the same room twice is 23P01
+(verify 56–57, rooms.mjs 4–5).
+
+---
+
+## D-052 · The price is computed in SQL by the insert trigger, stored on the booking, in centavos, and only for `per_room` · **Added 2026-09-27 (booking-types Phase 1)**
+
+**Decision:** `unit_price(tenant, unit, slot, date)` is the one place a price
+is computed: `unit_rates` weekday or weekend by the tenant's weekend days.
+`bookings_compute_during()` sets `bookings.price` from it and OVERWRITES
+whatever an insert or update sent; a booking re-saved without moving keeps
+its old price. `whole_resort` stores `null`: its prices live in its
+documents, by the user's decision (plan/booking-types.md § 8 q3). The staff
+quote calls the same function, so a preview cannot differ from what is stored.
+Prices are bigint centavos; the browser turns typed pesos into centavos by
+splitting the string, never by `× 100`.
+
+**Measured:** a forged `price: 1` stored as 350000 + 600000, equal to the quote
+(walk 5); a rate edit left a stored 350000 while the new quote said 999900
+(verify 61, rooms.mjs 7).
+
+**Reverse if:** a pricing rule the trigger cannot express (holidays, per-head
+charges) is wanted: that is a `rate_overrides` table, R-24.
+
+---
+
+## D-053 · Several rooms are one array insert sharing a `group_id` · **Added 2026-09-27 (booking-types Phase 2)**
+
+**Decision:** `createBookings()` inserts every room of a booking in one
+PostgREST call, which is one statement. If any row hits
+`bookings_no_overlap`, none is saved. Guest count is per room, because the
+trigger checks each row against its own room's capacity (the plan said
+`unitIds[]`; it is `rooms: [{ unitId, guestCount? }]`).
+
+**Why no SQL function:** atomicity comes from the statement already.
+
+**Measured:** a group clashing on one room left 0 rows (verify 57, rooms.mjs 5,
+isolation 17). **Trap:** in a multi-row insert PostgREST sends a key one row
+lacks as NULL, not the default, so every row carries every key (Phase 1,
+23502 on `units.active`).
+
+---
+
+## D-054 · A separate `check_room_availability`, security definer: a third definer function · **Added 2026-09-27 (booking-types Phases 1, 6). Amends D-042**
+
+**Decision:** per_room availability is its own function, returning
+`(date, unit, capacity, slot, status, price)` for active, priced rooms, with
+optional slot, room and guest filters, and nothing for a whole-resort tenant.
+`check_availability` keeps its four columns (and now skips inactive units),
+so villa's tool result and prompt are byte-identical.
+
+**Why definer, against D-042's "try a policy first":** it must see `bookings`
+to say open or taken, and a chat token reads no booking at all (auth-rls
+§ 2.5). That is exactly why `check_availability` is definer. It has the same
+five properties: definer, `search_path = ''`, its own token-tenant check, a
+range cap, and no guest data.
+
+**Measured:** verify 62, 68 (another tenant's id: 42501); battery rooms 10/10
+three times; villa's tools and prompt diff clean against Phase 0.
+
+---
+
+## D-055 · Switching booking type is an operator CLI, and the database refuses it while bookings are live · **Added 2026-09-27 (booking-types Phases 1, 5)**
+
+**Decision:** `pnpm --filter @rag/db tenant:booking-type -- <slug> [type]`.
+Not a staff screen. The validate trigger refuses a switch while any booking
+has not ended, and a switch to whole_resort with more than one active unit;
+the CLI prints that refusal as it is, so the rule exists once.
+
+**Why:** a live whole-property booking does not overlap a room booking, so a
+switch could sell the property twice (plan § 2.4).
+
+**Measured:** Phase 5, 6/6: "3 active units", "1 live booking(s)", then back
+and forth once cancelled.
+
+---
+
+## D-056 · Room photos: a public bucket, uploaded through our route on the staff token, checked by bytes, resized in the browser · **Added 2026-09-27 (booking-types Phases 1–4)**
+
+**Decision:**
+- bucket `unit-images`, public for reads, 2 MiB, jpeg/png/webp; objects at
+  `<tenant_id>/<unit_id>/<uuid>.<ext>`, the path built by `@rag/bookings`
+  from the server's tenant (wall 1) and checked by Storage policies (wall 2);
+- the browser POSTs to our route; it never holds a token, and service_role
+  is never used; the route checks the declared length before reading the
+  body, the package checks the size and the magic bytes, the bucket checks
+  both again, a trigger caps 6 per room;
+- the browser redraws each photo on a canvas and re-encodes it as WebP,
+  which drops EXIF and GPS; upload, then row, then remove the object if the
+  row failed; delete row, then object, checking the COUNT removed.
+
+**Why:** Free plan Storage has no transformations; phone photos carry GPS;
+a refused Storage delete returns no error and removes 0 (Phase 1 spike).
+
+**Measured:** spike 9/9 (our ES256 tokens accepted; cross-tenant 403, SVG 415,
+2 MiB + 1 413); the first real upload a WebP with no EXIF or GPS.
+**Still provisional:** MAX_IMAGE_BYTES and MAX_IMAGE_EDGE await a full-size
+phone photo (Phase 4 walk).
