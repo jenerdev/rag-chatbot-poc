@@ -125,6 +125,11 @@ the room filter, retiring Family Room; why the second walk round never
 reached the database. Then delete `walk-harbor@example.com`, and merge
 `feat/booking-types` into `master`.
 
+**Extra guests (standard/maximum capacity, a per-guest fee): plan drafted
+2026-09-27** in [`plan/extra-guests.md`](./plan/extra-guests.md), to be built
+on `feat/booking-types` before the merge. Nothing built; its § 7 has three
+questions (existing rooms, required guest count, multi-night).
+
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
 (R-30).
