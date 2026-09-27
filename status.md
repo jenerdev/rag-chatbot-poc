@@ -1029,7 +1029,10 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   user moved it to first place (sort 0).
 - **Decided from it:** MAX_IMAGE_EDGE 1600 and MAX_IMAGE_BYTES 2 MiB stay,
   now as measured values (constants.ts says why).
-- **Next:** reset harbor to its fixture, delete the walk login, merge.
+- **Then:** harbor reset to `fixtures/harbor-units.json` (Garden 2/2, Family
+  2/6 offered again; the user's bookings kept); `walk-harbor@example.com`
+  deleted (no memberships left).
+- **Next:** merge `feat/booking-types` into `master` (asked), then payments.
 
 ### 2026-09-28 — the owed browser walk, round 3
 - **Confirmed by the user:** villa's bookings screen looks as it did before
