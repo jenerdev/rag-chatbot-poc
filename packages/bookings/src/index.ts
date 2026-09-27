@@ -44,6 +44,7 @@ export {
   createBooking,
   createBookings,
   listBookings,
+  listRooms,
   listSlots,
   listUnits,
   quote,

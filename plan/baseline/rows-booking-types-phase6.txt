@@ -1,0 +1,5 @@
+ 1 days:   4 rows,    435 chars,   150 tokens
+ 7 days:  28 rows,   2979 chars,  1020 tokens
+14 days:  56 rows,   5947 chars,  2035 tokens
+31 days: 124 rows,  13155 chars,  4500 tokens
+≈ 36.3 tokens per row; MAX_AVAILABILITY_ROWS 150 ≈ 5438 tokens

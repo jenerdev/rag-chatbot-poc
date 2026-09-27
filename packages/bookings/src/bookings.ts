@@ -182,6 +182,25 @@ export async function checkRoomAvailability(
 }
 
 /**
+ * The rooms a per_room tenant offers: active ones, with their capacity, in
+ * the order staff set. What the chatbot's tool description names (a resort
+ * publishes its rooms), so a chat token may read it. No description (tenant
+ * free text is kept out of prompts) and no ids (plan/bookings.md Rule 2).
+ */
+export async function listRooms(tenant: BookingTenant): Promise<{ name: string; capacity: number | null }[]> {
+  await requirePerRoom(tenant);
+  const { data, error } = await tenant.db
+    .from('units')
+    .select('name, capacity')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('sort_order')
+    .order('name');
+  if (error) throw new Error(`Could not load rooms: ${error.message}`);
+  return data.map((u) => ({ name: u.name, capacity: u.capacity }));
+}
+
+/**
  * This tenant's units, by name, inactive ones included: a booking list still
  * names a room that was retired after it was booked. Forms offer only the
  * `active` ones.

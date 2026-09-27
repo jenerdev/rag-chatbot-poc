@@ -1,0 +1,22 @@
+[ingest] harbor "Harbor Inn Guest Guide": 2385 chars -> 3 chunks
+[ingest] embedded 3 chunks, 1536 dims each
+corpus: ingested "Harbor Inn Guest Guide" as document 228
+[bookings] harbor changed room #125: capacity, sort_order
+room: updated Garden Room
+[bookings] harbor changed room #126: capacity, sort_order
+room: updated Family Room
+[bookings] harbor added room #130 "Loft"
+room: added Loft
+[bookings] harbor rates for room #130: slot 155 480000/580000
+rate: Loft 480000/580000
+[bookings] harbor added room #131 "Sea View Suite"
+room: added Sea View Suite
+[bookings] harbor rates for room #131: slot 155 800000/950000
+rate: Sea View Suite 800000/950000
+[bookings] harbor added room #132 "Old Annex"
+room: added Old Annex
+[bookings] harbor rates for room #132: slot 155 250000/250000
+rate: Old Annex 250000/250000
+[bookings] harbor changed room #132: active
+room: Old Annex retired
+harbor now: Garden Room cap 2 350000/450000 · Family Room cap 6 600000/750000 · Loft cap 3 480000/580000 · Sea View Suite cap 2 800000/950000 · Old Annex (retired) cap 8 250000/250000

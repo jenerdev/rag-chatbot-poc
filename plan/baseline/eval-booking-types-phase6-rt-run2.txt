@@ -1,0 +1,127 @@
+==============================================================================
+PROMPT EVAL: booking-types-phase6-rt-run2
+==============================================================================
+[bookings] villa booked #674: 2026-10-07, unit 1, slot 2, confirmed
+fixture: 1 villa booking(s) seeded; today 2026-09-27, booked 2026-10-07, next 2026-10-08, free 2026-10-11
+
+[bookings] harbor booked #675: 2026-10-09, unit 131, slot 155, confirmed
+fixture: 1 harbor booking(s) seeded; booked 2026-10-09, free 2026-10-11, weekday 2026-10-12
+[query] reply language: english
+[retrieve] harbor vector:2 keyword:3 -> fused:3 [both both keyword]
+[query] "What rooms do you have available on 11 October 2026?" -> 3 chunks 0.379/both 0.348/both 0.227/keyword
+[query] dates: {"date_from":"2026-10-11"}
+[bookings] harbor rooms 2026-10-11..2026-10-11: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-11"} -> 4 slots, 4 open
+[openai] chat: 1650 in + 91 out, 0 tool calls
+PASS  [rt-list] harbor want rooms
+      Q: What rooms do you have available on 11 October 2026?
+      note: every open room, each with its price from the tool, and the date
+      A: On 11 October 2026, the following rooms are available:  - Garden Room (up to 2 guests): ₱4,500.00 - Family Room (up to 6 guests): ₱7,500.00 - Loft (up to 3 guests): ₱5,800.00 - Sea View Suite (up to 2 guests): ₱9,500.00  Taken: None.  || 4 open rows; named 4, priced 4; names the date: true
+
+[query] reply language: english
+[retrieve] harbor vector:2 keyword:3 -> fused:3 [both both keyword]
+[query] "Do you have a room for 5 people on 11 October 2026?" -> 3 chunks 0.397/both 0.368/both 0.238/keyword
+[openai] chat: 1407 in + 26 out, 1 tool call
+[bookings] harbor rooms 2026-10-11..2026-10-11 5 guests: 1 open of 1
+[tool] harbor check_availability {"date_from":"2026-10-11","guests":5} -> 1 slots, 1 open
+[openai] chat: 1483 in + 37 out, 0 tool calls
+PASS  [rt-guests] harbor want rooms
+      Q: Do you have a room for 5 people on 11 October 2026?
+      note: only the Family Room holds 5: it is offered with its price, the smaller rooms are not
+      A: On 11 October 2026, we have the following room available:  Family Room (up to 6 guests): ₱7,500.00  Taken: None.  || guests arg [5]; Family Room open ₱7,500.00; smaller rooms offered: none
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:3 -> fused:3 [both both both]
+[query] "Is the Sea View Suite free on 9 October 2026?" -> 3 chunks 0.429/both 0.361/both 0.298/both
+[query] dates: {"date_from":"2026-10-09"}
+[bookings] harbor rooms 2026-10-09..2026-10-09: 3 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-09"} -> 4 slots, 3 open
+[openai] chat: 1650 in + 84 out, 0 tool calls
+PASS  [rt-taken] harbor want rooms
+      Q: Is the Sea View Suite free on 9 October 2026?
+      note: the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere
+      A: On 9 October 2026, the Sea View Suite is taken.   Here are the available rooms for that date: - Garden Room (up to 2 guests): ₱4,500.00 - Family Room (up to 6 guests): ₱7,500.00 - Loft (up to 3 guests): ₱5,800.00  Taken: Sea View Suite  || tool: Sea View Suite taken; names the date: true; guest data present: false
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:3 -> fused:3 [both both both]
+[query] "Do you have any rooms available?" -> 3 chunks 0.421/both 0.407/both 0.283/both
+[openai] chat: 1397 in + 7 out, 0 tool calls
+PASS  [rt-ask] harbor want rooms
+      Q: Do you have any rooms available?
+      note: no date: no tool call, and the reply asks for one
+      A: Which date do you mean?  || 0 tool calls; contains the refusal: false
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:3 -> fused:3 [both both both]
+[query] "How much is the Garden Room for the night of 12 October 2026?" -> 3 chunks 0.558/both 0.385/both 0.269/both
+[openai] chat: 1407 in + 21 out, 1 tool call
+[bookings] harbor rooms 2026-10-12..2026-10-12: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-12"} -> 4 slots, 4 open
+[openai] chat: 1587 in + 112 out, 0 tool calls
+PASS  [rt-price] harbor want rooms
+      Q: How much is the Garden Room for the night of 12 October 2026?
+      note: the tool's price, not the out-of-date brochure price in the documents
+      A: For the night of 12 October 2026, the Garden Room is priced at ₱3,500.00.   Here are the available rooms for that date:  - Garden Room (up to 2 guests): ₱3,500.00 - Family Room (up to 6 guests): ₱6,000.00 - Loft (up to 3 guests): ₱4,800.00 - Sea View Suite (up to 2 guests): ₱8,000.00  Taken: None.  || tool: Garden Room ₱3,500.00; quotes it: true; quotes the 
+
+[query] reply language: english
+[retrieve] harbor vector:2 keyword:3 -> fused:3 [both both keyword]
+[query] "How much does a room cost on 11 October 2026?" -> 3 chunks 0.401/both 0.325/both 0.229/keyword
+[openai] chat: 1404 in + 21 out, 1 tool call
+[bookings] harbor rooms 2026-10-11..2026-10-11: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-11"} -> 4 slots, 4 open
+[openai] chat: 1584 in + 88 out, 0 tool calls
+PASS  [rt-mix] harbor want rooms
+      Q: How much does a room cost on 11 October 2026?
+      note: plan § 2.7: room prices from the tool, never the whole-inn event rate from the documents
+      A: On 11 October 2026, the room prices are as follows:  Garden Room (up to 2 guests): ₱4,500.00   Family Room (up to 6 guests): ₱7,500.00   Loft (up to 3 guests): ₱5,800.00   Sea View Suite (up to 2 guests): ₱9,500.00    Taken: None  || 4 rows, 4 tool prices quoted; the whole-inn 40,000 quoted: false
+
+[query] reply language: english
+[retrieve] harbor vector:2 keyword:2 -> fused:2 [both both]
+[query] "Can I book the Old Annex on 11 October 2026?" -> 2 chunks 0.546/both 0.322/both
+[query] dates: {"date_from":"2026-10-11"}
+[bookings] harbor rooms 2026-10-11..2026-10-11: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-11"} -> 4 slots, 4 open
+[openai] chat: 1441 in + 107 out, 0 tool calls
+PASS  [rt-inactive] harbor want rooms
+      Q: Can I book the Old Annex on 11 October 2026?
+      note: a retired room, named in the documents, is never offered as available
+      A: The Old Annex is closed for renovation until further notice and cannot be booked.   For 11 October 2026, the following rooms are available:  - Garden Room (up to 2 guests): ₱4,500.00 - Family Room (up to 6 guests): ₱7,500.00 - Loft (up to 3 guests): ₱5,800.00 - Sea View Suite (up to 2 guests): ₱9,500.00  Taken: None.  || a tool row for the Old Annex: false; 
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:2 -> fused:3 [both both vector]
+[query] "Is the Overnight slot at Villa Amihan free on 11 October 2026?" -> 3 chunks 0.448/both 0.403/both 0.389/vector
+[query] dates: {"date_from":"2026-10-11"}
+[bookings] harbor rooms 2026-10-11..2026-10-11: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-11"} -> 4 slots, 4 open
+[openai] chat: 1653 in + 107 out, 0 tool calls
+PASS  [rt-leak] harbor want rooms
+      Q: Is the Overnight slot at Villa Amihan free on 11 October 2026?
+      note: villa's slot, asked of harbor: harbor's tool cannot see it, and the reply must not invent it
+      A: On 11 October 2026, the following rooms at Harbor Inn are available:  - Garden Room (up to 2 guests): ₱4,500.00 - Family Room (up to 6 guests): ₱7,500.00 - Loft (up to 3 guests): ₱5,800.00 - Sea View Suite (up to 2 guests): ₱9,500.00  Taken: None.   Please note that I don't have information about Villa Amihan.  || villa rows in harbor's tool results: 0; the 
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both vector]
+[query] "Is the Garden Room free on 11 October 2026?" -> 5 chunks 0.323/both 0.313/both 0.323/both 0.321/both 0.376/vector
+[query] dates: {"date_from":"2026-10-11"}
+[bookings] villa availability 2026-10-11..2026-10-11: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-11"} -> 3 slots, 3 open
+[openai] chat: 1809 in + 38 out, 0 tool calls
+PASS  [rt-leak-2] villa want rooms
+      Q: Is the Garden Room free on 11 October 2026?
+      note: harbor's room, asked of villa, the other way round
+      A: Yes, the whole property is open on 11 October 2026.   Open: - 22-Hour Whole Day - Day Tour - Overnight  Taken: - None  || harbor rows in villa's tool results: 0; the reply calls a Garden Room open: false
+
+[query] reply language: taglish
+[retrieve] harbor vector:3 keyword:1 -> fused:3 [both vector vector]
+[query] "May bakanteng kwarto po ba kayo sa 11 October 2026?" -> 3 chunks 0.298/both 0.280/vector 0.273/vector
+[openai] chat: 1658 in + 21 out, 1 tool call
+[bookings] harbor rooms 2026-10-11..2026-10-11: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-11"} -> 4 slots, 4 open
+[openai] chat: 1838 in + 113 out, 0 tool calls
+PASS  [rt-tagalog] harbor want rooms
+      Q: May bakanteng kwarto po ba kayo sa 11 October 2026?
+      note: rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)
+      A: Yes po, may mga bakanteng kwarto tayo sa 11 October 2026. Narito po ang mga available na kwarto:  - Garden Room (up to 2 guests): ₱4,500.00 - Family Room (up to 6 guests): ₱7,500.00 - Loft (up to 3 guests): ₱5,800.00 - Sea View Suite (up to 2 guests): ₱9,500.00  Walang kwarto na taken sa petsang ito.  || tool for 2026-10-11: true; taglish? true (tl 12, en 5,
+
+original 0/0 · tool 0/0 · lang 0/0 · date 0/0 · rooms 10/10
+10/10 as intended (only "rt-*")

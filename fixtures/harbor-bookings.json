@@ -1,0 +1,14 @@
+{
+  "about": "A booking the eval battery seeds into tenant harbor for the rt-* cases, then hard-deletes. Dates are offsets from harbor's today (Asia/Manila), so the battery never goes stale. See plan/booking-types.md Phase 6.",
+  "marker": "fixture:harbor-bookings",
+  "bookings": [
+    {
+      "offsetDays": 12,
+      "room": "Sea View Suite",
+      "slot": "Night",
+      "guestName": "Battery Harbor Guest",
+      "guestPhone": "0917-555-0277",
+      "guestCount": 2
+    }
+  ]
+}

@@ -30,7 +30,10 @@ export const MAX_UNITS_PER_BOOKING = 10;
 
 // The most rows check_room_availability may hand back in one call. Rooms ×
 // slots × days grows fast (plan § 2.6), and every row becomes prompt text.
-// Phase 6 sets it from measured token counts; until then, 150.
+// MEASURED in Phase 6 (plan/booking-types-phase6-rows.mjs): 36.3 input tokens
+// a row, so 150 rows ≈ 5,400 tokens. That keeps a whole month of harbor's
+// four rooms (31 × 4 = 124 rows, 4,500 tokens) inside the cap, and a question
+// that would exceed it gets a message saying how to narrow it.
 export const MAX_AVAILABILITY_ROWS = 150;
 
 // The same bounds as the SQL checks on `units`, so the message is ours and not

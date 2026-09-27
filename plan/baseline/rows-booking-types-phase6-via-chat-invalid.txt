@@ -1,0 +1,6 @@
+ 1 days:   4 rows, 1650 input tokens  [{"date_from":"2026-11-06"}]
+ 7 days:   8 rows, 2009 input tokens  [{"date_from":"2026-11-06"},{"date_from":"2026-11-12"}]
+14 days:   8 rows, 2009 input tokens  [{"date_from":"2026-11-06"},{"date_from":"2026-11-19"}]
+31 days:   8 rows, 2009 input tokens  [{"date_from":"2026-11-06"},{"date_from":"2026-12-06"}]
+≈ 89.8 input tokens per row (31 days vs 1 day)
+150 rows ≈ 13463 tokens

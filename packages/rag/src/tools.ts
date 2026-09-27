@@ -23,10 +23,13 @@ import {
   BookingInputError,
   bookingsConfig,
   checkAvailability,
+  checkRoomAvailability,
+  listRooms,
   listSlots,
   localDate,
   MAX_AVAILABILITY_DAYS,
 } from '@rag/bookings';
+import type { BookingsConfig, SlotSummary } from '@rag/bookings';
 import { APPLICATIONS, enabledApplications } from './applications.js';
 import type { ApplicationKey } from './applications.js';
 import type { TenantContext, ToolCallRecord } from './types.js';
@@ -88,6 +91,12 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
 
   const [config, slots] = await Promise.all([bookingsConfig(tenant), listSlots(tenant)]);
   if (!config) return NO_TOOLS;
+
+  // A per_room tenant gets its own description and instructions, below. The
+  // whole-resort branch that follows is untouched, so villa's tool text and
+  // prompt are byte-identical to before booking types (plan/booking-types.md
+  // Rule 1, checked by diff in Phase 6).
+  if (config.bookingType === 'per_room') return roomTools(tenant, config, slots);
 
   const today = localDate(config.timezone);
   const slotList = slots.map((s) => `${s.name} (from ${s.startTime}, ${hoursOf(s.duration)})`).join('; ');
@@ -171,6 +180,110 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
   };
 }
 
+/** 350000 centavos → "₱3,500.00". The model reads prices as a person would, never as raw centavos. */
+function money(centavos: number, currency: string): string {
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency }).format(centavos / 100);
+}
+
+/**
+ * The tools of a per_room tenant (plan/booking-types.md Phase 6).
+ *
+ * The SAME tool name, check_availability, and the same date arguments, so the
+ * registry, D-046's up-front check for a resolved date, and the chat's
+ * "Checked availability" panel all work unchanged. What differs is what it
+ * checks (rooms, via check_room_availability) and what a row carries: the
+ * room, how many guests it holds, and its price for that date. Three optional
+ * arguments narrow it, because rooms × slots × days grows fast (§ 2.6).
+ *
+ * The room names and capacities go into the description, as the slot names
+ * do, so the model can match "the Garden Room" to a name the tool accepts.
+ * A NAME, not an id (plan/bookings.md Rule 2). Descriptions stay out: they
+ * are tenant free text (Rule 4).
+ */
+async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: SlotSummary[]): Promise<TenantTools> {
+  const today = localDate(config.timezone);
+  const rooms = await listRooms(tenant);
+  const slotList = slots.map((s) => `${s.name} (from ${s.startTime}, ${hoursOf(s.duration)})`).join('; ');
+  const roomList = rooms.map((r) => (r.capacity === null ? r.name : `${r.name} (up to ${r.capacity} guests)`)).join('; ');
+
+  const tool: ToolDefinition = {
+    type: 'function',
+    function: {
+      name: 'check_availability',
+      description:
+        `Check which of ${tenant.businessName}'s rooms are open or taken, and what each costs, for one date or a range of dates. ` +
+        `The rooms are: ${roomList || '(none yet)'}. The booking periods are: ${slotList}. ` +
+        `Dates are YYYY-MM-DD in ${config.timezone}. A range is at most ${MAX_AVAILABILITY_DAYS} days. ` +
+        'Returns one row per date, room and period: the room, how many guests it holds, "open" or "taken", ' +
+        "and the room's base price for that date in " +
+        `${config.currency}.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          date_from: { type: 'string', description: 'The first date to check, YYYY-MM-DD.' },
+          date_to: { type: 'string', description: 'The last date to check, YYYY-MM-DD. Omit it to check one date.' },
+          slot: {
+            type: 'string',
+            enum: slots.map((s) => s.name),
+            description: 'Only this booking period. Omit it for every period.',
+          },
+          room: {
+            type: 'string',
+            enum: rooms.map((r) => r.name),
+            description: 'Only this room, when the user names one. Omit it for every room.',
+          },
+          guests: {
+            type: 'integer',
+            minimum: 1,
+            description: 'How many guests will stay, when the user says. Only rooms that hold that many are returned.',
+          },
+        },
+        required: ['date_from'],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  return {
+    definitions: [tool],
+    prompt: {
+      // Written for rooms, in the shape the villa lines were MEASURED to work
+      // in: say what TO write, with an example, rather than what not to
+      // (D-017, plan/bookings.md Phase 6). Each line answers an rt-* case.
+      // Change one, and re-run `pnpm eval` (CLAUDE.md rule 1).
+      instructions: [
+        // rt-list, rt-taken, and R-23 (a price from memory).
+        'For which rooms are open, how many guests a room holds, or what a room',
+        'costs on a date, ALWAYS call check_availability; the documents cannot',
+        'know. Never state availability or a room price without a tool result',
+        'from this turn.',
+        // rt-list, rt-guests: open rooms first, each with capacity and price.
+        'When you answer about rooms, start with one sentence that names the',
+        'date. Then list each open room on its own line with how many guests it',
+        'holds and its price, for example "Garden Room (up to 2 guests):',
+        '₱3,500.00". Then one line "Taken:" with the taken rooms, if any.',
+        // rt-price, rt-mix (plan § 2.7): the documents may hold an old or a
+        // whole-venue rate.
+        "Quote a room's price only from the tool result, never from the",
+        'documents. The tool gives the base rate for that date.',
+        // rt-guests.
+        'If the user says how many guests, pass it as guests.',
+        // rt-ask, the same rule as villa's.
+        'If the user asks about rooms without giving a date, your whole reply is',
+        'one question asking which date they mean. Call the tool once they give',
+        'one.',
+        // tool-past, for rooms.
+        'If a tool result has an "error", tell the user what it says, for',
+        'example that the date is in the past. A tool error is an answer to',
+        'pass on, not a reason to reply "I don\'t know".',
+      ],
+      today,
+      weekday: weekdayOf(today),
+      timezone: config.timezone,
+    },
+  };
+}
+
 /** Which application owns a tool name, according to the registry. */
 function ownerOf(toolName: string): ApplicationKey | null {
   for (const [key, app] of Object.entries(APPLICATIONS) as [ApplicationKey, (typeof APPLICATIONS)[ApplicationKey]][]) {
@@ -225,6 +338,30 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
 
   if (call.name === 'check_availability') {
     try {
+      // Which branch is decided HERE, from the database, not from which tool
+      // text the model happened to be given (the enablement rule above).
+      const config = await bookingsConfig(tenant);
+      if (config?.bookingType === 'per_room') {
+        const rooms = await checkRoomAvailability(tenant, {
+          from: args.date_from,
+          to: args.date_to,
+          slot: args.slot,
+          unit: args.room,
+          guests: args.guests,
+        });
+        // Mapped field by field (Rule 3): the price becomes text a person
+        // reads, and nothing else is added.
+        return done({
+          slots: rooms.map((r) => ({
+            date: r.date,
+            unit: r.unit,
+            capacity: r.capacity,
+            slot: r.slot,
+            status: r.status,
+            price: money(r.price, config.currency),
+          })),
+        });
+      }
       const slots = await checkAvailability(tenant, { from: args.date_from, to: args.date_to });
       return done({ slots });
     } catch (error) {

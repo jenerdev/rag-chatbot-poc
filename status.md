@@ -100,9 +100,15 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
 - [x] **Phase 5 — The CLI** (2026-09-27). `pnpm --filter @rag/db
   tenant:booking-type -- <slug> [whole_resort|per_room]`.
   `plan/booking-types-phase5-cli.mjs` 6/6.
-- [ ] Phase 6 — the tool, then measure: harbor's fixture, the per_room
-  branch of `check_availability`, the `rt-*` cases. **Next.**
-- [ ] Phases 7–8.
+- [x] **Phase 6 — the tool, then measure** (2026-09-27). The per_room branch
+  of `check_availability` (same name; `slot`, `room`, `guests`; prices as
+  text), harbor's corpus/rooms/booking fixtures, ten `rt-*` cases. Full
+  battery **47/48** (`original 9/10 · tool 9/9 · lang 10/10 · date 9/9 ·
+  rooms 10/10`); rt 30/30 over three runs; villa's and Northwind's prompts
+  and villa's tools byte-identical; `MAX_AVAILABILITY_ROWS` 150 now measured
+  (36.3 tokens a row).
+- [ ] Phase 7 — isolation and the bundle. **Next.**
+- [ ] Phase 8 — the record.
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -970,6 +976,24 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 6 (the tool)
+- **Did:** `roomTools()` in tools.ts and a per_room branch in executeTool
+  (chosen from the database); `listRooms()`; `fixtures/harbor.json`,
+  `harbor-units.json`, `harbor-bookings.json`; the loader
+  `plan/booking-types-phase6-harbor.mjs` (idempotent, as harbor's operator);
+  the battery loads harbor, seeds/removes its fixture, and counts a `rooms`
+  group; `plan/booking-types-phase6-rows.mjs`.
+- **Observed:** rt 10/10 three times; full battery 47/48, the original 38 at
+  37/38 as in Phase 0 (`antecedent` only; `lang-followup` then 2/3 on
+  repeat, a known coin-flip); tests 13/14/72/299; verify 69/69; isolation
+  16/16 and 12/12 both ways; rooms 15/15.
+- **Finding, not fixed:** for "from X to Y", D-046's resolver checks the two
+  end dates as two single days, and the model does not ask for the range
+  (7, 14 and 31 days all came back as 8 rows). Pre-existing; it affects
+  villa's range questions too. dates.ts is prompt text, so a fix needs its
+  own battery run.
+- **Next:** Phase 7.
 
 ### 2026-09-27 — booking types Phases 4 (code) and 5
 - **Did (4):** `accommodations-screen.tsx`, its page, `lib/money.ts`,

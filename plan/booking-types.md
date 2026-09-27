@@ -540,6 +540,22 @@ original 38 still give 36/38 with the same two known failures; every `rt-*`
 case passes, and each case that flips is repeated before it is explained
 (R-18). `MAX_AVAILABILITY_ROWS` is set from measured token counts.
 
+> **Done 2026-09-27.** The tool keeps its name, `check_availability`, so the
+> registry, D-046's up-front call and the chat's tools panel are unchanged;
+> the per_room branch is chosen in executeTool from `bookingsConfig`, not
+> from the tool text the model was given. Rows are `date, unit, capacity,
+> slot, status, price`, with the price as text ("₱3,500.00"). Full battery
+> 47/48 (`plan/baseline/eval-booking-types-phase6-full.txt`): the original
+> 38 at 37/38, as in Phase 0; `rooms 10/10`, and 30/30 over three runs.
+> Villa's prompt (bar its date line) and tools, and Northwind's prompt,
+> byte-identical. Ten cases, not nine: `rt-leak` became two (`rt-leak`,
+> harbor asked about villa; `rt-leak-2`, villa asked about harbor).
+> **Measured:** 36.3 tokens a row, so MAX_AVAILABILITY_ROWS 150 ≈ 5,400
+> tokens and a month of four rooms (124 rows) fits; kept at 150.
+> **Found:** "from X to Y" is checked as its two end dates by D-046's
+> resolver, so a range never reaches the tool as a range. Pre-existing, and
+> villa has it too. Not fixed here: dates.ts is prompt text.
+
 ### Phase 7 — Isolation and the bundle
 
 Bookings isolation grows cases for `unit_rates`, `unit_images`, Storage paths

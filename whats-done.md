@@ -5356,3 +5356,62 @@ a live booking, refused with "1 live booking(s) that have not ended"; after
 cancelling, whole_resort (the key removed from the config), a no-op message,
 and per_room again. villa, harbor and northwind read correctly.
 
+## Booking types, Phase 6: the chatbot tool, measured · done 2026-09-27
+
+**What:**
+- `packages/rag/src/tools.ts`: a per_room branch, `roomTools()`. Same tool
+  name and date arguments, plus optional `slot`, `room` (a name, from an
+  enum of this tenant's active rooms) and `guests`. The description names
+  the rooms and their capacities; its instruction lines say to list open
+  rooms with capacity and price, to quote prices only from the tool, and
+  to pass the guest count. executeTool chooses the branch from the
+  database, and maps each row field by field with the price as text.
+- `@rag/bookings`: `listRooms()` (active rooms, name and capacity only).
+- Harbor's fixtures: `fixtures/harbor.json` (a guest guide with an
+  out-of-date ₱3,000 brochure rate, a ₱40,000 whole-inn event rate, the Old
+  Annex closed for renovation, a unique Wi-Fi password),
+  `harbor-units.json` (five rooms, the Old Annex retired but priced) and
+  `harbor-bookings.json` (the Sea View Suite, seeded and hard-deleted by
+  every battery run). `plan/booking-types-phase6-harbor.mjs` loads the first
+  two as harbor's operator, idempotently, keeping the Phase 4 walk's rooms.
+- The battery: harbor loaded, its fixture seeded and removed, ten `rt-*`
+  cases counted as their own `rooms` group, so the four older groups still
+  compare with their baselines.
+
+**Why it matters:** this is where a per_room tenant's guests actually meet
+the feature. Every price the cases accept is the TOOL's price for that row,
+compared in code, so the battery cannot be satisfied by a plausible number.
+
+**Observed:**
+- rt 10/10 on three separate runs. Examples: `rt-price` quoted ₱3,500.00 on a
+  Monday and not the brochure's 3,000; `rt-guests` passed `guests: 5` and
+  offered only the Family Room at ₱7,500.00; `rt-inactive` said the Old
+  Annex "is closed for renovation and cannot be booked"; `rt-taken` said the
+  Sea View Suite is taken, with no guest name or phone anywhere;
+  `rt-tagalog` answered in Taglish (tl 11, en 5);
+- the full battery 47/48: `original 9/10 · tool 9/9 · lang 10/10 · date 9/9
+  · rooms 10/10`. The original 38 at 37/38, the same as Phase 0: only
+  `antecedent` failed, and `lang-followup` was 2/3 on repeat;
+- villa's prompt (apart from its date line) and tool definitions, and
+  Northwind's prompt, byte-identical to Phase 0; harbor's saved as the new
+  per_room baseline;
+- 36.3 tokens a row, from the real tool result sent to the model: 4 rows 150
+  tokens, 124 rows 4,500. MAX_AVAILABILITY_ROWS stays 150 (≈ 5,400);
+- tests 13/14/72/299, verify 69/69, isolation 16/16 and 12/12 both ways,
+  rooms 15/15.
+
+**Trap found: a measurement that measured the resolver.** The first row
+probe asked the chatbot "which rooms are free from X to Y?" and read the
+token count of its answer. 7, 14 and 31 days all gave 8 rows: D-046's
+resolver had checked the two end dates as single days, and the model never
+asked for the range. So the probe was rewritten to measure the tool result
+itself, and the finding is recorded: ranges do not reach the tool as ranges,
+for villa as well. It is pre-existing and not fixed here, because dates.ts is
+prompt text and a change to it needs its own battery run.
+
+**Weak, but passing:** asked about harbor's Garden Room, villa answered with
+its own whole-property availability instead of saying it has no such room;
+asked about villa, harbor listed its own rooms, then said it has no
+information about Villa Amihan. Neither leaks anything, which is what the
+cases assert.
+

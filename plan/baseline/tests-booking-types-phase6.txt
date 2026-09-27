@@ -1,0 +1,4 @@
+@rag/chunker:test:       Tests  13 passed (13)
+@rag/openai:test:       Tests  14 passed (14)
+@rag/bookings:test:       Tests  72 passed (72)
+@rag/pipeline:test:       Tests  299 passed (299)

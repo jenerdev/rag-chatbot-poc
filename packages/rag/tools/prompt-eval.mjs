@@ -30,7 +30,7 @@
 // real calendar.
 import { readFileSync } from 'node:fs';
 import { asOperator, supabase } from '@rag/db/service';
-import { createBooking, listSlots, listUnits, localDate } from '@rag/bookings';
+import { createBooking, createBookings, listSlots, listUnits, localDate } from '@rag/bookings';
 import { answerQuestion, getMessages, loadTenant, NO_ANSWER } from '../dist/index.js';
 
 const label = process.argv[2] ?? 'unlabelled';
@@ -56,6 +56,17 @@ const words = (date, year = true) =>
     timeZone: 'UTC',
   });
 const BOOKED = plus(10); // the fixture: Overnight from 14:00 on this date to 12:00 the next
+// harbor (plan/booking-types.md Phase 6): the Sea View Suite is booked on
+// H_BOOKED by fixtures/harbor-bookings.json; nothing is seeded on H_FREE.
+const H_BOOKED = plus(12);
+const H_FREE = plus(14);
+// A Monday to Thursday at least 15 days out: the weekday rate applies.
+const H_WEEKDAY = (() => {
+  for (let i = 15; ; i++) {
+    const d = new Date(`${plus(i)}T00:00:00Z`).getUTCDay();
+    if (d >= 1 && d <= 4) return plus(i);
+  }
+})();
 const NEXT = plus(11); // Day Tour and 22-Hour overlap the fixture's morning; Overnight is open
 const FREE = plus(14); // nothing booked anywhere near
 
@@ -76,6 +87,10 @@ const slotStatus = (last, date, slot) =>
     .flatMap((c) => c.result?.slots ?? [])
     .find((s) => s.date === date && s.slot === slot)?.status;
 const says = (reply, words) => words.some((w) => reply.toLowerCase().includes(w));
+/** Every room row any tool call returned (harbor's rows carry unit, capacity and price). */
+const roomRows = (last) => callsFor(last).flatMap((c) => c.result?.slots ?? []);
+/** "₱3,500.00" → "3,500": what a reply must contain to be quoting that price. */
+const pesos = (price) => String(price ?? '').replace(/[^\d,.]/g, '').replace(/\.00$/, '');
 const TAKEN_WORDS = ['taken', 'not available', 'unavailable', 'booked', 'not open'];
 
 /**
@@ -316,6 +331,159 @@ const CASES = [
       };
     },
     note: 'a past date: the reply says it is in the past, and never presents availability for it',
+  },
+
+  // --- booking types: harbor's rooms (plan/booking-types.md Phase 6) ---------
+  // harbor is per_room: five rooms in fixtures/harbor-units.json (the Old
+  // Annex retired), a Night rate each, and fixtures/harbor.json, whose RATES
+  // section holds an out-of-date brochure price and a whole-inn event price.
+  // Every price check compares the reply with the TOOL's price for that row,
+  // never with a number typed here, so a rate edit cannot make a case lie.
+  {
+    id: 'rt-list',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`What rooms do you have available on ${words(H_FREE)}?`],
+    check: (last) => {
+      const open = roomRows(last).filter((r) => r.date === H_FREE && r.status === 'open');
+      const named = open.filter((r) => last.reply.includes(r.unit));
+      const priced = open.filter((r) => last.reply.includes(pesos(r.price)));
+      return {
+        ok: open.length > 0 && named.length === open.length && priced.length === open.length && namesDate(last.reply, H_FREE),
+        detail: `${open.length} open rows; named ${named.length}, priced ${priced.length}; names the date: ${namesDate(last.reply, H_FREE)}`,
+      };
+    },
+    note: 'every open room, each with its price from the tool, and the date',
+  },
+  {
+    id: 'rt-guests',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Do you have a room for 5 people on ${words(H_FREE)}?`],
+    check: (last) => {
+      const family = roomRows(last).find((r) => r.date === H_FREE && r.unit === 'Family Room');
+      const tooSmall = ['Garden Room', 'Loft', 'Sea View Suite'].filter((n) =>
+        new RegExp(`${n}[^.\\n]{0,40}\\b(open|available)`, 'i').test(last.reply),
+      );
+      return {
+        ok: family?.status === 'open' && last.reply.includes('Family Room') && last.reply.includes(pesos(family.price)) && tooSmall.length === 0,
+        detail: `guests arg ${JSON.stringify(callsFor(last).map((c) => c.args?.guests))}; Family Room ${family?.status ?? '(no row)'} ${family?.price ?? ''}; smaller rooms offered: ${tooSmall.join(', ') || 'none'}`,
+      };
+    },
+    note: 'only the Family Room holds 5: it is offered with its price, the smaller rooms are not',
+  },
+  {
+    id: 'rt-taken',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Is the Sea View Suite free on ${words(H_BOOKED)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_BOOKED && r.unit === 'Sea View Suite');
+      const everything = `${last.reply} ${JSON.stringify(callsFor(last))}`;
+      const pii = everything.includes('Battery Harbor') || everything.includes('555-0277');
+      return {
+        ok: row?.status === 'taken' && says(last.reply, TAKEN_WORDS) && namesDate(last.reply, H_BOOKED) && !pii,
+        detail: `tool: Sea View Suite ${row?.status ?? '(no row)'}; names the date: ${namesDate(last.reply, H_BOOKED)}; guest data present: ${pii}`,
+      };
+    },
+    note: "the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere",
+  },
+  {
+    id: 'rt-ask',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: ['Do you have any rooms available?'],
+    check: (last) => ({
+      ok: callsFor(last).length === 0 && says(last.reply, ['date', 'when']) && !last.reply.includes(NO_ANSWER),
+      detail: `${callsFor(last).length} tool calls; contains the refusal: ${last.reply.includes(NO_ANSWER)}`,
+    }),
+    note: 'no date: no tool call, and the reply asks for one',
+  },
+  {
+    id: 'rt-price',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`How much is the Garden Room for the night of ${words(H_WEEKDAY)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_WEEKDAY && r.unit === 'Garden Room');
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.price)) && !last.reply.includes('3,000'),
+        detail: `tool: Garden Room ${row?.price ?? '(no row)'}; quotes it: ${row ? last.reply.includes(pesos(row.price)) : false}; quotes the 2025 brochure's 3,000: ${last.reply.includes('3,000')}`,
+      };
+    },
+    note: "the tool's price, not the out-of-date brochure price in the documents",
+  },
+  {
+    id: 'rt-mix',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`How much does a room cost on ${words(H_FREE)}?`],
+    check: (last) => {
+      const rows = roomRows(last).filter((r) => r.date === H_FREE);
+      const quoted = rows.filter((r) => last.reply.includes(pesos(r.price)));
+      return {
+        ok: quoted.length > 0 && !last.reply.includes('40,000'),
+        detail: `${rows.length} rows, ${quoted.length} tool prices quoted; the whole-inn 40,000 quoted: ${last.reply.includes('40,000')}`,
+      };
+    },
+    note: 'plan § 2.7: room prices from the tool, never the whole-inn event rate from the documents',
+  },
+  {
+    id: 'rt-inactive',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Can I book the Old Annex on ${words(H_FREE)}?`],
+    check: (last) => {
+      const offered = roomRows(last).some((r) => r.unit === 'Old Annex');
+      const claimsOpen = /old annex[^.\n]{0,60}\b(is|are)\s+(open|available|free)\b/i.test(last.reply);
+      return {
+        ok: !offered && !claimsOpen && says(last.reply, ['not', 'closed', 'renovation', 'unavailable', "can't", 'cannot']),
+        detail: `a tool row for the Old Annex: ${offered}; the reply calls it open: ${claimsOpen}`,
+      };
+    },
+    note: 'a retired room, named in the documents, is never offered as available',
+  },
+  {
+    id: 'rt-leak',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Is the Overnight slot at Villa Amihan free on ${words(FREE)}?`],
+    check: (last) => {
+      const villaRows = roomRows(last).filter((r) => r.slot === 'Overnight');
+      const claims = /overnight[^.\n]{0,40}\b(is|are)\s+(open|available|free)\b/i.test(last.reply);
+      return {
+        ok: villaRows.length === 0 && !claims,
+        detail: `villa rows in harbor's tool results: ${villaRows.length}; the reply calls villa's Overnight open: ${claims}`,
+      };
+    },
+    note: "villa's slot, asked of harbor: harbor's tool cannot see it, and the reply must not invent it",
+  },
+  {
+    id: 'rt-leak-2',
+    tenant: 'villa',
+    want: 'rooms',
+    turns: [`Is the Garden Room free on ${words(FREE)}?`],
+    check: (last) => {
+      const harborRows = roomRows(last).filter((r) => r.unit === 'Garden Room');
+      const claims = /garden room[^.\n]{0,40}\b(is|are)\s+(open|available|free)\b/i.test(last.reply);
+      return {
+        ok: harborRows.length === 0 && !claims,
+        detail: `harbor rows in villa's tool results: ${harborRows.length}; the reply calls a Garden Room open: ${claims}`,
+      };
+    },
+    note: "harbor's room, asked of villa, the other way round",
+  },
+  {
+    id: 'rt-tagalog',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`May bakanteng kwarto po ba kayo sa ${words(H_FREE)}?`],
+    check: (last) => {
+      const called = callsFor(last).some((c) => c.args?.date_from === H_FREE);
+      const v = langVerdict(last, 'taglish', []);
+      return { ok: called && v.ok, detail: `tool for ${H_FREE}: ${called}; ${v.detail}` };
+    },
+    note: 'rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)',
   },
 
   // --- language: Taglish (D-043) --------------------------------------------
@@ -582,9 +750,9 @@ console.log('='.repeat(78));
 // Tenants by slug. There is no default tenant to fall back on (D-027), so a
 // missing one is an error, not a silently shorter battery.
 const tenants = {};
-for (const slug of ['northwind', 'villa']) {
+for (const slug of ['northwind', 'villa', 'harbor']) {
   tenants[slug] = await loadTenant(slug);
-  if (!tenants[slug]) throw new Error(`No "${slug}" tenant. Both must be loaded (plan.md Phase 2).`);
+  if (!tenants[slug]) throw new Error(`No "${slug}" tenant. All three must be loaded (plan.md Phase 2; harbor: plan/booking-types.md Phase 6).`);
 }
 // Every question below goes through tenants[slug], a CHAT token context,
 // exactly as the chat route's does. So the battery runs under RLS (auth-rls
@@ -592,6 +760,7 @@ for (const slug of ['northwind', 'villa']) {
 // villa's operator member on a staff token, through the same createBooking
 // the admin route calls (§ 2.7). Removing it is cleanup, on the service client.
 const villaAdmin = await asOperator(tenants.villa);
+const harborAdmin = await asOperator(tenants.harbor);
 
 // --- the villa bookings fixture ----------------------------------------------
 const fixture = JSON.parse(readFileSync(new URL('../../../fixtures/villa-bookings.json', import.meta.url), 'utf8'));
@@ -604,6 +773,35 @@ async function removeFixture() {
     .eq('tenant_id', tenants.villa.id)
     .eq('notes', fixture.marker);
   if (error) throw new Error(`Could not remove the bookings fixture: ${error.message}`);
+}
+
+// --- the harbor bookings fixture (plan/booking-types.md Phase 6) ---------------
+const harborFixture = JSON.parse(readFileSync(new URL('../../../fixtures/harbor-bookings.json', import.meta.url), 'utf8'));
+
+async function removeHarborFixture() {
+  const { error } = await supabase.from('bookings').delete().eq('tenant_id', tenants.harbor.id).eq('notes', harborFixture.marker);
+  if (error) throw new Error(`Could not remove the harbor bookings fixture: ${error.message}`);
+}
+
+async function seedHarborFixture() {
+  await removeHarborFixture();
+  const [units, slots] = await Promise.all([listUnits(harborAdmin), listSlots(harborAdmin)]);
+  for (const b of harborFixture.bookings) {
+    const unit = units.find((u) => u.name === b.room && u.active);
+    const slot = slots.find((s) => s.name === b.slot);
+    if (!unit || !slot) throw new Error(`harbor has no active "${b.room}" or no "${b.slot}" — run plan/booking-types-phase6-harbor.mjs`);
+    // createBookings, the admin route's path. A real booking on the same span
+    // is a 409 here, which stops the battery loudly.
+    await createBookings(harborAdmin, {
+      rooms: [{ unitId: unit.id, guestCount: b.guestCount }],
+      slotId: slot.id,
+      date: plus(b.offsetDays),
+      guestName: b.guestName,
+      guestPhone: b.guestPhone,
+      notes: harborFixture.marker,
+    });
+  }
+  console.log(`fixture: ${harborFixture.bookings.length} harbor booking(s) seeded; booked ${H_BOOKED}, free ${H_FREE}, weekday ${H_WEEKDAY}`);
 }
 
 async function seedFixture() {
@@ -657,10 +855,20 @@ let pass = 0;
 let basePass = 0;
 let langPass = 0;
 let datePass = 0;
-/** Four groups, counted apart, because each has its own baseline to match. */
+let roomPass = 0;
+/** Five groups, counted apart, because each has its own baseline to match. */
 const GROUP = (c) =>
-  c.id.startsWith('tool-') ? 'tool' : c.id.startsWith('lang-') ? 'lang' : c.id.startsWith('date-') ? 'date' : 'original';
+  c.id.startsWith('tool-')
+    ? 'tool'
+    : c.id.startsWith('lang-')
+      ? 'lang'
+      : c.id.startsWith('date-')
+        ? 'date'
+        : c.id.startsWith('rt-')
+          ? 'rooms'
+          : 'original';
 await seedFixture();
+await seedHarborFixture();
 try {
 for (const c of RUN) {
   const tenant = tenants[c.tenant];
@@ -668,7 +876,7 @@ for (const c of RUN) {
   let reply;
   answerCalls = 0;
 
-  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date') {
+  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date' || c.want === 'rooms') {
     const last = await ask(tenant, c.turns);
     const verdict = c.check(last, { answerCalls });
     ok = verdict.ok;
@@ -706,6 +914,7 @@ for (const c of RUN) {
   if (ok && GROUP(c) === 'original') basePass++;
   if (ok && GROUP(c) === 'lang') langPass++;
   if (ok && GROUP(c) === 'date') datePass++;
+  if (ok && GROUP(c) === 'rooms') roomPass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
@@ -715,6 +924,7 @@ for (const c of RUN) {
 }
 } finally {
   await removeFixture();
+  await removeHarborFixture();
 }
 
 // The ten cases that predate bookings, counted on their own, because their
@@ -723,6 +933,6 @@ for (const c of RUN) {
 // misleading "original 0/10".
 const total = (g) => RUN.filter((c) => GROUP(c) === g).length;
 console.log(
-  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')}`,
+  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass - roomPass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')} · rooms ${roomPass}/${total('rooms')}`,
 );
 console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);
