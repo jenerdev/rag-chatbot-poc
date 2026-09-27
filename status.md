@@ -1022,6 +1022,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — code review of the merge (`e8fc28b..bf62ed4`), fixes
+- **Reviewed:** 4 findings; re-verified live before fixing. 1 (a room with
+  no maximum vanished for any guest count), 2 (photo "move" sent a photo to
+  the end: every upload had order 0) and 4 (re-running
+  schema-booking-types.sql after schema-extra-guests.sql would fail, or put
+  the older trigger back) reproduced. 3 (an empty tool enum breaks chat) was
+  DISPROVED: the API accepted `enum: []`.
+- **Fixed:** 1 in both SQL files (`u.capacity is null or …`); 2 with
+  `moveImage` (swap positions, renumber) and next-place uploads; 4 by
+  guarding the two superseded definitions with `to_regprocedure(unit_quote)`.
+- **Observed:** after the user ran schema-extra-guests.sql then
+  schema-booking-types.sql: verify 76/76 (75 new: "No Limit" returned for 5
+  guests); the extra-guests checks unchanged, so the re-run undid nothing;
+  rooms 20/20 (new photo-order check); walk 11/11; isolation 23/23 and 20/20
+  both ways.
+
 ### 2026-09-28 — the owed browser walk, done
 - **Observed:** Family Room retired, its 20 Oct booking (#927) still
   confirmed. A phone photo: "Added a photo: 14509 KB → 87 KB, 1600×1067";

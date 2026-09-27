@@ -5610,3 +5610,31 @@ ICCP colour profile). MAX_IMAGE_EDGE 1600 and MAX_IMAGE_BYTES 2 MiB are now
 measured values, not guesses: 86.8 KB is 4% of the cap. R-27's egress becomes
 concrete too: about 60,000 views of such a photo a month on the Free plan.
 
+## Code review of the merge: three fixes · done 2026-09-28
+
+**What:** the user's review of `e8fc28b..bf62ed4` raised four findings. Each
+was re-run against the live system before anything was changed:
+1. a room with no maximum (`capacity` null) was dropped from room
+   availability whenever a guest count was given, because `null >= n` is
+   never true: reproduced ("No Limit" listed with no count, absent for 3);
+2. moving a photo right sent the first of three to the END: reproduced
+   (p1,p2,p3 → p2,p3,p1), because every upload was stored at order 0;
+3. an empty `enum` in the tool schema would make OpenAI refuse it:
+   DISPROVED, the API accepted `enum: []`, so nothing was changed for it;
+4. re-running schema-booking-types.sql after schema-extra-guests.sql fails
+   on the return-type change, after putting the older trigger back:
+   confirmed from the files and Postgres's rule (not executable from here).
+
+**Fixed:** 1, `u.capacity is null or u.capacity >= p_guests`, in both files;
+2, uploads take the next place and `moveImage` swaps positions then
+renumbers, and the screen sends `{ move: ±1 }`; 4, the two superseded
+definitions in schema-booking-types.sql run only while `unit_quote()` does
+not exist yet.
+
+**Observed:** verify 76/76 after the user ran both files in that order, with
+the extra-guests checks unchanged (proof that the re-run undid nothing);
+rooms 20/20; walk 11/11; isolation 23/23 and 20/20 both ways.
+
+**Why re-verify first:** one of the four was wrong. Fixing it would have
+added code for a failure that does not happen.
+
