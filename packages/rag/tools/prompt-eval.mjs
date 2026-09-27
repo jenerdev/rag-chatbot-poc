@@ -365,9 +365,12 @@ const CASES = [
       const tooSmall = ['Garden Room', 'Loft', 'Sea View Suite'].filter((n) =>
         new RegExp(`${n}[^.\\n]{0,40}\\b(open|available)`, 'i').test(last.reply),
       );
+      // plan/extra-guests.md: with 5 guests the tool gives the Family Room's
+      // TOTAL (3 above its standard of 2), and that is the number to quote.
+      const quoted = family?.total ?? family?.price;
       return {
-        ok: family?.status === 'open' && last.reply.includes('Family Room') && last.reply.includes(pesos(family.price)) && tooSmall.length === 0,
-        detail: `guests arg ${JSON.stringify(callsFor(last).map((c) => c.args?.guests))}; Family Room ${family?.status ?? '(no row)'} ${family?.price ?? ''}; smaller rooms offered: ${tooSmall.join(', ') || 'none'}`,
+        ok: family?.status === 'open' && last.reply.includes('Family Room') && last.reply.includes(pesos(quoted)) && tooSmall.length === 0,
+        detail: `guests arg ${JSON.stringify(callsFor(last).map((c) => c.args?.guests))}; Family Room ${family?.status ?? '(no row)'} ${quoted ?? ''}; smaller rooms offered: ${tooSmall.join(', ') || 'none'}`,
       };
     },
     note: 'only the Family Room holds 5: it is offered with its price, the smaller rooms are not',
@@ -472,6 +475,54 @@ const CASES = [
       };
     },
     note: "harbor's room, asked of villa, the other way round",
+  },
+  // --- extra guests (plan/extra-guests.md Phase 4) --------------------------
+  // harbor's rooms cover 2 guests and add ₱250 each above that, up to each
+  // room's own maximum. The TOOL computes the total (unit_quote()); a case
+  // passes only if the reply quotes that total, never one the model made.
+  {
+    id: 'rt-extra',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`How much is the Loft for 3 guests on ${words(H_WEEKDAY)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_WEEKDAY && r.unit === 'Loft' && r.total);
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.total)) && last.reply.includes(pesos(row.extra_guest_charge)),
+        detail: `tool: Loft ${row ? `${row.price} + ${row.extra_guest_charge} = ${row.total}` : '(no row with a total)'}; quotes the total: ${row ? last.reply.includes(pesos(row.total)) : false}; names the extra charge: ${row ? last.reply.includes(pesos(row.extra_guest_charge)) : false}`,
+      };
+    },
+    note: '3 guests in a room covering 2: the tool’s total (base + ₱250), and the charge named',
+  },
+  {
+    id: 'rt-over',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Can 3 people stay in the Garden Room on ${words(H_FREE)}?`],
+    check: (last) => {
+      const garden = roomRows(last).filter((r) => r.unit === 'Garden Room' && r.total);
+      const claims = /garden room[^.\n]{0,60}\b(is|are)\s+(open|available|free)\b/i.test(last.reply) && !says(last.reply, ['only', 'up to 2', 'maximum', "can't", 'cannot', 'not']);
+      return {
+        ok: garden.length === 0 && !claims && says(last.reply, ['2 guests', 'two guests', 'up to 2', 'only 2', 'maximum of 2', 'holds 2', 'fits 2']),
+        detail: `Garden Room rows priced for 3: ${garden.length}; the reply offers it for 3: ${claims}`,
+      };
+    },
+    note: 'more guests than a room holds: the room is not offered for them, and the reply says it holds 2',
+  },
+  {
+    id: 'rt-standard',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`How much is the Family Room for 2 guests on ${words(H_WEEKDAY)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_WEEKDAY && r.unit === 'Family Room');
+      const charged = /₱\s?250(\.00)?\b|\b250\.00\b/.test(last.reply) && !/no (extra|additional)/i.test(last.reply);
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.total ?? row.price)) && !charged,
+        detail: `tool: Family Room ${row?.total ?? row?.price ?? '(no row)'}; an extra charge named: ${charged}`,
+      };
+    },
+    note: 'within the included guests: the base price, and no extra charge',
   },
   {
     id: 'rt-tagalog',

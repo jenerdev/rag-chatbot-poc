@@ -5543,3 +5543,35 @@ name; a 3-guest quote 350000 + 25000 = 375000; 400 "Quad holds at most 4
 guests." for 5 at the quote, 400 at the booking, 400 "Enter the number of
 guests for each room." with none, 400 for a standard of 5 over 4.
 
+## Extra guests, Phase 4: the chatbot, measured · done 2026-09-28
+
+**What:** harbor's rooms now cover 2 guests and add ₱250 each (maximums
+unchanged: 2, 6, 3, 2). The per_room tool describes the fee; each row carries
+`included_guests` and `extra_guest_fee`, and, when the guests are known,
+that party's `extra_guest_charge` and `total`, all from unit_quote(). Two
+instruction lines: quote the tool's total, naming the charge, "never add up a
+total yourself"; a room too small is not in the result, so say so and offer
+the ones that fit. Three cases: `rt-extra`, `rt-over`, `rt-standard`.
+
+**Why it matters:** the request's § 5. The chatbot's ₱5,050.00 for the Loft
+with 3 guests is unit_quote()'s number, the same one the staff quote shows
+and the trigger stores. It was not added up by the model.
+
+**Observed:** full battery 49/51: `original 9/10 · tool 9/9 · lang 9/10 · date
+9/9 · rooms 13/13`, the original 48 exactly as expected; rooms 13/13 on two
+more runs. Replies, verbatim: "the Loft (3 guests): ₱4,800.00 + ₱250.00 for 1
+extra guest = ₱5,050.00"; for 3 people in the Garden Room, the Family Room
+and the Loft offered with totals, "Garden Room is not available for 3 guests
+as it only accommodates up to 2 guests"; the Family Room for 2 guests
+"₱6,000.00", no fee. Villa's and Northwind's prompts and villa's tools
+identical; pipeline tests 301; isolation 20/20 both ways.
+
+**Trap found: a missed word looked like a prompt problem.** `rt-tagalog`
+passed 3 of 3 before this phase and 1 of 7 after its new lines, and the
+failure read like the model ignoring a date ("Anong petsa po…?"). The real
+cause was older: `dates.ts` matched "bakante" but not "bakanteng", the same
+word with the Tagalog linker "-ng", so D-046's up-front check never ran and
+the call was left to the model. The fix is one regex group, pinned by a test
+that failed first; because dates.ts is prompt text, the whole battery was
+re-run on it. Rewording the prompt until the case passed would have hidden it.
+

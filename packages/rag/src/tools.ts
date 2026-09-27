@@ -216,7 +216,8 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
         `Dates are YYYY-MM-DD in ${config.timezone}. A range is at most ${MAX_AVAILABILITY_DAYS} days. ` +
         'Returns one row per date, room and period: the room, how many guests it holds, "open" or "taken", ' +
         "and the room's base price for that date in " +
-        `${config.currency}.`,
+        `${config.currency}. The base price covers the room's included guests; each guest above that adds the room's ` +
+        'extra guest fee, up to the most it holds. Pass guests to get the total for that party.',
       parameters: {
         type: 'object',
         properties: {
@@ -235,7 +236,8 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
           guests: {
             type: 'integer',
             minimum: 1,
-            description: 'How many guests will stay, when the user says. Only rooms that hold that many are returned.',
+            description:
+              'How many guests will stay, when the user says. Only rooms that hold that many are returned, each with its total for that many guests.',
           },
         },
         required: ['date_from'],
@@ -266,8 +268,15 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
         // whole-venue rate.
         "Quote a room's price only from the tool result, never from the",
         'documents. The tool gives the base rate for that date.',
-        // rt-guests.
-        'If the user says how many guests, pass it as guests.',
+        // rt-guests, and plan/extra-guests.md (rt-extra, rt-standard, R-37):
+        // the total is the TOOL's, never one the model adds up.
+        'If the user says how many guests, pass it as guests, and quote each',
+        'room\'s "total" from the result, naming its extra guest charge, for',
+        'example "Loft (3 guests): ₱4,800.00 + ₱250.00 for 1 extra guest =',
+        '₱5,050.00". Never add up a total yourself.',
+        // rt-over: a room too small for the party is not in the result.
+        'A room that holds fewer guests than asked is not in the result; say',
+        'it holds fewer, and offer the rooms that are.',
         // rt-ask, the same rule as villa's.
         'If the user asks about rooms without giving a date, your whole reply is',
         'one question asking which date they mean. Call the tool once they give',
@@ -351,14 +360,23 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
         });
         // Mapped field by field (Rule 3): the price becomes text a person
         // reads, and nothing else is added.
+        // plan/extra-guests.md: what the base price covers, the fee per guest
+        // above it, and, only when the guests are known, that party's extra
+        // charge and total, all from unit_quote(). Without a guest count there
+        // is no total to give, so none is given: the model is not handed a
+        // number it could mistake for the party's price.
+        const guests = args.guests !== undefined && args.guests !== null;
         return done({
           slots: rooms.map((r) => ({
             date: r.date,
             unit: r.unit,
             capacity: r.capacity,
+            included_guests: r.standardCapacity,
+            extra_guest_fee: r.extraPersonRate === null ? null : money(r.extraPersonRate, config.currency),
             slot: r.slot,
             status: r.status,
             price: money(r.price, config.currency),
+            ...(guests ? { extra_guest_charge: money(r.extraGuestPrice, config.currency), total: money(r.total, config.currency) } : {}),
           })),
         });
       }

@@ -176,6 +176,18 @@ accident.
 4. **The tool, then measure.** Full battery: the original 48 unchanged
    (46/48 expected, 47 when `lang-followup` passes), plus the new `rt-*`;
    villa and Northwind diff clean.
+   > **Done 2026-09-28.** Harbor's rooms got standard 2 and ₱250 through the
+   > fixture (maximums unchanged). The per_room tool rows carry
+   > `included_guests` and `extra_guest_fee`, and with a guest count
+   > `extra_guest_charge` and `total`, all from unit_quote(); two instruction
+   > lines say to quote that total and never add one up. Full battery
+   > **49/51**: the original 48 at 46/48 as expected, `rooms 13/13`, and 13/13
+   > on two more runs. Villa's and Northwind's prompts and villa's tools
+   > identical. **Found and fixed:** `rt-tagalog` fell to 1 pass in 7 after the
+   > new lines. Cause: `dates.ts` knew "bakante" but not "bakanteng" (the
+   > Tagalog linker), so the up-front check (D-046) never ran for "May
+   > bakanteng kwarto…". Fixed in `dates.ts` with a test; that file is prompt
+   > text, so the whole battery was re-run (the 49/51 above).
 5. **Isolation and the record.** Both walls; D-065–D-068, R-36–R-37
    (D-057–D-064 and R-31–R-35 are reserved by `plan/payments.md`).
 

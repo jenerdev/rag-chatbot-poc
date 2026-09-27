@@ -1,11 +1,60 @@
 {
-  "about": "Tenant harbor's rooms and Night rates (centavos), for the eval battery's rt-* cases (plan/booking-types.md Phase 6). Loaded by plan/booking-types-phase6-harbor.mjs, which upserts by name, so it is safe to run again. Garden Room and Family Room match what the Phase 4 walk created. The Old Annex is inactive but priced, so rt-inactive proves the tool leaves it out because it is retired, not because it has no rate.",
-  "slot": { "name": "Night", "start_time": "14:00", "duration": "22 hours" },
+  "about": "Tenant harbor's rooms and Night rates (centavos), for the eval battery's rt-* cases (plan/booking-types.md Phase 6). Loaded by plan/booking-types-phase6-harbor.mjs, which upserts by name, so it is safe to run again. Garden Room and Family Room match what the Phase 4 walk created. The Old Annex is inactive but priced, so rt-inactive proves the tool leaves it out because it is retired, not because it has no rate. Extra guests (plan/extra-guests.md): every room covers 2 guests in its rate and charges 25000 centavos (PHP 250) per guest above that, up to its own maximum, which is unchanged.",
+  "slot": {
+    "name": "Night",
+    "start_time": "14:00",
+    "duration": "22 hours"
+  },
   "rooms": [
-    { "name": "Garden Room", "capacity": 2, "sort_order": 1, "active": true, "weekday_price": 350000, "weekend_price": 450000 },
-    { "name": "Family Room", "capacity": 6, "sort_order": 2, "active": true, "weekday_price": 600000, "weekend_price": 750000 },
-    { "name": "Loft", "capacity": 3, "sort_order": 3, "active": true, "weekday_price": 480000, "weekend_price": 580000 },
-    { "name": "Sea View Suite", "capacity": 2, "sort_order": 4, "active": true, "weekday_price": 800000, "weekend_price": 950000 },
-    { "name": "Old Annex", "capacity": 8, "sort_order": 5, "active": false, "weekday_price": 250000, "weekend_price": 250000 }
+    {
+      "name": "Garden Room",
+      "capacity": 2,
+      "sort_order": 1,
+      "active": true,
+      "weekday_price": 350000,
+      "weekend_price": 450000,
+      "standard_capacity": 2,
+      "extra_person_rate": 25000
+    },
+    {
+      "name": "Family Room",
+      "capacity": 6,
+      "sort_order": 2,
+      "active": true,
+      "weekday_price": 600000,
+      "weekend_price": 750000,
+      "standard_capacity": 2,
+      "extra_person_rate": 25000
+    },
+    {
+      "name": "Loft",
+      "capacity": 3,
+      "sort_order": 3,
+      "active": true,
+      "weekday_price": 480000,
+      "weekend_price": 580000,
+      "standard_capacity": 2,
+      "extra_person_rate": 25000
+    },
+    {
+      "name": "Sea View Suite",
+      "capacity": 2,
+      "sort_order": 4,
+      "active": true,
+      "weekday_price": 800000,
+      "weekend_price": 950000,
+      "standard_capacity": 2,
+      "extra_person_rate": 25000
+    },
+    {
+      "name": "Old Annex",
+      "capacity": 8,
+      "sort_order": 5,
+      "active": false,
+      "weekday_price": 250000,
+      "weekend_price": 250000,
+      "standard_capacity": 2,
+      "extra_person_rate": 25000
+    }
   ]
 }

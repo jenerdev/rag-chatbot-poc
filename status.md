@@ -138,9 +138,11 @@ before the merge. § 7 answered with the recommendations.
 - [x] **Phase 3 — routes and screens** (2026-09-28). Schemas take standard,
   maximum (`maxCapacity`) and the fee; the screens show and edit them and the
   breakdown. Walk 11/11. The browser look joins the owed walk.
-- [ ] Phase 4 — the tool, then measure (harbor's rooms get standard 2 /
-  ₱250; `rt-extra`, `rt-over`, `rt-standard`; full battery). **Next.**
-- [ ] Phase 5 — isolation and the record.
+- [x] **Phase 4 — the tool, then measure** (2026-09-28). Battery **49/51**
+  (`original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13`), rooms
+  13/13 twice more; villa and Northwind unchanged. Fixed on the way:
+  "bakanteng" in `dates.ts`.
+- [ ] Phase 5 — isolation and the record. **Next.**
 
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
@@ -1012,6 +1014,17 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — extra guests Phase 4 (the tool)
+- **Did:** harbor fixture + loader (standard 2, ₱250); tool rows and
+  description; two instruction lines; `rt-guests` quotes the total;
+  `rt-extra`, `rt-over`, `rt-standard`; a `dates.ts` fix.
+- **Observed:** first full run 48/51 with `rt-tagalog` failing, then 0 of 5
+  on repeat: the model asked "Anong petsa po…?" for a message with a date.
+  `asksAvailability("May bakanteng kwarto…")` was false: `bakante` does
+  not match "bakanteng". Fixed (`bakante(?:ng)?`) with a failing-then-passing
+  test; full battery again 49/51; rooms 13/13 three times.
+- **Next:** Phase 5.
 
 ### 2026-09-28 — extra guests Phase 3 (routes and screens)
 - **Did:** `quoteSchema.guestCount`; room schemas with `maxCapacity`,

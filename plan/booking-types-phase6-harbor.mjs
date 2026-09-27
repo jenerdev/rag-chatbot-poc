@@ -48,8 +48,21 @@ for (const room of units.rooms) {
   if (!current) {
     current = await createAccommodation(harbor, { name: room.name, capacity: room.capacity, sortOrder: room.sort_order });
     console.log(`room: added ${room.name}`);
-  } else if (current.capacity !== room.capacity || current.sortOrder !== room.sort_order) {
-    current = await updateAccommodation(harbor, current.id, { capacity: room.capacity, sortOrder: room.sort_order });
+  }
+  // Capacity, order, and (plan/extra-guests.md) the standard capacity and the
+  // extra-guest rate, set together so a standard never exceeds the maximum.
+  if (
+    current.capacity !== room.capacity ||
+    current.sortOrder !== room.sort_order ||
+    current.standardCapacity !== (room.standard_capacity ?? null) ||
+    current.extraPersonRate !== (room.extra_person_rate ?? null)
+  ) {
+    current = await updateAccommodation(harbor, current.id, {
+      capacity: room.capacity,
+      sortOrder: room.sort_order,
+      standardCapacity: room.standard_capacity ?? null,
+      extraPersonRate: room.extra_person_rate ?? null,
+    });
     console.log(`room: updated ${room.name}`);
   }
   const rate = current.rates.find((r) => r.slotId === slot.id);
@@ -68,5 +81,7 @@ for (const room of units.rooms) {
 const final = await listAccommodations(harbor);
 console.log(
   'harbor now:',
-  final.map((a) => `${a.name}${a.active ? '' : ' (retired)'} cap ${a.capacity} ${a.rates.map((r) => `${r.weekdayPrice}/${r.weekendPrice}`).join(',')}`).join(' · '),
+  final
+    .map((a) => `${a.name}${a.active ? '' : ' (retired)'} ${a.standardCapacity}/${a.capacity} +${a.extraPersonRate} ${a.rates.map((r) => `${r.weekdayPrice}/${r.weekendPrice}`).join(',')}`)
+    .join(' · '),
 );

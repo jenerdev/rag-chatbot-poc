@@ -314,9 +314,13 @@ function scan(message: string, today: string): { mentions: DateMention[]; rest: 
  * message that ALSO has a date in it, so "free" and "slot" cannot fire on
  * their own. "check" and "open" are left out on purpose: "What time is
  * check-in bukas?" and "Is the pool open tomorrow?" are documents questions.
+ *
+ * "bakante(?:ng)?": Tagalog joins an adjective to its noun with the linker
+ * "-ng", so "a vacant room" is "bakanteng kwarto". `\bbakante\b` missed that,
+ * and the check never ran (found by rt-tagalog, plan/extra-guests.md Phase 4).
  */
 const AVAILABILITY =
-  /\b(?:available|availability|avail|vacant|vacancy|bakante|free|fully\s+booked|booked|book|booking|mag-?book|magpa-?book|pa-?book|i-?book|reserve|reservation|reserba|slots?|taken|may\s+(?:room|kwarto|cottage))\b/;
+  /\b(?:available|availability|avail|vacant|vacancy|bakante(?:ng)?|free|fully\s+booked|booked|book|booking|mag-?book|magpa-?book|pa-?book|i-?book|reserve|reservation|reserba|slots?|taken|may\s+(?:room|kwarto|cottage))\b/;
 
 export function asksAvailability(message: string): boolean {
   return AVAILABILITY.test(message.toLowerCase());

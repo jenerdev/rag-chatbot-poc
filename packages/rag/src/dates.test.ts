@@ -314,6 +314,17 @@ describe('asksAvailability and isDateOnly', () => {
     }
   });
 
+  // Found by rt-tagalog (plan/extra-guests.md Phase 4): Tagalog joins an
+  // adjective to its noun with the linker "-ng", so "bakante" (vacant)
+  // becomes "bakanteng kwarto" (a vacant room). `\bbakante\b` missed it, the
+  // up-front check never ran, and the model asked for a date it had been given.
+  it('the Tagalog linker: "bakanteng kwarto" and "may bakanteng slot" are availability questions', () => {
+    for (const m of ['May bakanteng kwarto po ba kayo sa 12 October 2026?', 'may bakanteng slot ba bukas', 'Bakanteng kwarto para sa 3']) {
+      expect(asksAvailability(m)).toBe(true);
+    }
+    expect(planDates('May bakanteng kwarto po ba kayo sa 12 October 2026?', SUNDAY, []).calls).toEqual([{ date_from: '2026-10-12' }]);
+  });
+
   it('a date wrapped in filler is date-only; a date inside a question is not', () => {
     expect(isDateOnly('How about the day after tomorrow?', SUNDAY)).toBe(true);
     expect(isDateOnly('Paano kung bukas po?', SUNDAY)).toBe(true);

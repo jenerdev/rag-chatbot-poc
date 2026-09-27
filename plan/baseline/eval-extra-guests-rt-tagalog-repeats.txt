@@ -1,0 +1,10 @@
+FAIL  [rt-tagalog] harbor want rooms
+      A: Anong petsa po ang gusto niyong i-check?  || tool for 2026-10-12: false; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+FAIL  [rt-tagalog] harbor want rooms
+      A: Anong petsa po ang gusto niyong i-check?  || tool for 2026-10-12: false; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+FAIL  [rt-tagalog] harbor want rooms
+      A: Anong petsa po ang gusto niyong i-check?  || tool for 2026-10-12: false; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+FAIL  [rt-tagalog] harbor want rooms
+      A: Anong petsa po ang gusto niyong i-check?  || tool for 2026-10-12: false; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+FAIL  [rt-tagalog] harbor want rooms
+      A: Anong petsa po ang gusto niyo? Please provide the date para ma-check ko ang availability ng mga kwarto.  || tool for 2026-10-12: false; taglish? false (tl 9, en 2, en-share 0.18); facts kept

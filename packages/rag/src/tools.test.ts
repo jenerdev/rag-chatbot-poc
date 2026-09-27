@@ -134,8 +134,8 @@ describe('per_room: check_availability checks rooms', () => {
   const config = vi.mocked(bookingsConfig);
   const HARBOR = { ...TENANT, id: 67, slug: 'harbor' } as unknown as TenantContext;
   const ROOMS = [
-    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, slot: 'Night', status: 'open', price: 350000 },
-    { date: '2026-09-28', unit: 'Family Room', capacity: 6, slot: 'Night', status: 'taken', price: 600000 },
+    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, extraGuestPrice: 0, total: 350000 },
+    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, extraGuestPrice: 25000, total: 625000 },
   ];
 
   beforeEach(() => {
@@ -155,12 +155,28 @@ describe('per_room: check_availability checks rooms', () => {
     expect(check).not.toHaveBeenCalled();
   });
 
-  it('hands the model prices as text, and exactly these six fields', async () => {
+  it('hands the model prices as text, and exactly these fields when the guests are unknown', async () => {
     const { record, content } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28"}' });
     const rows = (record.result as { slots: Record<string, unknown>[] }).slots;
-    expect(rows[0]).toEqual({ date: '2026-09-28', unit: 'Garden Room', capacity: 2, slot: 'Night', status: 'open', price: '₱3,500.00' });
-    expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,price,slot,status,unit')).toBe(true);
+    expect(rows[0]).toEqual({
+      date: '2026-09-28',
+      unit: 'Garden Room',
+      capacity: 2,
+      included_guests: 2,
+      extra_guest_fee: '₱250.00',
+      slot: 'Night',
+      status: 'open',
+      price: '₱3,500.00',
+    });
+    // No total without a guest count: there is no party to price.
+    expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,extra_guest_fee,included_guests,price,slot,status,unit')).toBe(true);
     expect(content).not.toContain('350000');
+  });
+
+  it("with a guest count, each row carries that party's extra charge and total, from the database", async () => {
+    const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28","guests":3}' });
+    const [, family] = (record.result as { slots: Record<string, unknown>[] }).slots;
+    expect(family).toMatchObject({ unit: 'Family Room', price: '₱6,000.00', extra_guest_charge: '₱250.00', total: '₱6,250.00' });
   });
 
   it('a resolved date ("bukas") reaches the rooms check too', async () => {
