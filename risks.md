@@ -568,6 +568,30 @@ orphan sweeper yet (plan § 2.8 named one, `storage-orphans.mjs`; not built).
 
 ---
 
+## R-36 · Giving an existing room a fee raises its future prices · **By design; stored prices are safe**
+
+Setting a standard capacity and a rate on a room makes its NEXT booking for
+more than the standard dearer. Bookings already made keep their stored
+breakdown (D-068). harbor's rooms were given standard 2 / ₱250 on purpose
+(extra-guests § 7 q1); nothing else changed.
+
+---
+
+## R-37 · The model quotes a party total it added up itself · **Guarded by the battery**
+
+The tool gives the total only when it knows the guests, and the
+instructions say "never add up a total yourself". `rt-extra`, `rt-guests` and
+`rt-standard` compare the reply with the tool's total: 39/39 over three runs.
+It reopens with every prompt edit, like R-14 and R-23.
+
+**Related, found 2026-09-28:** a Tagalog availability question that the
+date pre-check (D-046) did not recognise ("May bakanteng kwarto…") was left
+to the model, which then asked for a date it had been given. Fixed in
+`dates.ts`; the lesson is that a missing pre-check looks like a prompt
+failure (CLAUDE.md trap 18).
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product

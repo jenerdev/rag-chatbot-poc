@@ -7,7 +7,11 @@
 > the chatbot's tool all call it, so the three cannot disagree.
 >
 > Written 2026-09-27 on `feat/booking-types` at `718dcd4`, before it is merged.
-> **Status: agreed 2026-09-27, being built.** § 7 answered: the recommendations.
+> **Status: complete, 2026-09-28**, on `feat/booking-types` (the browser look
+> joins booking-types' owed Phase 4 walk). Battery 49/51 (`rooms 13/13`),
+> verify 75/75, rooms 19/19, isolation 23/23 and 20/20 both ways, walk
+> 11/11. Decisions D-065–D-068, risks R-36–R-37. § 7 answered: the
+> recommendations.
 > It extends [`booking-types.md`](./booking-types.md): read that plan's § 0
 > (Rule 2: the price is the database's, decided once) before this one.
 
@@ -188,7 +192,11 @@ accident.
    > Tagalog linker), so the up-front check (D-046) never ran for "May
    > bakanteng kwarto…". Fixed in `dates.ts` with a test; that file is prompt
    > text, so the whole battery was re-run (the 49/51 above).
-5. **Isolation and the record.** Both walls; D-065–D-068, R-36–R-37
+5. **Isolation and the record.**
+   > **Done 2026-09-28.** Bookings isolation 23/23 both ways: A cannot change
+   > B's standard, fee or maximum (`null`, B still 2/2 at 25000) nor quote a
+   > party in B's room ("No such unit or slot."). Recorded in decisions.md,
+   > risks.md, CLAUDE.md (numbers, header, trap 18) and flow.md. Both walls; D-065–D-068, R-36–R-37
    (D-057–D-064 and R-31–R-35 are reserved by `plan/payments.md`).
 
 It is small enough to finish on `feat/booking-types` before the merge, so the

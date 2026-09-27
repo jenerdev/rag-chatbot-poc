@@ -236,7 +236,10 @@ sequenceDiagram
     executeTool picks the branch from the DATABASE, calls
     `check_room_availability`, and hands the model rows of `date, unit,
     capacity, slot, status, price`, the price as text ("₱3,500.00"). Villa's
-    branch is unchanged (plan/booking-types.md Phase 6).
+    branch is unchanged (plan/booking-types.md Phase 6). Each row also says
+    how many guests the price includes and the fee per extra guest; with a
+    guest count, it carries that party's extra charge and total, from
+    `unit_quote()`, the one function that makes a price (plan/extra-guests.md).
 12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 

@@ -37,6 +37,13 @@
 > capacity, a weekday/weekend rate per slot and photos in Storage, and **the
 > price is set by the insert trigger, never by a request**. Read that plan's
 > § 0 before touching a price, a room or a photo.
+>
+> **Rooms have extra-guest pricing** since 2026-09-28
+> ([`plan/extra-guests.md`](./plan/extra-guests.md), Phases 1–5): a standard
+> capacity, a maximum (`capacity`) and a fee per guest above the standard.
+> ONE SQL function, `unit_quote()`, makes every price; the trigger, the staff
+> quote and the chatbot's tool all call it, and nothing adds one up anywhere
+> else.
 
 ## What this is
 
@@ -95,25 +102,25 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (7 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (8 files), and server-only
     src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     69 checks (24 through tenant tokens: RLS), no API key
+    tools/verify.mjs     75 checks (24 through tenant tokens: RLS), no API key
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type — a new tenant has no members until member:add
     tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
     tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     src/accommodations.ts  rooms and their rates, staff only (per_room)
     src/images.ts          room photos in the `unit-images` bucket, staff only
-    tools/isolation.mjs    22 cross-tenant checks, no API key
-    tools/rooms.mjs        15 checks of rooms, groups, quotes and photos on a staff token
+    tools/isolation.mjs    23 cross-tenant checks, no API key
+    tools/rooms.mjs        19 checks of rooms, groups, quotes, extra guests and photos on a staff token
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
     src/dates.ts           relative dates ("bukas", "next Friday") resolved in code; availability turns checked up front (D-046)
-    tools/prompt-eval.mjs  the battery, 48 cases (10 + 9 tool-* + 10 lang-* + 9 date-* + 10 rt-*), three tenants; seeds its own bookings
+    tools/prompt-eval.mjs  the battery, 51 cases (10 + 9 tool-* + 10 lang-* + 9 date-* + 13 rt-*), three tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
     tools/isolation.mjs    20 cross-tenant checks through the pipeline
   tsconfig/            shared base config
@@ -131,14 +138,14 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 69 checks, no API key needed
-pnpm eval                       # the prompt battery, 48 cases  ⚠ see below
+pnpm --filter @rag/db verify    # 75 checks, no API key needed
+pnpm eval                       # the prompt battery, 51 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 20 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 20, code filters alone (RLS bypassed)
-pnpm --filter @rag/bookings isolation   # 22 cross-tenant booking checks, on operator staff tokens, no API key
-pnpm --filter @rag/bookings isolation -- --filters-only   # the same 22, code filters alone
-pnpm --filter @rag/bookings rooms       # 15 checks: rooms, groups, quotes, photos, on a staff token, no API key
+pnpm --filter @rag/bookings isolation   # 23 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 23, code filters alone
+pnpm --filter @rag/bookings rooms       # 19 checks: rooms, groups, quotes, extra guests, photos, on a staff token, no API key
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db tenant:fallback -- <slug> <english|taglish|tagalog> "<message>"   # what the chat says when it cannot answer (D-048)
@@ -164,11 +171,11 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    northwind *alone*, because Villa describes parking and `absent-2` must refuse
    parking. Tenancy turned that fragile precondition into the feature (plan.md
    § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
-   but in the other tenant, is unreachable. Expect **46/48**, printed as
-   `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 10/10`:
+   but in the other tenant, is unreachable. Expect **49/51**, printed as
+   `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13`:
    `antecedent` is the known model limit (D-017), and `lang-followup` leans
    Tagalog after a bare date (D-043); it passes about one run in three, which
-   gives 47/48. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
+   gives 50/51. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
    before deciding why. A different number means something moved.
    **`packages/rag/src/language.ts` and `dates.ts` are prompt text too**:
    their lines are appended to `buildPrompt()`, so an edit there means
@@ -226,7 +233,7 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    - A new table needs its own policy, or tokens read nothing from it (R-22). The same applies
    to `tenant_applications`, `units`, `slots`, `bookings`, `unanswered_resolutions` (staff-only, D-045),
    `unit_rates`, `unit_images` and the `unit-images` bucket's `storage.objects` policies
-   (`pnpm --filter @rag/bookings isolation`, 22 checks). **The model never
+   (`pnpm --filter @rag/bookings isolation`, 23 checks). **The model never
    supplies a tenant.** No tool's argument schema has a tenant, unit or
    booking id; the executor takes `tenant` from the server (plan/bookings.md
    Rule 2).
@@ -322,7 +329,12 @@ All are expanded in `risks.md`.
     only (`pnpm --filter @rag/<pkg> build`).
 17. **A refused Storage delete is silent.** No error, 0 removed. Check how
     many objects were removed, never only the error (booking types Phase 1).
-
+18. **A missing pre-check looks like a prompt failure.** `rt-tagalog` fell
+    from 3 of 3 to 1 of 7 and read like the model ignoring a date. The cause
+    was `dates.ts` matching "bakante" but not "bakanteng" (the Tagalog
+    linker), so D-046's up-front check never ran. When a case that names a
+    date fails, check `[query] dates:` in the log before rewording anything
+    (extra-guests Phase 4).
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.

@@ -278,7 +278,7 @@ try {
   const bPhoto = await addImage(b, bRoom.id, PNG);
   const bBooked = await createBookings(b, { unitId: bRoom.id, guestCount: 1, slotId: bNight.id, date: probeDate, guestName: 'B Guest' });
   const bState = async () => {
-    const { data: unit } = await supabase.from('units').select('name, capacity, active').eq('id', bRoom.id).single();
+    const { data: unit } = await supabase.from('units').select('name, capacity, standard_capacity, extra_person_rate, active').eq('id', bRoom.id).single();
     const { data: rate } = await supabase.from('unit_rates').select('weekday_price').eq('unit_id', bRoom.id).single();
     const { data: objects } = await supabase.storage.from('unit-images').list(`${b.id}/${bRoom.id}`);
     const { data: photo } = await supabase.from('unit_images').select('sort_order').eq('id', bPhoto.id).single();
@@ -387,6 +387,22 @@ try {
       errors.every((e) => e?.status === 404),
       'villa: every room function is a 404',
       errors.map((e) => e?.message ?? 'no error').join(' | '),
+    );
+  }
+
+  // 23. plan/extra-guests.md Phase 5: A cannot change B's extra-guest
+  //     settings, nor price a party in B's room. B's room was created with
+  //     the defaults (standard 2, ₱250), so its state already carries them,
+  //     and check 16's before/after comparison covers them too.
+  {
+    const changed = await updateAccommodation(a, bRoom.id, { standardCapacity: 1, extraPersonRate: 0, maxCapacity: 9 });
+    const party = await thrown(() => quote(a, { unitId: bRoom.id, guestCount: 2, slotId: aNight.id, date: probeDate }));
+    const { data: unit } = await supabase.from('units').select('standard_capacity, extra_person_rate, capacity').eq('id', bRoom.id).single();
+    check(
+      changed === null && party instanceof BookingInputError && party.message === 'No such unit or slot.'
+        && unit.standard_capacity === 2 && unit.extra_person_rate === 25000 && unit.capacity === 2,
+      "rooms A: cannot change B's standard, fee or maximum, nor quote a party in B's room",
+      `update ${changed} · quote "${party?.message}" · B still ${unit.standard_capacity}/${unit.capacity} +${unit.extra_person_rate}`,
     );
   }
 

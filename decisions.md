@@ -1966,3 +1966,75 @@ a refused Storage delete returns no error and removes 0 (Phase 1 spike).
 2 MiB + 1 413); the first real upload a WebP with no EXIF or GPS.
 **Still provisional:** MAX_IMAGE_BYTES and MAX_IMAGE_EDGE await a full-size
 phone photo (Phase 4 walk).
+
+---
+
+## D-065 · `capacity` stays the maximum; `standard_capacity` and `extra_person_rate` are new, per room · **Added 2026-09-28 (extra-guests Phase 1)**
+
+**Decision:** the request's `maxCapacity` is the existing `units.capacity`,
+which the insert trigger already refused above (23514); the API accepts
+`maxCapacity` as its name. `standard_capacity` (guests the rate covers) and
+`extra_person_rate` (centavos per guest above it, per booking) are new, and
+null means "no fee", so no existing room changed price when the columns
+arrived. A standard above the maximum is refused by a check. New rooms get
+the request's numbers as DEFAULTS in `createAccommodation`: standard 2,
+maximum 4, ₱250.
+
+**Why defaults and not one rule:** the request calls them "configurable room
+properties", and harbor's Family Room takes 6 (the user kept every maximum,
+extra-guests § 7 q1).
+
+**Measured:** verify 70; rooms.mjs 15 (a room created with only a name: 2 / 4
+/ 25000).
+
+---
+
+## D-066 · `unit_quote()` is the only price arithmetic; the trigger, the staff quote and the chatbot's tool all call it · **Added 2026-09-28 (extra-guests Phases 1–4)**
+
+**Decision:** `unit_quote(tenant, unit, slot, date, guests)` returns base,
+extra guests, extra charge and total. The insert trigger stores its three
+amounts, overwriting anything sent; `quote()` returns its lines;
+`check_room_availability` returns its total for the party asked about, and
+the tool hands that total to the model as text. The instructions say to
+quote it and never add one up.
+
+**Why:** the request's § 5 ("the chatbot and the booking management system
+use the same pricing rules"), met by construction rather than by two copies
+kept in step.
+
+**Measured:** 1–4 guests 350000 / 350000 / 375000 / 400000 in verify, in
+rooms.mjs and over HTTP; the chatbot's "₱4,800.00 + ₱250.00 for 1 extra
+guest = ₱5,050.00" equals unit_quote() for the Loft with 3 (`rt-extra`).
+
+---
+
+## D-067 · One booking is one slot on one date, so the fee is per booking (per night for a Night slot) · **Added 2026-09-28 (extra-guests § 7 q3)**
+
+**Decision:** the request's "× the number of nights" is the number of
+bookings: a three-night stay is three bookings, each charged its own fee,
+which gives the same total. A multi-night booking as one row is out of scope.
+
+**Reverse if:** a stay is booked as one row. Then `during` spans several
+nights, and the fee must multiply by them.
+
+---
+
+## D-068 · The breakdown is stored on the booking, and a guest-count change reprices it · **Added 2026-09-28 (extra-guests Phase 1)**
+
+**Decision:** `bookings.base_price` and `extra_guest_price` sit beside
+`price` (the total). A per_room booking must have a guest count (the user's
+answer to § 7 q2). A re-save keeps the old breakdown only if the booking did
+not move AND its guest count is unchanged, so 2 → 4 guests reprices.
+
+**Why:** the screens show what was charged even after a rate or fee edit,
+and the price can never lag behind the party size.
+
+**Measured:** verify 72–73 (3 guests stored as 350000 + 25000, a forged
+breakdown ignored; 2 → 4 guests repriced to 410000 at an edited rate, the
+same count kept 350000).
+
+**Order that matters:** the guest count is NOT pre-checked in TypeScript. The
+trigger checks the unit first, so another tenant's room still says "No such
+unit or slot." even with no guest count; a pre-check would have answered it
+with the guest-count message and told the two apart.
+

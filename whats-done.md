@@ -5575,3 +5575,23 @@ the call was left to the model. The fix is one regex group, pinned by a test
 that failed first; because dates.ts is prompt text, the whole battery was
 re-run on it. Rewording the prompt until the case passed would have hidden it.
 
+## Extra guests, Phase 5: isolation and the record · done 2026-09-28
+
+**What:** bookings isolation check 23: tenant A's staff try to set B's room to
+standard 1, fee 0, maximum 9, and to quote a party of 2 in it. The record:
+D-065 (`capacity` stays the maximum), D-066 (`unit_quote()` is the only price
+arithmetic), D-067 (the fee is per booking), D-068 (the breakdown is stored;
+a guest-count change reprices; the guest count is not pre-checked); R-36 (a
+new fee raises future prices), R-37 (a total the model adds up); CLAUDE.md
+and flow.md brought up to the new numbers.
+
+**Observed:** 23/23 with RLS and 23/23 with the code filters alone; the update
+returned `null`, the quote "No such unit or slot.", and B's room still read
+standard 2, maximum 2, 25000 from the service client.
+
+**The plan, whole:** a standard capacity, a maximum and a per-guest fee per
+room; one SQL function for every price; the breakdown stored and shown; the
+chatbot quoting the database's total. Battery 49/51 (`rooms 13/13`), verify
+75/75, rooms 19/19, walk 11/11, isolation 23/23 and 20/20 both ways. Owed:
+the browser look, with booking-types' Phase 4 walk.
+

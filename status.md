@@ -142,7 +142,14 @@ before the merge. § 7 answered with the recommendations.
   (`original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13`), rooms
   13/13 twice more; villa and Northwind unchanged. Fixed on the way:
   "bakanteng" in `dates.ts`.
-- [ ] Phase 5 — isolation and the record. **Next.**
+- [x] **Phase 5 — isolation and the record** (2026-09-28). Bookings
+  isolation 23/23 both ways; D-065–D-068, R-36–R-37, CLAUDE.md, flow.md.
+
+**Extra guests is COMPLETE**, on `feat/booking-types`. Its browser look joins
+the owed booking-types Phase 4 walk: now also the Rooms screen's Included /
+Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
+= total) and a booking row's breakdown. Then delete
+`walk-harbor@example.com` and merge `feat/booking-types` into `master`.
 
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
@@ -1014,6 +1021,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — extra guests Phase 5 (isolation and the record)
+- **Did:** isolation check 23 (A cannot change B's standard, fee or maximum,
+  nor quote a party in B's room); decisions D-065–D-068; risks R-36–R-37;
+  CLAUDE.md (header, 8 SQL files, verify 75, rooms 19, isolation 23, battery
+  51 cases expecting 49/51, trap 18); flow.md 11b.
+- **Observed:** isolation 23/23 with RLS and 23/23 with filters alone.
+- **Next:** the owed browser walk, then the merge, then payments.
 
 ### 2026-09-28 — extra guests Phase 4 (the tool)
 - **Did:** harbor fixture + loader (standard 2, ₱250); tool rows and
