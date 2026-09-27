@@ -92,7 +92,7 @@ try {
   const future = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
   const { data: booking, error: bookingError } = await supabase
     .from('bookings')
-    .insert({ tenant_id: probe.id, unit_id: first.id, slot_id: slot.id, booked_date: future, guest_name: 'CLI probe' })
+    .insert({ tenant_id: probe.id, unit_id: first.id, slot_id: slot.id, booked_date: future, guest_name: 'CLI probe', guest_count: 1 })
     .select('id')
     .single();
   if (bookingError) throw new Error(`seed booking: ${bookingError.message}`);

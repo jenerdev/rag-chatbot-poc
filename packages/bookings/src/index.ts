@@ -34,6 +34,9 @@ export {
   MAX_UNIT_DESCRIPTION,
   MAX_UNIT_NAME,
   MAX_UNITS_PER_BOOKING,
+  DEFAULT_EXTRA_PERSON_RATE,
+  DEFAULT_MAX_CAPACITY,
+  DEFAULT_STANDARD_CAPACITY,
 } from './constants.js';
 export { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
 export {

@@ -138,13 +138,15 @@ try {
   );
 
   // 3. A quote, weekday and weekend, and a room with no rate.
-  const monday = await quote(probe, { rooms: [{ unitId: garden.id }, { unitId: family.id }], slotId: night.id, date: MONDAY });
+  // Garden 2 guests (its standard), Family 5 guests: 3 above the default
+  // standard of 2, at the default ₱250 (plan/extra-guests.md).
+  const monday = await quote(probe, { rooms: [{ unitId: garden.id, guestCount: 2 }, { unitId: family.id, guestCount: 5 }], slotId: night.id, date: MONDAY });
   const friday = await quote(probe, { unitId: garden.id, slotId: night.id, date: FRIDAY });
   const noRate = await thrown(() => quote(probe, { unitId: loft.id, slotId: night.id, date: MONDAY }));
   check(
-    monday.total === 950000 && friday.total === 450000 && noRate instanceof BookingInputError,
-    'quote: weekday and weekend from the database; no rate says so',
-    `${MONDAY} ${monday.lines.map((l) => `${l.unit} ${l.price}`).join(' + ')} = ${monday.total} · ${FRIDAY} ${friday.total} · Loft: ${described(noRate)}`,
+    monday.total === 1025000 && friday.total === 450000 && noRate instanceof BookingInputError,
+    'quote: weekday and weekend from the database, with extra guests; no rate says so',
+    `${MONDAY} ${monday.lines.map((l) => `${l.unit} ${l.basePrice}+${l.extraGuestPrice}`).join(' + ')} = ${monday.total} · ${FRIDAY} ${friday.total} · Loft: ${described(noRate)}`,
   );
 
   // 4. Two rooms, one booking: one group, and the stored total is the quote's.
@@ -165,10 +167,15 @@ try {
   // 5. The same room again is a 409. Then a group that clashes on ONE room:
   //    Garden is booked alone on Tuesday first, so Family + Garden on Tuesday
   //    must fail, and must leave no Family row behind (one statement, D-053).
-  const again = await thrown(() => createBookings(probe, { unitId: garden.id, slotId: night.id, date: MONDAY, guestName: 'Second' }));
-  const blocker = await createBookings(probe, { unitId: garden.id, slotId: night.id, date: TUESDAY, guestName: 'Blocker' });
+  const again = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: MONDAY, guestName: 'Second' }));
+  const blocker = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: TUESDAY, guestName: 'Blocker' });
   const clash = await thrown(() =>
-    createBookings(probe, { rooms: [{ unitId: family.id }, { unitId: garden.id }], slotId: night.id, date: TUESDAY, guestName: 'Clash' }),
+    createBookings(probe, {
+      rooms: [{ unitId: family.id, guestCount: 1 }, { unitId: garden.id, guestCount: 1 }],
+      slotId: night.id,
+      date: TUESDAY,
+      guestName: 'Clash',
+    }),
   );
   const tuesday = await listBookings(probe, { from: TUESDAY });
   check(
@@ -181,16 +188,16 @@ try {
   // 6. Refused rooms, each with the message the caller should see.
   await setRates(probe, loft.id, [{ slotId: night.id, weekdayPrice: 400000, weekendPrice: 500000 }]);
   await updateAccommodation(probe, loft.id, { active: false });
-  const inactive = await thrown(() => createBookings(probe, { unitId: loft.id, slotId: night.id, date: FRIDAY, guestName: 'x' }));
-  const foreign = await thrown(() => createBookings(probe, { unitId: villaRoom.id, slotId: night.id, date: FRIDAY, guestName: 'x' }));
-  const nowhere = await thrown(() => createBookings(probe, { unitId: 999999999, slotId: night.id, date: FRIDAY, guestName: 'x' }));
+  const inactive = await thrown(() => createBookings(probe, { unitId: loft.id, guestCount: 1, slotId: night.id, date: FRIDAY, guestName: 'x' }));
+  const foreign = await thrown(() => createBookings(probe, { unitId: villaRoom.id, guestCount: 1, slotId: night.id, date: FRIDAY, guestName: 'x' }));
+  const nowhere = await thrown(() => createBookings(probe, { unitId: 999999999, guestCount: 1, slotId: night.id, date: FRIDAY, guestName: 'x' }));
   check(
     [inactive, foreign, nowhere].every((e) => e instanceof BookingInputError && e.message === 'No such unit or slot.'),
     'inactive, another tenant\'s, and missing rooms look identical',
     [inactive, foreign, nowhere].map(described).join(' | '),
   );
   const noRateRoom = await createAccommodation(probe, { name: 'Unpriced', capacity: 2 });
-  const unpriced = await thrown(() => createBookings(probe, { unitId: noRateRoom.id, slotId: night.id, date: FRIDAY, guestName: 'x' }));
+  const unpriced = await thrown(() => createBookings(probe, { unitId: noRateRoom.id, guestCount: 1, slotId: night.id, date: FRIDAY, guestName: 'x' }));
   const tooMany = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 3, slotId: night.id, date: FRIDAY, guestName: 'x' }));
   const fits = await createBookings(probe, { unitId: garden.id, guestCount: 2, slotId: night.id, date: FRIDAY, guestName: 'Fits' });
   check(
@@ -219,7 +226,7 @@ try {
   check(
     rooms.map((r) => `${r.unit} ${r.status}`).join(', ') === 'Garden Room taken, Family Room taken'
       && forSix.map((r) => r.unit).join(',') === 'Family Room'
-      && keys === 'capacity,date,price,slot,status,unit',
+      && keys === 'capacity,date,extraGuestPrice,extraPersonRate,price,slot,standardCapacity,status,total,unit',
     'room availability: priced active rooms, capacity filter, no guest data',
     `${rooms.map((r) => `${r.unit} ${r.status} ${r.price}`).join(', ')} · 6 guests: ${forSix.map((r) => r.unit).join(',')} · keys ${keys}`,
   );
@@ -279,6 +286,54 @@ try {
     'listAccommodations: order, rates, photos, inactive rooms kept',
     list.map((a) => `${a.name}${a.active ? '' : ' (inactive)'} ${a.rates.length}r ${a.images.length}p`).join(', '),
   );
+
+  // 15–18. Extra guests (plan/extra-guests.md Phase 2), through the package.
+  //        A room created with NOTHING but a name gets the request's
+  //        defaults: standard 2, maximum 4, ₱250.
+  const quad = await createAccommodation(probe, { name: 'Quad' });
+  await setRates(probe, quad.id, [{ slotId: night.id, weekdayPrice: 350000, weekendPrice: 450000 }]);
+  check(
+    quad.standardCapacity === 2 && quad.capacity === 4 && quad.extraPersonRate === 25000,
+    'extra guests: a new room defaults to standard 2, maximum 4, ₱250',
+    `standard ${quad.standardCapacity}, maximum ${quad.capacity}, rate ${quad.extraPersonRate}`,
+  );
+  {
+    const parties = [];
+    for (const guestCount of [1, 2, 3, 4]) {
+      const q = await quote(probe, { unitId: quad.id, guestCount, slotId: night.id, date: MONDAY });
+      parties.push(`${guestCount}:${q.lines[0].basePrice}+${q.lines[0].extraGuestPrice}=${q.total}`);
+    }
+    const five = await thrown(() => quote(probe, { unitId: quad.id, guestCount: 5, slotId: night.id, date: MONDAY }));
+    check(
+      parties.join(' ') === '1:350000+0=350000 2:350000+0=350000 3:350000+25000=375000 4:350000+50000=400000'
+        && five instanceof BookingInputError && /at most 4/.test(five.message),
+      'extra guests: the quote for 1–4 guests, and 5 refused before booking',
+      `${parties.join(' ')} · 5: ${described(five)}`,
+    );
+  }
+  {
+    const booked = await createBookings(probe, { unitId: quad.id, guestCount: 3, slotId: night.id, date: MONDAY, guestName: 'Three' });
+    const [row] = booked.bookings;
+    const listed = (await listBookings(probe, { from: MONDAY })).find((b) => b.id === row?.id);
+    check(
+      row?.basePrice === 350000 && row.extraGuestPrice === 25000 && row.price === 375000 && booked.total === 375000
+        && listed?.extraGuestPrice === 25000,
+      'extra guests: 3 guests stored and listed as 350000 + 25000 = 375000',
+      `${row?.basePrice} + ${row?.extraGuestPrice} = ${row?.price}; group total ${booked.total}; listed ${listed?.basePrice}+${listed?.extraGuestPrice}`,
+    );
+  }
+  {
+    const noCount = await thrown(() => createBookings(probe, { unitId: quad.id, slotId: night.id, date: TUESDAY, guestName: 'x' }));
+    const foreignNoCount = await thrown(() => createBookings(probe, { unitId: villaRoom.id, slotId: night.id, date: TUESDAY, guestName: 'x' }));
+    const badStandard = await thrown(() => updateAccommodation(probe, quad.id, { standardCapacity: 5 }));
+    check(
+      noCount instanceof BookingInputError && /number of guests/.test(noCount.message)
+        && foreignNoCount?.message === 'No such unit or slot.'
+        && badStandard instanceof BookingInputError,
+      "extra guests: no guest count is a 400; another tenant's room still says 'No such unit'; standard above the maximum refused",
+      `${described(noCount)} | ${described(foreignNoCount)} | ${described(badStandard)}`,
+    );
+  }
 
   // 14. A whole-resort tenant has no rooms to manage, and cannot book several.
   const errors = await Promise.all([

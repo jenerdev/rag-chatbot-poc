@@ -130,10 +130,13 @@ reached the database. Then delete `walk-harbor@example.com`, and merge
 before the merge. § 7 answered with the recommendations.
 - [x] **Phase 1 — Schema** (2026-09-27). `schema-extra-guests.sql` run by the
   user; verify 75/75; villa's availability and tools identical.
-- [ ] Phase 2 — `@rag/bookings`, and the scripts that book per_room rooms
-  without a guest count (rooms.mjs, bookings isolation, the Phase 3 walk,
-  the Phase 5 CLI check), which the database now refuses. **Next.**
-- [ ] Phases 3–5.
+- [x] **Phase 2 — `@rag/bookings`** (2026-09-28). Quotes per room (base,
+  extra, total) from `unit_quote()`; defaults 2 / 4 / ₱250 for new rooms;
+  the breakdown on every booking; room availability carries the fee. rooms
+  19/19, verify 75/75, isolation 22/22 and 20/20 both ways, CLI 6/6, walk
+  10/10, tests unchanged.
+- [ ] Phase 3 — routes and screens. **Next.**
+- [ ] Phases 4–5.
 
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
@@ -1005,6 +1008,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — extra guests Phase 2 (`@rag/bookings`)
+- **Did:** types (db and package), `quote` via `unit_quote()` with guests and
+  the maximum, `createBookings` maps the "needs a guest count" refusal,
+  accommodations with standard/maximum/rate and the defaults, availability
+  rows with the fee; four scripts now send a guest count.
+- **Observed:** rooms 19/19 after two wrong expectations of mine (the old key
+  list, and Quad in a list taken before Quad existed); everything else green.
+- **Next:** Phase 3.
 
 ### 2026-09-27 — extra guests Phase 1 (schema)
 - **Did:** `schema-extra-guests.sql` (standard_capacity, extra_person_rate,

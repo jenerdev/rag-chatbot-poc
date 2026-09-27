@@ -168,7 +168,9 @@ try {
     json: { rooms: rooms2, slotId: rooms.slotId, date: monday, guestName: 'Walk Guest', price: 1, total: 1 },
   });
   check(
-    q.status === 200 && q.data.total === 950000 && booked.status === 201 && booked.data.total === 950000
+    // Family Room, 4 guests: 2 above the default standard of 2, at ₱250
+    // (plan/extra-guests.md): 350000 + (600000 + 50000) = 1000000.
+    q.status === 200 && q.data.total === 1000000 && booked.status === 201 && booked.data.total === 1000000
       && booked.data.bookings.every((b) => b.price !== 1 && b.groupId === booked.data.groupId),
     'a forged price in the body is ignored: stored total = quote',
     `quote ${q.status} ${q.data.total} · booked ${booked.status} total ${booked.data.total} · prices ${booked.data.bookings?.map((b) => b.price).join('+')}`,
@@ -178,11 +180,11 @@ try {
   {
     const foreign = await call('POST', rooms.slug, '/bookings', {
       cookie: rooms.cookie,
-      json: { unitId: wholeUnit.id, slotId: rooms.slotId, date: monday, guestName: 'x' },
+      json: { unitId: wholeUnit.id, guestCount: 1, slotId: rooms.slotId, date: monday, guestName: 'x' },
     });
     const clash = await call('POST', rooms.slug, '/bookings', {
       cookie: rooms.cookie,
-      json: { unitId: garden.data.id, slotId: rooms.slotId, date: monday, guestName: 'x' },
+      json: { unitId: garden.data.id, guestCount: 1, slotId: rooms.slotId, date: monday, guestName: 'x' },
     });
     check(
       foreign.status === 400 && foreign.data.error === 'No such unit or slot.' && clash.status === 409,

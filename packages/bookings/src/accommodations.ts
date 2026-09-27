@@ -12,14 +12,27 @@
 // Rooms are never deleted, only deactivated: the bookings that name a room
 // keep it, and there is no delete policy for a token to use.
 
-import { MAX_UNIT_DESCRIPTION, MAX_UNIT_NAME } from './constants.js';
+import {
+  DEFAULT_EXTRA_PERSON_RATE,
+  DEFAULT_MAX_CAPACITY,
+  DEFAULT_STANDARD_CAPACITY,
+  MAX_UNIT_DESCRIPTION,
+  MAX_UNIT_NAME,
+} from './constants.js';
 import { requirePerRoom } from './bookings.js';
 import { listImagesFor } from './images.js';
 import { BookingInputError } from './errors.js';
 import type { Accommodation, AccommodationInput, BookingTenant, RateSummary } from './types.js';
 import { optionalText, parsePrice, positiveInt, requireText } from './validate.js';
 
-const UNIT_COLUMNS = 'id, name, description, capacity, active, sort_order';
+const UNIT_COLUMNS = 'id, name, description, capacity, standard_capacity, extra_person_rate, active, sort_order';
+
+/** `maxCapacity` (the request's name) or `capacity` (the column's): the same thing, the maximum. */
+function maximumOf(input: AccommodationInput): unknown {
+  return input.maxCapacity !== undefined ? input.maxCapacity : input.capacity;
+}
+
+const blank = (value: unknown) => value === null || value === '';
 
 /**
  * Every room of this tenant, active or not, in the order staff set, with its
@@ -45,6 +58,8 @@ export async function listAccommodations(tenant: BookingTenant): Promise<Accommo
     name: u.name,
     description: u.description,
     capacity: u.capacity,
+    standardCapacity: u.standard_capacity,
+    extraPersonRate: u.extra_person_rate,
     active: u.active,
     sortOrder: u.sort_order,
     rates: rates.data
@@ -68,19 +83,44 @@ export async function getAccommodation(tenant: BookingTenant, id: unknown): Prom
   return (await listAccommodations(tenant)).find((a) => a.id === unitId) ?? null;
 }
 
-/** Add a room. It starts active, and cannot be booked until it has a rate. */
+/**
+ * Add a room. It starts active, and cannot be booked until it has a rate.
+ *
+ * Anything left out gets the request's defaults (plan/extra-guests.md):
+ * standard 2, maximum 4, ₱250 per extra guest. A standard above the maximum
+ * is refused by the database (units_standard_capacity_range).
+ */
 export async function createAccommodation(tenant: BookingTenant, input: AccommodationInput): Promise<Accommodation> {
   await requirePerRoom(tenant);
+  const maximum = maximumOf(input);
   const row = {
     tenant_id: tenant.id,
     name: requireText(input.name, 'Room name', MAX_UNIT_NAME),
     description: optionalText(input.description, 'Description', MAX_UNIT_DESCRIPTION),
-    capacity: input.capacity === undefined || input.capacity === null || input.capacity === '' ? null : positiveInt(input.capacity, 'Capacity'),
+    capacity: maximum === undefined ? DEFAULT_MAX_CAPACITY : blank(maximum) ? null : positiveInt(maximum, 'Maximum guests'),
+    standard_capacity:
+      input.standardCapacity === undefined
+        ? DEFAULT_STANDARD_CAPACITY
+        : blank(input.standardCapacity)
+          ? null
+          : positiveInt(input.standardCapacity, 'Standard guests'),
+    extra_person_rate:
+      input.extraPersonRate === undefined
+        ? DEFAULT_EXTRA_PERSON_RATE
+        : blank(input.extraPersonRate)
+          ? null
+          : parsePrice(input.extraPersonRate, 'Extra guest rate'),
     active: true,
     sort_order: input.sortOrder === undefined ? 0 : nonNegativeInt(input.sortOrder, 'Order'),
   };
+  // A default standard of 2 in a room whose maximum is 1 would be refused;
+  // the standard can never exceed the maximum, so it is lowered to it.
+  if (row.capacity !== null && row.standard_capacity !== null && input.standardCapacity === undefined) {
+    row.standard_capacity = Math.min(row.standard_capacity, row.capacity);
+  }
   const { data, error } = await tenant.db.from('units').insert(row).select('id').single();
   if (error?.code === '23505') throw new BookingInputError(`There is already a room called "${row.name}".`);
+  if (error?.code === '23514') throw new BookingInputError('Standard guests cannot be more than the maximum.');
   if (error) throw new Error(`Could not add the room: ${error.message}`);
   console.log(`[bookings] ${tenant.slug} added room #${data.id} "${row.name}"`);
   return (await getAccommodation(tenant, data.id))!;
@@ -101,11 +141,24 @@ export async function updateAccommodation(
 ): Promise<Accommodation | null> {
   await requirePerRoom(tenant);
   const unitId = positiveInt(id, 'Room');
-  const patch: { name?: string; description?: string | null; capacity?: number | null; active?: boolean; sort_order?: number } = {};
+  const patch: {
+    name?: string;
+    description?: string | null;
+    capacity?: number | null;
+    standard_capacity?: number | null;
+    extra_person_rate?: number | null;
+    active?: boolean;
+    sort_order?: number;
+  } = {};
   if (input.name !== undefined) patch.name = requireText(input.name, 'Room name', MAX_UNIT_NAME);
   if (input.description !== undefined) patch.description = optionalText(input.description, 'Description', MAX_UNIT_DESCRIPTION);
-  if (input.capacity !== undefined) {
-    patch.capacity = input.capacity === null || input.capacity === '' ? null : positiveInt(input.capacity, 'Capacity');
+  const maximum = maximumOf(input);
+  if (maximum !== undefined) patch.capacity = blank(maximum) ? null : positiveInt(maximum, 'Maximum guests');
+  if (input.standardCapacity !== undefined) {
+    patch.standard_capacity = blank(input.standardCapacity) ? null : positiveInt(input.standardCapacity, 'Standard guests');
+  }
+  if (input.extraPersonRate !== undefined) {
+    patch.extra_person_rate = blank(input.extraPersonRate) ? null : parsePrice(input.extraPersonRate, 'Extra guest rate');
   }
   if (input.active !== undefined) {
     if (typeof input.active !== 'boolean') throw new BookingInputError('Active must be true or false.');
@@ -116,6 +169,7 @@ export async function updateAccommodation(
 
   const { data, error } = await tenant.db.from('units').update(patch).eq('tenant_id', tenant.id).eq('id', unitId).select('id');
   if (error?.code === '23505') throw new BookingInputError(`There is already a room called "${patch.name}".`);
+  if (error?.code === '23514') throw new BookingInputError('Standard guests cannot be more than the maximum.');
   if (error) throw new Error(`Could not change the room: ${error.message}`);
   if (data.length === 0) return null;
   console.log(`[bookings] ${tenant.slug} changed room #${unitId}: ${Object.keys(patch).join(', ')}`);

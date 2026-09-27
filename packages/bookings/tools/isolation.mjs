@@ -276,7 +276,7 @@ try {
   await setRates(a, aRoom.id, [{ slotId: aNight.id, weekdayPrice: 100000, weekendPrice: 100000 }]);
   await setRates(b, bRoom.id, [{ slotId: bNight.id, weekdayPrice: 200000, weekendPrice: 200000 }]);
   const bPhoto = await addImage(b, bRoom.id, PNG);
-  const bBooked = await createBookings(b, { unitId: bRoom.id, slotId: bNight.id, date: probeDate, guestName: 'B Guest' });
+  const bBooked = await createBookings(b, { unitId: bRoom.id, guestCount: 1, slotId: bNight.id, date: probeDate, guestName: 'B Guest' });
   const bState = async () => {
     const { data: unit } = await supabase.from('units').select('name, capacity, active').eq('id', bRoom.id).single();
     const { data: rate } = await supabase.from('unit_rates').select('weekday_price').eq('unit_id', bRoom.id).single();
@@ -335,7 +335,7 @@ try {
     const quoted = await thrown(() => quote(a, { unitId: bRoom.id, slotId: aNight.id, date: probeDate }));
     const nowhere = await thrown(() => quote(a, { unitId: 999_999_999, slotId: aNight.id, date: probeDate }));
     const group = await thrown(() =>
-      createBookings(a, { rooms: [{ unitId: aRoom.id }, { unitId: bRoom.id }], slotId: aNight.id, date: probeDate, guestName: 'x' }),
+      createBookings(a, { rooms: [{ unitId: aRoom.id, guestCount: 1 }, { unitId: bRoom.id, guestCount: 1 }], slotId: aNight.id, date: probeDate, guestName: 'x' }),
     );
     const aRows = await listBookings(a, { from: probeDate });
     check(

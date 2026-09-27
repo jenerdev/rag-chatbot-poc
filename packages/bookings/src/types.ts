@@ -59,8 +59,11 @@ export interface BookingSummary {
   guestPhone: string | null;
   guestCount: number | null;
   notes: string | null;
-  /** centavos, set by the database; null for whole_resort and for bookings made before prices existed */
+  /** centavos, the TOTAL, set by the database; null for whole_resort and for bookings made before prices existed */
   price: number | null;
+  /** its two parts (extra-guests D-068): the rate, and the extra-guest fee. Null likewise */
+  basePrice: number | null;
+  extraGuestPrice: number | null;
   /** shared by every room of one multi-room booking; null for a single room */
   groupId: string | null;
   createdAt: string;
@@ -121,11 +124,18 @@ export interface BookingsConfig {
 export interface RoomAvailability {
   date: string;
   unit: string;
+  /** the MAXIMUM guests */
   capacity: number | null;
+  /** guests the base price covers, and the fee per guest above it (null = no fee) */
+  standardCapacity: number | null;
+  extraPersonRate: number | null;
   slot: string;
   status: 'open' | 'taken';
   /** centavos, the base rate for that date: weekday or weekend, nothing else (R-24) */
   price: number;
+  /** for the guests asked about (0 when none were): the fee, and base + fee */
+  extraGuestPrice: number;
+  total: number;
 }
 
 /** A booking group as createBookings returns it. */
@@ -142,7 +152,8 @@ export interface Quote {
   date: string;
   slotId: number;
   slot: string;
-  lines: { unitId: number; unit: string; price: number }[];
+  /** one line per room: the rate, the guests above standard and their fee, and the room's total */
+  lines: { unitId: number; unit: string; guests: number | null; basePrice: number; extraGuests: number; extraGuestPrice: number; price: number }[];
   /** centavos */
   total: number;
   currency: string;
@@ -171,7 +182,11 @@ export interface Accommodation {
   id: number;
   name: string;
   description: string | null;
+  /** the MAXIMUM guests (the request's maxCapacity; the column kept its name, D-065) */
   capacity: number | null;
+  standardCapacity: number | null;
+  /** centavos per guest above standard, per booking */
+  extraPersonRate: number | null;
   active: boolean;
   sortOrder: number;
   rates: RateSummary[];
@@ -182,7 +197,11 @@ export interface Accommodation {
 export interface AccommodationInput {
   name?: unknown;
   description?: unknown;
+  /** the maximum; `maxCapacity` is accepted as the same thing */
   capacity?: unknown;
+  maxCapacity?: unknown;
+  standardCapacity?: unknown;
+  extraPersonRate?: unknown;
   active?: unknown;
   sortOrder?: unknown;
 }

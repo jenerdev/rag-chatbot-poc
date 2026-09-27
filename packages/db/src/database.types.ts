@@ -301,8 +301,12 @@ export interface Database {
           tenant_id: number;
           name: string;
           description: string | null;
-          /** maximum guests; null = not stated, so never offered for a guest-count search */
+          /** the MAXIMUM guests (D-065); null = not stated, so never offered for a guest-count search */
           capacity: number | null;
+          /** guests the base rate covers (schema-extra-guests.sql); null = no extra-guest fee */
+          standard_capacity: number | null;
+          /** centavos per guest above standard, per booking; null = no fee */
+          extra_person_rate: number | null;
           active: boolean;
           sort_order: number;
           created_at: string;
@@ -313,6 +317,8 @@ export interface Database {
           name: string;
           description?: string | null;
           capacity?: number | null;
+          standard_capacity?: number | null;
+          extra_person_rate?: number | null;
           active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -323,6 +329,8 @@ export interface Database {
           name?: string;
           description?: string | null;
           capacity?: number | null;
+          standard_capacity?: number | null;
+          extra_person_rate?: number | null;
           active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -451,8 +459,11 @@ export interface Database {
           guest_phone: string | null;
           guest_count: number | null;
           notes: string | null;
-          /** centavos, set by the insert trigger from unit_rates; null for whole_resort and for old rows */
+          /** centavos, the TOTAL, set by the insert trigger from unit_quote(); null for whole_resort and for old rows */
           price: number | null;
+          /** the rate part and the extra-guest part of `price` (schema-extra-guests.sql); null likewise */
+          base_price: number | null;
+          extra_guest_price: number | null;
           /** shared by the rows of one multi-room booking (plan § 2.5) */
           group_id: string | null;
           created_at: string;
@@ -472,6 +483,8 @@ export interface Database {
           notes?: string | null;
           /** computed by the trigger, which overwrites anything supplied (plan Rule 2) */
           price?: never;
+          base_price?: never;
+          extra_guest_price?: never;
           group_id?: string | null;
           created_at?: string;
         };
@@ -488,6 +501,8 @@ export interface Database {
           guest_count?: number | null;
           notes?: string | null;
           price?: never;
+          base_price?: never;
+          extra_guest_price?: never;
           group_id?: string | null;
           created_at?: string;
         };
@@ -602,11 +617,21 @@ export interface Database {
           booked_date: string;
           unit: string;
           capacity: number | null;
+          standard_capacity: number | null;
+          extra_person_rate: number | null;
           slot: string;
           status: 'open' | 'taken';
-          /** centavos */
+          /** centavos: the BASE price for that date */
           price: number;
+          /** for p_guests (0 when it is null): the extra-guest fee, and base + fee */
+          extra_guest_price: number;
+          total: number;
         }[];
+      };
+      /** sql/schema-extra-guests.sql § 3 — THE price arithmetic; no row = no rate. */
+      unit_quote: {
+        Args: { p_tenant_id: number; p_unit_id: number; p_slot_id: number; p_date: string; p_guests: number | null };
+        Returns: { base_price: number; extra_guests: number; extra_guest_price: number; price: number }[];
       };
       /** sql/schema-booking-types.sql § 5 — THE price of a (unit, slot, date), or null: no rate. */
       unit_price: {

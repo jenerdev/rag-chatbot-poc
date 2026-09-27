@@ -152,6 +152,16 @@ accident.
    > rates" (the new Quad Room made 4), not the schema.
 2. **`@rag/bookings`.** Types, quote, create, accommodations; `rooms.mjs`
    grows the 1–5 guest cases through the package.
+   > **Done 2026-09-28.** `rooms.mjs` 19/19 (4 new): a room created with only
+   > a name gets standard 2, maximum 4, ₱250; the quote for 1–4 guests is
+   > 350000 / 350000 / 375000 / 400000 and 5 is refused before booking ("Quad
+   > holds at most 4 guests."); 3 guests stored and listed as 350000 + 25000;
+   > no guest count is a 400 while another tenant's room, also without one,
+   > still says "No such unit or slot.". **Deviations:** the maximum keeps its
+   > column name, `capacity`, and `maxCapacity` is accepted as input for it;
+   > the guest count is NOT pre-checked in TypeScript, because the trigger
+   > checks the unit first, and a pre-check would make "not yours" and "no
+   > count" say different things. Four older scripts now send a guest count.
 3. **Routes and screens.** The walk script grows the forged-price and
    over-capacity cases; the screens show the breakdown.
 4. **The tool, then measure.** Full battery: the original 48 unchanged

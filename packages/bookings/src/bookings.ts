@@ -175,9 +175,13 @@ export async function checkRoomAvailability(
     date: r.booked_date,
     unit: r.unit,
     capacity: r.capacity,
+    standardCapacity: r.standard_capacity,
+    extraPersonRate: r.extra_person_rate,
     slot: r.slot,
     status: r.status,
     price: r.price,
+    extraGuestPrice: r.extra_guest_price,
+    total: r.total,
   }));
 }
 
@@ -262,7 +266,7 @@ export async function listBookings(
 
   let query = tenant.db
     .from('bookings')
-    .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, group_id, created_at')
+    .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, base_price, extra_guest_price, group_id, created_at')
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
     .lte('booked_date', to);
@@ -289,6 +293,8 @@ export async function listBookings(
     guestCount: b.guest_count,
     notes: b.notes,
     price: b.price,
+    basePrice: b.base_price,
+    extraGuestPrice: b.extra_guest_price,
     groupId: b.group_id,
     createdAt: b.created_at,
   }));
@@ -303,8 +309,12 @@ export async function listBookings(
  *   23P01  the span overlaps a live booking  → BookingConflictError (409)
  *   23503  the unit or slot is not this tenant's, does not exist, or the
  *          room is inactive                  → BookingInputError (400)
- *   23514  too many guests for a room, or a per_room room with no rate
- *                                             → BookingInputError (400)
+ *   23514  too many guests for a room, a per_room room with no rate, or a
+ *          per_room booking with no guest count  → BookingInputError (400)
+ *
+ * The guest count is NOT pre-checked here, on purpose: the trigger checks the
+ * unit first, so another tenant's room still gets "No such unit or slot.",
+ * not a guest-count message that would tell the two apart.
  *
  * For 23503 the message is the same whether the id belongs to another tenant,
  * to nobody, or to a retired room. "Not yours" and "not there" must be
@@ -392,7 +402,7 @@ export async function createBooking(tenant: BookingTenant, input: NewBooking): P
  */
 export async function quote(
   tenant: BookingTenant,
-  input: { unitId?: unknown; rooms?: unknown; slotId: unknown; date: unknown },
+  input: { unitId?: unknown; rooms?: unknown; guestCount?: unknown; slotId: unknown; date: unknown },
 ): Promise<Quote> {
   const { currency } = await requirePerRoom(tenant);
   const rooms = parseRooms(input);
@@ -403,7 +413,7 @@ export async function quote(
   const [units, slot] = await Promise.all([
     tenant.db
       .from('units')
-      .select('id, name')
+      .select('id, name, capacity')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .in(
@@ -417,19 +427,36 @@ export async function quote(
   if (!slot.data || units.data.length !== rooms.length) throw new BookingInputError('No such unit or slot.');
   const slotName = slot.data.name;
 
-  const names = new Map(units.data.map((u) => [u.id, u.name]));
+  const byId = new Map(units.data.map((u) => [u.id, u]));
   const lines = await Promise.all(
-    rooms.map(async ({ unitId }) => {
-      const { data: price, error } = await tenant.db.rpc('unit_price', {
+    rooms.map(async ({ unitId, guestCount }) => {
+      const room = byId.get(unitId);
+      const unit = room?.name ?? `Room ${unitId}`;
+      // The maximum, said BEFORE a booking is tried (request § 4). The
+      // trigger refuses it anyway, whatever path the insert takes.
+      if (guestCount !== null && room?.capacity != null && guestCount > room.capacity) {
+        throw new BookingInputError(`${unit} holds at most ${room.capacity} guests.`);
+      }
+      // unit_quote(): the same arithmetic the trigger stores (extra-guests Rule 1).
+      const { data, error } = await tenant.db.rpc('unit_quote', {
         p_tenant_id: tenant.id,
         p_unit_id: unitId,
         p_slot_id: slotId,
         p_date: date,
+        p_guests: guestCount,
       });
       if (error) throw new Error(`Could not price room ${unitId}: ${error.message}`);
-      const unit = names.get(unitId) ?? `Room ${unitId}`;
-      if (price === null) throw new BookingInputError(`${unit} has no price for ${slotName} yet.`);
-      return { unitId, unit, price };
+      const [q] = data;
+      if (!q) throw new BookingInputError(`${unit} has no price for ${slotName} yet.`);
+      return {
+        unitId,
+        unit,
+        guests: guestCount,
+        basePrice: q.base_price,
+        extraGuests: q.extra_guests,
+        extraGuestPrice: q.extra_guest_price,
+        price: q.price,
+      };
     }),
   );
   return { date, slotId, slot: slotName, lines, total: lines.reduce((sum, l) => sum + l.price, 0), currency };
@@ -448,6 +475,9 @@ function writeError(error: { code?: string; message: string }, date: string): Er
   }
   if (error.code === '23514' && /no rate/.test(error.message)) {
     return new BookingInputError('That room has no price for that slot yet.');
+  }
+  if (error.code === '23514' && /guest count/.test(error.message)) {
+    return new BookingInputError('Enter the number of guests for each room.');
   }
   return new Error(`Could not save the booking: ${error.message}`);
 }

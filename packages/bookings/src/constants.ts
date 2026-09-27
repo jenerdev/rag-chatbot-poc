@@ -53,3 +53,13 @@ export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 export const MAX_IMAGES_PER_UNIT = 6;
 export const MAX_IMAGE_EDGE = 1600;
 export const IMAGE_BUCKET = 'unit-images';
+
+// --- extra guests (plan/extra-guests.md) --------------------------------------
+// The request's numbers, as the DEFAULTS for a new room, not one rule for
+// every room: they are "configurable room properties" (§ 1). A room created
+// without them gets these; an existing room keeps whatever it has, so no
+// price changes by accident (§ 2.1). The arithmetic is NOT here: it is SQL's
+// unit_quote(), the one place a price is made.
+export const DEFAULT_STANDARD_CAPACITY = 2;
+export const DEFAULT_MAX_CAPACITY = 4;
+export const DEFAULT_EXTRA_PERSON_RATE = 25_000; // centavos: ₱250 per extra guest, per booking

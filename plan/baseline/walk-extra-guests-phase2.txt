@@ -1,0 +1,12 @@
+PASS  no staff cookie: every new route is 401  — 401 401 401 401 401 401 401
+PASS  one tenant's staff cookie is not another's  — 401 Admin login required for "routes-whole"
+PASS  whole_resort: rooms and quotes are 404, setup says whole_resort  — list 404 · add 404 · quote 404 · setup 200 whole_resort
+PASS  per_room: rooms added and rated; a float price is a 400; setup says per_room  — rooms 201/201 · rates 200 · float 400 Weekday price must be a whole number of centavos from 0 to 100000000. · setup per_room PHP
+PASS  a forged price in the body is ignored: stored total = quote  — quote 200 1000000 · booked 201 total 1000000 · prices 350000+650000
+PASS  another tenant's unit is a 400 'No such unit or slot.'; a clash is a 409  — foreign 400 No such unit or slot. · clash 409
+PASS  ?unit= shows one room; another tenant's room shows []  — garden 1 · foreign 200 0
+PASS  photo: uploaded and served; an SVG named .png, 3 MB, and another tenant's room refused  — upload 201 served 200 · svg 400 A photo must be a JPEG, PNG or WebP image. · huge 400 · foreign room 404
+PASS  photo: reordered; wrong room 404; removed with its object; twice 404  — reorder 200 · wrong room 404 · removed 200 · again 404 · objects 0
+PASS  a room retired; another tenant's and a missing room are 404, and the foreign one is untouched  — retire 200 false · foreign 404 · missing 404 · foreign still active: true
+
+ALL PHASE 3 WALK CHECKS PASS

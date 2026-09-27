@@ -5501,3 +5501,26 @@ identical to Phase 0.
 **Mistake, mine:** check 65 asserted exactly 3 rates; the new Quad Room is a
 fourth. It now compares with the real count, which is what it meant.
 
+## Extra guests, Phase 2: `@rag/bookings` · done 2026-09-28
+
+**What:** the quote calls `unit_quote()` per room with its guest count and
+returns base, extra guests, fee and total per room; it refuses a party above
+the room's maximum before any booking. `createBookings` maps the trigger's
+"needs a guest count" to a 400 and returns the stored breakdown. New rooms
+default to standard 2, maximum 4, ₱250 (`DEFAULT_*` constants); a default
+standard is lowered to a smaller maximum. `listBookings` and room
+availability carry the breakdown and the fee.
+
+**Why it matters:** the arithmetic lives only in SQL; this package passes
+guest counts in and reads amounts out, so the staff screen (Phase 3) and the
+chatbot (Phase 4) cannot compute a different price.
+
+**Observed:** rooms 19/19; verify 75/75; isolation 22/22 and 20/20, both ways;
+the Phase 5 CLI check 6/6; the Phase 3 HTTP walk 10/10 against dev, where a
+forged price stored the database's 1000000 (Family Room, 4 guests: +50000).
+
+**Trap avoided: a helpful pre-check that leaks.** Checking "no guest count"
+in TypeScript first would answer another tenant's room with the guest-count
+message, while a missing room says "No such unit or slot.". The trigger
+checks the unit first, so the package leaves the order to it.
+
