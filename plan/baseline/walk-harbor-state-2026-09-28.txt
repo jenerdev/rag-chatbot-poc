@@ -1,0 +1,5 @@
+rooms [{"n":"Garden Room","std":2,"max":4,"fee":25000,"active":true},{"n":"Family Room","std":4,"max":6,"fee":25000,"active":true},{"n":"Loft","std":2,"max":3,"fee":25000,"active":true},{"n":"Sea View Suite","std":2,"max":2,"fee":25000,"active":true},{"n":"Old Annex","std":2,"max":8,"fee":25000,"active":false}]
+booking 668 Garden Room 2026-10-24 confirmed guests 2 null + null = 450000 group null "Keith Luzung" 2026-09-27T10:58:08.949719+00:00
+booking 926 Garden Room 2026-10-20 confirmed guests 2 350000 + 0 = 350000 group 33dc8b18-4a30-47cf-85b2-1ea11a2ba31b "Keith Luzung" 2026-09-27T17:30:21.881171+00:00
+booking 927 Family Room 2026-10-20 confirmed guests 6 600000 + 50000 = 650000 group 33dc8b18-4a30-47cf-85b2-1ea11a2ba31b "Keith Luzung" 2026-09-27T17:30:21.881171+00:00
+photos [{"id":57,"unit_id":125,"path":"67/125/1204ca25-3338-4b58-b293-07971be71098.webp","sort_order":0}]

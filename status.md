@@ -1022,6 +1022,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — the owed browser walk, round 3
+- **Confirmed by the user:** villa's bookings screen looks as it did before
+  (booking types Rule 1, by eye).
+- **Checked in the database:** the two-room booking landed as one group
+  (#926 Garden 2 guests 350000 + 0; #927 Family 6 guests 600000 + 50000), and
+  the Garden-only clash on the same night saved nothing. The user's Rooms-
+  screen edits reached the database too (Garden maximum 2 → 4, Family
+  standard 2 → 4), so harbor now differs from `fixtures/harbor-units.json`:
+  re-run `plan/booking-types-phase6-harbor.mjs` before the next battery.
+- **Still owed:** a full-size phone photo (sets MAX_IMAGE_BYTES /
+  MAX_IMAGE_EDGE), photo reorder and remove, retiring Family Room.
+
 ### 2026-09-28 — extra guests Phase 5 (isolation and the record)
 - **Did:** isolation check 23 (A cannot change B's standard, fee or maximum,
   nor quote a party in B's room); decisions D-065–D-068; risks R-36–R-37;
