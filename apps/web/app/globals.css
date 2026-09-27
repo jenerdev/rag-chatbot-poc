@@ -394,3 +394,7 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 .photo img { display: block; width: 132px; height: 96px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
 .photo figcaption { display: flex; justify-content: space-between; font-size: 13px; }
 .photo-add { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; width: 132px; height: 96px; cursor: pointer; }
+
+/* The quote: one line per room (rate, extra guests, room total), then the total. */
+.quote-line { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.quote-total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }

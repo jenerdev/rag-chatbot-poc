@@ -252,6 +252,42 @@ try {
       `retire ${retire.status} ${retire.data.active} · foreign ${foreign.status} · missing ${missing.status} · foreign still active: ${wholeStill.active}`,
     );
   }
+  // 11. Extra guests over HTTP (plan/extra-guests.md Phase 3). A room posted
+  //     with only a name gets the defaults; the quote shows each room's rate,
+  //     fee and total; 5 guests in a 4-guest room is refused at the quote AND
+  //     at the booking; a standard above the maximum is refused.
+  {
+    const quad = await call('POST', rooms.slug, '/accommodations', { cookie: rooms.cookie, json: { name: 'Quad' } });
+    await call('PUT', rooms.slug, `/accommodations/${quad.data.id}/rates`, {
+      cookie: rooms.cookie,
+      json: { rates: [{ slotId: rooms.slotId, weekdayPrice: 350000, weekendPrice: 450000 }] },
+    });
+    const three = await call('POST', rooms.slug, '/bookings/quote', {
+      cookie: rooms.cookie,
+      json: { rooms: [{ unitId: quad.data.id, guestCount: 3 }], slotId: rooms.slotId, date: monday },
+    });
+    const line = three.data.lines?.[0];
+    const fiveQuote = await call('POST', rooms.slug, '/bookings/quote', {
+      cookie: rooms.cookie,
+      json: { unitId: quad.data.id, guestCount: 5, slotId: rooms.slotId, date: monday },
+    });
+    const fiveBook = await call('POST', rooms.slug, '/bookings', {
+      cookie: rooms.cookie,
+      json: { rooms: [{ unitId: quad.data.id, guestCount: 5 }], slotId: rooms.slotId, date: monday, guestName: 'Five' },
+    });
+    const noCount = await call('POST', rooms.slug, '/bookings', {
+      cookie: rooms.cookie,
+      json: { rooms: [{ unitId: quad.data.id }], slotId: rooms.slotId, date: monday, guestName: 'None' },
+    });
+    const badStandard = await call('PATCH', rooms.slug, `/accommodations/${quad.data.id}`, { cookie: rooms.cookie, json: { standardCapacity: 5 } });
+    check(
+      quad.status === 201 && quad.data.standardCapacity === 2 && quad.data.capacity === 4 && quad.data.extraPersonRate === 25000
+        && line?.basePrice === 350000 && line.extraGuests === 1 && line.extraGuestPrice === 25000 && line.price === 375000
+        && fiveQuote.status === 400 && fiveBook.status === 400 && noCount.status === 400 && badStandard.status === 400,
+      'extra guests: defaults 2/4/₱250; 3 guests quoted as 350000 + 25000; 5 guests, no count, and standard 5 of 4 are 400s',
+      `quad ${quad.status} ${quad.data.standardCapacity}/${quad.data.capacity}/${quad.data.extraPersonRate} · 3 guests ${line?.basePrice}+${line?.extraGuestPrice}=${line?.price} · 5 quote ${fiveQuote.status} "${fiveQuote.data.error}" · 5 book ${fiveBook.status} "${fiveBook.data.error}" · no count ${noCount.status} "${noCount.data.error}" · standard 5 ${badStandard.status}`,
+    );
+  }
 } finally {
   for (const tenantId of made.tenants) {
     const { data: folders } = await supabase.storage.from('unit-images').list(`${tenantId}`);

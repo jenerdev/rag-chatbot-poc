@@ -135,8 +135,12 @@ before the merge. § 7 answered with the recommendations.
   the breakdown on every booking; room availability carries the fee. rooms
   19/19, verify 75/75, isolation 22/22 and 20/20 both ways, CLI 6/6, walk
   10/10, tests unchanged.
-- [ ] Phase 3 — routes and screens. **Next.**
-- [ ] Phases 4–5.
+- [x] **Phase 3 — routes and screens** (2026-09-28). Schemas take standard,
+  maximum (`maxCapacity`) and the fee; the screens show and edit them and the
+  breakdown. Walk 11/11. The browser look joins the owed walk.
+- [ ] Phase 4 — the tool, then measure (harbor's rooms get standard 2 /
+  ₱250; `rt-extra`, `rt-over`, `rt-standard`; full battery). **Next.**
+- [ ] Phase 5 — isolation and the record.
 
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
@@ -1008,6 +1012,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — extra guests Phase 3 (routes and screens)
+- **Did:** `quoteSchema.guestCount`; room schemas with `maxCapacity`,
+  `standardCapacity`, `extraPersonRate`; Rooms screen inputs and a sentence
+  saying what the fee is; the quote per room (rate, extra guests, total) and
+  the total; Book waits for every guest count; the row breakdown. Walk +1.
+- **Observed:** walk 11/11; pages 200; typecheck and tests green.
+- **Next:** Phase 4.
 
 ### 2026-09-28 — extra guests Phase 2 (`@rag/bookings`)
 - **Did:** types (db and package), `quote` via `unit_quote()` with guests and

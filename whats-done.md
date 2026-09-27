@@ -5524,3 +5524,22 @@ in TypeScript first would answer another tenant's room with the guest-count
 message, while a missing room says "No such unit or slot.". The trigger
 checks the unit first, so the package leaves the order to it.
 
+## Extra guests, Phase 3: routes and screens · done 2026-09-28 (browser look owed)
+
+**What:** the route schemas accept a guest count on a one-unit quote and the
+three room properties (`maxCapacity` = `capacity`); the Rooms screen edits
+Included / Max guests / Per extra guest (pesos, sent as centavos) and says in
+a sentence what the fee is; the booking form sends each room's guests to the
+quote, shows each room's rate, extra guests and room total and then the
+total, and keeps Book disabled until every ticked room has a guest count; a
+booking row shows "₱3,500.00 + ₱250.00 extra guests = ₱3,750.00".
+
+**Why it matters:** the request's § 3 (show the rate, the extra charge and the
+total separately) and § 4 (tell the guest before confirming). Every number on
+screen is the server's; the screen adds nothing up.
+
+**Observed:** walk 11/11: 201 with 2 / 4 / 25000 for a room posted with only a
+name; a 3-guest quote 350000 + 25000 = 375000; 400 "Quad holds at most 4
+guests." for 5 at the quote, 400 at the booking, 400 "Enter the number of
+guests for each room." with none, 400 for a standard of 5 over 4.
+

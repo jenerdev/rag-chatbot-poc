@@ -101,7 +101,11 @@ function BookingRow({
           {[
             booking.guestCount ? `${booking.guestCount} guests` : null,
             booking.guestPhone,
-            perRoom && booking.price !== null ? formatMoney(booking.price, perRoom.currency) : null,
+            perRoom && booking.price !== null
+              ? booking.extraGuestPrice
+                ? `${formatMoney(booking.basePrice ?? 0, perRoom.currency)} + ${formatMoney(booking.extraGuestPrice, perRoom.currency)} extra guests = ${formatMoney(booking.price, perRoom.currency)}`
+                : formatMoney(booking.price, perRoom.currency)
+              : null,
             perRoom && booking.groupId ? 'group booking' : null,
             booking.status === 'confirmed' ? null : booking.status,
           ]
@@ -249,7 +253,10 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         response = await fetch(`${api}/bookings/quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rooms: chosenRooms.map((r) => ({ unitId: r.unitId })), slotId, date }),
+          // The guests go too: the extra-guest fee is part of the price, and
+          // the server refuses a party above a room's maximum here, before
+          // anyone presses Book.
+          body: JSON.stringify({ rooms: chosenRooms, slotId, date }),
         });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
@@ -448,6 +455,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
                             />{' '}
                             {r.name}
                             {r.capacity !== null && <span className="muted"> · up to {r.capacity}</span>}
+                            {r.standardCapacity !== null && r.extraPersonRate !== null && r.extraPersonRate > 0 && (
+                              <span className="muted">
+                                {' '}
+                                · {r.standardCapacity} included, +{formatMoney(r.extraPersonRate, setup.currency)} each extra
+                              </span>
+                            )}
                             {r.rates.length === 0 && <span className="muted"> · no rate yet</span>}
                           </label>
                           {picked && (
@@ -537,11 +550,24 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
               <div className={`quote${quote.message ? ' error' : ''}`}>
                 {quote.quote ? (
                   <>
-                    <strong>Total {formatMoney(quote.quote.total, quote.quote.currency)}</strong>
-                    <span className="muted">
-                      {' '}
-                      · {quote.quote.lines.map((l) => `${l.unit} ${formatMoney(l.price, quote.quote!.currency)}`).join(' + ')}
-                    </span>
+                    {/* Each room: its rate, then its extra guests, then its total,
+                        separately (request § 3). Every number is the server's. */}
+                    {quote.quote.lines.map((l) => (
+                      <div key={l.unitId} className="quote-line">
+                        <span>{l.unit}</span>
+                        <span>
+                          {formatMoney(l.basePrice, quote.quote!.currency)}
+                          {l.extraGuestPrice > 0 &&
+                            ` + ${l.extraGuests} extra guest${l.extraGuests === 1 ? '' : 's'} ${formatMoney(l.extraGuestPrice, quote.quote!.currency)}`}
+                          {' = '}
+                          {formatMoney(l.price, quote.quote!.currency)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="quote-line quote-total">
+                      <strong>Total</strong>
+                      <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>
+                    </div>
                   </>
                 ) : (
                   quote.message
@@ -556,7 +582,15 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
               <button
                 type="submit"
                 className="primary"
-                disabled={busy || slotId === null || (perRoom ? chosenRooms.length === 0 || quote.quote === null : unitId === null)}
+                // per_room: every ticked room needs its guest count (the
+                // database requires one), and a quote must have come back.
+                disabled={
+                  busy ||
+                  slotId === null ||
+                  (perRoom
+                    ? chosenRooms.length === 0 || chosenRooms.some((r) => r.guestCount === null) || quote.quote === null
+                    : unitId === null)
+                }
               >
                 {busy ? 'Saving…' : 'Book'}
               </button>

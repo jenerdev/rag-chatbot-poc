@@ -164,6 +164,15 @@ accident.
    > count" say different things. Four older scripts now send a guest count.
 3. **Routes and screens.** The walk script grows the forged-price and
    over-capacity cases; the screens show the breakdown.
+   > **Done 2026-09-28 (routes and screen code; the browser look is part of
+   > the owed walk).** Walk 11/11 against dev: a room posted with only a name
+   > is 201 with 2 / 4 / 25000; a 3-guest quote is 350000 + 25000 = 375000;
+   > 5 guests in a 4-guest room is a 400 at the quote ("Quad holds at most 4
+   > guests.") and at the booking; no guest count and a standard of 5 over a
+   > maximum of 4 are 400s. The Rooms screen has Included / Max guests / Per
+   > extra guest; the booking form's quote shows each room's rate, extra
+   > guests and total, then the total; Book waits for every room's guest
+   > count; a booking row shows "base + extra guests = total".
 4. **The tool, then measure.** Full battery: the original 48 unchanged
    (46/48 expected, 47 when `lang-followup` passes), plus the new `rt-*`;
    villa and Northwind diff clean.

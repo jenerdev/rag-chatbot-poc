@@ -73,6 +73,10 @@ interface RoomCardProps {
 function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits }: RoomCardProps) {
   const [name, setName] = useState(room.name);
   const [capacity, setCapacity] = useState(room.capacity === null ? '' : String(room.capacity));
+  // plan/extra-guests.md: guests the rate covers, and the fee per guest above
+  // them, typed in pesos and sent as centavos like every price.
+  const [standard, setStandard] = useState(room.standardCapacity === null ? '' : String(room.standardCapacity));
+  const [extraRate, setExtraRate] = useState(room.extraPersonRate === null ? '' : centavosToInput(room.extraPersonRate));
   const [description, setDescription] = useState(room.description ?? '');
   // One weekday and one weekend input per slot, as TEXT in pesos.
   const [rates, setRates] = useState<Record<number, { weekday: string; weekend: string }>>(() =>
@@ -106,11 +110,17 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
   const saveDetails = (event: React.FormEvent) => {
     event.preventDefault();
     void run(async () => {
+      const extraPersonRate = extraRate.trim() === '' ? null : parseMoneyInput(extraRate);
+      if (extraRate.trim() !== '' && extraPersonRate === null) {
+        throw new Error('Enter the extra guest fee as pesos, for example 250 or 250.50.');
+      }
       await call(`/accommodations/${room.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           name,
-          capacity: capacity === '' ? null : Number(capacity),
+          maxCapacity: capacity === '' ? null : Number(capacity),
+          standardCapacity: standard === '' ? null : Number(standard),
+          extraPersonRate,
           description: description === '' ? null : description,
         }),
       });
@@ -212,9 +222,29 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             <input type="text" id={`name-${room.id}`} required value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="field narrow">
-            <label htmlFor={`capacity-${room.id}`}>Guests</label>
+            <label htmlFor={`standard-${room.id}`}>Included</label>
+            <input type="number" id={`standard-${room.id}`} min={1} step={1} value={standard} onChange={(e) => setStandard(e.target.value)} />
+          </div>
+          <div className="field narrow">
+            <label htmlFor={`capacity-${room.id}`}>Max guests</label>
             <input type="number" id={`capacity-${room.id}`} min={1} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
           </div>
+          <div className="field narrow">
+            <label htmlFor={`extra-${room.id}`}>Per extra guest</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              id={`extra-${room.id}`}
+              placeholder="no fee"
+              value={extraRate}
+              onChange={(e) => setExtraRate(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="small muted">
+          {room.standardCapacity !== null && room.extraPersonRate !== null
+            ? `The rate covers ${room.standardCapacity} guest(s); each guest above that adds ${formatMoney(room.extraPersonRate, setup.currency)}, up to ${room.capacity ?? 'any number of'} guests.`
+            : 'No extra-guest fee: the rate is the same for any party up to the maximum.'}
         </div>
         <div className="field">
           <label htmlFor={`description-${room.id}`}>
@@ -380,7 +410,9 @@ export function AccommodationsScreen({
     try {
       await call('/accommodations', {
         method: 'POST',
-        body: JSON.stringify({ name, capacity: capacity === '' ? null : Number(capacity), sortOrder: rooms?.length ?? 0 }),
+        // Left empty, the maximum is @rag/bookings' default (4), and so are
+        // the standard (2) and the extra-guest fee (₱250).
+        body: JSON.stringify({ name, ...(capacity === '' ? {} : { maxCapacity: Number(capacity) }), sortOrder: rooms?.length ?? 0 }),
       });
       setNotice({ message: `Added ${name}. Give it a rate so it can be booked.`, kind: 'ok' });
       setName('');
@@ -453,12 +485,14 @@ export function AccommodationsScreen({
                 <input type="text" id="new-name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="field narrow">
-                <label htmlFor="new-capacity">Guests</label>
+                <label htmlFor="new-capacity">Max guests</label>
                 <input type="number" id="new-capacity" min={1} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
               </div>
             </div>
             <div className="form-footer">
-              <span className="small muted">A new room is offered once it has a rate for at least one slot.</span>
+              <span className="small muted">
+                A new room covers 2 guests, takes up to 4, and charges ₱250 per extra guest until you change it. It is offered once it has a rate.
+              </span>
               <button type="submit" className="primary" disabled={busy}>
                 Add room
               </button>
@@ -472,7 +506,7 @@ export function AccommodationsScreen({
           // after a save the card is rebuilt from the server's values rather
           // than keeping stale local text.
           <RoomCard
-            key={`${room.id}:${room.name}:${room.capacity}:${room.description}:${JSON.stringify(room.rates)}`}
+            key={`${room.id}:${room.name}:${room.capacity}:${room.standardCapacity}:${room.extraPersonRate}:${room.description}:${JSON.stringify(room.rates)}`}
             room={room}
             setup={setup}
             call={call}

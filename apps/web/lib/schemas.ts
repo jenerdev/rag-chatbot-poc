@@ -126,16 +126,26 @@ export const createBookingSchema = z.object({
 /** A price preview for one unit or several rooms (per_room only). */
 export const quoteSchema = z.object({
   unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
+  // One unit's guests; with `rooms`, each room carries its own.
+  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
   rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
   slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
   date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
 });
 
-/** A new room. Lengths and "positive" are @rag/bookings' to check. */
+/**
+ * A new room. Lengths and "positive" are @rag/bookings' to check, and so are
+ * the defaults for anything left out (standard 2, maximum 4, ₱250;
+ * plan/extra-guests.md). `maxCapacity` and `capacity` are the same thing.
+ * The rate is CENTAVOS, like every price.
+ */
 export const createAccommodationSchema = z.object({
   name: z.string({ required_error: 'A room name is required', invalid_type_error: 'A room name is required' }),
   description: z.string({ invalid_type_error: 'Description must be text' }).nullish(),
-  capacity: z.number({ invalid_type_error: 'Capacity must be a number' }).nullish(),
+  capacity: z.number({ invalid_type_error: 'Maximum guests must be a number' }).nullish(),
+  maxCapacity: z.number({ invalid_type_error: 'Maximum guests must be a number' }).nullish(),
+  standardCapacity: z.number({ invalid_type_error: 'Standard guests must be a number' }).nullish(),
+  extraPersonRate: z.number({ invalid_type_error: 'The extra guest rate must be a number' }).nullish(),
   sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
 });
 
