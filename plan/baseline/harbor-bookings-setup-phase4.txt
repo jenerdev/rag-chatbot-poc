@@ -1,0 +1,1 @@
+{"tenant":{"id":67,"slug":"harbor"},"app":[{"config":{"timezone":"Asia/Manila","booking_type":"per_room"}}],"slot":[{"id":155,"name":"Night","start_time":"14:00:00","duration":"22:00:00"}]}

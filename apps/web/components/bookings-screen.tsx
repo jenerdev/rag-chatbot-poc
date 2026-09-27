@@ -13,12 +13,20 @@
 // check_availability says, and it attempts the booking. If the slot was taken
 // in the meantime, the server's 409 is shown as-is. The rule lives in one
 // place, the exclusion constraint (plan/bookings.md § 2.2).
+//
+// A per_room tenant (plan/booking-types.md Phase 4) gets three more things,
+// and a whole-resort tenant sees none of them, so villa's screen is the one it
+// was before: rooms to tick (several at once, one guest count each), a price
+// from the server's quote, and a room filter. The price shown is ALWAYS the
+// server's (the quote before, the stored price after); this screen never adds
+// up a price of its own.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { BookingSummary, SlotAvailability, SlotSummary, UnitSummary } from '@rag/bookings';
+import type { Accommodation, BookingGroup, BookingSummary, BookingType, Quote, SlotAvailability, SlotSummary, UnitSummary } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { formatMoney } from '@/lib/money';
 
 export interface BookingsScreenProps {
   slug: string;
@@ -31,6 +39,9 @@ interface Setup {
   timezone: string;
   /** Today in the TENANT'S timezone, computed on the server, not from this browser's clock. */
   today: string;
+  bookingType: BookingType;
+  currency: string;
+  /** inactive ones included, so the list can still name a retired room */
   units: UnitSummary[];
   slots: SlotSummary[];
 }
@@ -72,21 +83,26 @@ function BookingRow({
   booking,
   onCancel,
   busy,
+  perRoom,
 }: {
   booking: BookingSummary;
   onCancel: (booking: BookingSummary) => void;
   busy: boolean;
+  /** per_room: show the room and the stored price. Null for whole_resort, so villa's row is unchanged. */
+  perRoom: { currency: string } | null;
 }) {
   const cancelled = booking.status === 'cancelled';
   return (
     <div className={`booking${cancelled ? ' cancelled' : ''}`}>
       <div className="booking-main">
-        <span className="booking-slot">{booking.slot}</span>
+        <span className="booking-slot">{perRoom ? `${booking.unit} · ${booking.slot}` : booking.slot}</span>
         <span className="booking-guest">{booking.guestName}</span>
         <span className="booking-meta">
           {[
             booking.guestCount ? `${booking.guestCount} guests` : null,
             booking.guestPhone,
+            perRoom && booking.price !== null ? formatMoney(booking.price, perRoom.currency) : null,
+            perRoom && booking.groupId ? 'group booking' : null,
             booking.status === 'confirmed' ? null : booking.status,
           ]
             .filter(Boolean)
@@ -124,6 +140,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
   const [guestCount, setGuestCount] = useState('');
   const [notes, setNotes] = useState('');
 
+  // per_room only. The ticked rooms, each with its own guest count (capacity
+  // is checked per room, plan/booking-types.md Phase 2), the server's quote
+  // for them, and the list's room filter.
+  const [rooms, setRooms] = useState<Accommodation[]>([]);
+  const [chosen, setChosen] = useState<Record<number, string>>({});
+  const [quote, setQuote] = useState<{ quote: Quote | null; message: string | null }>({ quote: null, message: null });
+  const [roomFilter, setRoomFilter] = useState<number | null>(null);
+
   const unauthorized = useCallback(() => {
     setAuth('out');
     setSetup(null);
@@ -157,8 +181,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         setSetup(body);
         setFrom(body.today);
         setDate(body.today);
-        setUnitId(body.units[0]?.id ?? null);
+        setUnitId(body.units.find((u) => u.active)?.id ?? null);
         setSlotId(body.slots[0]?.id ?? null);
+        if (body.bookingType === 'per_room') {
+          // Capacities for the room list. Staff-only, like everything here.
+          const r = await fetch(`${api}/accommodations`);
+          if (r.status === 401) return unauthorized();
+          if (r.ok) setRooms(await r.json());
+        }
       } catch (error) {
         setLoadMessage(await describeFailure(error as Error, response));
       }
@@ -177,7 +207,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
       const range = `from=${from}&to=${to}`;
       const [a, b] = await Promise.all([
         fetch(`${api}/bookings/availability?${range}`),
-        fetch(`${api}/bookings?${range}`),
+        fetch(`${api}/bookings?${range}${roomFilter === null ? '' : `&unit=${roomFilter}`}`),
       ]);
       if (a.status === 401 || b.status === 401) return unauthorized();
       response = a.ok ? b : a;
@@ -189,11 +219,51 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
       setBookings(null);
       setLoadMessage(await describeFailure(error as Error, response));
     }
-  }, [api, from, to, unauthorized]);
+  }, [api, from, roomFilter, to, unauthorized]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const perRoom = setup?.bookingType === 'per_room';
+  const chosenRooms = useMemo(
+    () =>
+      Object.entries(chosen).map(([id, guests]) => ({
+        unitId: Number(id),
+        guestCount: guests === '' ? null : Number(guests),
+      })),
+    [chosen],
+  );
+
+  // The server's price for what is ticked, re-asked whenever it changes. Its
+  // total is what the booking will store, because both come from unit_price().
+  useEffect(() => {
+    if (!perRoom || chosenRooms.length === 0 || slotId === null || !date) {
+      setQuote({ quote: null, message: null });
+      return;
+    }
+    let stale = false;
+    void (async () => {
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/bookings/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rooms: chosenRooms.map((r) => ({ unitId: r.unitId })), slotId, date }),
+        });
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        const body: Quote = await response.json();
+        if (!stale) setQuote({ quote: body, message: null });
+      } catch (error) {
+        const message = await describeFailure(error as Error, response);
+        if (!stale) setQuote({ quote: null, message });
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [api, chosenRooms, date, perRoom, slotId, unauthorized]);
 
   const logout = useCallback(async () => {
     await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
@@ -207,23 +277,32 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
       setBusy(true);
       let response: Response | null = null;
       try {
+        const who = { slotId, date, guestName, guestPhone: guestPhone || null, notes: notes || null };
         response = await fetch(`${api}/bookings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            unitId,
-            slotId,
-            date,
-            guestName,
-            guestPhone: guestPhone || null,
-            guestCount: guestCount === '' ? null : Number(guestCount),
-            notes: notes || null,
-          }),
+          body: JSON.stringify(
+            perRoom
+              ? { ...who, rooms: chosenRooms }
+              : { ...who, unitId, guestCount: guestCount === '' ? null : Number(guestCount) },
+          ),
         });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
-        const created: BookingSummary = await response.json();
-        setNotice({ message: `Booked ${created.slot} on ${dayLabel(created.date)} for ${created.guestName}.`, kind: 'ok' });
+        if (perRoom && setup) {
+          const group: BookingGroup = await response.json();
+          const [first] = group.bookings;
+          setNotice({
+            message:
+              `Booked ${group.bookings.map((b) => b.unit).join(', ')} (${first?.slot}) on ${first ? dayLabel(first.date) : date} ` +
+              `for ${first?.guestName}. Total ${formatMoney(group.total ?? 0, setup.currency)}.`,
+            kind: 'ok',
+          });
+          setChosen({});
+        } else {
+          const created: BookingSummary = await response.json();
+          setNotice({ message: `Booked ${created.slot} on ${dayLabel(created.date)} for ${created.guestName}.`, kind: 'ok' });
+        }
         setGuestName('');
         setGuestPhone('');
         setGuestCount('');
@@ -237,7 +316,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         setBusy(false);
       }
     },
-    [api, date, guestCount, guestName, guestPhone, load, notes, slotId, unauthorized, unitId],
+    [api, chosenRooms, date, guestCount, guestName, guestPhone, load, notes, perRoom, setup, slotId, unauthorized, unitId],
   );
 
   const cancel = useCallback(
@@ -261,6 +340,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
     [api, load, unauthorized],
   );
 
+  // The room filter by name, because availability rows carry the unit's name.
+  const filteredName = roomFilter === null ? null : (setup?.units.find((u) => u.id === roomFilter)?.name ?? null);
+
   // Group both lists by date, in range order.
   const days = useMemo(() => {
     if (!from || !availability || !bookings) return [];
@@ -268,13 +350,16 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
       const day = addDays(from, i);
       return {
         day,
-        slots: availability.filter((a) => a.date === day),
+        slots: availability.filter((a) => a.date === day && (filteredName === null || a.unit === filteredName)),
         bookings: bookings.filter((b) => b.date === day),
       };
     });
-  }, [availability, bookings, from]);
+  }, [availability, bookings, filteredName, from]);
 
-  const multipleUnits = (setup?.units.length ?? 0) > 1;
+  // Active units only: a retired room is not offered in the form or shown as
+  // a chip. Villa has one, so none of the per-unit UI appears for it.
+  const activeUnits = setup?.units.filter((u) => u.active) ?? [];
+  const multipleUnits = activeUnits.length > 1;
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Bookings">
@@ -282,6 +367,11 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         <button type="button" className="link" onClick={logout}>
           Log out
         </button>
+      )}
+      {perRoom && (
+        <Link className="button" href={`/t/${slug}/admin/accommodations`}>
+          Rooms
+        </Link>
       )}
       <Link className="button" href={`/t/${slug}/admin`}>
         Knowledge base
@@ -328,12 +418,63 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         <section className="card">
           <h2>New booking</h2>
           <form onSubmit={book}>
+            {perRoom && (
+              <div className="field">
+                <label>Rooms</label>
+                {rooms.filter((r) => r.active).length === 0 && (
+                  <div className="small muted">
+                    No rooms yet. Add them on the <Link href={`/t/${slug}/admin/accommodations`}>Rooms</Link> screen.
+                  </div>
+                )}
+                <div className="room-picks">
+                  {rooms
+                    .filter((r) => r.active)
+                    .map((r) => {
+                      const picked = chosen[r.id] !== undefined;
+                      return (
+                        <div key={r.id} className={`room-pick${picked ? ' picked' : ''}`}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={picked}
+                              onChange={(e) =>
+                                setChosen((current) => {
+                                  const next = { ...current };
+                                  if (e.target.checked) next[r.id] = '';
+                                  else delete next[r.id];
+                                  return next;
+                                })
+                              }
+                            />{' '}
+                            {r.name}
+                            {r.capacity !== null && <span className="muted"> · up to {r.capacity}</span>}
+                            {r.rates.length === 0 && <span className="muted"> · no rate yet</span>}
+                          </label>
+                          {picked && (
+                            <input
+                              type="number"
+                              min={1}
+                              max={r.capacity ?? undefined}
+                              step={1}
+                              placeholder="guests"
+                              aria-label={`Guests in ${r.name}`}
+                              value={chosen[r.id]}
+                              onChange={(e) => setChosen((current) => ({ ...current, [r.id]: e.target.value }))}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             <div className="field-row">
-              {multipleUnits && (
+              {!perRoom && multipleUnits && (
                 <div className="field">
                   <label htmlFor="unit">Unit</label>
                   <select id="unit" value={unitId ?? ''} onChange={(e) => setUnitId(Number(e.target.value))}>
-                    {setup.units.map((u) => (
+                    {activeUnits.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
                       </option>
@@ -368,19 +509,21 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
                 </label>
                 <input type="text" id="guest-phone" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
               </div>
-              <div className="field narrow">
-                <label htmlFor="guest-count">
-                  Guests <span className="muted">(optional)</span>
-                </label>
-                <input
-                  type="number"
-                  id="guest-count"
-                  min={1}
-                  step={1}
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(e.target.value)}
-                />
-              </div>
+              {!perRoom && (
+                <div className="field narrow">
+                  <label htmlFor="guest-count">
+                    Guests <span className="muted">(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="guest-count"
+                    min={1}
+                    step={1}
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="field">
@@ -390,11 +533,31 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
               <input type="text" id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
+            {perRoom && (quote.quote || quote.message) && (
+              <div className={`quote${quote.message ? ' error' : ''}`}>
+                {quote.quote ? (
+                  <>
+                    <strong>Total {formatMoney(quote.quote.total, quote.quote.currency)}</strong>
+                    <span className="muted">
+                      {' '}
+                      · {quote.quote.lines.map((l) => `${l.unit} ${formatMoney(l.price, quote.quote!.currency)}`).join(' + ')}
+                    </span>
+                  </>
+                ) : (
+                  quote.message
+                )}
+              </div>
+            )}
+
             <div className="form-footer">
               <span className="small muted">
                 Times are in {setup.timezone}. Today there is {dayLabel(setup.today)}.
               </span>
-              <button type="submit" className="primary" disabled={busy || unitId === null || slotId === null}>
+              <button
+                type="submit"
+                className="primary"
+                disabled={busy || slotId === null || (perRoom ? chosenRooms.length === 0 || quote.quote === null : unitId === null)}
+              >
                 {busy ? 'Saving…' : 'Book'}
               </button>
             </div>
@@ -407,6 +570,17 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
               {dayLabel(from)} – {dayLabel(to)}
             </h2>
             <div className="range-nav">
+              {perRoom && (
+                <select aria-label="Show room" value={roomFilter ?? ''} onChange={(e) => setRoomFilter(e.target.value === '' ? null : Number(e.target.value))}>
+                  <option value="">All rooms</option>
+                  {setup.units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                      {u.active ? '' : ' (retired)'}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button type="button" disabled={from <= setup.today} onClick={() => setFrom(addDays(from, -RANGE_DAYS))}>
                 ← Earlier
               </button>
@@ -433,14 +607,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
                         className={`slot-chip ${s.status}`}
                         title={s.status === 'taken' ? 'Overlaps a booking — maybe one from another day' : 'Free to book'}
                       >
-                        {multipleUnits ? `${s.unit} · ` : ''}
+                        {multipleUnits || perRoom ? `${s.unit} · ` : ''}
                         {s.slot}: {s.status}
                       </span>
                     ))}
                   </span>
                 </div>
                 {dayBookings.map((b) => (
-                  <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} />
+                  <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} perRoom={perRoom ? { currency: setup.currency } : null} />
                 ))}
               </div>
             ))
