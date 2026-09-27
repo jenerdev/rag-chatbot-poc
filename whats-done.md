@@ -5478,3 +5478,26 @@ look like a mistake, or made a fourth look allowed.
 still provisional; `storage-orphans.mjs` planned and not built (R-30); date
 ranges reaching the tool as their two end dates (R-15).
 
+## Extra guests, Phase 1: the schema · done 2026-09-27
+
+**What:** `packages/db/sql/schema-extra-guests.sql`: `units.standard_capacity`
+and `extra_person_rate` (null = no fee, so no existing room changed price);
+`bookings.base_price` and `extra_guest_price` beside `price`; `unit_quote()`,
+the ONE price function; the trigger requires a per_room guest count, stores
+all three amounts from `unit_quote()`, and reprices a guest-count change;
+`check_room_availability` rebuilt with standard capacity, rate, fee and total
+(`price` still the base). verify checks 69–74.
+
+**Why it matters:** the request's last requirement, "the chatbot and the
+booking management system use the same pricing rules", is met by
+construction: there is one function, and both reach it.
+
+**Observed:** verify 75/75; for a standard-2, maximum-4, ₱250 room at ₱3,500:
+1–4 guests 350000 / 350000 / 375000 / 400000, 5 refused; a forged breakdown
+stored as the database's; 2 → 4 guests repriced to 410000 at an edited rate
+while a same-count re-save kept 350000; villa's availability and tools
+identical to Phase 0.
+
+**Mistake, mine:** check 65 asserted exactly 3 rates; the new Quad Room is a
+fourth. It now compares with the real count, which is what it meant.
+

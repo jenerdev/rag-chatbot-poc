@@ -143,6 +143,13 @@ accident.
 
 1. **Schema.** The SQL file; verify's new checks; villa's availability and
    tool definitions diff clean.
+   > **Done 2026-09-27.** verify 75/75 (checks 69–74 new): 1–4 guests quote
+   > 350000 / 350000 / 375000 / 400000; 3 guests stored as 350000 + 25000
+   > with a forged breakdown ignored; 5 refused (23514); 2 → 4 guests
+   > repriced, the same count kept; no guest count refused; standard 3 above
+   > a maximum of 2 refused. Villa's availability and tools identical to
+   > Phase 0. One failure on the first run was my check's hard-coded "3
+   > rates" (the new Quad Room made 4), not the schema.
 2. **`@rag/bookings`.** Types, quote, create, accommodations; `rooms.mjs`
    grows the 1–5 guest cases through the package.
 3. **Routes and screens.** The walk script grows the forged-price and

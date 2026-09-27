@@ -972,7 +972,7 @@ async function bookingTypeChecks(probeId) {
       const chatInsert = await chat.from('unit_rates').insert(write);
       const staffInsert = await staff.from('unit_rates').insert(write);
       check(
-        truth === 3 && seen.count === truth && chatInsert.error?.code === '42501' && !staffInsert.error,
+        truth > 0 && seen.count === truth && chatInsert.error?.code === '42501' && !staffInsert.error,
         'auth: unit_rates read by the tenant, written by its staff',
         `chat sees ${seen.error?.message ?? seen.count} of ${truth} · chat insert ${chatInsert.error?.code ?? 'INSERTED'} · staff insert ${staffInsert.error ? `${staffInsert.error.code} ${staffInsert.error.message}` : 'ok'}`,
       );

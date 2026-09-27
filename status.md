@@ -125,10 +125,15 @@ the room filter, retiring Family Room; why the second walk round never
 reached the database. Then delete `walk-harbor@example.com`, and merge
 `feat/booking-types` into `master`.
 
-**Extra guests (standard/maximum capacity, a per-guest fee): plan drafted
-2026-09-27** in [`plan/extra-guests.md`](./plan/extra-guests.md), to be built
-on `feat/booking-types` before the merge. Nothing built; its § 7 has three
-questions (existing rooms, required guest count, multi-night).
+**Extra guests (standard/maximum capacity, a per-guest fee)**,
+[`plan/extra-guests.md`](./plan/extra-guests.md), on `feat/booking-types`
+before the merge. § 7 answered with the recommendations.
+- [x] **Phase 1 — Schema** (2026-09-27). `schema-extra-guests.sql` run by the
+  user; verify 75/75; villa's availability and tools identical.
+- [ ] Phase 2 — `@rag/bookings`, and the scripts that book per_room rooms
+  without a guest count (rooms.mjs, bookings isolation, the Phase 3 walk,
+  the Phase 5 CLI check), which the database now refuses. **Next.**
+- [ ] Phases 3–5.
 
 **Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
@@ -1000,6 +1005,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — extra guests Phase 1 (schema)
+- **Did:** `schema-extra-guests.sql` (standard_capacity, extra_person_rate,
+  base_price, extra_guest_price, unit_quote(), the trigger, a rebuilt
+  check_room_availability); verify 69–74; per_room test bookings now carry
+  a guest count.
+- **Observed:** 75/75 after fixing my check 65's hard-coded "3 rates";
+  villa identical.
+- **Next:** Phase 2.
 
 ### 2026-09-27 — booking types Phase 8 (the record)
 - **Did:** decisions D-050–D-056, D-042 amended; risks R-23–R-30, R-15 and
