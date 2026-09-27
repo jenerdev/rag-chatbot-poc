@@ -5415,3 +5415,41 @@ asked about villa, harbor listed its own rooms, then said it has no
 information about Villa Amihan. Neither leaks anything, which is what the
 cases assert.
 
+## Booking types, Phase 7: both walls, and the bundle · done 2026-09-27
+
+**What:**
+- `packages/bookings/tools/isolation.mjs` +10: two throwaway per_room
+  tenants, A and B, with villa's operator a member of both. A's staff try
+  every new function against B's room: list, get, update, set rates, reorder,
+  remove and add a photo, quote, a mixed group booking, the room filter;
+  room availability on chat tokens for A, B and harbor; every room function
+  for villa.
+- `packages/rag/tools/isolation.mjs` +4: harbor's document and chunks,
+  harbor's Wi-Fi password (answered by harbor, not findable from villa), and
+  each tenant's tool result through executeTool.
+- `plan/booking-types-phase7-bundle.mjs`: the rule-2 scan, names and values,
+  values read from .env and never printed.
+
+**Why it matters:** CLAUDE.md rule 6 wants each wall to hold alone. With RLS
+on, the checks run on staff and chat tokens; with `--filters-only`, on the
+service client, so only the `.eq('tenant_id', …)` filters stand in the way.
+Both runs pass the same checks.
+
+**Observed:** bookings 22/22 and 22/22; pipeline 20/20 and 20/20; B's state
+(`{"unit":{"name":"B Room","capacity":2,"active":true},"rate":{"weekday_price":200000},"objects":1,"photo":{"sort_order":0}}`)
+identical before and after everything A tried; the mixed group left A with
+0 rows; harbor's chat token saw only its four rooms. The bundle: 0 files for
+`service_role`, `SUPABASE_SECRET`, `SUPABASE_SERVICE_ROLE`,
+`TENANT_SIGNING_JWK`, `guest_phone`, `@rag/db/service`, `admin_key_hash`
+and six secret values, on a build with the service key empty and on one
+with the full `.env`, 46 static files each.
+
+**Trap avoided: a check that could destroy what it checks.** "A cannot
+remove B's photo" is only safe to run when B's photo is disposable. With a
+real tenant as B, one regression would have deleted a real photo while
+reporting the failure.
+
+**Trap avoided: a scan that scans nothing.** The first positive twin: the
+same scan finds `admin/accommodations` (the new screen's fetch path) in 1
+file and `image/webp` (resize-image) in 2, so "0 files" is a real zero.
+

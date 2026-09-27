@@ -107,8 +107,14 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
   rooms 10/10`); rt 30/30 over three runs; villa's and Northwind's prompts
   and villa's tools byte-identical; `MAX_AVAILABILITY_ROWS` 150 now measured
   (36.3 tokens a row).
-- [ ] Phase 7 — isolation and the bundle. **Next.**
-- [ ] Phase 8 — the record.
+- [x] **Phase 7 — isolation and the bundle** (2026-09-27). Bookings isolation
+  22/22 both ways (10 new, on two throwaway per_room tenants); pipeline
+  isolation 20/20 both ways (4 new, harbor ↔ villa); verify 69/69; bundle
+  scan of `.next/static` clean on two fresh builds (service key empty, and
+  full `.env`), with its positive twin. Dev server stopped for the builds and
+  restarted in the background (with the user's OK).
+- [ ] Phase 8 — the record: decisions.md, risks.md, CLAUDE.md, flow.md.
+  **Next.**
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -976,6 +982,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 7 (isolation and the bundle)
+- **Did:** 10 checks in `packages/bookings/tools/isolation.mjs` (probes A and
+  B, both per_room, one operator a member of both); 4 in
+  `packages/rag/tools/isolation.mjs` (harbor ↔ villa: documents, the Wi-Fi
+  token, the tool through executeTool); `plan/booking-types-phase7-bundle.mjs`.
+- **Observed:** bookings 22/22 and 22/22 (`--filters-only`); pipeline 20/20
+  and 20/20; B's room, rate, object and photo row byte-identical after
+  everything A tried; the bundle: 0 files for every name and every secret
+  value, on both builds, 46 static files; the scan finds
+  `admin/accommodations` in 1 file, so it reads the right files.
+- **Why probes, not harbor, as B:** a failing "cannot delete another
+  tenant's photo" would have deleted a real photo.
+- **Next:** Phase 8, the record.
 
 ### 2026-09-27 — booking types Phase 6 (the tool)
 - **Did:** `roomTools()` in tools.ts and a per_room branch in executeTool

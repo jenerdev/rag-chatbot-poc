@@ -565,6 +565,14 @@ pair. verify grows by the Phase 1 checks. Then CLAUDE.md rule 2's grep of
 `.next/static`. **Done when** all pass and each new RLS check has a positive
 twin.
 
+> **Done 2026-09-27.** Bookings isolation 22/22 both ways, pipeline 20/20
+> both ways (`plan/baseline/isolation-*-booking-types-phase7.txt`). The
+> cross-tenant target is a throwaway per_room tenant, not harbor: a failing
+> photo-delete check would otherwise delete a real photo. Bundle
+> (`plan/baseline/bundle-grep-booking-types-phase7.txt`): 0 files for every
+> name and secret value on both builds, and the positive twin finds the new
+> screen's own path, so the scan reads the right files.
+
 ### Phase 8 — The record
 
 `decisions.md`, `risks.md`, `CLAUDE.md` (layout, commands, the new SQL file in
