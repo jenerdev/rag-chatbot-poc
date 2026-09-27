@@ -1,0 +1,7 @@
+units [{"id":125,"name":"Garden Room","capacity":2,"active":true},{"id":126,"name":"Family Room","capacity":6,"active":true}]
+rates [{"unit_id":125,"weekday_price":350000,"weekend_price":450000},{"unit_id":126,"weekday_price":600000,"weekend_price":750000}]
+image rows [{"id":57,"unit_id":125,"path":"67/125/1204ca25-3338-4b58-b293-07971be71098.webp","sort_order":0}]
+objects in Garden Room [{"name":"1204ca25-3338-4b58-b293-07971be71098.webp","size":6560,"type":"image/webp"}]
+objects in Family Room []
+photo 57 67/125/1204ca25-3338-4b58-b293-07971be71098.webp bytes 6560 magic RIFF/WEBP chunks VP8X,ICCP,VP8  dims [330,352] Exif marker false EXIF chunk false GPS false
+bookings [{"id":668,"unit_id":125,"booked_date":"2026-10-24","status":"confirmed","guest_count":2,"price":450000,"group_id":null,"guest_name":"Keith Luzung"}]

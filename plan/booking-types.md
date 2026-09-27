@@ -495,11 +495,26 @@ size before and after the browser resize (this sets `MAX_IMAGE_BYTES` and
 file and confirm it has no EXIF/GPS; remove it and confirm the object is gone
 from the bucket.
 
+> **Code done 2026-09-27 (`f720ab8`); the browser walk is owed**, deferred by
+> the user. Page codes: villa bookings 200; accommodations 404 for villa and
+> northwind, 200 for harbor. From the database after the first round: one
+> photo, a 330×352 WebP of 6560 bytes with no EXIF or GPS (only an ICCP
+> profile), and a Garden Room booking on a Saturday stored at 450000. That
+> photo was smaller than MAX_IMAGE_EDGE, so it measured nothing:
+> MAX_IMAGE_BYTES and MAX_IMAGE_EDGE are still provisional. **Deviation:**
+> harbor got its bookings application (`per_room`, slot Night) here rather
+> than in Phase 5, because the walk needed a per_room tenant.
+
 ### Phase 5 — The CLI
 
 `tenant:booking-type`. **Done when** it shows the type, refuses per § 2.4 with
 the count of future bookings, and switching the scratch tenant back and forth
 with no bookings works.
+
+> **Done 2026-09-27.** `plan/booking-types-phase5-cli.mjs` 6/6, running the
+> real CLI as a child process on a scratch tenant. The CLI does not re-check
+> the rules: the trigger refuses, and its message ("3 active units", "1 live
+> booking(s)") is printed as is.
 
 ### Phase 6 — The tool, then measure
 

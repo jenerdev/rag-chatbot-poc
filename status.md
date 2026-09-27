@@ -82,9 +82,27 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
   `rates`, `images`, `images/[imageId]`), `bookings/quote`, `?unit=` and
   `rooms` on `bookings`, `bookingType`/`currency` on `setup`. HTTP walk
   (`plan/booking-types-phase3-walk.mjs`) 10/10 against `pnpm dev`.
-- [ ] Phase 4 — Screens: S-5 accommodations, the bookings screen, photo
-  resize in the browser. **Next.**
-- [ ] Phases 5–8.
+- [~] **Phase 4 — Screens** (code 2026-09-27, `f720ab8`; **browser walk
+  owed**). S-5 `/t/<slug>/admin/accommodations` (rooms, rates in pesos →
+  centavos by string, photos resized to WebP in the browser), and on the
+  bookings screen for per_room only: rooms to tick with guests each, the
+  server's quote, a room filter, room and price on each row. Pages: villa
+  bookings 200, accommodations 404 for villa/northwind, 200 for harbor.
+  Harbor now has the bookings application, `per_room`, slot Night 14:00 +22h.
+  **Owed, by the user in the browser** (walk login `walk-harbor@example.com`,
+  delete it after): villa's screen unchanged; a FULL-SIZE phone photo, whose
+  before/after sizes set `MAX_IMAGE_BYTES` / `MAX_IMAGE_EDGE` (both still
+  provisional); photo reorder/remove; a two-room booking; the 409 clash; the
+  room filter; retiring Family Room. Checked so far from the database: one
+  330×352 WebP, 6560 bytes, no EXIF/GPS (ICCP only); one Garden Room booking
+  on a Saturday at 450000. The second round of steps did not reach the
+  database; the user deferred finding out why.
+- [x] **Phase 5 — The CLI** (2026-09-27). `pnpm --filter @rag/db
+  tenant:booking-type -- <slug> [whole_resort|per_room]`.
+  `plan/booking-types-phase5-cli.mjs` 6/6.
+- [ ] Phase 6 — the tool, then measure: harbor's fixture, the per_room
+  branch of `check_availability`, the `rt-*` cases. **Next.**
+- [ ] Phases 7–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -952,6 +970,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phases 4 (code) and 5
+- **Did (4):** `accommodations-screen.tsx`, its page, `lib/money.ts`,
+  `lib/resize-image.ts`, the per_room parts of `bookings-screen.tsx`, CSS.
+  Photo limits reach the browser as props from the server page (one copy).
+  Gave harbor `per_room` bookings and a Night slot; made a walk login.
+- **Observed (4):** typecheck green; page codes as expected; the user's
+  first upload stored as a 330×352 WebP with no EXIF. The walk's second round
+  did not reach the database. The user chose to move on and check later.
+- **Did (5):** `tenant:booking-type` in `tools/tenant.mjs`: it shows the type,
+  and a switch is decided by the SQL trigger, whose message (with the count)
+  is printed as is.
+- **Observed (5):** 6/6: refused with "3 active units" and with "1 live
+  booking(s)"; allowed back and forth once the booking was cancelled;
+  whole_resort is stored as the ABSENCE of the key.
+- **Next:** Phase 6.
 
 ### 2026-09-27 — booking types Phase 3 (routes)
 - **Did:** seven route files (four new directories under `accommodations/`,

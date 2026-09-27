@@ -26,6 +26,7 @@
     "verify": "node --conditions=react-server --env-file=../../.env tools/verify.mjs",
     "tenant:add": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs add",
     "tenant:fallback": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs fallback",
+    "tenant:booking-type": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs booking-type",
     "member:add": "node --conditions=react-server --env-file=../../.env tools/member.mjs add",
     "member:remove": "node --conditions=react-server --env-file=../../.env tools/member.mjs remove",
     "member:list": "node --conditions=react-server --env-file=../../.env tools/member.mjs list",

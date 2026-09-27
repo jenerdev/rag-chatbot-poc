@@ -1,0 +1,6 @@
+units [{"id":125,"name":"Garden Room","capacity":2,"active":true},{"id":126,"name":"Family Room","capacity":6,"active":true}]
+image rows [{"id":57,"unit_id":125,"path":"67/125/1204ca25-3338-4b58-b293-07971be71098.webp","sort_order":0,"created_at":"2026-09-27T10:56:50.947461+00:00"}]
+objects in Garden Room [{"name":"1204ca25-3338-4b58-b293-07971be71098.webp","size":6560,"type":"image/webp"}]
+objects in Family Room []
+photo 57 sort 0 bytes 6560 RIFF/WEBP VP8X,ICCP,VP8  dims [330,352] Exif false EXIFchunk false GPS false
+bookings [{"id":668,"unit_id":125,"slot_id":155,"booked_date":"2026-10-24","status":"confirmed","guest_count":2,"price":450000,"group_id":null,"guest_name":"Keith Luzung","created_at":"2026-09-27T10:58:08.949719+00:00"}]

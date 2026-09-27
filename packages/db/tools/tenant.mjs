@@ -5,6 +5,8 @@
 //   pnpm --filter @rag/db tenant:fallback -- <slug> <language> --clear    that language back to the default
 //   pnpm --filter @rag/db tenant:fallback -- <slug> --clear               every language back to the default
 //   pnpm --filter @rag/db tenant:fallback -- <slug>                       show what is set
+//   pnpm --filter @rag/db tenant:booking-type -- <slug>                    show how it books (D-055)
+//   pnpm --filter @rag/db tenant:booking-type -- <slug> <whole_resort|per_room>   switch it
 //
 // A new tenant has no members, so nobody can administer it yet. Add the first
 // one with `pnpm --filter @rag/db member:add -- <slug> <email>`. Until auth-rls
@@ -59,8 +61,73 @@ if (command === 'fallback') {
     if (error) fail(`could not update "${slug}": ${error.message}`);
     else console.log(`"${slug}" fallback messages:\n${show(data[0].fallback_messages)}`);
   }
+} else if (command === 'booking-type') {
+  // whole_resort or per_room (plan/booking-types.md § 2.4, D-055). An
+  // OPERATOR command, not a staff screen: a whole-property booking would not
+  // overlap a room booking, so switching a tenant that has live bookings could
+  // sell the property twice.
+  //
+  // The database decides whether a switch is allowed. tenant_applications'
+  // validate trigger refuses it while any booking has not ended, and refuses
+  // whole_resort with more than one active unit, and its message carries the
+  // count. This command does not re-implement either rule: it says what is
+  // set, asks for the change, and reports Postgres's answer as it is.
+  const TYPES = ['whole_resort', 'per_room'];
+  const [, , wanted] = args;
+  const { data: tenant, error: tenantError } = await supabase.from('tenants').select('id, slug').eq('slug', slug ?? '').maybeSingle();
+  if (!slug || (wanted !== undefined && !TYPES.includes(wanted))) {
+    fail(`usage: tenant:booking-type -- <slug> [${TYPES.join('|')}]`);
+  } else if (tenantError || !tenant) {
+    fail(tenantError ? `could not read "${slug}": ${tenantError.message}` : `no tenant "${slug}"`);
+  } else {
+    const { data: app, error: appError } = await supabase
+      .from('tenant_applications')
+      .select('config')
+      .eq('tenant_id', tenant.id)
+      .eq('application_key', 'bookings')
+      .maybeSingle();
+    const describe = async (config) => {
+      const { data: units } = await supabase.from('units').select('active').eq('tenant_id', tenant.id);
+      const active = (units ?? []).filter((u) => u.active).length;
+      return (
+        `"${slug}" books as ${config.booking_type ?? 'whole_resort'}` +
+        `${config.booking_type ? '' : ' (the default: no booking_type in its config)'}; ` +
+        `${active} active unit(s), ${(units ?? []).length - active} retired; timezone ${config.timezone}`
+      );
+    };
+    if (appError) {
+      fail(`could not read "${slug}"'s bookings: ${appError.message}`);
+    } else if (!app) {
+      fail(`"${slug}" does not have the bookings application, so it has no booking type`);
+    } else if (wanted === undefined) {
+      console.log(await describe(app.config));
+    } else if ((app.config.booking_type ?? 'whole_resort') === wanted) {
+      console.log(`${await describe(app.config)}. Nothing to change.`);
+    } else {
+      // whole_resort is the ABSENCE of the key, so every tenant that never
+      // chose looks the same as one that chose whole_resort.
+      const config = { ...app.config };
+      if (wanted === 'whole_resort') delete config.booking_type;
+      else config.booking_type = wanted;
+      const { data, error } = await supabase
+        .from('tenant_applications')
+        .update({ config })
+        .eq('tenant_id', tenant.id)
+        .eq('application_key', 'bookings')
+        .select('config')
+        .single();
+      if (error) {
+        fail(`refused: ${error.message}`);
+      } else {
+        console.log(await describe(data.config));
+        if (wanted === 'per_room') {
+          console.log('Add rooms and give each a rate on its Rooms screen; a room with no rate cannot be booked.');
+        }
+      }
+    }
+  }
 } else if (command !== 'add') {
-  fail('the command is "add" or "fallback" (tenant:key was removed in auth-rls Phase 6; use member:add)');
+  fail('the command is "add", "fallback" or "booking-type" (tenant:key was removed in auth-rls Phase 6; use member:add)');
 } else if (!slug || !businessName || !assistantName) {
   fail('usage: tenant:add -- <slug> "<business name>" "<assistant name>"');
 } else {

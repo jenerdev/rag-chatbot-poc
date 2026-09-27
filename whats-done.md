@@ -5312,3 +5312,47 @@ page then returned 500 with `Cannot find module './535.js'` while API routes
 kept working. Nothing in the code was wrong. While dev runs, build only the
 packages.
 
+## Booking types, Phase 4: the screens · code done 2026-09-27, walk owed
+
+**What:**
+- S-5 at `/t/<slug>/admin/accommodations` (404 unless bookings AND
+  per_room): add a room; edit name, guests, description; retire it (with a
+  warning that counts its bookings in the next 92 days, which stay valid);
+  rates per slot, typed in pesos and turned into centavos by splitting the
+  string (`lib/money.ts`), never by `× 100`; photos with order and remove.
+- `lib/resize-image.ts`: `createImageBitmap` (EXIF rotation applied), a
+  canvas scaled to MAX_IMAGE_EDGE, WebP at 0.82 (JPEG if the browser cannot
+  encode WebP). Re-encoding keeps only pixels, so EXIF and GPS go.
+- The bookings screen, for per_room only: rooms to tick, one guest count
+  each; the server's quote (the same `unit_price()` the trigger uses); a
+  room filter; room and stored price on each row; a Rooms link. Whole-resort
+  tenants render exactly the old screen.
+- The photo limits come from `@rag/bookings` in the SERVER page and reach
+  the Client Component as props: one copy of each number.
+
+**Observed so far:** typecheck green; villa bookings page 200; accommodations
+404 for villa and northwind, 200 for harbor; the user's first photo stored as
+a 330×352 WebP, 6560 bytes, chunks VP8X/ICCP/VP8, no EXIF, no GPS.
+
+**Owed:** the rest of the browser walk, and a full-size phone photo to set
+MAX_IMAGE_BYTES and MAX_IMAGE_EDGE from a measurement. A second round of walk
+steps did not reach the database; the user deferred finding out why.
+
+## Booking types, Phase 5: the operator CLI · done 2026-09-27
+
+**What:** `pnpm --filter @rag/db tenant:booking-type -- <slug>
+[whole_resort|per_room]`. It shows the type, active and retired units, and
+the timezone; switching writes the config and nothing else.
+
+**Why it matters:** switching a tenant with live bookings could sell the
+property twice (plan § 2.4). The rule is the SQL trigger's; the CLI prints
+the trigger's own refusal, so there is one rule and not two copies.
+
+**Observed (`plan/booking-types-phase5-cli.mjs`, 6/6):** a tenant without
+bookings, a bad type and a missing tenant are refused; the default shows as
+`whole_resort (the default: no booking_type in its config)`; per_room →
+whole_resort refused with "Tenant 95 has 3 active units"; with one room and
+a live booking, refused with "1 live booking(s) that have not ended"; after
+cancelling, whole_resort (the key removed from the config), a no-op message,
+and per_room again. villa, harbor and northwind read correctly.
+
