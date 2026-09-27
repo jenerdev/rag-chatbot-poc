@@ -1022,6 +1022,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — the owed browser walk, done
+- **Observed:** Family Room retired, its 20 Oct booking (#927) still
+  confirmed. A phone photo: "Added a photo: 14509 KB → 87 KB, 1600×1067";
+  stored as 88,902 bytes, WebP, chunks VP8X/ICCP/VP8, no EXIF, no GPS; the
+  user moved it to first place (sort 0).
+- **Decided from it:** MAX_IMAGE_EDGE 1600 and MAX_IMAGE_BYTES 2 MiB stay,
+  now as measured values (constants.ts says why).
+- **Next:** reset harbor to its fixture, delete the walk login, merge.
+
 ### 2026-09-28 — the owed browser walk, round 3
 - **Confirmed by the user:** villa's bookings screen looks as it did before
   (booking types Rule 1, by eye).

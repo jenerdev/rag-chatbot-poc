@@ -540,8 +540,9 @@ an error that says how to narrow the question.
 
 ## R-27 · Free plan Storage egress is 5 GB a month · **Low while photos are staff-only**
 
-Browser-resized WebP keeps each view small. Showing photos to chat visitors
-would change this sum.
+Browser-resized WebP keeps each view small: a real phone photo measured 86.8
+KB at 1600×1067 (2026-09-28), so 5 GB is roughly 60,000 photo views a month.
+Showing photos to chat visitors would change this sum.
 
 ---
 

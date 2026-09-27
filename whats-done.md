@@ -5595,3 +5595,18 @@ chatbot quoting the database's total. Battery 49/51 (`rooms 13/13`), verify
 75/75, rooms 19/19, walk 11/11, isolation 23/23 and 20/20 both ways. Owed:
 the browser look, with booking-types' Phase 4 walk.
 
+## Booking types and extra guests: the browser walk · done 2026-09-28
+
+**What the user did, and what the database showed:** villa's bookings screen
+unchanged (by eye); a Garden + Family booking stored as one group (#926
+350000 + 0, #927 600000 + 50000 for 6 guests at the user's own standard of
+4); the same Garden night again refused, no row saved; the Rooms screen's
+inputs saved (Garden maximum 2 → 4, Family standard 2 → 4); Family Room
+retired, its booking kept; a phone photo uploaded and moved to first place.
+
+**The measurement the walk existed for:** the browser turned a 14,509 KB phone
+photo into a 1600×1067 WebP of 88,902 bytes, with no EXIF or GPS (only an
+ICCP colour profile). MAX_IMAGE_EDGE 1600 and MAX_IMAGE_BYTES 2 MiB are now
+measured values, not guesses: 86.8 KB is 4% of the cap. R-27's egress becomes
+concrete too: about 60,000 views of such a photo a month on the Free plan.
+

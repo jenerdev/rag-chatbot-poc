@@ -8,9 +8,11 @@
 > `check_availability` answers with rooms, capacities and prices.
 >
 > Written 2026-09-27, against `3eaba16` on `master`. **Status: complete,
-> 2026-09-27, on `feat/booking-types`, except Phase 4's browser walk** (owed;
-> MAX_IMAGE_BYTES and MAX_IMAGE_EDGE stay provisional until a full-size photo
-> is measured). Battery 47/48 (`rooms 10/10`), verify 69/69, isolation 20/20
+> 2026-09-28, walk included.** The user's walk: villa's screen unchanged; a
+> two-room booking stored as one group, and its clash refused; Family Room
+> retired with its booking kept; a 14,509 KB phone photo stored as a
+> 1600×1067 WebP of 86.8 KB with no EXIF or GPS, which set MAX_IMAGE_EDGE
+> (1600) and MAX_IMAGE_BYTES (2 MiB) from measurement. Battery 47/48 (`rooms 10/10`), verify 69/69, isolation 20/20
 > and 22/22 both ways, bundle clean. Decisions D-050–D-056, risks R-23–R-30.
 > Earlier status: § 8 is answered (harbor as the
 > per-room fixture, weekday/weekend rates only, villa's rates stay in the

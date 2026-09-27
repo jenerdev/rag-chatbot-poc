@@ -1,0 +1,2 @@
+{"id":57,"unit":125,"sort":1,"bytes":6560,"kb":"6.4","magic":"RIFF/WEBP","chunks":["VP8X","ICCP","VP8 "],"dims":[330,352],"exif":false,"gps":false,"created":"2026-09-27T10:56:50.947461+00:00"}
+{"id":133,"unit":125,"sort":0,"bytes":88902,"kb":"86.8","magic":"RIFF/WEBP","chunks":["VP8X","ICCP","VP8 "],"dims":[1600,1067],"exif":false,"gps":false,"created":"2026-09-27T17:54:33.381188+00:00"}

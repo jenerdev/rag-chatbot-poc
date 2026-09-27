@@ -47,8 +47,12 @@ export const MAX_PRICE = 100_000_000;
 
 // Photos. MAX_IMAGE_BYTES matches the bucket's file_size_limit and
 // MAX_IMAGES_PER_UNIT matches the unit_images_cap trigger (schema-booking-types.sql
-// § 10, § 11): change them together. Phase 4 sets MAX_IMAGE_BYTES and
-// MAX_IMAGE_EDGE from a real phone photo after the browser resize.
+// § 10, § 11): change them together. MEASURED 2026-09-28 with a real phone
+// photo (plan/baseline/photo-measurement-2026-09-28.txt): 14,509 KB in the
+// browser became a 1600×1067 WebP of 88,902 bytes (86.8 KB), with no EXIF or
+// GPS. So 1600 px keeps a room photo sharp at under 100 KB, and 2 MiB leaves
+// ~24× headroom for busier scenes and for the JPEG fallback of a browser that
+// cannot encode WebP; an unresized phone photo is still refused.
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 export const MAX_IMAGES_PER_UNIT = 6;
 export const MAX_IMAGE_EDGE = 1600;
