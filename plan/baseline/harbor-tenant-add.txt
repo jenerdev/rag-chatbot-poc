@@ -1,0 +1,6 @@
+Created tenant "harbor" (id 67).
+Nobody can administer it yet. Add the first member with:
+  pnpm --filter @rag/db member:add -- harbor <email>
+Created the operator account rag-operator+harbor@example.com.
+rag-operator+harbor@example.com is a member of "harbor" (tenant 67).
+{"id":67,"slug":"harbor","business_name":"Harbor Inn","assistant_name":"Marina","applications":0,"documents":0,"units":0}

@@ -389,6 +389,15 @@ Northwind's prompt snapshot, **villa's prompt with its tools block**, verify
 48/48, pipeline isolation 16/16 both ways, bookings isolation 12/12 both
 ways, and the test counts. **Done when** all seven are saved from one commit.
 
+> **Done 2026-09-27, from `e8fc28b`.** All seven saved, plus villa's tool
+> definitions (`villa-tools-…`, no date in them, so they diff exactly) and
+> villa's 14-day availability (42 rows, all open). Villa's prompt carries one
+> dated line, `Today is … Asia/Manila.`, which Phase 6's diff must ignore.
+> Battery 37/38 on the run, `lang-followup` then 1/4 on repeat: the usual
+> 36/38. `harbor` is tenant 67; it was created **after** the baseline, and
+> verify, bookings isolation and Northwind's snapshot were re-run to show it
+> changed nothing.
+
 ### Phase 1 — Schema
 
 **First, the Storage spike (§ 2.8).** Create the bucket and its policies

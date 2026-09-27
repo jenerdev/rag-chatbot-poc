@@ -56,13 +56,16 @@
 
 ## ▶ Next up (do this next)
 
-**Booking types (whole-resort / per-room): plan drafted 2026-09-27**, in
-[`plan/booking-types.md`](./plan/booking-types.md). Nothing built. § 8
-questions 1–4 answered: `harbor` is the per-room fixture tenant,
-weekday/weekend rates only, villa's rates stay in the documents, room photos
-uploaded to Supabase Storage (§ 2.8, gated on a token spike). Question 5 is
-superseded by the payments plan. **Next:** Phase 0 (baseline). Before that,
-the browser walk of D-047–D-049 is still owed.
+**Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
+on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
+- [x] **Phase 0 — Baseline** (2026-09-27). `harbor` created (tenant 67,
+  "Harbor Inn", assistant Marina, operator member), no application, no
+  documents, no units. Baselines in `plan/baseline/*-pre-booking-types*`.
+- [ ] Phase 1 — Schema, starting with the Storage token spike (§ 2.8). **Next.**
+  Needs the user to run SQL in the Supabase SQL editor.
+- [ ] Phases 2–8.
+
+Before that, the browser walk of D-047–D-049 is still owed.
 
 **Payments (booking lifecycle + manual verification): plan drafted
 2026-09-27**, in [`plan/payments.md`](./plan/payments.md). Nothing built;
@@ -928,6 +931,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 0 (baseline)
+- **Did:** committed `plan/booking-types.md` and `plan/payments.md`
+  (`e8fc28b`), branched `feat/booking-types`, saved the baseline, created
+  `harbor` and its operator.
+- **Observed:** tests 13/14/27/294; verify 48/48; isolation 16/16 both
+  ways; bookings isolation 12/12 both ways; Northwind's prompt identical to
+  `northwind-prompt-pre-bookings.txt`; villa's 14 days 42 rows, 42 open;
+  battery **37/38** (`lang-followup` passed once), then `lang-followup` 1 of 4
+  on repeat, so the baseline is the usual 36/38.
+- **Deviation:** the plan said create harbor first; the baseline was taken
+  first and verify + bookings isolation + the Northwind snapshot re-run
+  after, so "harbor changes nothing" is measured, not assumed.
+- **Next:** Phase 1, the Storage spike.
 
 ### 2026-09-26 — session 8, continued (Taglish replies, D-043)
 - **Did:** added `packages/rag/src/language.ts` (explicit-request detection,

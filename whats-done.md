@@ -5109,3 +5109,36 @@ question. The prefix is added only where the reply leaves the server.
 **Limits:** "sige" answering "Which date?" gets the refusal, as it did
 before, and the lists are English and Tagalog only.
 
+
+## Booking types, Phase 0: the baseline · done 2026-09-27
+
+**What:** before any code changes for per-room booking
+(`plan/booking-types.md`), saved what "unchanged" has to mean, and created
+the fixture tenant `harbor` (tenant 67, "Harbor Inn", assistant Marina) and
+its operator member. Plans committed at `e8fc28b`; work continues on
+`feat/booking-types`.
+
+**Why it matters:** Rule 1 of the plan is that villa and Northwind see no
+change at all. That can only be proven by a diff against something taken
+before the first edit.
+
+**Observed, all in `plan/baseline/*-pre-booking-types*`:**
+- tests 13 / 14 / 27 / 294, typecheck and build green;
+- verify 48/48; pipeline isolation 16/16 and 16/16 (`--filters-only`);
+  bookings isolation 12/12 and 12/12;
+- Northwind's prompt snapshot is byte-identical to
+  `northwind-prompt-pre-bookings.txt`, so nothing since bookings has moved it;
+- villa's prompt with its tools block, and villa's tool definitions saved
+  separately. The prompt has one dated line ("Today is 2026-09-27 (Sunday),
+  Asia/Manila."); the definitions have none, so they diff exactly;
+- villa's availability for 2026-09-27..10-10: 42 rows, 42 open;
+- battery **37/38**: only `antecedent` failed. `lang-followup` passed, then
+  failed 3 of 4 repeats, so this was one lucky run of a known lean (D-043),
+  not a change. The baseline is the usual 36/38.
+
+**Trap avoided: a fixture tenant polluting the baseline.** The plan said to
+create `harbor` first. The baseline was taken first instead, then verify,
+bookings isolation and the Northwind snapshot were re-run after `harbor`
+existed. Their only differences are message counts (the battery's own runs)
+and the ids of verify's scratch tenants, so "harbor changes nothing" is
+measured.
