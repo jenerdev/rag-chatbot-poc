@@ -59,12 +59,18 @@ export interface BookingSummary {
   guestPhone: string | null;
   guestCount: number | null;
   notes: string | null;
+  /** centavos, set by the database; null for whole_resort and for bookings made before prices existed */
+  price: number | null;
+  /** shared by every room of one multi-room booking; null for a single room */
+  groupId: string | null;
   createdAt: string;
 }
 
 export interface UnitSummary {
   id: number;
   name: string;
+  /** false once staff deactivate a room; its old bookings still name it */
+  active: boolean;
 }
 
 export interface SlotSummary {
@@ -78,7 +84,13 @@ export interface SlotSummary {
 
 /** What createBooking accepts. Loose types on purpose: this package validates them itself. */
 export interface NewBooking {
-  unitId: unknown;
+  /**
+   * One unit, as before. For several rooms at once, send `rooms` instead;
+   * exactly one of the two.
+   */
+  unitId?: unknown;
+  /** Several rooms, one booking group (per_room only): `[{ unitId, guestCount? }, …]` */
+  rooms?: unknown;
   slotId: unknown;
   date: unknown;
   guestName: unknown;
@@ -89,6 +101,88 @@ export interface NewBooking {
   status?: unknown;
 }
 
+export type BookingType = 'whole_resort' | 'per_room';
+
 export interface BookingsConfig {
   timezone: string;
+  /** absent in config means 'whole_resort' (plan/booking-types.md § 2.1) */
+  bookingType: BookingType;
+  /** ISO weekdays, 1 = Monday … 7 = Sunday, priced at the weekend rate */
+  weekendDays: number[];
+  /** three letters, for formatting only; every amount is centavos */
+  currency: string;
+}
+
+/**
+ * One (date, room, slot) for a per_room tenant: SlotAvailability plus what a
+ * resort publishes anyway (plan/booking-types.md Rule 4). No guest data, and
+ * no description: tenant-written free text is not put into a prompt.
+ */
+export interface RoomAvailability {
+  date: string;
+  unit: string;
+  capacity: number | null;
+  slot: string;
+  status: 'open' | 'taken';
+  /** centavos, the base rate for that date: weekday or weekend, nothing else (R-24) */
+  price: number;
+}
+
+/** A booking group as createBookings returns it. */
+export interface BookingGroup {
+  /** null when the group is one room */
+  groupId: string | null;
+  bookings: BookingSummary[];
+  /** centavos, the sum of the stored prices; null for whole_resort */
+  total: number | null;
+}
+
+/** What a price preview returns. The same unit_price() the insert trigger uses. */
+export interface Quote {
+  date: string;
+  slotId: number;
+  slot: string;
+  lines: { unitId: number; unit: string; price: number }[];
+  /** centavos */
+  total: number;
+  currency: string;
+}
+
+export interface RateSummary {
+  slotId: number;
+  slot: string;
+  /** centavos */
+  weekdayPrice: number;
+  weekendPrice: number;
+}
+
+export interface ImageSummary {
+  id: number;
+  unitId: number;
+  /** the object name in the bucket */
+  path: string;
+  /** public, no token needed (the bucket is public for reads, plan § 2.8) */
+  url: string;
+  sortOrder: number;
+}
+
+/** A room as the staff screen shows it. Staff only. */
+export interface Accommodation {
+  id: number;
+  name: string;
+  description: string | null;
+  capacity: number | null;
+  active: boolean;
+  sortOrder: number;
+  rates: RateSummary[];
+  images: ImageSummary[];
+}
+
+/** What createAccommodation / updateAccommodation accept. Loose, validated here. */
+export interface AccommodationInput {
+  name?: unknown;
+  description?: unknown;
+  capacity?: unknown;
+  active?: unknown;
+  sortOrder?: unknown;
 }

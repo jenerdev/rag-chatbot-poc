@@ -71,9 +71,16 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
     Spike 9/9 again, isolation 16/16 + 12/12 both ways, tests unchanged.
   - [x] The file's second run changes nothing: verify 69/69, villa's
     availability and tools identical, spike 9/9, bucket settings unchanged.
-- [ ] Phase 2 — `@rag/bookings`: types, config, accommodations, rates,
-  quote, multi-room `createBooking`, `checkRoomAvailability`, images. **Next.**
-- [ ] Phases 3–8.
+- [x] **Phase 2 — `@rag/bookings`** (2026-09-27). `accommodations.ts`,
+  `images.ts`, and in `bookings.ts` `createBookings` (several rooms, one
+  insert), `quote`, `checkRoomAvailability`, `requirePerRoom`, the room
+  filter. `tools/rooms.mjs` (`pnpm --filter @rag/bookings rooms`) 15/15 on a
+  staff token; unit tests 27 → 72; verify 69/69; isolation 16/16 + 12/12
+  both ways; `tool-*` 9/9; villa and Northwind prompts and villa's tools
+  identical to Phase 0.
+- [ ] Phase 3 — Routes: `accommodations`, photos, `quote`, and the `bookings`
+  and `setup` changes. **Next.**
+- [ ] Phases 4–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -941,6 +948,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 2 (`@rag/bookings`)
+- **Did:** database types for the new schema; `parseConfig`, `parseRooms`,
+  `parsePrice`, `sniffImageType` (pure, tested); `createBookings`, `quote`,
+  `checkRoomAvailability`, `requirePerRoom`, `listBookings` room filter;
+  `accommodations.ts`; `images.ts`; `tools/rooms.mjs`.
+- **Observed:** rooms 15/15 (after one test-date bug of mine: two dates found
+  independently put Friday before Monday); tests 13/14/72/294; verify 69/69;
+  isolation 16/16 and 12/12 both ways; `tool-*` 9/9; prompts identical.
+- **Deviation:** the plan said `unitIds[]`; it is `rooms: [{ unitId,
+  guestCount? }]`, because capacity is per room and so is the guest count.
+- **Next:** Phase 3, routes.
 
 ### 2026-09-27 — booking types Phase 1 (schema)
 - **Did:** steps 1–10 of `schema-booking-types.sql` (booking_type in config,

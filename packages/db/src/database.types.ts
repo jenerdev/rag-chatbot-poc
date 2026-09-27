@@ -1,7 +1,8 @@
 // database.types.ts — the shape of the database, for @supabase/supabase-js.
 //
 // HAND-WRITTEN FROM `sql/schema.sql`, `sql/schema-hybrid.sql`,
-// `sql/schema-tenancy.sql` AND `sql/schema-bookings.sql`, not generated. This describes the schema AFTER the
+// `sql/schema-tenancy.sql`, `sql/schema-bookings.sql` AND
+// `sql/schema-booking-types.sql`, not generated. This describes the schema AFTER the
 // D-031 bridge is removed: `tenant_id` is required on every insert, and only
 // the tenant-scoped signatures of the two search functions exist.
 //
@@ -267,7 +268,11 @@ export interface Database {
           tenant_id: number;
           /** `check (application_key in ('bookings'))`, the same keys as the code registry */
           application_key: 'bookings';
-          /** for bookings: `{ timezone: <IANA name> }`, required and validated by a trigger */
+          /**
+           * for bookings: `{ timezone, booking_type?, weekend_days?, currency? }`, validated
+           * by a trigger. timezone is required; booking_type absent = 'whole_resort'
+           * (schema-booking-types.sql § 1).
+           */
           config: Json;
           created_at: string;
         };
@@ -285,27 +290,119 @@ export interface Database {
         };
         Relationships: [];
       };
-      /** sql/schema-bookings.sql § 3 — a thing that can be booked. */
+      /**
+       * sql/schema-bookings.sql § 3 — a thing that can be booked; a room, for a
+       * per_room tenant (schema-booking-types.sql § 2). Never deleted by a token:
+       * deactivated, so the bookings that name it keep their unit.
+       */
       units: {
         Row: {
           id: number;
           tenant_id: number;
           name: string;
+          description: string | null;
+          /** maximum guests; null = not stated, so never offered for a guest-count search */
+          capacity: number | null;
+          active: boolean;
+          sort_order: number;
           created_at: string;
         };
         Insert: {
           tenant_id: number;
           id?: never;
           name: string;
+          description?: string | null;
+          capacity?: number | null;
+          active?: boolean;
+          sort_order?: number;
           created_at?: string;
         };
         Update: {
           tenant_id?: number;
           id?: never;
           name?: string;
+          description?: string | null;
+          capacity?: number | null;
+          active?: boolean;
+          sort_order?: number;
           created_at?: string;
         };
         Relationships: [];
+      };
+      /** sql/schema-booking-types.sql § 3 — one price per (unit, slot), in CENTAVOS. */
+      unit_rates: {
+        Row: {
+          tenant_id: number;
+          unit_id: number;
+          slot_id: number;
+          weekday_price: number;
+          weekend_price: number;
+          updated_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          unit_id: number;
+          slot_id: number;
+          weekday_price: number;
+          weekend_price: number;
+          updated_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          unit_id?: number;
+          slot_id?: number;
+          weekday_price?: number;
+          weekend_price?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'unit_rates_unit_tenant_fk';
+            columns: ['unit_id', 'tenant_id'];
+            referencedRelation: 'units';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+          {
+            foreignKeyName: 'unit_rates_slot_tenant_fk';
+            columns: ['slot_id', 'tenant_id'];
+            referencedRelation: 'slots';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+        ];
+      };
+      /**
+       * sql/schema-booking-types.sql § 10 — one row per photo in the `unit-images`
+       * bucket. `path` is '<tenant_id>/<unit_id>/<uuid>.<ext>' (a check says so),
+       * and only sort_order may be updated (a column grant says so).
+       */
+      unit_images: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          unit_id: number;
+          path: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          id?: never;
+          unit_id: number;
+          path: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'unit_images_unit_tenant_fk';
+            columns: ['unit_id', 'tenant_id'];
+            referencedRelation: 'units';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+        ];
       };
       /** sql/schema-bookings.sql § 4 — a named time window, in the tenant's timezone. */
       slots: {
@@ -354,6 +451,10 @@ export interface Database {
           guest_phone: string | null;
           guest_count: number | null;
           notes: string | null;
+          /** centavos, set by the insert trigger from unit_rates; null for whole_resort and for old rows */
+          price: number | null;
+          /** shared by the rows of one multi-room booking (plan § 2.5) */
+          group_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -369,6 +470,9 @@ export interface Database {
           guest_phone?: string | null;
           guest_count?: number | null;
           notes?: string | null;
+          /** computed by the trigger, which overwrites anything supplied (plan Rule 2) */
+          price?: never;
+          group_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -383,6 +487,8 @@ export interface Database {
           guest_phone?: string | null;
           guest_count?: number | null;
           notes?: string | null;
+          price?: never;
+          group_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -476,6 +582,41 @@ export interface Database {
           slot: string;
           status: 'open' | 'taken';
         }[];
+      };
+      /**
+       * sql/schema-booking-types.sql § 8 — per_room only: priced, active rooms,
+       * per (date, room, slot). Capacity and price, and still no guest data.
+       * Zero rows for a whole_resort tenant.
+       */
+      check_room_availability: {
+        Args: {
+          p_tenant_id: number;
+          p_from: string;
+          p_to: string;
+          /** slot name, or null for any; likewise unit and guests */
+          p_slot: string | null;
+          p_unit: string | null;
+          p_guests: number | null;
+        };
+        Returns: {
+          booked_date: string;
+          unit: string;
+          capacity: number | null;
+          slot: string;
+          status: 'open' | 'taken';
+          /** centavos */
+          price: number;
+        }[];
+      };
+      /** sql/schema-booking-types.sql § 5 — THE price of a (unit, slot, date), or null: no rate. */
+      unit_price: {
+        Args: { p_tenant_id: number; p_unit_id: number; p_slot_id: number; p_date: string };
+        Returns: number | null;
+      };
+      /** sql/schema-booking-types.sql § 1 — 'whole_resort' unless config says 'per_room'. */
+      booking_type_of: {
+        Args: { p_tenant_id: number };
+        Returns: 'whole_resort' | 'per_room';
       };
       /** sql/schema-tenancy.sql § 8 — cosine similarity search within ONE tenant. */
       match_chunks: {

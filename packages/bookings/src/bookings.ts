@@ -11,25 +11,40 @@
 // requests race (plan/bookings.md § 2.2). The insert is attempted, and
 // Postgres says no.
 
+import { randomUUID } from 'node:crypto';
 import {
   MAX_AVAILABILITY_DAYS,
+  MAX_AVAILABILITY_ROWS,
   MAX_GUEST_NAME,
   MAX_GUEST_PHONE,
   MAX_LIST_DAYS,
   MAX_NOTES,
+  MAX_UNIT_NAME,
 } from './constants.js';
-import { BookingConflictError, BookingInputError, BookingsNotEnabledError } from './errors.js';
+import { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
 import type {
+  BookingGroup,
   BookingStatus,
   BookingSummary,
   BookingTenant,
   BookingsConfig,
   NewBooking,
+  Quote,
+  RoomAvailability,
   SlotAvailability,
   SlotSummary,
   UnitSummary,
 } from './types.js';
-import { isIsoDate, localDate, optionalText, requireText, validateRange } from './validate.js';
+import {
+  isIsoDate,
+  localDate,
+  optionalText,
+  parseConfig,
+  parseRooms,
+  positiveInt,
+  requireText,
+  validateRange,
+} from './validate.js';
 
 /**
  * This tenant's bookings configuration, or null if the application is off.
@@ -48,18 +63,26 @@ export async function bookingsConfig(tenant: BookingTenant): Promise<BookingsCon
     .maybeSingle();
   if (error) throw new Error(`Could not load the bookings configuration: ${error.message}`);
   if (!data) return null;
-
-  const timezone = (data.config as { timezone?: unknown } | null)?.timezone;
-  if (typeof timezone !== 'string') {
-    throw new Error(`The bookings configuration for "${tenant.slug}" has no timezone`);
-  }
-  return { timezone };
+  // Defaults for booking_type, weekend_days and currency are applied in ONE
+  // place, parseConfig (validate.ts): the same defaults SQL applies.
+  return parseConfig(data.config, tenant.slug);
 }
 
 /** The config, or a 404-shaped error. Every public function below starts here. */
-async function requireConfig(tenant: BookingTenant): Promise<BookingsConfig> {
+export async function requireConfig(tenant: BookingTenant): Promise<BookingsConfig> {
   const config = await bookingsConfig(tenant);
   if (!config) throw new BookingsNotEnabledError(tenant.slug);
+  return config;
+}
+
+/**
+ * The config of a per_room tenant, or a 404-shaped error. Rooms, rates,
+ * photos and quotes do not exist for a whole-resort tenant, and saying so must
+ * look like "no such route" (PerRoomOnlyError).
+ */
+export async function requirePerRoom(tenant: BookingTenant): Promise<BookingsConfig> {
+  const config = await requireConfig(tenant);
+  if (config.bookingType !== 'per_room') throw new PerRoomOnlyError(tenant.slug);
   return config;
 }
 
@@ -100,16 +123,78 @@ export async function checkAvailability(
   return data.map((r) => ({ date: r.booked_date, unit: r.unit, slot: r.slot, status: r.status }));
 }
 
-/** This tenant's units, by name. */
+/**
+ * Room availability for a per_room tenant: priced, active rooms only, with
+ * capacity and the base price for each date (plan/booking-types.md § 3 step 8).
+ *
+ * `slot`, `unit` and `guests` narrow the result, and the result is capped at
+ * MAX_AVAILABILITY_ROWS: rooms × slots × days grows fast, and every row is
+ * prompt text when the chatbot asks (§ 2.6). A range that would exceed it is
+ * refused with a message that says how to narrow it, so the model can.
+ *
+ * Like checkAvailability, the result has no guest data, and the chatbot's
+ * executor may call it. It is mapped field by field, never spread.
+ */
+export async function checkRoomAvailability(
+  tenant: BookingTenant,
+  query: { from: unknown; to?: unknown; slot?: unknown; unit?: unknown; guests?: unknown },
+): Promise<RoomAvailability[]> {
+  const { timezone } = await requirePerRoom(tenant);
+  const { from, to } = validateRange(query, {
+    today: localDate(timezone),
+    maxDays: MAX_AVAILABILITY_DAYS,
+    allowPast: false,
+  });
+  const blank = (v: unknown) => v === undefined || v === null || v === '';
+  const slot = blank(query.slot) ? null : requireText(query.slot, 'Slot', MAX_UNIT_NAME);
+  const unit = blank(query.unit) ? null : requireText(query.unit, 'Room', MAX_UNIT_NAME);
+  const guests = blank(query.guests) ? null : positiveInt(query.guests, 'Guests');
+
+  const { data, error } = await tenant.db.rpc('check_room_availability', {
+    p_tenant_id: tenant.id,
+    p_from: from,
+    p_to: to,
+    p_slot: slot,
+    p_unit: unit,
+    p_guests: guests,
+  });
+  if (error) throw new Error(`Could not check room availability: ${error.message}`);
+
+  const open = data.filter((r) => r.status === 'open').length;
+  console.log(
+    `[bookings] ${tenant.slug} rooms ${from}..${to}${slot ? ` ${slot}` : ''}${unit ? ` ${unit}` : ''}` +
+      `${guests ? ` ${guests} guests` : ''}: ${open} open of ${data.length}`,
+  );
+  if (data.length > MAX_AVAILABILITY_ROWS) {
+    throw new BookingInputError(
+      `That is ${data.length} results, more than ${MAX_AVAILABILITY_ROWS}. Ask for fewer dates, one slot, or one room.`,
+    );
+  }
+
+  return data.map((r) => ({
+    date: r.booked_date,
+    unit: r.unit,
+    capacity: r.capacity,
+    slot: r.slot,
+    status: r.status,
+    price: r.price,
+  }));
+}
+
+/**
+ * This tenant's units, by name, inactive ones included: a booking list still
+ * names a room that was retired after it was booked. Forms offer only the
+ * `active` ones.
+ */
 export async function listUnits(tenant: BookingTenant): Promise<UnitSummary[]> {
   await requireConfig(tenant);
   const { data, error } = await tenant.db
     .from('units')
-    .select('id, name')
+    .select('id, name, active')
     .eq('tenant_id', tenant.id)
     .order('name');
   if (error) throw new Error(`Could not load units: ${error.message}`);
-  return data;
+  return data.map((u) => ({ id: u.id, name: u.name, active: u.active }));
 }
 
 /** This tenant's slots, in the order they start in a day. */
@@ -142,6 +227,7 @@ export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
 export async function listBookings(
   tenant: BookingTenant,
   range: { from: unknown; to?: unknown },
+  filter: { unitId?: unknown } = {},
 ): Promise<BookingSummary[]> {
   const { timezone } = await requireConfig(tenant);
   const { from, to } = validateRange(range, {
@@ -149,15 +235,20 @@ export async function listBookings(
     maxDays: MAX_LIST_DAYS,
     allowPast: true,
   });
+  // The per_room screen's room filter. Another tenant's unit id is not an
+  // error: the tenant_id filter makes it match nothing, which is the same `[]`
+  // as a room with no bookings.
+  const unitId =
+    filter.unitId === undefined || filter.unitId === null || filter.unitId === '' ? null : positiveInt(filter.unitId, 'Room');
 
-  const { data, error } = await tenant.db
+  let query = tenant.db
     .from('bookings')
-    .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, created_at')
+    .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, group_id, created_at')
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
-    .lte('booked_date', to)
-    .order('booked_date')
-    .order('id');
+    .lte('booked_date', to);
+  if (unitId !== null) query = query.eq('unit_id', unitId);
+  const { data, error } = await query.order('booked_date').order('id');
   if (error) throw new Error(`Could not load bookings: ${error.message}`);
 
   // Names are joined here rather than embedded in the select. Both lookups
@@ -178,31 +269,46 @@ export async function listBookings(
     guestPhone: b.guest_phone,
     guestCount: b.guest_count,
     notes: b.notes,
+    price: b.price,
+    groupId: b.group_id,
     createdAt: b.created_at,
   }));
 }
 
 /**
- * Book a slot.
+ * Book a slot, for one unit or several rooms at once.
  *
  * No availability check first (see the top of this file). The insert either
  * lands or Postgres refuses it:
  *
  *   23P01  the span overlaps a live booking  → BookingConflictError (409)
- *   23503  the unit or slot is not this tenant's, or does not exist
+ *   23503  the unit or slot is not this tenant's, does not exist, or the
+ *          room is inactive                  → BookingInputError (400)
+ *   23514  too many guests for a room, or a per_room room with no rate
  *                                             → BookingInputError (400)
  *
- * For 23503 the message is the same whether the id belongs to another tenant
- * or to nobody. "Not yours" and "not there" must be indistinguishable, or unit
- * ids could be enumerated across tenants.
+ * For 23503 the message is the same whether the id belongs to another tenant,
+ * to nobody, or to a retired room. "Not yours" and "not there" must be
+ * indistinguishable, or unit ids could be enumerated across tenants.
  *
- * `during` is not sent. The bookings_compute_during trigger computes it, and it
- * would overwrite anything that was sent.
+ * SEVERAL ROOMS ARE ONE INSERT, so one statement: if any room clashes, none is
+ * saved (plan/booking-types.md § 2.5, D-053). Every row carries EVERY key: in a
+ * multi-row insert PostgREST sends a key missing from one row as NULL, not as
+ * the column default (observed in Phase 1, 23502).
+ *
+ * Neither `during` nor `price` is sent. The bookings_compute_during trigger
+ * computes both and would overwrite anything that was sent (plan Rule 2).
  */
-export async function createBooking(tenant: BookingTenant, input: NewBooking): Promise<BookingSummary> {
-  const { timezone } = await requireConfig(tenant);
+export async function createBookings(tenant: BookingTenant, input: NewBooking): Promise<BookingGroup> {
+  const { timezone, bookingType } = await requireConfig(tenant);
 
-  const unitId = positiveInt(input.unitId, 'Unit');
+  const rooms = parseRooms(input);
+  // A whole-resort tenant has one active unit, so "several" can only be a
+  // mistake. Refused here, clearly, rather than by the trigger with "No such
+  // unit or slot." for the second one.
+  if (rooms.length > 1 && bookingType !== 'per_room') {
+    throw new BookingInputError('This business is booked as a whole, one unit at a time.');
+  }
   const slotId = positiveInt(input.slotId, 'Slot');
   if (!isIsoDate(input.date)) throw new BookingInputError(`"${String(input.date)}" is not a date. Use YYYY-MM-DD.`);
   const date = input.date;
@@ -212,40 +318,119 @@ export async function createBooking(tenant: BookingTenant, input: NewBooking): P
   const guestName = requireText(input.guestName, 'Guest name', MAX_GUEST_NAME);
   const guestPhone = optionalText(input.guestPhone, 'Guest phone', MAX_GUEST_PHONE);
   const notes = optionalText(input.notes, 'Notes', MAX_NOTES);
-  const guestCount =
-    input.guestCount === undefined || input.guestCount === null || input.guestCount === ''
-      ? null
-      : positiveInt(input.guestCount, 'Guest count');
   const status = input.status === undefined ? 'confirmed' : bookableStatus(input.status);
+  const groupId = rooms.length > 1 ? randomUUID() : null;
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .insert({
-      tenant_id: tenant.id,
-      unit_id: unitId,
-      slot_id: slotId,
-      booked_date: date,
-      status,
-      guest_name: guestName,
-      guest_phone: guestPhone,
-      guest_count: guestCount,
-      notes,
-    })
-    .select('id')
-    .single();
+    .insert(
+      rooms.map((room) => ({
+        tenant_id: tenant.id,
+        unit_id: room.unitId,
+        slot_id: slotId,
+        booked_date: date,
+        status,
+        guest_name: guestName,
+        guest_phone: guestPhone,
+        guest_count: room.guestCount,
+        notes,
+        group_id: groupId,
+      })),
+    )
+    .select('id');
 
-  if (error?.code === '23P01') {
-    throw new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
-  }
-  if (error?.code === '23503') {
-    throw new BookingInputError('No such unit or slot.');
-  }
-  if (error) throw new Error(`Could not save the booking: ${error.message}`);
+  if (error) throw writeError(error, date);
 
-  console.log(`[bookings] ${tenant.slug} booked #${data.id}: ${date}, unit ${unitId}, slot ${slotId}, ${status}`);
-  const [created] = (await listBookings(tenant, { from: date })).filter((b) => b.id === data.id);
-  if (!created) throw new Error(`Booking #${data.id} was saved but could not be read back`);
+  const ids = new Set(data.map((row) => row.id));
+  console.log(
+    `[bookings] ${tenant.slug} booked ${[...ids].map((id) => `#${id}`).join(', ')}: ${date}, ` +
+      `unit ${rooms.map((r) => r.unitId).join('+')}, slot ${slotId}, ${status}${groupId ? `, group ${groupId}` : ''}`,
+  );
+  const bookings = (await listBookings(tenant, { from: date })).filter((b) => ids.has(b.id));
+  if (bookings.length !== ids.size) throw new Error(`Bookings ${[...ids].join(', ')} were saved but could not be read back`);
+
+  // The total is read back from what was STORED, never computed here: the
+  // trigger's price is the only price (plan Rule 2).
+  const total = bookingType === 'per_room' ? bookings.reduce((sum, b) => sum + (b.price ?? 0), 0) : null;
+  return { groupId, bookings, total };
+}
+
+/** One unit, one booking: what the staff form has always sent. */
+export async function createBooking(tenant: BookingTenant, input: NewBooking): Promise<BookingSummary> {
+  const { bookings } = await createBookings(tenant, input);
+  const [created] = bookings;
+  if (!created || bookings.length !== 1) throw new BookingInputError('Use createBookings for several rooms.');
   return created;
+}
+
+/**
+ * The price of booking these rooms, before booking them. per_room only.
+ *
+ * Calls unit_price(), the same SQL function the insert trigger calls, so the
+ * preview and the stored price cannot drift (plan Rule 2). A room that is not
+ * this tenant's, not there, or retired gives "No such unit or slot.", exactly
+ * as createBookings does; a room with no rate for the slot says so.
+ */
+export async function quote(
+  tenant: BookingTenant,
+  input: { unitId?: unknown; rooms?: unknown; slotId: unknown; date: unknown },
+): Promise<Quote> {
+  const { currency } = await requirePerRoom(tenant);
+  const rooms = parseRooms(input);
+  const slotId = positiveInt(input.slotId, 'Slot');
+  if (!isIsoDate(input.date)) throw new BookingInputError(`"${String(input.date)}" is not a date. Use YYYY-MM-DD.`);
+  const date = input.date;
+
+  const [units, slot] = await Promise.all([
+    tenant.db
+      .from('units')
+      .select('id, name')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .in(
+        'id',
+        rooms.map((r) => r.unitId),
+      ),
+    tenant.db.from('slots').select('id, name').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle(),
+  ]);
+  if (units.error) throw new Error(`Could not load rooms: ${units.error.message}`);
+  if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
+  if (!slot.data || units.data.length !== rooms.length) throw new BookingInputError('No such unit or slot.');
+  const slotName = slot.data.name;
+
+  const names = new Map(units.data.map((u) => [u.id, u.name]));
+  const lines = await Promise.all(
+    rooms.map(async ({ unitId }) => {
+      const { data: price, error } = await tenant.db.rpc('unit_price', {
+        p_tenant_id: tenant.id,
+        p_unit_id: unitId,
+        p_slot_id: slotId,
+        p_date: date,
+      });
+      if (error) throw new Error(`Could not price room ${unitId}: ${error.message}`);
+      const unit = names.get(unitId) ?? `Room ${unitId}`;
+      if (price === null) throw new BookingInputError(`${unit} has no price for ${slotName} yet.`);
+      return { unitId, unit, price };
+    }),
+  );
+  return { date, slotId, slot: slotName, lines, total: lines.reduce((sum, l) => sum + l.price, 0), currency };
+}
+
+/**
+ * The one place a failed booking write becomes what the caller sees. Only the
+ * codes the schema raises on purpose are translated; anything else propagates
+ * as a plain Error, so a real fault is never dressed up as bad input.
+ */
+function writeError(error: { code?: string; message: string }, date: string): Error {
+  if (error.code === '23P01') return new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
+  if (error.code === '23503') return new BookingInputError('No such unit or slot.');
+  if (error.code === '23514' && /holds at most/.test(error.message)) {
+    return new BookingInputError('That is more guests than the room holds.');
+  }
+  if (error.code === '23514' && /no rate/.test(error.message)) {
+    return new BookingInputError('That room has no price for that slot yet.');
+  }
+  return new Error(`Could not save the booking: ${error.message}`);
 }
 
 /**
@@ -271,14 +456,6 @@ export async function cancelBooking(tenant: BookingTenant, id: unknown): Promise
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} cancelled #${bookingId}`);
   return data.length > 0;
-}
-
-function positiveInt(value: unknown, label: string): number {
-  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
-  if (typeof n !== 'number' || !Number.isInteger(n) || n <= 0) {
-    throw new BookingInputError(`${label} must be a positive whole number.`);
-  }
-  return n;
 }
 
 /** 'cancelled' is not a status you create a booking in. */

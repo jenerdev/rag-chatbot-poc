@@ -455,6 +455,17 @@ scratch per-room tenant made by the tests' own setup:
   after, to prove it; trap 12: an empty listing proves nothing without the
   successful upload beside it).
 
+> **Done 2026-09-27.** `tools/rooms.mjs` 15/15 on a real staff token
+> (`plan/baseline/rooms-booking-types-phase2.txt`): a 2-room group priced
+> 350000 + 600000 = 950000, equal to its quote; a clashing group leaves no
+> row; inactive, foreign and missing rooms all say "No such unit or slot.";
+> the 7th photo is refused and its upload removed (6 objects, 6 rows).
+> **Deviation:** multi-room input is `rooms: [{ unitId, guestCount? }]`, not
+> `unitIds[]`: capacity is checked per room, so the guest count must be per
+> room too. `createBookings` returns the group; `createBooking` (one unit)
+> keeps its old signature, so the current staff form and the battery's
+> seeding are unchanged (`tool-*` 9/9).
+
 ### Phase 3 — Routes
 
 `accommodations`, `quote`, and the changes to `bookings` and `setup`. **Done

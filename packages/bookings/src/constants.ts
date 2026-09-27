@@ -20,3 +20,33 @@ export const MAX_LIST_DAYS = 92;
 export const MAX_GUEST_NAME = 200;
 export const MAX_GUEST_PHONE = 40;
 export const MAX_NOTES = 2000;
+
+// --- booking types (plan/booking-types.md) -----------------------------------
+// Provisional too, and each says which phase measures it.
+
+// The most rooms one booking (one group, one insert) may hold. A group is one
+// statement, so this bounds how much a single mistake can hold.
+export const MAX_UNITS_PER_BOOKING = 10;
+
+// The most rows check_room_availability may hand back in one call. Rooms ×
+// slots × days grows fast (plan § 2.6), and every row becomes prompt text.
+// Phase 6 sets it from measured token counts; until then, 150.
+export const MAX_AVAILABILITY_ROWS = 150;
+
+// The same bounds as the SQL checks on `units`, so the message is ours and not
+// Postgres's. Change both together.
+export const MAX_UNIT_NAME = 100;
+export const MAX_UNIT_DESCRIPTION = 2000;
+
+// The highest price, in CENTAVOS (₱1,000,000). Not a business rule: a guard
+// against a typo that adds three zeros.
+export const MAX_PRICE = 100_000_000;
+
+// Photos. MAX_IMAGE_BYTES matches the bucket's file_size_limit and
+// MAX_IMAGES_PER_UNIT matches the unit_images_cap trigger (schema-booking-types.sql
+// § 10, § 11): change them together. Phase 4 sets MAX_IMAGE_BYTES and
+// MAX_IMAGE_EDGE from a real phone photo after the browser resize.
+export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+export const MAX_IMAGES_PER_UNIT = 6;
+export const MAX_IMAGE_EDGE = 1600;
+export const IMAGE_BUCKET = 'unit-images';

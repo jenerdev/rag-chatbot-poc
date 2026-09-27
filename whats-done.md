@@ -5225,3 +5225,49 @@ the same keys, or pass `defaultToNull: false`.
 again, villa's availability and tool definitions still identical to Phase 0,
 the Storage spike 9/9, and the bucket still `public`, 2097152 bytes,
 jpeg/png/webp (`plan/baseline/*-booking-types-phase1-rerun.txt`).
+
+## Booking types, Phase 2: `@rag/bookings` · done 2026-09-27
+
+**What:** the package code for per-room booking, on top of Phase 1's schema.
+- `validate.ts`: `parseConfig` (the defaults `whole_resort`, Fri–Sun, PHP,
+  in one place), `parseRooms`, `parsePrice` (whole centavos only),
+  `positiveInt`, and `sniffImageType` (JPEG/PNG/WebP by magic bytes).
+- `bookings.ts`: `createBookings` (one or several rooms, ONE insert, every
+  row with every key), `createBooking` unchanged for one unit, `quote` (the
+  same `unit_price()` the trigger uses), `checkRoomAvailability` (capped at
+  `MAX_AVAILABILITY_ROWS`), `requirePerRoom` (404 for whole-resort), and a
+  room filter on `listBookings`. One `writeError()` maps 23P01, 23503 and
+  the two 23514s; anything else stays a plain Error.
+- `accommodations.ts`: list, get, create, update (incl. deactivate), set
+  rates. `images.ts`: add (upload → row → remove the object if the row
+  fails), remove (row → object, checking the COUNT), reorder, list.
+- `packages/db/src/database.types.ts` gained the new columns, tables and
+  functions; `price` is `never` on insert and update, so the compiler refuses
+  code that tries to send one.
+
+**Why it matters:** both callers, the admin routes (Phase 3) and the
+chatbot's executor (Phase 6), get one set of functions with the same rules,
+and neither can put a price in the database.
+
+**Observed:**
+- `pnpm --filter @rag/bookings rooms` 15/15, on a staff token minted for a
+  real member of a scratch per_room tenant: quote 950000 for Garden + Family
+  on a Monday and the group stored at exactly that; Friday 450000; a
+  clashing group left only the blocker's row; three kinds of bad room gave
+  the identical "No such unit or slot."; the 7th photo refused and its object
+  removed (6 objects, 6 rows); remove, then remove again = true, false;
+  villa got `PerRoomOnlyError` (404) for rooms and a 400 for two units;
+- unit tests 27 → 72 (45 new, pure);
+- verify 69/69; isolation 16/16 and bookings isolation 12/12, both ways;
+  battery `tool-*` 9/9, seeding through the changed `createBooking`;
+- villa's and Northwind's prompts and villa's tool definitions still
+  byte-identical to Phase 0.
+
+**Trap avoided: a refused delete that reports success.** `removeImage` checks
+how many objects Storage removed, because Phase 1 measured that a refused
+delete returns no error and removes 0.
+
+**Deviation:** the plan said `unitIds[]`. It is `rooms: [{ unitId,
+guestCount? }]`, because the trigger checks each room's capacity against
+that room's own guest count; a single total could not be checked at all.
+

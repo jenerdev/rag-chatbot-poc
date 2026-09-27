@@ -18,7 +18,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "isolation": "node --conditions=react-server --env-file=../../.env tools/isolation.mjs"
+    "isolation": "node --conditions=react-server --env-file=../../.env tools/isolation.mjs",
+    "rooms": "node --conditions=react-server --env-file=../../.env tools/rooms.mjs"
   },
   "dependencies": {
     "@rag/db": "workspace:*"

@@ -1,0 +1,42 @@
+WALL: code filters alone (service client, RLS bypassed)
+PASS  loadTenant  — northwind 1, villa 3, nope null
+PASS  no admin hash in TenantContext  — id,slug,businessName,assistantName,fallbackMessages,db
+PASS  listDocuments per tenant  — northwind 1 [4], villa 8 [5,3,3,4,4,5,4,3]
+PASS  getChunks cross-tenant is empty  — doc 38
+PASS  getDocument cross-tenant is null  — northwind null, villa 2225 chars
+PASS  deleteDocument cross-tenant refused  — doc 38 survives
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 352 in + 10 out
+PASS  northwind refuses the villa fact  — Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How many cars can park at the resort?" -> 5 chunks 0.440/both 0.457/both 0.430/both 0.367/both 0.421/both
+[openai] chat: 1611 in + 24 out, 0 tool calls
+PASS  villa answers from villa sources only  — Parking fits six cars inside the gate. Additional vehicles can park along Sampaguita Lane  | Villa Amihan — Amenities and Facilities; Villa Amihan — Frequently Asked Questions; Villa Amihan Private Resort — Overview
+[query] northwind: conversation 9ce5e8f0-2e7c-428b-8394-58a2ac7f9234 is not this tenant's; starting a new one
+[query] small talk: greeting (english)
+PASS  a villa conversation id is not reused by northwind  — 9ce5e8f0 -> 19110474
+PASS  getMessages cross-tenant is null  — northwind null, villa 2 messages
+[unanswered] tenant=northwind open: 200 question(s)
+[unanswered] tenant=villa open: 92 question(s)
+PASS  listUnanswered per tenant  — northwind 200, villa 92, the refusal only in northwind's
+[unanswered] tenant=villa open: 92 question(s)
+PASS  resolve cross-tenant refused  — northwind refusal 2966
+[unanswered] tenant=villa resolved 2894
+[unanswered] tenant=villa open: 91 question(s)
+[unanswered] tenant=villa resolved: 20 question(s)
+[unanswered] tenant=villa reopened 2894
+[unanswered] tenant=villa open: 92 question(s)
+PASS  resolve and reopen in its own tenant  — villa question 2894: resolved true, left open true, in resolved true, reopened true, open again true
+[ingest] villa "isolation probe": 33 chars -> 1 chunks
+[ingest] embedded 1 chunks, 1536 dims each
+PASS  ingest lands in the right tenant, chunks and all  — doc 223, 1 chunk
+[ingest] villa "isolation probe": 31 chars -> 1 chunks
+[ingest] embedded 1 chunks, 1536 dims each
+[ingest] villa document 223 replaced by 224
+PASS  updateDocument replaces in its own tenant only  — northwind null, doc 223 -> 224
+PASS  probe document removed  — doc 224
+
+ALL ISOLATION CHECKS PASS

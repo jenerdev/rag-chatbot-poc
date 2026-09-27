@@ -1,0 +1,18 @@
+WALL: filters + RLS (operator staff tokens, as the admin routes)
+PASS  northwind: bookings not enabled, 404  — Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind"
+PASS  villa: 1 unit, 3 slots  — Whole property · 22-Hour Whole Day 08:00, Day Tour 08:00, Overnight 14:00
+[bookings] villa booked #614: 2027-07-24, unit 1, slot 2, confirmed
+PASS  villa: booking created  — #614 2027-07-24 Overnight
+PASS  villa: the same slot again is a 409  — That slot on 2027-07-24 overlaps an existing booking.
+[bookings] villa availability 2027-07-24..2027-07-24: 0 open of 3
+PASS  villa: availability shows the booking as taken  — 22-Hour Whole Day taken, Day Tour taken, Overnight taken
+PASS  villa: availability carries no guest data  — keys: date,slot,status,unit
+PASS  probe: listBookings does not include villa's booking  — 0 rows
+[bookings] bookings-probe availability 2027-07-24..2027-07-24: 1 open of 1
+PASS  probe: availability shows only its own unit, all open  — Probe unit/Probe slot open
+PASS  probe: cannot cancel villa's booking  — returned false, villa's is still confirmed
+PASS  probe: a nonexistent id gives the same false  — returned false
+PASS  probe: villa's unit looks exactly like no unit  — "No such unit or slot." vs "No such unit or slot."
+PASS  villa: yesterday is refused  — 2026-09-26 is in the past. Today is 2026-09-27.
+
+ALL BOOKINGS ISOLATION CHECKS PASS

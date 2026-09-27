@@ -46,3 +46,16 @@ export class BookingsNotEnabledError extends Error {
     this.name = 'BookingsNotEnabledError';
   }
 }
+
+/**
+ * This tenant books its whole property, so there are no rooms to manage or
+ * list. HTTP 404, for the same reason as BookingsNotEnabledError: "not a
+ * per-room tenant" must look like "no such route".
+ */
+export class PerRoomOnlyError extends Error {
+  readonly status = 404;
+  constructor(slug: string) {
+    super(`"${slug}" does not book by room`);
+    this.name = 'PerRoomOnlyError';
+  }
+}
