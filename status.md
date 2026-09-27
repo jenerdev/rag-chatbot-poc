@@ -56,6 +56,20 @@
 
 ## ▶ Next up (do this next)
 
+**Booking types (whole-resort / per-room): plan drafted 2026-09-27**, in
+[`plan/booking-types.md`](./plan/booking-types.md). Nothing built. § 8
+questions 1–4 answered: `harbor` is the per-room fixture tenant,
+weekday/weekend rates only, villa's rates stay in the documents, room photos
+uploaded to Supabase Storage (§ 2.8, gated on a token spike). Question 5 is
+superseded by the payments plan. **Next:** Phase 0 (baseline). Before that,
+the browser walk of D-047–D-049 is still owed.
+
+**Payments (booking lifecycle + manual verification): plan drafted
+2026-09-27**, in [`plan/payments.md`](./plan/payments.md). Nothing built;
+needs booking-types first. § 9 answered: payments are `per_room` only
+(villa keeps Viber), the model quotes and a button books, email via Resend.
+Roles, phone, proof retention and deployment deferred to their phases.
+
 ~~**Conversational messages (D-049).**~~ **Done 2026-09-27, uncommitted.**
 Greetings, thanks, acknowledgments and goodbyes (English + Tagalog) are
 answered in code, short and in the conversation's language, with no
