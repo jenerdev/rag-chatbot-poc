@@ -5142,3 +5142,35 @@ bookings isolation and the Northwind snapshot were re-run after `harbor`
 existed. Their only differences are message counts (the battery's own runs)
 and the ids of verify's scratch tenants, so "harbor changes nothing" is
 measured.
+
+## Booking types, Phase 1: the Storage spike · done 2026-09-27
+
+**What:** before building room photos, asked Supabase Storage the question
+auth-rls Phase 0 asked PostgREST: does it accept the tokens we sign, and do
+its policies see our claims? `schema-booking-types.sql` § 11 made the
+`unit-images` bucket and three policies; `plan/booking-types-phase1-storage.mjs`
+ran nine checks.
+
+**Why it mattered:** the whole photo design (upload through our route on the
+staff token, isolation by the path's first folder) depends on it. If Storage
+had refused our tokens, the only way to upload would have been
+`service_role` in a request, which CLAUDE.md rule 2 forbids. So this could
+have stopped the plan.
+
+**Observed (`plan/baseline/storage-spike-booking-types-phase1.txt`), 9/9:**
+- harbor staff uploaded `67/spike/<uuid>.png`, and the public URL returned
+  200 with the identical 70 bytes and no token: the positive twin every
+  refusal below leans on;
+- `403 new row violates row-level security policy` for harbor staff into
+  villa's folder, and for a chat token into either folder, so both the
+  tenant check and `app_is_admin()` work inside Storage;
+- `415 mime type image/svg+xml is not supported` and `413 The object exceeded
+  the maximum allowed size`: the bucket is a second wall behind the route;
+- villa staff deleting harbor's photo: **no error, 0 removed**, and the
+  object was still there; harbor staff then removed it (1 removed, gone).
+
+**Trap avoided: trusting an error.** Every refusal was confirmed by listing
+the bucket as the service client, because an upload can report an error and
+still land, and a delete can report success and remove nothing. The second
+one happened: a refused delete is silent. So `removeImage()` must check how
+many objects were removed, not whether there was an error.

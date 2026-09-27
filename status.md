@@ -61,8 +61,12 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
 - [x] **Phase 0 — Baseline** (2026-09-27). `harbor` created (tenant 67,
   "Harbor Inn", assistant Marina, operator member), no application, no
   documents, no units. Baselines in `plan/baseline/*-pre-booking-types*`.
-- [ ] Phase 1 — Schema, starting with the Storage token spike (§ 2.8). **Next.**
-  Needs the user to run SQL in the Supabase SQL editor.
+- [ ] Phase 1 — Schema. **In progress.**
+  - [x] Storage spike (§ 2.8), 9/9 on 2026-09-27: Storage accepts our
+    tokens; cross-tenant and chat-token uploads refused (403), SVG 415,
+    over 2 MiB 413. A refused delete is silent (0 removed, no error).
+  - [ ] Steps 1–10 of `schema-booking-types.sql`. **Next**: written by me,
+    run by the user in the SQL editor.
 - [ ] Phases 2–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
@@ -931,6 +935,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 1 (Storage spike)
+- **Did:** wrote `schema-booking-types.sql` § 11 (bucket `unit-images`,
+  public read, 2 MiB, jpeg/png/webp; insert/select/delete policies on the
+  first folder = token tenant AND app_is_admin, no update policy) and
+  `plan/booking-types-phase1-storage.mjs`. The user ran the SQL.
+- **Observed:** 9/9. Refusals confirmed by listing, not by the error.
+  Villa staff's delete of harbor's photo: no error, 0 removed.
+- **Next:** steps 1–10 of the schema.
 
 ### 2026-09-27 — booking types Phase 0 (baseline)
 - **Did:** committed `plan/booking-types.md` and `plan/payments.md`

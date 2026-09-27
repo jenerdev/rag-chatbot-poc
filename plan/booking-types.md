@@ -407,6 +407,16 @@ operator staff token and a chat token. It must show: staff upload to
 to `<villa>/…` is refused; a chat token is refused both. **If Storage rejects
 our tokens, stop and re-plan.** Save the output to `plan/baseline/`.
 
+> **Spike passed 2026-09-27, 9/9** (`plan/baseline/storage-spike-booking-types-phase1.txt`).
+> Storage accepts our ES256 tokens and its policies see `tenant_id` and
+> `app_admin`: harbor staff uploaded to `67/spike/…`, and the public URL
+> served the same 70 bytes with no token. Refused, each confirmed absent by a
+> service-client listing: harbor staff into villa's folder, and a chat token
+> into either (`403 new row violates row-level security policy`); SVG (`415`);
+> 2 MiB + 1 (`413`). Villa staff deleting harbor's photo returned **no error
+> and removed 0**: "not yours" is silent, the same shape as `cancelBooking`'s
+> `false`, so `removeImage` must check the count, not the error. R-28 closed.
+
 Then write and run the rest of `schema-booking-types.sql` (the user runs it in the Supabase SQL
 editor, as before). **Done when**: villa's `check_availability` output for the
 next 14 days is identical to the baseline; a second run of the file changes
