@@ -22,16 +22,28 @@
 import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, operatorEmail, supabase, userIdByEmail } from '@rag/db/service';
 import {
+  addImage,
   BookingConflictError,
   BookingInputError,
   BookingsNotEnabledError,
   cancelBooking,
   checkAvailability,
+  checkRoomAvailability,
+  createAccommodation,
   createBooking,
+  createBookings,
+  getAccommodation,
+  listAccommodations,
   listBookings,
+  listImages,
   listSlots,
   listUnits,
   localDate,
+  quote,
+  removeImage,
+  setImageOrder,
+  setRates,
+  updateAccommodation,
 } from '../dist/index.js';
 
 let failures = 0;
@@ -92,6 +104,40 @@ if (!filtersOnly) {
   if (!probeDb) throw new Error('Could not make the probe operator a member');
 }
 const probe = { id: probeRow.id, slug: probeRow.slug, db: probeDb };
+
+// --- booking types (plan/booking-types.md Phase 7) ----------------------------
+// Two throwaway per_room tenants, A and B. A's staff try every new read and
+// write against B's room, rate, photo and booking. B is a probe, not a real
+// tenant, ON PURPOSE: a failing "cannot delete another tenant's photo" check
+// would otherwise delete a real one. Harbor is only READ (its chat token).
+// The same villa operator is a member of both, so with RLS on, this proves a
+// member of two tenants still acts as only the one its token names.
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+const roomProbes = [];
+async function roomProbe(slug) {
+  const { data, error } = await supabase
+    .from('tenants')
+    .insert({ slug, business_name: `rooms isolation ${slug}`, assistant_name: 'Probe' })
+    .select('id, slug')
+    .single();
+  if (error) throw new Error(`Could not create ${slug}: ${error.message}`);
+  roomProbes.push(data.id);
+  await supabase
+    .from('tenant_applications')
+    .insert({ tenant_id: data.id, application_key: 'bookings', config: { timezone: 'Asia/Manila', booking_type: 'per_room' } });
+  await supabase.from('slots').insert({ tenant_id: data.id, name: 'Night', start_time: '14:00', duration: '22 hours' });
+  let db = supabase;
+  if (!filtersOnly) {
+    const operatorId = await userIdByEmail(operatorEmail('villa'));
+    await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: data.id });
+    db = await staffClient(data.id, operatorId);
+    if (!db) throw new Error(`Could not make the operator a member of ${slug}`);
+  }
+  return { id: data.id, slug: data.slug, db };
+}
 
 let villaBookingId = null;
 try {
@@ -220,7 +266,151 @@ try {
       past?.message ?? 'NO ERROR',
     );
   }
+  // 13–22. Booking types: A cannot reach B's rooms, rates, photos, bookings.
+  const a = await roomProbe('rooms-iso-a');
+  const b = await roomProbe('rooms-iso-b');
+  const [aNight] = await listSlots(a);
+  const [bNight] = await listSlots(b);
+  const aRoom = await createAccommodation(a, { name: 'A Room', capacity: 2 });
+  const bRoom = await createAccommodation(b, { name: 'B Room', capacity: 2 });
+  await setRates(a, aRoom.id, [{ slotId: aNight.id, weekdayPrice: 100000, weekendPrice: 100000 }]);
+  await setRates(b, bRoom.id, [{ slotId: bNight.id, weekdayPrice: 200000, weekendPrice: 200000 }]);
+  const bPhoto = await addImage(b, bRoom.id, PNG);
+  const bBooked = await createBookings(b, { unitId: bRoom.id, slotId: bNight.id, date: probeDate, guestName: 'B Guest' });
+  const bState = async () => {
+    const { data: unit } = await supabase.from('units').select('name, capacity, active').eq('id', bRoom.id).single();
+    const { data: rate } = await supabase.from('unit_rates').select('weekday_price').eq('unit_id', bRoom.id).single();
+    const { data: objects } = await supabase.storage.from('unit-images').list(`${b.id}/${bRoom.id}`);
+    const { data: photo } = await supabase.from('unit_images').select('sort_order').eq('id', bPhoto.id).single();
+    return JSON.stringify({ unit, rate, objects: objects?.length, photo });
+  };
+  const before = await bState();
+
+  // 13. A's staff list only A's rooms, and B's room reads as "not there".
+  {
+    const list = await listAccommodations(a);
+    const got = await getAccommodation(a, bRoom.id);
+    check(
+      list.map((r) => r.name).join(',') === 'A Room' && got === null,
+      "rooms A: lists only its own rooms; B's room is null",
+      `${list.map((r) => r.name).join(',')} · B's room: ${got}`,
+    );
+  }
+
+  // 14. A cannot change B's room, its rates, or its photo's order; each is
+  //     `null`/`false`, like a room that does not exist.
+  {
+    const renamed = await updateAccommodation(a, bRoom.id, { name: 'Hijacked', active: false });
+    const repriced = await setRates(a, bRoom.id, [{ slotId: aNight.id, weekdayPrice: 1, weekendPrice: 1 }]);
+    const reordered = await setImageOrder(a, bRoom.id, bPhoto.id, 9);
+    const missing = await updateAccommodation(a, 999_999_999, { name: 'x' });
+    check(
+      renamed === null && repriced === null && reordered === false && missing === null,
+      "rooms A: cannot change B's room, rates or photo order",
+      `rename ${renamed} · rates ${repriced} · order ${reordered} · a missing room ${missing}`,
+    );
+  }
+
+  // 15. A cannot remove B's photo, even naming B's room, and cannot add one to it.
+  {
+    const removed = await removeImage(a, bRoom.id, bPhoto.id);
+    const added = await addImage(a, bRoom.id, PNG);
+    const photos = await listImages(a, bRoom.id);
+    check(
+      removed === false && added === null && photos.length === 0,
+      "rooms A: cannot remove, add or list B's photos",
+      `remove ${removed} · add ${added} · list ${photos.length}`,
+    );
+  }
+
+  // 16. B's room, rate, object and photo row are exactly as they were.
+  {
+    const after = await bState();
+    check(after === before, "rooms B: untouched by everything A tried", after);
+  }
+
+  // 17. A cannot quote or book B's room: the message is the one a missing room
+  //     gets. A group of A's room + B's room saves NEITHER (one statement).
+  {
+    const quoted = await thrown(() => quote(a, { unitId: bRoom.id, slotId: aNight.id, date: probeDate }));
+    const nowhere = await thrown(() => quote(a, { unitId: 999_999_999, slotId: aNight.id, date: probeDate }));
+    const group = await thrown(() =>
+      createBookings(a, { rooms: [{ unitId: aRoom.id }, { unitId: bRoom.id }], slotId: aNight.id, date: probeDate, guestName: 'x' }),
+    );
+    const aRows = await listBookings(a, { from: probeDate });
+    check(
+      quoted instanceof BookingInputError && quoted.message === nowhere?.message
+        && group instanceof BookingInputError && group.message === 'No such unit or slot.' && aRows.length === 0,
+      "rooms A: B's room quotes and books like no room, and a mixed group saves nothing",
+      `quote "${quoted?.message}" vs "${nowhere?.message}" · group "${group?.message}" · A's rows ${aRows.length}`,
+    );
+  }
+
+  // 18. A's room filter with B's room id: [], though B has a booking there.
+  {
+    const filtered = await listBookings(a, { from: probeDate }, { unitId: bRoom.id });
+    const own = await listBookings(b, { from: probeDate });
+    check(
+      filtered.length === 0 && own.length === 1 && own[0].id === bBooked.bookings[0].id,
+      "rooms A: filtering by B's room shows nothing; B sees its booking",
+      `A filtered ${filtered.length} · B ${own.length}`,
+    );
+  }
+
+  // 19–20. Room availability, on CHAT tokens as the chatbot asks: each probe
+  //        sees only its own room, and harbor (real, read only) neither.
+  {
+    const ra = await checkRoomAvailability(chat(a), { from: probeDate });
+    const rb = await checkRoomAvailability(chat(b), { from: probeDate });
+    check(
+      ra.map((r) => `${r.unit} ${r.status}`).join(',') === 'A Room open' && rb.map((r) => `${r.unit} ${r.status}`).join(',') === 'B Room taken',
+      'rooms: each tenant\'s room availability is its own',
+      `A: ${ra.map((r) => `${r.unit} ${r.status}`).join(',')} · B: ${rb.map((r) => `${r.unit} ${r.status}`).join(',')}`,
+    );
+    const { data: harborRow } = await supabase.from('tenants').select('id, slug').eq('slug', 'harbor').single();
+    const rh = await checkRoomAvailability(chat(harborRow), { from: probeDate });
+    check(
+      rh.length > 0 && !rh.some((r) => r.unit === 'A Room' || r.unit === 'B Room'),
+      "harbor: its rooms only, no probe's",
+      [...new Set(rh.map((r) => r.unit))].join(', '),
+    );
+  }
+
+  // 21. A whole-resort tenant (villa) reaches no room function at all.
+  {
+    const errors = await Promise.all([
+      thrown(() => listAccommodations(villa)),
+      thrown(() => getAccommodation(villa, bRoom.id)),
+      thrown(() => checkRoomAvailability(chat(villa), { from: probeDate })),
+    ]);
+    check(
+      errors.every((e) => e?.status === 404),
+      'villa: every room function is a 404',
+      errors.map((e) => e?.message ?? 'no error').join(' | '),
+    );
+  }
+
+  // 22. B's photo is on the public URL (the twin of 15's refusals), and B
+  //     can remove it itself.
+  {
+    const served = await fetch(bPhoto.url);
+    const removed = await removeImage(b, bRoom.id, bPhoto.id);
+    const { data: objects } = await supabase.storage.from('unit-images').list(`${b.id}/${bRoom.id}`);
+    check(
+      served.status === 200 && removed === true && objects?.length === 0,
+      'rooms B: its own photo is served, and it can remove it',
+      `served ${served.status} · removed ${removed} · objects left ${objects?.length}`,
+    );
+  }
 } finally {
+  for (const id of roomProbes) {
+    const { data: folders } = await supabase.storage.from('unit-images').list(`${id}`);
+    for (const folder of folders ?? []) {
+      const { data: files } = await supabase.storage.from('unit-images').list(`${id}/${folder.name}`);
+      if (files?.length) await supabase.storage.from('unit-images').remove(files.map((f) => `${id}/${folder.name}/${f.name}`));
+    }
+  }
+  if (roomProbes.length) await supabase.from('tenants').delete().in('id', roomProbes);
   if (villaBookingId !== null) {
     const { error } = await supabase.from('bookings').delete().eq('tenant_id', villa.id).eq('id', villaBookingId);
     if (error) console.log(`WARN  could not delete villa probe booking #${villaBookingId}: ${error.message}`);

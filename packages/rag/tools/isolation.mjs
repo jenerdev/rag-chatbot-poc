@@ -22,7 +22,7 @@
 //
 // Run:  pnpm --filter @rag/pipeline isolation [-- --filters-only]
 import { asOperator, supabase as service } from '@rag/db/service';
-import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, NO_ANSWER } from '../dist/index.js';
+import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
 const filtersOnly = process.argv.includes('--filters-only');
@@ -77,4 +77,31 @@ check(eX === null && r2 && r2.id !== r.id && !after.some(d => d.id === r.id) && 
   && !afterN.some(d => d.id === r2.id || d.title === 'hijack') && (await getDocument(villa, r2.id))?.content.includes('zanzibaropal'),
   'updateDocument replaces in its own tenant only', `northwind ${eX}, doc ${r.id} -> ${r2?.id}`);
 check(await deleteDocument(villaAdmin, r2.id), 'probe document removed', `doc ${r2.id}`);
+
+// 17–20: harbor ↔ villa (plan/booking-types.md Phase 7). harbor is per_room,
+// villa whole_resort; each is asked for the other's documents and rooms. Read
+// only: nothing is written to either tenant.
+const harbor = as(await loadTenant('harbor'));
+const dh = await listDocuments(harbor);
+const hdoc = dh[0]?.id;
+check(dh.length === 1 && (await getChunks(villa, hdoc)).length === 0 && (await getChunks(harbor, hdoc)).length > 0,
+  'harbor: its document, and villa cannot read its chunks', `harbor ${dh.length} doc(s), doc ${hdoc}`);
+// harbor's Wi-Fi password is an exact token, found by keyword search. From
+// villa it must not be found; from harbor it must (the positive twin).
+const wifiV = await answerQuestion({ tenant: villa, conversationId: null, message: 'What is saltwater-lantern-58?' });
+const wifiH = await answerQuestion({ tenant: harbor, conversationId: null, message: 'What is the Wi-Fi password?' });
+check(!wifiV.reply.includes('saltwater-lantern-58') && wifiV.sources.every((s) => dv.some((d) => d.id === s.documentId))
+  && wifiH.reply.includes('saltwater-lantern-58') && wifiH.sources.every((s) => s.documentId === hdoc),
+  "harbor's Wi-Fi password: harbor answers it, villa cannot", `villa: ${wifiV.reply.slice(0, 70)} | harbor: ${wifiH.reply.slice(0, 70)}`);
+// The tool, through executeTool exactly as the chat runs it. Each tenant's
+// rows are its own: harbor gets rooms (with capacity and price), villa gets
+// its whole-property slots, and neither holds a unit name of the other's.
+const soon = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
+const call = { id: 'iso', name: 'check_availability', arguments: JSON.stringify({ date_from: soon }) };
+const tH = (await executeTool(harbor, call)).record.result?.slots ?? [];
+const tV = (await executeTool(villa, call)).record.result?.slots ?? [];
+check(tH.length > 0 && tH.every((r) => r.unit !== 'Whole property' && 'price' in r) && !tH.some((r) => r.slot === 'Overnight'),
+  "harbor's tool: its rooms only, priced", [...new Set(tH.map((r) => r.unit))].join(', '));
+check(tV.length > 0 && tV.every((r) => r.unit === 'Whole property' && !('price' in r)),
+  "villa's tool: its whole property only, unpriced", [...new Set(tV.map((r) => `${r.unit}/${r.slot}`))].join(', '));
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');
