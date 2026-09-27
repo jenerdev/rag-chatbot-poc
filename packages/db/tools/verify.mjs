@@ -641,6 +641,314 @@ async function authChecks(probeId, anyChunk) {
   }
 }
 
+// 49–68 are booking-types Phase 1 (plan/booking-types.md § 3,
+// schema-booking-types.sql). Two probes:
+//   - verify-probe, left whole_resort by the checks above, for "villa's kind
+//     of tenant sees no change";
+//   - verify-rooms, a per_room tenant made here: two rooms, one slot, rates.
+// Villa is never written to, only read (check 49). Every refusal has its
+// positive twin (CLAUDE.md trap 12): a refused write is evidence only beside
+// an allowed one of the same shape.
+//
+// The dates are fixed and in the future: 2026-10-05 is a Monday (weekday
+// rate), 2026-10-09 a Friday (weekend rate under the default Fri–Sun).
+async function bookingTypeChecks(probeId) {
+  const { data: tenants } = await supabase.from('tenants').select('id, slug').eq('slug', 'villa');
+  const villa = tenants?.[0]?.id;
+
+  // 49. The schema is applied: the new columns and table exist, and villa's
+  //     unit got the defaults (active, no capacity), which is Rule 1's "villa
+  //     is untouched" in data.
+  {
+    const { data, error } = await supabase.from('units').select('id, active, capacity, description').eq('tenant_id', villa ?? -1);
+    const rates = await supabase.from('unit_rates').select('*', { count: 'exact', head: true });
+    const ok = !error && typeof rates.count === 'number' && data.length === 1 && data[0].active === true && data[0].capacity === null;
+    check(
+      ok,
+      'booking types: schema applied, villa has one active unit',
+      error || typeof rates.count !== 'number'
+        ? `${error?.message ?? 'unit_rates unreadable'} — run sql/schema-booking-types.sql`
+        : JSON.stringify(data),
+    );
+    if (!ok) return;
+  }
+
+  const { data: probeUnit } = await supabase.from('units').select('id').eq('tenant_id', probeId).limit(1).single();
+  const { data: probeSlot } = await supabase.from('slots').select('id').eq('tenant_id', probeId).eq('name', 'Evening').single();
+
+  // 50. whole_resort: a forged price is overwritten with null.
+  {
+    const { data, error } = await supabase
+      .from('bookings')
+      .insert({ tenant_id: probeId, unit_id: probeUnit.id, slot_id: probeSlot.id, booked_date: '2027-04-01', guest_name: 'verify.mjs probe', price: 123 })
+      .select('id, price')
+      .single();
+    check(!error && data.price === null, 'whole_resort: a supplied price is stored as null', error ? `${error.code} ${error.message}` : `price ${data.price}`);
+  }
+
+  // 51. whole_resort: a second active unit is refused (deferred, so at commit)...
+  // 52. ...and a second INACTIVE unit is allowed: the positive twin.
+  {
+    const { data, error } = await supabase.from('units').insert({ tenant_id: probeId, name: 'Second unit' }).select('id');
+    if (!error) await supabase.from('units').delete().in('id', data.map((r) => r.id));
+    check(error?.code === '23514', 'whole_resort: a second active unit is refused', error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED');
+    const inactive = await supabase.from('units').insert({ tenant_id: probeId, name: 'Retired unit', active: false }).select('id');
+    if (!inactive.error) await supabase.from('units').delete().in('id', inactive.data.map((r) => r.id));
+    check(!inactive.error, 'whole_resort: a second inactive unit is allowed', inactive.error ? `${inactive.error.code} ${inactive.error.message}` : 'inserted');
+  }
+
+  // 53. check_room_availability gives a whole_resort tenant nothing, while
+  //     check_availability still gives it rows (the twin).
+  {
+    const rooms = await supabase.rpc('check_room_availability', { p_tenant_id: probeId, p_from: '2026-10-01', p_to: '2026-10-02', p_slot: null, p_unit: null, p_guests: null });
+    const slots = await supabase.rpc('check_availability', { p_tenant_id: probeId, p_from: '2026-10-01', p_to: '2026-10-02' });
+    check(
+      !rooms.error && rooms.data.length === 0 && !slots.error && slots.data.length > 0,
+      'check_room_availability(whole_resort) returns 0 rows',
+      `${rooms.error?.message ?? `${rooms.data.length} rows`}; check_availability ${slots.error?.message ?? `${slots.data.length} rows`}`,
+    );
+  }
+
+  // The per_room probe. Created with the application but no booking_type, so
+  // it starts whole_resort, then switched while it has nothing: the positive
+  // twin for the refused switches in 55 and 64.
+  const { data: rooms, error: roomsError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'verify-rooms', business_name: 'verify.mjs rooms probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (roomsError) {
+    check(false, 'create the verify-rooms tenant', roomsError.message);
+    return;
+  }
+  const roomsId = rooms.id;
+  const email = `verify-rooms-${Date.now()}@example.com`;
+  let userId = null;
+  try {
+    await supabase.from('tenant_applications').insert({ tenant_id: roomsId, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+
+    // 54. An unknown booking_type is refused; per_room is accepted.
+    {
+      const bad = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila', booking_type: 'per_bed' } }).eq('tenant_id', roomsId);
+      const good = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila', booking_type: 'per_room' } }).eq('tenant_id', roomsId);
+      check(
+        bad.error?.code === '23514' && !good.error,
+        'booking_type: "per_bed" refused, "per_room" accepted',
+        `${bad.error ? bad.error.code : 'per_bed ACCEPTED'} · ${good.error ? `${good.error.code} ${good.error.message}` : 'per_room ok'}`,
+      );
+    }
+
+    // Every row carries EVERY key. In a multi-row insert PostgREST sends a key
+    // one row lacks as NULL, not as the column default: with `active` on the
+    // last row only, the first three failed `not null` (observed 2026-09-27,
+    // 23502). The same applies to @rag/bookings' multi-room inserts.
+    const { data: unitRows, error: unitsError } = await supabase
+      .from('units')
+      .insert([
+        { tenant_id: roomsId, name: 'Garden Room', capacity: 2, sort_order: 1, active: true },
+        { tenant_id: roomsId, name: 'Family Room', capacity: 6, sort_order: 2, active: true },
+        { tenant_id: roomsId, name: 'Unpriced Room', capacity: 4, sort_order: 3, active: true },
+        { tenant_id: roomsId, name: 'Closed Room', capacity: 4, sort_order: 4, active: false },
+      ])
+      .select('id, name');
+    if (unitsError || unitRows?.length !== 4) {
+      check(false, 'set up the verify-rooms units', unitsError ? `${unitsError.code} ${unitsError.message}` : `${unitRows?.length} rows`);
+      return;
+    }
+    const unit = Object.fromEntries((unitRows ?? []).map((u) => [u.name, u.id]));
+    const { data: night } = await supabase
+      .from('slots')
+      .insert({ tenant_id: roomsId, name: 'Night', start_time: '14:00', duration: '22 hours' })
+      .select('id')
+      .single();
+    await supabase.from('unit_rates').insert([
+      { tenant_id: roomsId, unit_id: unit['Garden Room'], slot_id: night.id, weekday_price: 350000, weekend_price: 450000 },
+      { tenant_id: roomsId, unit_id: unit['Family Room'], slot_id: night.id, weekday_price: 600000, weekend_price: 750000 },
+      { tenant_id: roomsId, unit_id: unit['Closed Room'], slot_id: night.id, weekday_price: 100000, weekend_price: 100000 },
+    ]);
+    const booking = (row) => ({ tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', ...row });
+    const insertExpectingFailure = async (rows) => {
+      const { data, error } = await supabase.from('bookings').insert(rows).select('id');
+      if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
+      return error;
+    };
+
+    // 55. Four units, per_room: switching back to whole_resort is refused.
+    {
+      const { error } = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila' } }).eq('tenant_id', roomsId);
+      check(error?.code === '23514', 'per_room → whole_resort refused with several active units', error ? `${error.code} ${error.message}` : 'SWITCH SUCCEEDED');
+    }
+
+    // 56. Two rooms, same night: both land. The price is the database's, by
+    //     weekday (Monday) and weekend (Friday), and a forged one is ignored.
+    {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([
+          booking({ unit_id: unit['Garden Room'], booked_date: '2026-10-05', price: 1 }),
+          booking({ unit_id: unit['Family Room'], booked_date: '2026-10-05', price: 1 }),
+          booking({ unit_id: unit['Garden Room'], booked_date: '2026-10-09', price: null }),
+        ])
+        .select('unit_id, booked_date, price');
+      const got = (data ?? []).map((b) => `${b.unit_id === unit['Garden Room'] ? 'Garden' : 'Family'} ${b.booked_date} ${b.price}`).join(', ');
+      check(
+        !error && got === 'Garden 2026-10-05 350000, Family 2026-10-05 600000, Garden 2026-10-09 450000',
+        'per_room: two rooms on one night, priced by the database',
+        error ? `${error.code} ${error.message}` : got,
+      );
+    }
+
+    // 57. The same room twice is 23P01, and a group with one clash saves NONE
+    //     of its rows: the free Family Room on the 12th is not left behind.
+    {
+      const error = await insertExpectingFailure([
+        booking({ unit_id: unit['Family Room'], booked_date: '2026-10-12' }),
+        booking({ unit_id: unit['Garden Room'], booked_date: '2026-10-05' }),
+      ]);
+      const { count } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('tenant_id', roomsId).eq('booked_date', '2026-10-12');
+      check(error?.code === '23P01' && count === 0, 'per_room: a group with one clash saves nothing', `${error ? error.code : 'INSERT SUCCEEDED'}; rows left on 12 Oct: ${count}`);
+    }
+
+    // 58–60. Refused rooms: over capacity (23514), no rate (23514), inactive (23503).
+    {
+      const over = await insertExpectingFailure([booking({ unit_id: unit['Garden Room'], booked_date: '2026-10-19', guest_count: 3 })]);
+      const fits = await insertExpectingFailure([booking({ unit_id: unit['Garden Room'], booked_date: '2026-10-19', guest_count: 2 })]);
+      check(over?.code === '23514' && !fits, 'per_room: over capacity refused, at capacity allowed', `3 guests ${over ? over.code : 'ACCEPTED'} · 2 guests ${fits ? fits.code : 'ok'}`);
+      const unpriced = await insertExpectingFailure([booking({ unit_id: unit['Unpriced Room'], booked_date: '2026-10-19' })]);
+      check(unpriced?.code === '23514', 'per_room: a room with no rate is refused', unpriced ? `${unpriced.code} ${unpriced.message}` : 'INSERT SUCCEEDED');
+      const closed = await insertExpectingFailure([booking({ unit_id: unit['Closed Room'], booked_date: '2026-10-19' })]);
+      check(closed?.code === '23503', 'per_room: an inactive room is refused, even with a rate', closed ? `${closed.code} ${closed.message}` : 'INSERT SUCCEEDED');
+    }
+
+    // 61. A rate change does not reprice an existing booking, and a later
+    //     update of the booking's guest count keeps its stored price too.
+    {
+      await supabase.from('unit_rates').update({ weekday_price: 999900 }).eq('tenant_id', roomsId).eq('unit_id', unit['Garden Room']);
+      await supabase.from('bookings').update({ guest_count: 1, price: 5 }).eq('tenant_id', roomsId).eq('unit_id', unit['Garden Room']).eq('booked_date', '2026-10-05');
+      const { data } = await supabase.from('bookings').select('price').eq('tenant_id', roomsId).eq('unit_id', unit['Garden Room']).eq('booked_date', '2026-10-05').single();
+      const { data: quoted } = await supabase.rpc('unit_price', { p_tenant_id: roomsId, p_unit_id: unit['Garden Room'], p_slot_id: night.id, p_date: '2026-10-05' });
+      check(data?.price === 350000 && quoted === 999900, 'per_room: a rate edit leaves history alone', `stored ${data?.price}, new quote ${quoted}`);
+    }
+
+    // 62. check_room_availability: active and priced rooms only, with capacity
+    //     and price and no guest data; `taken` agrees with the constraint; the
+    //     guest filter drops the Garden Room (2) for 3 guests.
+    {
+      const all = await supabase.rpc('check_room_availability', { p_tenant_id: roomsId, p_from: '2026-10-05', p_to: '2026-10-05', p_slot: null, p_unit: null, p_guests: null });
+      const three = await supabase.rpc('check_room_availability', { p_tenant_id: roomsId, p_from: '2026-10-06', p_to: '2026-10-06', p_slot: 'Night', p_unit: null, p_guests: 3 });
+      const got = (all.data ?? []).map((r) => `${r.unit} ${r.capacity} ${r.status} ${r.price}`).join(', ');
+      const keys = all.data?.[0] ? Object.keys(all.data[0]).sort().join(',') : '';
+      check(
+        !all.error && got === 'Garden Room 2 taken 999900, Family Room 6 taken 600000' && keys === 'booked_date,capacity,price,slot,status,unit',
+        'check_room_availability: priced active rooms, no guest data',
+        all.error ? all.error.message : `${got} · keys ${keys}`,
+      );
+      check(
+        !three.error && three.data.map((r) => r.unit).join(',') === 'Family Room',
+        'check_room_availability: 3 guests leaves only the Family Room',
+        three.error ? three.error.message : three.data.map((r) => r.unit).join(',') || '(none)',
+      );
+    }
+
+    // 63. check_availability no longer offers an inactive unit.
+    {
+      const { data, error } = await supabase.rpc('check_availability', { p_tenant_id: roomsId, p_from: '2026-10-05', p_to: '2026-10-05' });
+      const names = [...new Set((data ?? []).map((r) => r.unit))].join(',');
+      check(!error && !names.includes('Closed Room') && names.includes('Garden Room'), 'check_availability skips inactive units', error ? error.message : names);
+    }
+
+    // 64. With live bookings, the type cannot change at all.
+    {
+      await supabase.from('units').update({ active: false }).eq('tenant_id', roomsId).in('id', [unit['Family Room'], unit['Unpriced Room']]);
+      const { error } = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila' } }).eq('tenant_id', roomsId);
+      check(error?.code === '23514' && /live booking/.test(error.message), 'a type switch is refused while bookings are live', error ? `${error.code} ${error.message}` : 'SWITCH SUCCEEDED');
+      await supabase.from('units').update({ active: true }).eq('tenant_id', roomsId).in('id', [unit['Family Room'], unit['Unpriced Room']]);
+    }
+
+    // 65–68 are the same rules through tokens (RLS), with a real member.
+    const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password: randomBytes(24).toString('base64url'), email_confirm: true });
+    if (createError) {
+      check(false, 'booking types: create a probe user', createError.message);
+      return;
+    }
+    userId = created.user.id;
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: roomsId });
+    const staff = asToken(staffToken(roomsId, userId));
+    const chat = asToken(chatToken(roomsId));
+
+    // 65. unit_rates: a chat token reads all of its tenant's rates and none of
+    //     anyone else's, and cannot write; the member can.
+    {
+      const { count: truth } = await supabase.from('unit_rates').select('*', { count: 'exact', head: true }).eq('tenant_id', roomsId);
+      const seen = await chat.from('unit_rates').select('*', { count: 'exact', head: true });
+      const write = { tenant_id: roomsId, unit_id: unit['Unpriced Room'], slot_id: night.id, weekday_price: 1, weekend_price: 1 };
+      const chatInsert = await chat.from('unit_rates').insert(write);
+      const staffInsert = await staff.from('unit_rates').insert(write);
+      check(
+        truth === 3 && seen.count === truth && chatInsert.error?.code === '42501' && !staffInsert.error,
+        'auth: unit_rates read by the tenant, written by its staff',
+        `chat sees ${seen.error?.message ?? seen.count} of ${truth} · chat insert ${chatInsert.error?.code ?? 'INSERTED'} · staff insert ${staffInsert.error ? `${staffInsert.error.code} ${staffInsert.error.message}` : 'ok'}`,
+      );
+    }
+
+    // 66. units: staff add and deactivate a room; a chat token cannot; a
+    //     villa-claiming token from this member cannot add one to villa.
+    {
+      const chatInsert = await chat.from('units').insert({ tenant_id: roomsId, name: 'Chat Room' });
+      const staffInsert = await staff.from('units').insert({ tenant_id: roomsId, name: 'Staff Room', capacity: 2 }).select('id').single();
+      const staffOff = staffInsert.error
+        ? null
+        : await staff.from('units').update({ active: false }).eq('tenant_id', roomsId).eq('id', staffInsert.data.id).select('active').single();
+      const forged = await asToken(staffToken(villa, userId)).from('units').insert({ tenant_id: villa, name: 'Forged Room' });
+      check(
+        chatInsert.error?.code === '42501' && !staffInsert.error && staffOff?.data?.active === false && forged.error?.code === '42501',
+        'auth: units written by their own staff only',
+        `chat ${chatInsert.error?.code ?? 'INSERTED'} · staff ${staffInsert.error?.message ?? 'ok'} · deactivate ${staffOff?.error?.message ?? staffOff?.data?.active} · villa-claiming ${forged.error?.code ?? 'INSERTED'}`,
+      );
+    }
+
+    // 67. unit_images: staff add a row under their own folder; another
+    //     tenant's folder breaks the path check; the 7th photo is refused;
+    //     sort_order can change and path cannot.
+    {
+      const row = (n, prefix = `${roomsId}/${unit['Garden Room']}`) => ({ tenant_id: roomsId, unit_id: unit['Garden Room'], path: `${prefix}/verify-${Date.now()}-${n}.webp` });
+      const chatInsert = await chat.from('unit_images').insert(row('chat'));
+      const wrongFolder = await staff.from('unit_images').insert(row('wrong', `${villa}/${unit['Garden Room']}`));
+      const six = await staff.from('unit_images').insert([1, 2, 3, 4, 5, 6].map((n) => row(n))).select('id');
+      const seventh = await staff.from('unit_images').insert(row(7));
+      const firstId = six.data?.[0]?.id ?? -1;
+      const reorder = await staff.from('unit_images').update({ sort_order: 9 }).eq('tenant_id', roomsId).eq('id', firstId).select('sort_order');
+      const repath = await staff.from('unit_images').update({ path: `${roomsId}/${unit['Garden Room']}/moved.webp` }).eq('tenant_id', roomsId).eq('id', firstId);
+      check(
+        chatInsert.error?.code === '42501' && wrongFolder.error?.code === '23514' && !six.error && six.data.length === 6
+          && seventh.error?.code === '23514' && reorder.data?.[0]?.sort_order === 9 && repath.error?.code === '42501',
+        'auth: unit_images staff-only, own folder, 6 per room, path fixed',
+        `chat ${chatInsert.error?.code ?? 'INSERTED'} · villa folder ${wrongFolder.error?.code ?? 'INSERTED'} · six ${six.error?.message ?? six.data.length} · 7th ${seventh.error?.code ?? 'INSERTED'} · reorder ${reorder.error?.message ?? reorder.data?.[0]?.sort_order} · repath ${repath.error?.code ?? 'UPDATED'}`,
+      );
+    }
+
+    // 68. check_room_availability under tokens: own tenant works, another
+    //     tenant's id is refused (it is security definer, so it checks itself).
+    {
+      const args = (tenantId) => ({ p_tenant_id: tenantId, p_from: '2026-10-05', p_to: '2026-10-05', p_slot: null, p_unit: null, p_guests: null });
+      const own = await chat.rpc('check_room_availability', args(roomsId));
+      const other = await chat.rpc('check_room_availability', args(villa));
+      check(
+        !own.error && own.data.length > 0 && other.error?.code === '42501',
+        'auth: check_room_availability for its own tenant only',
+        `own ${own.error?.message ?? `${own.data.length} rows`} · villa ${other.error?.code ?? `${other.data.length} rows RETURNED`}`,
+      );
+    }
+  } finally {
+    if (userId) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) console.log(`WARN  could not delete the probe user ${email}: ${error.message}`);
+    }
+    const { error } = await supabase.from('tenants').delete().eq('id', roomsId);
+    if (error) console.log(`WARN  could not delete the verify-rooms tenant: ${error.message}`);
+  }
+}
+
 // 12–14 need a chunk to work with, and a second tenant that owns nothing.
 if (chunk && typeof chunk.tenant_id === 'number') {
   const { data: probe, error: probeError } = await supabase
@@ -707,6 +1015,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
 
       await bookingChecks(probe.id);
       await authChecks(probe.id, chunk);
+      await bookingTypeChecks(probe.id);
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);

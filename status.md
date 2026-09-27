@@ -65,8 +65,12 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
   - [x] Storage spike (§ 2.8), 9/9 on 2026-09-27: Storage accepts our
     tokens; cross-tenant and chat-token uploads refused (403), SVG 415,
     over 2 MiB 413. A refused delete is silent (0 removed, no error).
-  - [ ] Steps 1–10 of `schema-booking-types.sql`. **Next**: written by me,
-    run by the user in the SQL editor.
+  - [x] Steps 1–10 of `schema-booking-types.sql`, run by the user.
+    verify **69/69** (21 new: 49–68). Villa's availability, tool
+    definitions and prompt, and Northwind's prompt, byte-identical to Phase 0.
+    Spike 9/9 again, isolation 16/16 + 12/12 both ways, tests unchanged.
+  - [ ] The file's second run changes nothing. **Next**: the user re-runs
+    it, then verify and the villa diff again.
 - [ ] Phases 2–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
@@ -935,6 +939,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 1 (schema)
+- **Did:** steps 1–10 of `schema-booking-types.sql` (booking_type in config,
+  unit columns, unit_rates, bookings.price/group_id, unit_price(), the
+  extended insert trigger, check_availability skipping inactive units,
+  check_room_availability, RLS and grants, unit_images) and verify checks
+  49–68 on a per_room probe with a real member.
+- **Observed:** first run 55 PASS / 14 FAIL, all from one cause: PostgREST
+  sends a key missing from one row of a multi-row insert as NULL, not the
+  default, so three test rooms had `active = null` (23502). Test data fixed
+  (every row, every key); then 69/69. Villa and Northwind diff clean.
+- **Next:** the idempotency re-run, then Phase 2.
 
 ### 2026-09-27 — booking types Phase 1 (Storage spike)
 - **Did:** wrote `schema-booking-types.sql` § 11 (bucket `unit-images`,

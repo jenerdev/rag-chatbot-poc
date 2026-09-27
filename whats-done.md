@@ -5174,3 +5174,49 @@ the bucket as the service client, because an upload can report an error and
 still land, and a delete can report success and remove nothing. The second
 one happened: a refused delete is silent. So `removeImage()` must check how
 many objects were removed, not whether there was an error.
+
+## Booking types, Phase 1: the schema · done 2026-09-27 (idempotency re-run owed)
+
+**What:** `packages/db/sql/schema-booking-types.sql` steps 1–10, run by the
+user after schema-auth.sql:
+- `booking_type` in the bookings application's config, absent =
+  `whole_resort`, read in SQL only by `booking_type_of()`;
+- the config trigger now also validates `booking_type`, `weekend_days` and
+  `currency`, and refuses a type switch while a booking has not ended, or
+  to whole_resort with more than one active unit;
+- `units`: `description`, `capacity`, `active`, `sort_order`, and a deferred
+  constraint trigger: a whole-resort tenant has exactly one active unit;
+- `unit_rates` (weekday/weekend, centavos), `bookings.price` and
+  `group_id`, `unit_price()`;
+- the insert trigger refuses a foreign or inactive unit (23503), too many
+  guests or a missing rate (23514), and sets the price itself, keeping the
+  old one when a booking is re-saved without moving;
+- `check_availability` skips inactive units; `check_room_availability` is
+  new (per_room only, priced active rooms, capacity and price, no guest data);
+- RLS and EXECUTE grants for all of it; `unit_images` with the path check,
+  6 per room under an advisory lock, and only `sort_order` updatable.
+
+**Why it matters:** the price is now decided in exactly one place, the
+database, and no request can override it (plan Rule 2); and nothing a
+whole-resort tenant does has changed (Rule 1).
+
+**Observed:**
+- verify 69/69; the 21 new checks include: two rooms on one night priced
+  350000 and 600000 (Monday) and 450000 (Friday) with a forged `price: 1`
+  ignored; a 2-room group with one clash leaving 0 rows; 3 guests in a
+  2-guest room 23514, 2 allowed; after a rate edit the stored price stays
+  350000 while the quote says 999900; a chat token reads 3 of 3 rates and
+  cannot write one; a path into villa's folder 23514; the 7th photo 23514;
+  `path` update 42501 while `sort_order` updates;
+- villa's 14-day availability, tool definitions and prompt, and Northwind's
+  prompt: identical to Phase 0;
+- Storage spike 9/9 again; isolation 16/16 and bookings 12/12, both ways;
+  tests unchanged.
+
+**Trap found: PostgREST fills a missing key with NULL, not the default.**
+The first verify run failed 14 checks from one cause. Four rooms were
+inserted in one call, and only the last row said `active: false`. PostgREST
+builds one column list for the whole array, so the other three were sent
+`active = null`, and `not null` refused the insert (23502). It is a silent
+trap for Phase 2 too: `createBooking` with several rooms must give every row
+the same keys, or pass `defaultToNull: false`.

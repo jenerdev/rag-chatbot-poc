@@ -1,0 +1,255 @@
+[bookings] villa availability 2026-09-27..2026-10-10: 42 open of 42
+[
+ {
+  "date": "2026-09-27",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-27",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-27",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-28",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-28",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-28",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-29",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-29",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-29",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-30",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-30",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-09-30",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-01",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-01",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-01",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-02",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-02",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-02",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-03",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-03",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-03",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-04",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-04",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-04",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-05",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-05",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-05",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-06",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-06",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-06",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-07",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-07",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-07",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-08",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-08",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-08",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-09",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-09",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-09",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-10",
+  "unit": "Whole property",
+  "slot": "22-Hour Whole Day",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-10",
+  "unit": "Whole property",
+  "slot": "Day Tour",
+  "status": "open"
+ },
+ {
+  "date": "2026-10-10",
+  "unit": "Whole property",
+  "slot": "Overnight",
+  "status": "open"
+ }
+]
