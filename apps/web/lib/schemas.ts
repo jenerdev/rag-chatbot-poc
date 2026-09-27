@@ -172,7 +172,9 @@ export const setRatesSchema = z.object({
  */
 export const imageOrderSchema = z
   .object({
-    move: z.union([z.literal(-1), z.literal(1)], { invalid_type_error: 'move is -1 or 1' }).optional(),
+    // errorMap, not invalid_type_error: a union reports its own "invalid_union"
+    // issue, which invalid_type_error never reaches (code review, 2026-09-28).
+    move: z.union([z.literal(-1), z.literal(1)], { errorMap: () => ({ message: 'move is -1 or 1' }) }).optional(),
     sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
   })
   .refine((v) => (v.move === undefined) !== (v.sortOrder === undefined), { message: 'Send either move or sortOrder' });
