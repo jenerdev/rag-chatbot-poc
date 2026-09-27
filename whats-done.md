@@ -5271,3 +5271,44 @@ delete returns no error and removes 0.
 guestCount? }]`, because the trigger checks each room's capacity against
 that room's own guest count; a single total could not be checked at all.
 
+## Booking types, Phase 3: the routes · done 2026-09-27
+
+**What:** HTTP for Phase 2's functions, under `app/api/t/[tenant]/`:
+- `accommodations` GET/POST; `accommodations/[id]` GET/PATCH (no DELETE: a
+  room is retired with `active: false`); `…/rates` PUT; `…/images` GET and
+  POST (multipart, `file`); `…/images/[imageId]` DELETE/PATCH;
+- `bookings/quote` POST; `bookings` GET `?unit=`, POST `rooms` (returns the
+  group) beside `unitId` (unchanged); `bookings/setup` adds `bookingType`
+  and `currency`;
+- every handler: `withTenantRoute` → `requireAdmin` → `requireApplication`,
+  then @rag/bookings' `requirePerRoom` (404 for whole_resort);
+- zod schemas check shape only; there is no `price` key anywhere, so zod
+  strips one;
+- the upload route refuses an oversized `Content-Length` before reading the
+  body; the package checks the real size and the bytes.
+
+**Why it matters:** the routes are where a stranger, another tenant's staff,
+or a forged body arrives. Each of those is now shown to fail.
+
+**Observed (`plan/booking-types-phase3-walk.mjs`, 10/10 against `pnpm dev`):**
+- 401 on all seven new endpoints without a cookie; routes-rooms' cookie on
+  routes-whole: 401;
+- whole_resort: `accommodations` GET 404, POST 404, `quote` 404; `setup`
+  says `whole_resort`;
+- a booking POST with `price: 1, total: 1` stored 350000 + 600000, total
+  950000, exactly the quote;
+- another tenant's unit: 400 "No such unit or slot."; a clash: 409;
+- `?unit=` another tenant's room: 200 `[]`;
+- photo upload 201, public URL 200; an SVG sent as `x.png` / `image/png`:
+  400 "A photo must be a JPEG, PNG or WebP image."; 3 MB: 400; another
+  tenant's room: 404; delete via the wrong room 404, then 200, then 404,
+  and 0 objects left in the folder;
+- retiring a room 200 `active: false`; PATCH of another tenant's room 404,
+  and that room still active when read as the service client.
+
+**Trap hit: `next build` under a running `next dev`.** A full `pnpm build`
+rebuilt `apps/web/.next` while the dev server was serving from it; every
+page then returned 500 with `Cannot find module './535.js'` while API routes
+kept working. Nothing in the code was wrong. While dev runs, build only the
+packages.
+

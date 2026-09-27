@@ -1,0 +1,73 @@
+PASS  read documents  — 9 rows
+PASS  read chunks  — 35 rows
+PASS  read conversations  — 1125 rows
+PASS  read messages  — 2948 rows
+PASS  embedding arrives as a string  — typeof string
+PASS  parses to 1536 finite numbers  — 1536 dims
+PASS  match_chunks rows match MatchRow
+PASS  a chunk is its own nearest neighbour  — chunk 283, top 283
+PASS  self-similarity is 1  — 1.000000
+PASS  results are ordered most-similar first  — 1.000 > 0.767 > 0.765
+PASS  every row has a tenant_id  — documents 0 · chunks 0 · conversations 0 · messages 0
+PASS  a chunk cannot belong to another tenant's document  — 23503 insert or update on table "chunks" violates foreign key constraint "chunks_document_tenant_fk"
+PASS  match_chunks(own tenant) finds the chunk at 1.000000  — top 283 at 1.000000
+PASS  match_chunks(another tenant) returns zero rows  — 0 rows
+PASS  read the bookings tables  — tenant_applications 1 · units 1 · slots 3 · bookings 5
+PASS  villa has bookings, northwind has none  — villa {"timezone":"Asia/Manila"} · northwind 0 rows
+PASS  an unknown timezone is refused  — 22023 time zone "Mars/Olympus_Mons" not recognized
+PASS  during is computed from slot and timezone  — ["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")
+PASS  a supplied during is overwritten  — ["2026-11-01 06:00:00+00","2026-11-02 04:00:00+00")
+PASS  an Overnight blocks the next day's Day Tour  — 23P01 conflicting key value violates exclusion constraint "bookings_no_overlap"
+PASS  back-to-back slots do not overlap  — ["2026-10-05 00:00:00+00","2026-10-05 09:00:00+00") then ["2026-10-05 09:00:00+00","2026-10-05 13:00:00+00")
+PASS  a cancelled booking frees its slot  — ["2026-10-02 00:00:00+00","2026-10-02 09:00:00+00")
+PASS  a booking cannot use another tenant's unit  — 23503 Unit 1 does not belong to tenant 91
+PASS  a booking cannot use another tenant's slot  — 23503 Slot 1 does not belong to tenant 91
+PASS  check_availability matches the constraint  — 2026-10-01 Day Tour open, 2026-10-01 Overnight taken, 2026-10-01 Evening open, 2026-10-02 Day Tour taken, 2026-10-02 Overnight taken, 2026-10-02 Evening open
+PASS  check_availability returns no guest data  — keys: booked_date,slot,status,unit
+PASS  check_availability(northwind) returns zero rows  — 0 rows
+PASS  no bookings application, no bookings  — 23503 Tenant 91 does not have the bookings application
+PASS  auth: schema-auth.sql is applied  — villa's token sees 31 chunks
+PASS  auth: anon reads 0 chunks and cannot call match_chunks  — 0 rows · 42501 permission denied for function match_chunks
+PASS  auth: RLS alone, documents under villa's token  — 8 rows, 0 foreign, villa has 8
+PASS  auth: RLS alone, chunks under villa's token  — 31 rows, 0 foreign, villa has 31
+PASS  auth: RLS alone, conversations under villa's token  — 644 rows, 0 foreign, villa has 644
+PASS  auth: RLS alone, messages under villa's token  — 1788 rows, 0 foreign, villa has 1788
+PASS  auth: match_chunks under its own token finds the chunk  — top 283, want 283
+PASS  auth: match_chunks naming another tenant returns 0 under RLS  — 0 rows
+PASS  auth: a chat token reads 0 bookings  — 0 rows, the probe has 5
+PASS  auth: a chat token cannot insert a booking  — 42501 new row violates row-level security policy for table "bookings"
+PASS  auth: check_availability under its own token  — Day Tour open, Overnight taken, Evening open, Day Tour taken, Overnight taken, Evening open
+PASS  auth: check_availability refuses another tenant's id  — 42501 check_availability: tenant 3 is not the token's tenant
+PASS  auth: app_is_admin() is false for a chat token  — false
+PASS  auth: a chat token reads 0 tenants rows  — 0 rows
+PASS  auth: tenant_public('villa') has only public columns  — keys: assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,theme
+PASS  auth: staff without a membership cannot insert  — 42501 new row violates row-level security policy for table "documents"
+PASS  auth: a member can insert and delete a document  — deleted 1
+PASS  auth: resolutions are staff-only  — chat insert 42501 · staff insert ok · chat reads 0 · staff reads 1 · staff deletes 1
+PASS  auth: a token for the wrong tenant cannot write or read bookings  — document 42501 · booking 42501 · bookings read 0
+PASS  auth: a Supabase Auth token alone reads 0 chunks  — 0 rows
+PASS  booking types: schema applied, villa has one active unit  — [{"id":1,"active":true,"capacity":null,"description":null}]
+PASS  whole_resort: a supplied price is stored as null  — price null
+PASS  whole_resort: a second active unit is refused  — 23514 A whole-resort tenant has exactly one active unit; tenant 91 would have 2
+PASS  whole_resort: a second inactive unit is allowed  — inserted
+PASS  check_room_availability(whole_resort) returns 0 rows  — 0 rows; check_availability 6 rows
+PASS  booking_type: "per_bed" refused, "per_room" accepted  — 23514 · per_room ok
+PASS  per_room → whole_resort refused with several active units  — 23514 Tenant 92 has 3 active units; a whole-resort tenant has at most one
+PASS  per_room: two rooms on one night, priced by the database  — Garden 2026-10-05 350000, Family 2026-10-05 600000, Garden 2026-10-09 450000
+PASS  per_room: a group with one clash saves nothing  — 23P01; rows left on 12 Oct: 0
+PASS  per_room: over capacity refused, at capacity allowed  — 3 guests 23514 · 2 guests ok
+PASS  per_room: a room with no rate is refused  — 23514 Unit 118 has no rate for slot 152
+PASS  per_room: an inactive room is refused, even with a rate  — 23503 Unit 119 is not active
+PASS  per_room: a rate edit leaves history alone  — stored 350000, new quote 999900
+PASS  check_room_availability: priced active rooms, no guest data  — Garden Room 2 taken 999900, Family Room 6 taken 600000 · keys booked_date,capacity,price,slot,status,unit
+PASS  check_room_availability: 3 guests leaves only the Family Room  — Family Room
+PASS  check_availability skips inactive units  — Family Room,Garden Room,Unpriced Room
+PASS  a type switch is refused while bookings are live  — 23514 Tenant 92 has 3 live booking(s) that have not ended; its booking type cannot change
+PASS  auth: unit_rates read by the tenant, written by its staff  — chat sees 3 of 3 · chat insert 42501 · staff insert ok
+PASS  auth: units written by their own staff only  — chat 42501 · staff ok · deactivate false · villa-claiming 42501
+PASS  auth: unit_images staff-only, own folder, 6 per room, path fixed  — chat 42501 · villa folder 23514 · six 6 · 7th 23514 · reorder 9 · repath 42501
+PASS  auth: check_room_availability for its own tenant only  — own 3 rows · villa 42501
+
+documents 9 · chunks 35 · conversations 1125 · messages 2948
+
+OK — the database layer is wired correctly.

@@ -474,6 +474,14 @@ new route is 401; cross-tenant unit id is 400 "No such unit or slot."; a POST
 with `price` in the body stores the database's price; an image POST to
 another tenant's room id is 404, the same as a room that does not exist.
 
+> **Done 2026-09-27.** Walk 10/10 (`plan/baseline/walk-booking-types-phase3.txt`),
+> on two throwaway tenants, one of each type, each with its own staff login.
+> Photo delete and reorder take the room from the URL too, so a photo id
+> under the wrong room is a 404 like any other "not there". **Trap met:**
+> `next build` while `next dev` runs corrupts the dev server's `.next`
+> (every page 500, `Cannot find module './535.js'`); build packages only
+> while dev is up.
+
 ### Phase 4 — Screens
 
 S-5 accommodations, and the bookings screen changes, in the existing styles.

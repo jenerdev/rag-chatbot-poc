@@ -110,10 +110,19 @@ export async function addImage(tenant: BookingTenant, unitId: unknown, bytes: Ui
  * an object that did not go is logged as an orphan, and the row is gone
  * either way (the screen no longer shows the photo).
  */
-export async function removeImage(tenant: BookingTenant, imageId: unknown): Promise<boolean> {
+export async function removeImage(tenant: BookingTenant, unitId: unknown, imageId: unknown): Promise<boolean> {
   await requirePerRoom(tenant);
+  const room = positiveInt(unitId, 'Room');
   const id = positiveInt(imageId, 'Photo');
-  const { data, error } = await tenant.db.from('unit_images').delete().eq('tenant_id', tenant.id).eq('id', id).select('path');
+  // Scoped to the room in the URL as well as the tenant: another room's photo
+  // is "not there", like another tenant's.
+  const { data, error } = await tenant.db
+    .from('unit_images')
+    .delete()
+    .eq('tenant_id', tenant.id)
+    .eq('unit_id', room)
+    .eq('id', id)
+    .select('path');
   if (error) throw new Error(`Could not remove the photo: ${error.message}`);
   const [row] = data;
   if (!row) return false;
@@ -128,13 +137,20 @@ export async function removeImage(tenant: BookingTenant, imageId: unknown): Prom
 }
 
 /** Move a photo in the order. Only sort_order can change (a column grant says so). `false`: not yours or not there. */
-export async function setImageOrder(tenant: BookingTenant, imageId: unknown, sortOrder: unknown): Promise<boolean> {
+export async function setImageOrder(tenant: BookingTenant, unitId: unknown, imageId: unknown, sortOrder: unknown): Promise<boolean> {
   await requirePerRoom(tenant);
+  const room = positiveInt(unitId, 'Room');
   const id = positiveInt(imageId, 'Photo');
   if (typeof sortOrder !== 'number' || !Number.isInteger(sortOrder) || sortOrder < 0) {
     throw new BookingInputError('Order must be a whole number, 0 or more.');
   }
-  const { data, error } = await tenant.db.from('unit_images').update({ sort_order: sortOrder }).eq('tenant_id', tenant.id).eq('id', id).select('id');
+  const { data, error } = await tenant.db
+    .from('unit_images')
+    .update({ sort_order: sortOrder })
+    .eq('tenant_id', tenant.id)
+    .eq('unit_id', room)
+    .eq('id', id)
+    .select('id');
   if (error) throw new Error(`Could not reorder the photo: ${error.message}`);
   return data.length > 0;
 }

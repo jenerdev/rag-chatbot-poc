@@ -78,9 +78,13 @@ on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
   staff token; unit tests 27 → 72; verify 69/69; isolation 16/16 + 12/12
   both ways; `tool-*` 9/9; villa and Northwind prompts and villa's tools
   identical to Phase 0.
-- [ ] Phase 3 — Routes: `accommodations`, photos, `quote`, and the `bookings`
-  and `setup` changes. **Next.**
-- [ ] Phases 4–8.
+- [x] **Phase 3 — Routes** (2026-09-27). `accommodations` (+ `[id]`,
+  `rates`, `images`, `images/[imageId]`), `bookings/quote`, `?unit=` and
+  `rooms` on `bookings`, `bookingType`/`currency` on `setup`. HTTP walk
+  (`plan/booking-types-phase3-walk.mjs`) 10/10 against `pnpm dev`.
+- [ ] Phase 4 — Screens: S-5 accommodations, the bookings screen, photo
+  resize in the browser. **Next.**
+- [ ] Phases 5–8.
 
 Before that, the browser walk of D-047–D-049 is still owed.
 
@@ -948,6 +952,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-27 — booking types Phase 3 (routes)
+- **Did:** seven route files (four new directories under `accommodations/`,
+  `bookings/quote`), the `bookings` and `setup` changes, zod schemas (shape
+  only), photo remove/reorder scoped to the room in the URL.
+- **Observed:** walk 10/10: 401 on every new route without a cookie; one
+  tenant's cookie refused by another; whole_resort 404 for rooms and quotes;
+  a forged `price: 1` in the body stored as 350000 + 600000 = the quote;
+  another tenant's unit 400 "No such unit or slot."; SVG named `.png` 400,
+  3 MB 400, another tenant's room 404; delete via the wrong room 404. rooms
+  15/15, verify 69/69, bookings isolation 12/12 both ways, tests unchanged.
+- **Mistake, mine:** a full `pnpm build` while the user's `pnpm dev` was
+  running rewrote `apps/web/.next` under it, and every page returned 500
+  (`Cannot find module './535.js'`). The user restarted dev. Rule now: while
+  dev runs, build packages only (`pnpm --filter @rag/<pkg> build`).
+- **Next:** Phase 4, screens.
 
 ### 2026-09-27 — booking types Phase 2 (`@rag/bookings`)
 - **Did:** database types for the new schema; `parseConfig`, `parseRooms`,

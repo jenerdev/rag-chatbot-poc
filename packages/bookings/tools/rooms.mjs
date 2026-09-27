@@ -261,13 +261,14 @@ try {
   );
 
   // 12. Removing a photo removes its object; removing it again is false.
-  const removed = await removeImage(probe, rows[0].id);
-  const removedAgain = await removeImage(probe, rows[0].id);
+  const wrongRoom = await removeImage(probe, family.id, rows[0].id);
+  const removed = await removeImage(probe, garden.id, rows[0].id);
+  const removedAgain = await removeImage(probe, garden.id, rows[0].id);
   const { data: objectsAfter } = await supabase.storage.from('unit-images').list(`${probe.id}/${garden.id}`);
   check(
-    removed === true && removedAgain === false && objectsAfter?.length === 5,
-    'a removed photo takes its object with it',
-    `removed ${removed}, again ${removedAgain}, objects left ${objectsAfter?.length}`,
+    wrongRoom === false && removed === true && removedAgain === false && objectsAfter?.length === 5,
+    "a removed photo takes its object with it; another room's id removes nothing",
+    `via the Family Room ${wrongRoom}, removed ${removed}, again ${removedAgain}, objects left ${objectsAfter?.length}`,
   );
 
   // 13. The staff list: rooms in order, with rates and photos, inactive included.

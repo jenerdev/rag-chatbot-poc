@@ -101,8 +101,19 @@ export const setPasswordSchema = z.object({
  * lived here too they would be two copies free to drift, so they live in one
  * place and this only rejects the wrong TYPES.
  */
+const room = z.object({
+  unitId: z.number({ required_error: 'A room is required', invalid_type_error: 'A room is required' }),
+  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
+});
+
+// One unit (`unitId`, what the form has always sent) or several rooms
+// (`rooms`, per_room only, plan/booking-types.md § 2.5). "Exactly one of the
+// two" is @rag/bookings' rule (parseRooms), so both are optional here.
+// There is deliberately no `price`: zod strips unknown keys, and the trigger
+// would overwrite one anyway (plan Rule 2).
 export const createBookingSchema = z.object({
-  unitId: z.number({ required_error: 'A unit is required', invalid_type_error: 'A unit is required' }),
+  unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
+  rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
   slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
   date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
   guestName: z.string({ required_error: 'Guest name is required.', invalid_type_error: 'Guest name is required.' }),
@@ -110,6 +121,44 @@ export const createBookingSchema = z.object({
   guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
   notes: z.string({ invalid_type_error: 'Notes must be text.' }).nullish(),
   status: z.enum(['pending', 'confirmed'], { invalid_type_error: 'Status must be "pending" or "confirmed".' }).optional(),
+});
+
+/** A price preview for one unit or several rooms (per_room only). */
+export const quoteSchema = z.object({
+  unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
+  rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
+  slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
+  date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
+});
+
+/** A new room. Lengths and "positive" are @rag/bookings' to check. */
+export const createAccommodationSchema = z.object({
+  name: z.string({ required_error: 'A room name is required', invalid_type_error: 'A room name is required' }),
+  description: z.string({ invalid_type_error: 'Description must be text' }).nullish(),
+  capacity: z.number({ invalid_type_error: 'Capacity must be a number' }).nullish(),
+  sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
+});
+
+/** A change to a room: any subset, including `active: false` to retire it. */
+export const updateAccommodationSchema = createAccommodationSchema.partial().extend({
+  active: z.boolean({ invalid_type_error: 'Active must be true or false' }).optional(),
+});
+
+/** A room's rates, in CENTAVOS, one entry per slot being set. */
+export const setRatesSchema = z.object({
+  rates: z.array(
+    z.object({
+      slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
+      weekdayPrice: z.number({ required_error: 'A weekday price is required', invalid_type_error: 'A weekday price is required' }),
+      weekendPrice: z.number({ required_error: 'A weekend price is required', invalid_type_error: 'A weekend price is required' }),
+    }),
+    { required_error: 'Rates are required', invalid_type_error: 'Rates must be a list' },
+  ),
+});
+
+/** A photo's place in the order. */
+export const imageOrderSchema = z.object({
+  sortOrder: z.number({ required_error: 'An order is required', invalid_type_error: 'Order must be a number' }),
 });
 
 /**
