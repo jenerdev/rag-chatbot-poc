@@ -766,7 +766,10 @@ async function bookingTypeChecks(probeId) {
       { tenant_id: roomsId, unit_id: unit['Family Room'], slot_id: night.id, weekday_price: 600000, weekend_price: 750000 },
       { tenant_id: roomsId, unit_id: unit['Closed Room'], slot_id: night.id, weekday_price: 100000, weekend_price: 100000 },
     ]);
-    const booking = (row) => ({ tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', ...row });
+    // guest_count on EVERY row: a per_room booking must have one
+    // (schema-extra-guests.sql), and a multi-row insert sends a missing key as
+    // NULL (trap 15). 1 guest is inside every room's standard.
+    const booking = (row) => ({ tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', guest_count: 1, ...row });
     const insertExpectingFailure = async (rows) => {
       const { data, error } = await supabase.from('bookings').insert(rows).select('id');
       if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
@@ -839,7 +842,8 @@ async function bookingTypeChecks(probeId) {
       const got = (all.data ?? []).map((r) => `${r.unit} ${r.capacity} ${r.status} ${r.price}`).join(', ');
       const keys = all.data?.[0] ? Object.keys(all.data[0]).sort().join(',') : '';
       check(
-        !all.error && got === 'Garden Room 2 taken 999900, Family Room 6 taken 600000' && keys === 'booked_date,capacity,price,slot,status,unit',
+        !all.error && got === 'Garden Room 2 taken 999900, Family Room 6 taken 600000'
+          && keys === 'booked_date,capacity,extra_guest_price,extra_person_rate,price,slot,standard_capacity,status,total,unit',
         'check_room_availability: priced active rooms, no guest data',
         all.error ? all.error.message : `${got} · keys ${keys}`,
       );
@@ -863,6 +867,89 @@ async function bookingTypeChecks(probeId) {
       const { error } = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila' } }).eq('tenant_id', roomsId);
       check(error?.code === '23514' && /live booking/.test(error.message), 'a type switch is refused while bookings are live', error ? `${error.code} ${error.message}` : 'SWITCH SUCCEEDED');
       await supabase.from('units').update({ active: true }).eq('tenant_id', roomsId).in('id', [unit['Family Room'], unit['Unpriced Room']]);
+    }
+
+    // 69–74 are plan/extra-guests.md Phase 1: a standard capacity, the
+    //        maximum (`capacity`), and a per-guest fee, all priced by ONE
+    //        function, unit_quote(). The Quad Room: standard 2, maximum 4,
+    //        ₱250 (25000 centavos), ₱3,500 on a weekday. 2026-10-26, 11-02
+    //        and 11-09 are Mondays.
+    {
+      const noCount = await insertExpectingFailure([
+        { tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', unit_id: unit['Family Room'], booked_date: '2026-10-26', guest_count: null },
+      ]);
+      check(noCount?.code === '23514' && /guest count/.test(noCount.message), 'extra guests: a room booking needs a guest count', noCount ? `${noCount.code} ${noCount.message}` : 'INSERT SUCCEEDED');
+    }
+    const { data: quad, error: quadError } = await supabase
+      .from('units')
+      .insert({ tenant_id: roomsId, name: 'Quad Room', capacity: 4, standard_capacity: 2, extra_person_rate: 25000, sort_order: 9, active: true })
+      .select('id')
+      .single();
+    {
+      const tooHigh = await supabase.from('units').update({ standard_capacity: 3 }).eq('tenant_id', roomsId).eq('id', unit['Garden Room']);
+      check(!quadError && tooHigh.error?.code === '23514', 'extra guests: standard above the maximum is refused; 2 of 4 is accepted',
+        `Quad ${quadError ? quadError.message : 'ok'} · Garden standard 3 of 2: ${tooHigh.error?.code ?? 'ACCEPTED'}`);
+    }
+    await supabase.from('unit_rates').insert({ tenant_id: roomsId, unit_id: quad.id, slot_id: night.id, weekday_price: 350000, weekend_price: 450000 });
+
+    // 71. The arithmetic, from the one function: 1–4 guests, weekday.
+    {
+      const quotes = [];
+      for (const guests of [1, 2, 3, 4]) {
+        const { data } = await supabase.rpc('unit_quote', { p_tenant_id: roomsId, p_unit_id: quad.id, p_slot_id: night.id, p_date: '2026-10-26', p_guests: guests });
+        quotes.push(`${guests}:${data?.[0]?.base_price}+${data?.[0]?.extra_guest_price}=${data?.[0]?.price}`);
+      }
+      check(
+        quotes.join(' ') === '1:350000+0=350000 2:350000+0=350000 3:350000+25000=375000 4:350000+50000=400000',
+        'extra guests: unit_quote for 1–4 guests', quotes.join(' '),
+      );
+    }
+
+    // 72. Stored: 3 guests with a forged breakdown → the database's; 5 guests refused.
+    {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert(booking({ unit_id: quad.id, booked_date: '2026-10-26', guest_count: 3, price: 1, base_price: 1, extra_guest_price: 1 }))
+        .select('base_price, extra_guest_price, price')
+        .single();
+      const five = await insertExpectingFailure([booking({ unit_id: quad.id, booked_date: '2026-11-09', guest_count: 5 })]);
+      check(
+        !error && data.base_price === 350000 && data.extra_guest_price === 25000 && data.price === 375000 && five?.code === '23514',
+        'extra guests: 3 guests stored as 350000 + 25000, forged values ignored; 5 refused',
+        `${error ? error.message : `${data.base_price} + ${data.extra_guest_price} = ${data.price}`} · 5 guests: ${five?.code ?? 'ACCEPTED'}`,
+      );
+    }
+
+    // 73. A guest-count change reprices; a re-save with the same count does not.
+    {
+      await supabase.from('bookings').insert(booking({ unit_id: quad.id, booked_date: '2026-11-02', guest_count: 2 }));
+      const read = async () =>
+        (await supabase.from('bookings').select('price, extra_guest_price').eq('tenant_id', roomsId).eq('unit_id', quad.id).eq('booked_date', '2026-11-02').single()).data;
+      await supabase.from('unit_rates').update({ weekday_price: 360000 }).eq('tenant_id', roomsId).eq('unit_id', quad.id);
+      await supabase.from('bookings').update({ guest_count: 2, notes: 'same count' }).eq('tenant_id', roomsId).eq('unit_id', quad.id).eq('booked_date', '2026-11-02');
+      const kept = await read();
+      await supabase.from('bookings').update({ guest_count: 4 }).eq('tenant_id', roomsId).eq('unit_id', quad.id).eq('booked_date', '2026-11-02');
+      const repriced = await read();
+      check(
+        kept?.price === 350000 && repriced?.price === 410000 && repriced.extra_guest_price === 50000,
+        'extra guests: 2 → 4 guests reprices (at the current rate); the same count keeps the old price',
+        `same count ${kept?.price} · 4 guests ${repriced?.price} (extra ${repriced?.extra_guest_price})`,
+      );
+      await supabase.from('unit_rates').update({ weekday_price: 350000 }).eq('tenant_id', roomsId).eq('unit_id', quad.id);
+    }
+
+    // 74. Room availability carries the fee: for 3 guests, the total; with no
+    //     guest count, the base price and no fee.
+    {
+      const args = (guests) => ({ p_tenant_id: roomsId, p_from: '2026-11-16', p_to: '2026-11-16', p_slot: null, p_unit: 'Quad Room', p_guests: guests });
+      const three = (await supabase.rpc('check_room_availability', args(3))).data?.[0];
+      const none = (await supabase.rpc('check_room_availability', args(null))).data?.[0];
+      check(
+        three?.price === 350000 && three.extra_guest_price === 25000 && three.total === 375000 && three.standard_capacity === 2
+          && three.extra_person_rate === 25000 && none?.extra_guest_price === 0 && none.total === 350000,
+        'extra guests: room availability shows base, fee and total',
+        `3 guests ${three?.price} + ${three?.extra_guest_price} = ${three?.total} · no count ${none?.price} + ${none?.extra_guest_price} = ${none?.total}`,
+      );
     }
 
     // 65–68 are the same rules through tokens (RLS), with a real member.

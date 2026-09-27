@@ -7,7 +7,7 @@
 > the chatbot's tool all call it, so the three cannot disagree.
 >
 > Written 2026-09-27 on `feat/booking-types` at `718dcd4`, before it is merged.
-> **Status: draft, nothing built.** § 7 has three questions to answer first.
+> **Status: agreed 2026-09-27, being built.** § 7 answered: the recommendations.
 > It extends [`booking-types.md`](./booking-types.md): read that plan's § 0
 > (Rule 2: the price is the database's, decided once) before this one.
 
@@ -172,6 +172,14 @@ owed Phase 4 browser walk covers it too.
 ---
 
 ## 7. Questions before Phase 1
+
+**Answered 2026-09-27 by the user: all three recommendations.**
+- **1:** harbor's rooms get standard 2 and ₱250 each; their maximums stay
+  (Garden 2, Family 6, Loft 3, Sea View 2). Done through
+  `fixtures/harbor-units.json` and its loader, not the schema, which knows
+  no tenant. New rooms default to 2 / 4 / ₱250.
+- **2:** guest count is REQUIRED for a per_room booking, in the database.
+- **3:** one booking is one night; no multi-night booking here.
 
 1. **Existing rooms.** Harbor's Garden Room (max 2), Family Room (max 6), Loft
    (max 3) and Sea View Suite (max 2) exist. Should they get standard 2 and
