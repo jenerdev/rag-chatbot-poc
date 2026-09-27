@@ -1033,8 +1033,9 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   2/6 offered again; the user's bookings kept); `walk-harbor@example.com`
   deleted (no memberships left).
 - **Then:** merged into `master` by fast-forward at `bf62ed4` (22 commits),
-  at the user's request. `feat/booking-types` is fully merged and still
-  exists.
+  at the user's request. `feat/booking-types` (and the older, also merged
+  `feat/auth-rls`) was then deleted with `git branch -d`, at the user's
+  request; `master` is the only branch.
 - **Next:** [`plan/payments.md`](./plan/payments.md), Phase 0.
 
 ### 2026-09-28 — the owed browser walk, round 3
