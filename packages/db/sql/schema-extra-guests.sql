@@ -1,6 +1,9 @@
 -- schema-extra-guests.sql — standard capacity, maximum capacity, and a per-guest fee (plan/extra-guests.md).
 --
 -- Run in the Supabase SQL editor AFTER schema-booking-types.sql. Idempotent.
+-- After schema-customer-booking.sql, steps 3–5 are skipped (guarded): that
+-- file replaces all three, and unit_quote's return type changed, so a
+-- re-created old one would fail or undo it.
 --
 -- THE ONE THING TO KNOW
 -- ---------------------
@@ -46,6 +49,13 @@ alter table bookings add  constraint bookings_breakdown_nonnegative check (
 --    the room has no rate for that slot: "not bookable", as unit_price() says
 --    with null. p_guests null prices the standard number of guests (no fee):
 --    what an availability row shows before the party size is known.
+--    GUARDED (customer booking Phase 1, 2026-09-28): schema-customer-booking.sql
+--    replaces this. Once that file has run (rate_calendar exists), re-running
+--    THIS file must not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.rate_calendar') is null then
+    execute $ddl$
 create or replace function unit_quote(p_tenant_id bigint, p_unit_id bigint, p_slot_id bigint, p_date date, p_guests int)
 returns table (base_price bigint, extra_guests int, extra_guest_price bigint, price bigint)
 language sql stable
@@ -68,7 +78,11 @@ as $$
   select base.amount, extra.guests, extra.guests * extra.rate, base.amount + extra.guests * extra.rate
   from base, extra
   where base.amount is not null
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 4. bookings_compute_during(), again. The schema-booking-types.sql body, with
 --    three changes, all per_room only:
@@ -77,6 +91,13 @@ $$;
 --      - a re-save keeps the old breakdown only if it did not MOVE and the
 --        guest count is the same: 2 → 4 guests reprices (plan § 2.2)
 --    Whatever an insert or update sends for any of the three is overwritten.
+--    GUARDED (customer booking Phase 1, 2026-09-28): schema-customer-booking.sql
+--    replaces this. Once that file has run (rate_calendar exists), re-running
+--    THIS file must not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.rate_calendar') is null then
+    execute $ddl$
 create or replace function bookings_compute_during() returns trigger
 language plpgsql
 as $$
@@ -153,12 +174,17 @@ begin
 
   return new;
 end;
-$$;
-
-drop trigger if exists bookings_compute_during on bookings;
+$$
+    $ddl$;
+    execute 'drop trigger if exists bookings_compute_during on bookings';
+    execute $ddl$
 create trigger bookings_compute_during
   before insert or update of tenant_id, unit_id, slot_id, booked_date, guest_count, price, base_price, extra_guest_price on bookings
-  for each row execute function bookings_compute_during();
+  for each row execute function bookings_compute_during()
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 5. check_room_availability, with the fee. The return type changes, so the
 --    function is DROPPED and re-created, and its grants re-applied (step 6).
@@ -167,7 +193,14 @@ create trigger bookings_compute_during
 --    the BASE price, as before, so every existing reader of it still reads
 --    the same number. Still: definer, search_path = '', the token-tenant
 --    check, a range cap, no guest data (D-054).
-drop function if exists check_room_availability(bigint, date, date, text, text, int);
+--    GUARDED (customer booking Phase 1, 2026-09-28): schema-customer-booking.sql
+--    replaces this. Once that file has run (rate_calendar exists), re-running
+--    THIS file must not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.rate_calendar') is null then
+    execute 'drop function if exists check_room_availability(bigint, date, date, text, text, int)';
+    execute $ddl$
 create function check_room_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -251,7 +284,11 @@ begin
       and (p_guests is null or u.capacity is null or u.capacity >= p_guests)
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. EXECUTE grants, as schema-booking-types.sql step 9.
 revoke all on function unit_quote(bigint, bigint, bigint, date, int)                from public, anon, authenticated;

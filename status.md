@@ -154,8 +154,8 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phase 0, the baseline, done 2026-09-28 on
-`feat/customer-booking`; next is Phase 1, the schema). For the MVP the chatbot only explains how to book; customers book
+Phases 0 and 1 done 2026-09-28 on
+`feat/customer-booking`, verify 92/92; next is Phase 2, `@rag/bookings`). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1042,6 +1042,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 1 (schema)
+- **Built:** `schema-customer-booking.sql` (holiday calendar, holiday_price,
+  nightly slots, source/reference/guest_email/surcharge, confirmed-only
+  `bookings_no_overlap`, `request_booking()`, booking_page settings);
+  guards in `schema-booking-types.sql` and `schema-extra-guests.sql`;
+  `plan/customer-booking-villa-rates.mjs`; verify 77–92; the DB types.
+- **Caught before running:** the pricing trigger named its tables without
+  `public.`, and `request_booking()` runs with an empty search_path, so every
+  web request would have failed. Now `search_path = ''`, all qualified.
+- **Observed** (`plan/baseline/*-customer-booking-phase1*`): verify 92/92;
+  availability identical to Phase 0; isolation 20/20 and 23/23 both ways;
+  rooms 20/20; all three prompts and both tool definitions byte-identical.
+- **Next:** Phase 2, `requests.ts` and `calendar.ts` in `@rag/bookings`.
 
 ### 2026-09-28 — customer booking Phase 0 (baseline)
 - **Observed, from `9bacea7`** (`plan/baseline/*-pre-customer-booking*`):

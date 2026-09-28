@@ -308,7 +308,9 @@ be in this plan.
 -- 8. request_booking(p_tenant_id bigint, p_slot_id, p_unit_ids bigint[], p_guests int[],
 --                    p_check_in date, p_nights int,
 --                    p_name text, p_phone text, p_email text, p_notes text)
---    returns (reference text, nights jsonb, total bigint)
+--    returns one row per unit per night: reference, date, unit, slot,
+--    starts_at, ends_at, guests and the stored breakdown. The total is the
+--    sum of those stored prices (Rule 3).
 --    security definer, search_path = ''; p_tenant_id must equal app_tenant_id().
 --    Validates (§ 2.1, § 2.2), enforces the per-contact limit, makes the
 --    reference and group_id, inserts rooms × nights rows in ONE insert,
@@ -316,14 +318,26 @@ be in this plan.
 --    A fourth definer function: D-042 amended again (D-071).
 
 -- 9. booking_page settings: tenant_applications.config.booking_page
---    { enabled, instructions, guest_hint }, validated by the existing trigger.
+--    { instructions, guest_hint }, validated by a second trigger so the
+--    existing one is not redefined. No `enabled`: every tenant with the
+--    bookings application and a price has the page (§ 8, "every resort").
 --    'instructions' is what the customer reads after sending (e.g. villa's
 --    GCash steps); plain text, rendered as text, never HTML.
 ```
 
 The reference is `<3 letters of the slug>-` plus 6 characters from a
-30-character alphabet with no `0/O/1/I/L` (payments.md § 2.4), unique per
-tenant, retried on collision. It is for people to quote on Viber. **It grants
+30-character alphabet with no `0/O/1/I/L/8` (payments.md § 2.4), unique per
+tenant, retried on collision. Several rows share one reference, so an index
+cannot keep it unique; `request_booking()` does, under a per-tenant advisory
+lock that also makes the per-contact limit safe under concurrency.
+
+**Built in Phase 1, not in the first draft:** the file also guards the five
+definitions it replaces in `schema-booking-types.sql` (steps 5, 7) and
+`schema-extra-guests.sql` (steps 3–5), keyed on `rate_calendar` existing, so
+re-running an earlier file cannot put an older price function back. And
+`bookings_compute_during` gets `search_path = ''` with every name qualified:
+a trigger fired from inside `request_booking()` inherits its empty
+search_path. It is for people to quote on Viber. **It grants
 nothing**: no page takes it.
 
 ---
@@ -378,6 +392,19 @@ Run `schema-customer-booking.sql` (the user runs it, as before), then the
 load script. verify grows by the new checks. **Done when** verify passes,
 a second run of the file changes nothing, villa's and harbor's availability
 equal Phase 0's, and villa's **past** bookings still have `price null`.
+
+> **Done 2026-09-28.** The user ran `schema-customer-booking.sql` (twice, as
+> asked); then the load script: villa's unit 30/45 +₱250, three rates, and
+> `nightly` on villa's Overnight and harbor's Night. Its read-back, 32 guests:
+> Overnight ₱16,500 on a Monday and ₱20,500 on a Saturday; a second run of the
+> script changes nothing. verify **92/92** (16 new, 77–92), including villa's
+> 24 Dec at exactly 2000000 + 50000 + 400000 = 2450000, a 2-night request
+> stored as 2 pending rows priced 1650000 and 2050000, and a confirm over a
+> confirmed night refused whole (23P01). Villa's and harbor's 14-day
+> availability identical to Phase 0; villa's 5 older bookings still unpriced.
+> Isolation 20/20 and 23/23 both ways, rooms 20/20; Northwind's, villa's and
+> harbor's prompts and villa's and harbor's tool definitions byte-identical
+> to Phase 0. Tests unchanged (13 / 14 / 72 / 301), typecheck green.
 
 ### Phase 2 — `@rag/bookings`
 

@@ -1,8 +1,9 @@
 // database.types.ts — the shape of the database, for @supabase/supabase-js.
 //
 // HAND-WRITTEN FROM `sql/schema.sql`, `sql/schema-hybrid.sql`,
-// `sql/schema-tenancy.sql`, `sql/schema-bookings.sql` AND
-// `sql/schema-booking-types.sql`, not generated. This describes the schema AFTER the
+// `sql/schema-tenancy.sql`, `sql/schema-bookings.sql`,
+// `sql/schema-booking-types.sql`, `sql/schema-extra-guests.sql` AND
+// `sql/schema-customer-booking.sql`, not generated. This describes the schema AFTER the
 // D-031 bridge is removed: `tenant_id` is required on every insert, and only
 // the tenant-scoped signatures of the two search functions exist.
 //
@@ -337,6 +338,35 @@ export interface Database {
         };
         Relationships: [];
       };
+      /** sql/schema-customer-booking.sql § 1 — holiday and peak dates, per tenant; surcharge in CENTAVOS. */
+      rate_calendar: {
+        Row: {
+          tenant_id: number;
+          /** `date`, as "YYYY-MM-DD" */
+          day: string;
+          kind: 'holiday' | 'peak';
+          label: string;
+          surcharge: number;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          day: string;
+          kind?: 'holiday' | 'peak';
+          label: string;
+          surcharge?: number;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: never;
+          day?: string;
+          kind?: 'holiday' | 'peak';
+          label?: string;
+          surcharge?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       /** sql/schema-booking-types.sql § 3 — one price per (unit, slot), in CENTAVOS. */
       unit_rates: {
         Row: {
@@ -345,6 +375,8 @@ export interface Database {
           slot_id: number;
           weekday_price: number;
           weekend_price: number;
+          /** schema-customer-booking.sql § 2 — null means the weekend rate on a calendar day */
+          holiday_price: number | null;
           updated_at: string;
         };
         Insert: {
@@ -353,6 +385,7 @@ export interface Database {
           slot_id: number;
           weekday_price: number;
           weekend_price: number;
+          holiday_price?: number | null;
           updated_at?: string;
         };
         Update: {
@@ -361,6 +394,7 @@ export interface Database {
           slot_id?: number;
           weekday_price?: number;
           weekend_price?: number;
+          holiday_price?: number | null;
           updated_at?: string;
         };
         Relationships: [
@@ -422,6 +456,8 @@ export interface Database {
           start_time: string;
           /** `interval`, as PostgREST renders it, e.g. "22:00:00" */
           duration: string;
+          /** schema-customer-booking.sql § 3 — a stay of N nights is N rows of a nightly slot */
+          nightly: boolean;
           created_at: string;
         };
         Insert: {
@@ -430,6 +466,7 @@ export interface Database {
           name: string;
           start_time: string;
           duration: string;
+          nightly?: boolean;
           created_at?: string;
         };
         Update: {
@@ -438,6 +475,7 @@ export interface Database {
           name?: string;
           start_time?: string;
           duration?: string;
+          nightly?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -466,6 +504,13 @@ export interface Database {
           extra_guest_price: number | null;
           /** shared by the rows of one multi-room booking (plan § 2.5) */
           group_id: string | null;
+          /** schema-customer-booking.sql § 4 — the calendar's part of `price`; null likewise */
+          surcharge: number | null;
+          /** 'staff' for every row a staff member or tool made; 'web' for request_booking() */
+          source: 'staff' | 'web';
+          /** for people, shared by the rows of one request; grants nothing */
+          reference: string | null;
+          guest_email: string | null;
           created_at: string;
         };
         Insert: {
@@ -485,7 +530,12 @@ export interface Database {
           price?: never;
           base_price?: never;
           extra_guest_price?: never;
+          surcharge?: never;
           group_id?: string | null;
+          /** web rows come from request_booking() only; staff inserts leave the default */
+          source?: 'staff';
+          reference?: never;
+          guest_email?: string | null;
           created_at?: string;
         };
         Update: {
@@ -503,7 +553,12 @@ export interface Database {
           price?: never;
           base_price?: never;
           extra_guest_price?: never;
+          surcharge?: never;
           group_id?: string | null;
+          /** web rows come from request_booking() only; staff inserts leave the default */
+          source?: 'staff';
+          reference?: never;
+          guest_email?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -628,10 +683,43 @@ export interface Database {
           total: number;
         }[];
       };
-      /** sql/schema-extra-guests.sql § 3 — THE price arithmetic; no row = no rate. */
+      /**
+       * sql/schema-customer-booking.sql § 11 — THE public write: pending rows only,
+       * one per unit per night, priced by the trigger. Security definer; checks
+       * the token's tenant itself.
+       */
+      request_booking: {
+        Args: {
+          p_tenant_id: number;
+          p_slot_id: number;
+          p_unit_ids: number[];
+          p_guests: number[];
+          /** "YYYY-MM-DD", the first night */
+          p_check_in: string;
+          p_nights: number;
+          p_name: string;
+          p_phone: string;
+          p_email: string;
+          p_notes: string | null;
+        };
+        Returns: {
+          reference: string;
+          booked_date: string;
+          unit: string;
+          slot: string;
+          starts_at: string;
+          ends_at: string;
+          guests: number;
+          base_price: number;
+          extra_guest_price: number;
+          surcharge: number;
+          price: number;
+        }[];
+      };
+      /** sql/schema-customer-booking.sql § 7 — THE price arithmetic (holidays included); no row = no rate. */
       unit_quote: {
         Args: { p_tenant_id: number; p_unit_id: number; p_slot_id: number; p_date: string; p_guests: number | null };
-        Returns: { base_price: number; extra_guests: number; extra_guest_price: number; price: number }[];
+        Returns: { base_price: number; extra_guests: number; extra_guest_price: number; surcharge: number; price: number }[];
       };
       /** sql/schema-booking-types.sql § 5 — THE price of a (unit, slot, date), or null: no rate. */
       unit_price: {

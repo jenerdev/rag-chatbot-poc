@@ -5706,3 +5706,51 @@ be on record too.
   § 2.5 relies on;
 - battery **49/51**, the known two (`antecedent`, D-017; `lang-followup`,
   D-043).
+
+## Customer booking, Phase 1: the schema · done 2026-09-28
+
+**What:** `packages/db/sql/schema-customer-booking.sql`, run by the user:
+a per-tenant holiday calendar with a per-date surcharge, an optional
+`holiday_price` per rate, `nightly` slots, the columns a web request needs,
+`bookings_no_overlap` narrowed to `confirmed`, and `request_booking()`, the
+one public write. Then `plan/customer-booking-villa-rates.mjs` gave villa
+prices in the database. 16 new verify checks (77–92).
+
+**Why it matters:** the booking page must show the price the booking will be
+stored at, for villa too, on holidays too. Every one of those prices still
+comes from `unit_quote()`, so the page, the staff quote, the stored booking
+and the chat's tool cannot disagree.
+
+**Observed:**
+- verify **92/92**. Villa's own 24 Dec example is exactly
+  2000000 + 50000 + 400000 = 2450000 (₱24,500); a holiday_price, when set,
+  wins over the weekend rate (2950000);
+- a 2-night request from a chat token is 2 `pending`, `web` rows, one group,
+  one reference (`VER-Q4DHKJ`), priced 1650000 (Thursday) and 2050000
+  (Friday), check-out 12:00 Manila on the Saturday;
+- a request holds nothing: availability says open and a staff booking of the
+  same night lands; confirming the request is then 23P01 and both nights stay
+  pending (all or nothing);
+- the walls: a chat token's direct insert is 42501, anon cannot call the
+  function, another tenant's id is 42501, villa's unit is 23503, and in each
+  case nothing is saved;
+- villa read back at 32 guests: Overnight 1650000 Monday, 2050000 Saturday;
+  its 5 older bookings still `price null`; the script's second run changes
+  nothing;
+- villa's and harbor's 14-day availability, all three prompts and both tool
+  definitions are byte-identical to Phase 0; isolation 20/20 and 23/23 both
+  ways; rooms 20/20.
+
+**Trap avoided: a trigger inherits its caller's search_path.** The pricing
+trigger named `units`, `slots` and `tenant_applications` bare. Fired by a
+staff insert that works; fired from inside `request_booking()`, whose
+`search_path` is `''`, it would have been "relation does not exist" on every
+web request. Found by reading, before the first run; the trigger now has
+`search_path = ''` and qualifies every name.
+
+**Trap avoided: re-running an older file.** This file replaces five
+definitions. The two files that made them now skip those steps once
+`rate_calendar` exists; without that, re-running `schema-extra-guests.sql`
+would fail (`unit_quote` changed its return type) and re-running
+`schema-booking-types.sql` would quietly put back a price function with no
+holidays and an availability check that counts requests as taken.

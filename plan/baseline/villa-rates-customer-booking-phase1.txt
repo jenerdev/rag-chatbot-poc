@@ -1,0 +1,6 @@
+slot: villa "Overnight" nightly
+slot: harbor "Night" nightly
+unit: villa "Whole property" 30/45 +25000
+rates: villa Day Tour 950000/1200000 · Overnight 1600000/2000000 · 22-Hour Whole Day 2200000/2700000
+quote 2026-10-05 (Mon), 32 guests: Day Tour 950000+50000+0=1000000 · 22-Hour Whole Day 2200000+50000+0=2250000 · Overnight 1600000+50000+0=1650000
+quote 2026-10-10 (Sat), 32 guests: Day Tour 1200000+50000+0=1250000 · 22-Hour Whole Day 2700000+50000+0=2750000 · Overnight 2000000+50000+0=2050000

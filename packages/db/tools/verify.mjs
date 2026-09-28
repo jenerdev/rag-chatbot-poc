@@ -656,13 +656,14 @@ async function bookingTypeChecks(probeId) {
   const { data: tenants } = await supabase.from('tenants').select('id, slug').eq('slug', 'villa');
   const villa = tenants?.[0]?.id;
 
-  // 49. The schema is applied: the new columns and table exist, and villa's
-  //     unit got the defaults (active, no capacity), which is Rule 1's "villa
-  //     is untouched" in data.
+  // 49. The schema is applied: the new columns and table exist, and villa has
+  //     its one active unit. Its capacity was null until customer booking
+  //     Phase 1 gave villa prices (capacity 45, plan/customer-booking.md
+  //     § 2.4), so null or 45 are both villa as intended.
   {
     const { data, error } = await supabase.from('units').select('id, active, capacity, description').eq('tenant_id', villa ?? -1);
     const rates = await supabase.from('unit_rates').select('*', { count: 'exact', head: true });
-    const ok = !error && typeof rates.count === 'number' && data.length === 1 && data[0].active === true && data[0].capacity === null;
+    const ok = !error && typeof rates.count === 'number' && data.length === 1 && data[0].active === true && (data[0].capacity === null || data[0].capacity === 45);
     check(
       ok,
       'booking types: schema applied, villa has one active unit',
@@ -1052,6 +1053,342 @@ async function bookingTypeChecks(probeId) {
   }
 }
 
+// 77–92 are customer booking Phase 1 (plan/customer-booking.md § 3,
+// schema-customer-booking.sql): holiday prices, a priced whole_resort tenant,
+// multi-night stays, and the one public write, request_booking(). They run in
+// their own throwaway tenant, verify-book: whole_resort, one unit with villa's
+// numbers (30 included, 45 at most, ₱250 each above 30), an Overnight slot
+// (nightly) and a Day Tour (not). Villa is only read.
+//
+// request_booking refuses the past and more than 365 days ahead, so its dates
+// are computed from today in Manila, not fixed: the first Thursday at least
+// 40 days out, so night 1 is a weekday and night 2 (Friday) a weekend night.
+// The pricing checks call unit_quote() directly, which takes any date, so
+// they use fixed ones (24 Dec 2026 is a Thursday).
+async function customerBookingChecks() {
+  const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+  const villa = villaRow?.id;
+
+  // 77. The schema is applied: the calendar, the new columns, the function.
+  {
+    const cal = await supabase.from('rate_calendar').select('*', { count: 'exact', head: true });
+    const cols = await supabase.from('bookings').select('source, reference, guest_email, surcharge').limit(1);
+    const night = await supabase.from('slots').select('nightly').limit(1);
+    const ok = typeof cal.count === 'number' && !cols.error && !night.error;
+    check(ok, 'customer booking: schema applied', ok ? `rate_calendar ${cal.count} rows` : `${cal.error?.message ?? cols.error?.message ?? night.error?.message ?? 'rate_calendar unreadable'} — run sql/schema-customer-booking.sql`);
+    if (!ok) return;
+  }
+
+  const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
+  const addDays = (iso, n) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  let thursday = addDays(localToday, 40);
+  while (new Date(`${thursday}T00:00:00Z`).getUTCDay() !== 4) thursday = addDays(thursday, 1);
+
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'verify-book', business_name: 'verify.mjs booking probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (tenantError) {
+    check(false, 'create the verify-book tenant', tenantError.message);
+    return;
+  }
+  const bookId = tenant.id;
+  const email = `verify-book-${Date.now()}@example.com`;
+  let userId = null;
+  try {
+    await supabase.from('tenant_applications').insert({ tenant_id: bookId, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+    const { data: unit } = await supabase
+      .from('units')
+      .insert({ tenant_id: bookId, name: 'Whole property', standard_capacity: 30, capacity: 45, extra_person_rate: 25000 })
+      .select('id')
+      .single();
+    const { data: slotRows } = await supabase
+      .from('slots')
+      .insert([
+        { tenant_id: bookId, name: 'Overnight', start_time: '14:00', duration: '22 hours', nightly: true },
+        { tenant_id: bookId, name: 'Day Tour', start_time: '08:00', duration: '9 hours', nightly: false },
+      ])
+      .select('id, name');
+    const slot = Object.fromEntries((slotRows ?? []).map((s) => [s.name, s.id]));
+    if (!unit || !slot.Overnight || !slot['Day Tour']) {
+      check(false, 'set up the verify-book unit and slots', 'insert returned nothing');
+      return;
+    }
+
+    // 78. whole_resort before and after a rate: a booking stored with no rate
+    //     keeps price null, and one stored after the rate is priced.
+    {
+      const before = await supabase
+        .from('bookings')
+        .insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: '2027-01-04', guest_name: 'verify.mjs probe', guest_count: 10 })
+        .select('id, price')
+        .single();
+      await supabase.from('unit_rates').insert([
+        { tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, weekday_price: 1600000, weekend_price: 2000000, holiday_price: null },
+        { tenant_id: bookId, unit_id: unit.id, slot_id: slot['Day Tour'], weekday_price: 950000, weekend_price: 1200000, holiday_price: null },
+      ]);
+      const after = await supabase
+        .from('bookings')
+        .insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: '2027-01-11', guest_name: 'verify.mjs probe', guest_count: 10 })
+        .select('id, price')
+        .single();
+      const { data: kept } = await supabase.from('bookings').select('price').eq('tenant_id', bookId).eq('id', before.data?.id ?? -1).single();
+      check(
+        !before.error && before.data.price === null && kept?.price === null && !after.error && after.data.price === 1600000,
+        'whole_resort: unpriced until it has a rate; an older booking stays null',
+        `${before.error?.message ?? `before ${before.data.price}`} · kept ${kept?.price} · ${after.error?.message ?? `after ${after.data.price}`}`,
+      );
+      await supabase.from('bookings').delete().eq('tenant_id', bookId);
+    }
+
+    // 79. The calendar: villa's 24 Dec, 32 guests, is the weekend rate (a
+    //     holiday with no holiday_price) + 2 × ₱250 + the ₱4,000 surcharge =
+    //     ₱24,500 (plan § 2.3). 23 Dec, a Wednesday with no entry, is the
+    //     weekday rate. Then a holiday_price, when set, wins over the weekend.
+    {
+      await supabase.from('rate_calendar').insert({ tenant_id: bookId, day: '2026-12-24', kind: 'peak', label: 'Christmas Eve', surcharge: 400000 });
+      const quote = async (day) =>
+        (await supabase.rpc('unit_quote', { p_tenant_id: bookId, p_unit_id: unit.id, p_slot_id: slot.Overnight, p_date: day, p_guests: 32 })).data?.[0];
+      const eve = await quote('2026-12-24');
+      const wed = await quote('2026-12-23');
+      await supabase.from('unit_rates').update({ holiday_price: 2500000 }).eq('tenant_id', bookId).eq('unit_id', unit.id).eq('slot_id', slot.Overnight);
+      const own = await quote('2026-12-24');
+      await supabase.from('unit_rates').update({ holiday_price: null }).eq('tenant_id', bookId).eq('unit_id', unit.id).eq('slot_id', slot.Overnight);
+      const show = (q) => `${q?.base_price}+${q?.extra_guest_price}+${q?.surcharge}=${q?.price}`;
+      check(
+        show(eve) === '2000000+50000+400000=2450000' && show(wed) === '1600000+50000+0=1650000' && show(own) === '2500000+50000+400000=2950000',
+        'holidays: weekend rate + surcharge on 24 Dec (₱24,500); a holiday_price wins',
+        `24 Dec ${show(eve)} · 23 Dec ${show(wed)} · with holiday_price ${show(own)}`,
+      );
+    }
+
+    // 80. The stored breakdown carries the surcharge, and a forged one is ignored.
+    {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: '2026-12-24', guest_name: 'verify.mjs probe', guest_count: 32, surcharge: 1, price: 1 })
+        .select('base_price, extra_guest_price, surcharge, price')
+        .single();
+      check(
+        !error && data.base_price === 2000000 && data.extra_guest_price === 50000 && data.surcharge === 400000 && data.price === 2450000,
+        'holidays: the stored booking is 2000000 + 50000 + 400000, forged values ignored',
+        error ? `${error.code} ${error.message}` : `${data.base_price} + ${data.extra_guest_price} + ${data.surcharge} = ${data.price}`,
+      );
+      // Emptied again, so the computed dates below never land on a holiday.
+      await supabase.from('bookings').delete().eq('tenant_id', bookId);
+      await supabase.from('rate_calendar').delete().eq('tenant_id', bookId);
+    }
+
+    // The member, for the token checks below.
+    const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password: randomBytes(24).toString('base64url'), email_confirm: true });
+    if (createError) {
+      check(false, 'customer booking: create a probe user', createError.message);
+      return;
+    }
+    userId = created.user.id;
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: bookId });
+    const staff = asToken(staffToken(bookId, userId));
+    const chat = asToken(chatToken(bookId));
+    const request = (client, overrides = {}) =>
+      client.rpc('request_booking', {
+        p_tenant_id: bookId,
+        p_slot_id: slot.Overnight,
+        p_unit_ids: [unit.id],
+        p_guests: [32],
+        p_check_in: thursday,
+        p_nights: 2,
+        p_name: 'Verify Probe',
+        p_phone: '0917 123 4567',
+        p_email: 'probe@example.com',
+        p_notes: null,
+        ...overrides,
+      });
+    const rowsOf = async () =>
+      (await supabase.from('bookings').select('id, group_id, reference, status, source, booked_date, price, guest_phone').eq('tenant_id', bookId).order('booked_date')).data ?? [];
+
+    // 81. A chat token cannot insert into bookings directly (no policy), and
+    //     anon cannot call request_booking at all: the function is the only way.
+    {
+      const direct = await chat.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: thursday, guest_name: 'x', status: 'pending' });
+      const anon = await request(asToken(null));
+      check(
+        direct.error?.code === '42501' && anon.error?.code === '42501' && (await rowsOf()).length === 0,
+        'request_booking is the only way in: chat insert and anon call refused',
+        `chat insert ${direct.error?.code ?? 'INSERTED'} · anon ${anon.error?.code ?? 'CALLED'}`,
+      );
+    }
+
+    // 82. THE positive case: 2 nights on a chat token → 2 pending web rows, one
+    //     group, one reference, each night priced for its own date (Thursday
+    //     weekday, Friday weekend), the phone normalised, check-out 12:00 on
+    //     the third day.
+    {
+      const { data, error } = await request(chat);
+      const rows = await rowsOf();
+      const saturday = addDays(thursday, 2);
+      const got = (data ?? []).map((r) => `${r.booked_date} ${r.price}`).join(', ');
+      check(
+        !error && data.length === 2 && got === `${thursday} 1650000, ${addDays(thursday, 1)} 2050000`
+          && rows.length === 2 && rows.every((r) => r.status === 'pending' && r.source === 'web' && r.guest_phone === '09171234567')
+          && new Set(rows.map((r) => r.group_id)).size === 1 && new Set(rows.map((r) => r.reference)).size === 1
+          && /^VER-[A-Z2-9]{6}$/.test(rows[0].reference) && data[1].ends_at === `${saturday}T04:00:00+00:00`,
+        'request_booking: a 2-night stay is 2 pending rows, one group, priced per night',
+        error ? `${error.code} ${error.message}` : `${got} · ${rows[0]?.reference} · ends ${data[1]?.ends_at}`,
+      );
+    }
+
+    // 83. A request holds nothing: check_availability still says open, and a
+    //     staff booking of the same night lands. Then confirming the request
+    //     is refused by the constraint (23P01), and nothing half-confirms.
+    {
+      const avail = await chat.rpc('check_availability', { p_tenant_id: bookId, p_from: thursday, p_to: thursday });
+      const overnightOpen = avail.data?.find((r) => r.slot === 'Overnight')?.status;
+      const staffBooking = await staff.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: addDays(thursday, 1), guest_name: 'Staff guest', guest_count: 20 }).select('id').single();
+      const group = (await rowsOf()).find((r) => r.source === 'web')?.group_id;
+      const confirm = await staff.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', bookId).eq('group_id', group ?? '');
+      const statuses = (await rowsOf()).filter((r) => r.source === 'web').map((r) => r.status).join(',');
+      check(
+        overnightOpen === 'open' && !staffBooking.error && confirm.error?.code === '23P01' && statuses === 'pending,pending',
+        'a request holds nothing; confirming it over a confirmed night is 23P01, all or nothing',
+        `availability ${avail.error?.message ?? overnightOpen} · staff ${staffBooking.error?.message ?? 'ok'} · confirm ${confirm.error?.code ?? 'CONFIRMED'} · ${statuses}`,
+      );
+
+      // 84. ...and a new request for that confirmed night is refused up front.
+      const late = await request(chat, { p_check_in: addDays(thursday, 1), p_nights: 1, p_phone: '09170000001', p_email: 'late@example.com' });
+      check(late.error?.code === '23P01', 'request_booking: a confirmed night is refused up front', late.error ? `${late.error.code} ${late.error.message}` : 'REQUEST ACCEPTED');
+      if (staffBooking.data) await supabase.from('bookings').delete().eq('tenant_id', bookId).eq('id', staffBooking.data.id);
+    }
+
+    // 85. The walls: another tenant's id is 42501; villa's unit, sent to our
+    //     own tenant, is refused by the trigger, and nothing is saved.
+    {
+      const before = (await rowsOf()).length;
+      const otherTenant = await request(chat, { p_tenant_id: villa ?? -1, p_phone: '09170000002', p_email: 'wall@example.com' });
+      const { data: villaUnit } = await supabase.from('units').select('id').eq('tenant_id', villa ?? -1).limit(1).single();
+      const otherUnit = await request(chat, { p_unit_ids: [villaUnit?.id ?? -1], p_phone: '09170000003', p_email: 'wall2@example.com' });
+      const after = (await rowsOf()).length;
+      check(
+        otherTenant.error?.code === '42501' && otherUnit.error?.code === '23503' && after === before,
+        "request_booking: another tenant's id or unit is refused, nothing saved",
+        `tenant ${otherTenant.error?.code ?? 'ACCEPTED'} · unit ${otherUnit.error ? `${otherUnit.error.code} ${otherUnit.error.message}` : 'ACCEPTED'} · rows ${before} → ${after}`,
+      );
+    }
+
+    // 86. Nights: 14 accepted, 15 refused; a Day Tour cannot be several nights.
+    //     The 14-night request is removed again so it does not count toward
+    //     the contact limit in 88.
+    {
+      const fourteen = await request(chat, { p_check_in: addDays(thursday, 30), p_nights: 14, p_phone: '09170000004', p_email: 'long@example.com' });
+      const fifteen = await request(chat, { p_check_in: addDays(thursday, 60), p_nights: 15, p_phone: '09170000004', p_email: 'long@example.com' });
+      const dayTour = await request(chat, { p_slot_id: slot['Day Tour'], p_check_in: addDays(thursday, 90), p_nights: 2, p_phone: '09170000004', p_email: 'long@example.com' });
+      check(
+        !fourteen.error && fourteen.data.length === 14 && fifteen.error?.code === '22023' && dayTour.error?.code === '22023',
+        'request_booking: 14 nights accepted, 15 refused, a 2-night Day Tour refused',
+        `14 ${fourteen.error?.code ?? `${fourteen.data.length} rows`} · 15 ${fifteen.error?.code ?? 'ACCEPTED'} · Day Tour ${dayTour.error?.code ?? 'ACCEPTED'}`,
+      );
+      await supabase.from('bookings').delete().eq('tenant_id', bookId).eq('guest_email', 'long@example.com');
+    }
+
+    // 87. Contact details are checked for FORMAT: a landline-shaped phone, a
+    //     bad email, a one-letter name and a date in the past are refused;
+    //     +63 917 is accepted and stored as 0917 (the positive twin).
+    {
+      const codes = [];
+      for (const bad of [{ p_phone: '02 8123 4567' }, { p_email: 'not-an-email' }, { p_name: 'X' }, { p_check_in: addDays(localToday, -1), p_nights: 1 }]) {
+        const { error } = await request(chat, { p_phone: '09170000005', p_email: 'format@example.com', ...bad });
+        codes.push(error?.code ?? 'ACCEPTED');
+      }
+      const plus63 = await request(chat, { p_check_in: addDays(thursday, 120), p_nights: 1, p_phone: '+63 917 000 0006', p_email: 'plus63@example.com' });
+      const { data: stored } = await supabase.from('bookings').select('guest_phone').eq('tenant_id', bookId).eq('guest_email', 'plus63@example.com');
+      check(
+        codes.every((c) => c === '22023') && !plus63.error && stored?.[0]?.guest_phone === '09170000006',
+        'request_booking: bad phone, email, name and a past date refused; +63 normalised',
+        `${codes.join(',')} · +63 ${plus63.error?.message ?? stored?.[0]?.guest_phone}`,
+      );
+    }
+
+    // 88. The per-contact limit: the phone from 82 has 1 open request; two
+    //     more are accepted (3), the 4th is 54000, and a different contact is
+    //     still accepted (the twin).
+    {
+      const codes = [];
+      for (const offset of [150, 160, 170]) {
+        const { error } = await request(chat, { p_check_in: addDays(thursday, offset), p_nights: 1, p_email: `limit-${offset}@example.com` });
+        codes.push(error?.code ?? 'ok');
+      }
+      const other = await request(chat, { p_check_in: addDays(thursday, 180), p_nights: 1, p_phone: '09170000007', p_email: 'other@example.com' });
+      check(
+        codes.join(',') === 'ok,ok,54000' && !other.error,
+        'request_booking: 3 open requests per phone, the 4th refused (54000)',
+        `${codes.join(',')} · another contact ${other.error?.code ?? 'ok'}`,
+      );
+    }
+
+    // 89. A slot with no rate: the request is refused and nothing is saved.
+    {
+      await supabase.from('unit_rates').delete().eq('tenant_id', bookId).eq('slot_id', slot['Day Tour']);
+      const before = (await rowsOf()).length;
+      const { error } = await request(chat, { p_slot_id: slot['Day Tour'], p_check_in: addDays(thursday, 200), p_nights: 1, p_phone: '09170000008', p_email: 'norate@example.com' });
+      const after = (await rowsOf()).length;
+      check(error?.code === '22023' && after === before, 'request_booking: a slot with no price is refused, nothing saved', `${error ? `${error.code} ${error.message}` : 'ACCEPTED'} · rows ${before} → ${after}`);
+    }
+
+    // 90. rate_calendar under tokens: staff write; the chat token reads its
+    //     tenant's rows and cannot write; villa's token sees none of ours.
+    {
+      const staffInsert = await staff.from('rate_calendar').insert({ tenant_id: bookId, day: '2026-12-25', kind: 'peak', label: 'Christmas', surcharge: 400000 });
+      const chatInsert = await chat.from('rate_calendar').insert({ tenant_id: bookId, day: '2026-12-31', kind: 'peak', label: 'New Year Eve' });
+      const { count: truth } = await supabase.from('rate_calendar').select('*', { count: 'exact', head: true }).eq('tenant_id', bookId);
+      const seen = await chat.from('rate_calendar').select('*', { count: 'exact', head: true });
+      const villaSees = await asToken(chatToken(villa ?? -1)).from('rate_calendar').select('day').eq('tenant_id', bookId);
+      check(
+        truth > 0 && seen.count === truth && chatInsert.error?.code === '42501' && !staffInsert.error && !villaSees.error && villaSees.data.length === 0,
+        'auth: rate_calendar read by the tenant, written by its staff, invisible to villa',
+        `chat sees ${seen.error?.message ?? seen.count} of ${truth} · chat insert ${chatInsert.error?.code ?? 'INSERTED'} · staff ${staffInsert.error?.message ?? 'ok'} · villa ${villaSees.error?.message ?? villaSees.data.length}`,
+      );
+    }
+
+    // 91. booking_page settings: an unknown key is refused, the two known ones
+    //     are accepted.
+    {
+      const config = (page) => ({ timezone: 'Asia/Manila', booking_page: page });
+      const bad = await supabase.from('tenant_applications').update({ config: config({ enabled: true }) }).eq('tenant_id', bookId);
+      const good = await supabase.from('tenant_applications').update({ config: config({ instructions: 'Pay the fee by GCash.', guest_hint: 'Do not count children aged 3 and below.' }) }).eq('tenant_id', bookId);
+      check(
+        bad.error?.code === '23514' && !good.error,
+        'booking_page: an unknown key refused, instructions and guest_hint accepted',
+        `${bad.error?.code ?? 'ACCEPTED'} · ${good.error ? `${good.error.code} ${good.error.message}` : 'ok'}`,
+      );
+    }
+
+    // 92. Villa's data, if the load script has run: its rates exist, its
+    //     Overnight is nightly, and every booking it had before stays unpriced.
+    {
+      const { data: rates } = await supabase.from('unit_rates').select('weekday_price, weekend_price').eq('tenant_id', villa ?? -1);
+      const { data: nightly } = await supabase.from('slots').select('name').eq('tenant_id', villa ?? -1).eq('nightly', true);
+      const { count: priced } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('tenant_id', villa ?? -1).not('price', 'is', null).lt('created_at', '2026-09-29');
+      check(
+        rates?.length === 3 && nightly?.map((s) => s.name).join(',') === 'Overnight' && priced === 0,
+        'villa: three rates, Overnight nightly, older bookings unpriced',
+        `${rates?.length ?? 0} rates · nightly ${nightly?.map((s) => s.name).join(',') || '(none)'} · older priced ${priced}` +
+          (rates?.length === 3 ? '' : ' — run plan/customer-booking-villa-rates.mjs'),
+      );
+    }
+  } finally {
+    if (userId) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) console.log(`WARN  could not delete the probe user ${email}: ${error.message}`);
+    }
+    const { error } = await supabase.from('tenants').delete().eq('id', bookId);
+    if (error) console.log(`WARN  could not delete the verify-book tenant: ${error.message}`);
+  }
+}
+
 // 12–14 need a chunk to work with, and a second tenant that owns nothing.
 if (chunk && typeof chunk.tenant_id === 'number') {
   const { data: probe, error: probeError } = await supabase
@@ -1119,6 +1456,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await bookingChecks(probe.id);
       await authChecks(probe.id, chunk);
       await bookingTypeChecks(probe.id);
+      await customerBookingChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);

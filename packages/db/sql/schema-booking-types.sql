@@ -3,7 +3,8 @@
 -- Run in the Supabase SQL editor AFTER schema-auth.sql. Idempotent: every
 -- step can run again harmlessly, so the file is re-run whole as it grows.
 -- Also after schema-extra-guests.sql: the two definitions that file replaces
--- (steps 6 and 8) are guarded, and skipped once it has run.
+-- (steps 6 and 8) are guarded, and skipped once it has run. And after
+-- schema-customer-booking.sql: steps 5 and 7 are guarded the same way.
 --
 -- THE ONE THING TO KNOW
 -- ---------------------
@@ -183,6 +184,13 @@ create index if not exists bookings_tenant_unit_date_idx on bookings (tenant_id,
 --    (plan Rule 2). `p_date` is the date the slot STARTS on, which is already
 --    a calendar date in the tenant's timezone (booked_date), so its weekday
 --    needs no timezone. Null means "no rate": not bookable.
+--    GUARDED (customer booking Phase 1, 2026-09-28): schema-customer-booking.sql
+--    replaces this. Once that file has run (rate_calendar exists), re-running
+--    THIS file must not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.rate_calendar') is null then
+    execute $ddl$
 create or replace function unit_price(p_tenant_id bigint, p_unit_id bigint, p_slot_id bigint, p_date date)
 returns bigint
 language sql stable
@@ -199,7 +207,11 @@ as $$
          end
   from public.unit_rates r
   where r.tenant_id = p_tenant_id and r.unit_id = p_unit_id and r.slot_id = p_slot_id
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. bookings_compute_during(), extended. Same trigger, same timing. What it
 --    adds, in order:
@@ -299,6 +311,13 @@ $guard$;
 --    u.active`. An inactive room must not be offered as open. Villa's one
 --    unit is active, so villa's rows are unchanged (Phase 1's done-when diffs
 --    them). Same signature, so `create or replace` keeps its grants.
+--    GUARDED (customer booking Phase 1, 2026-09-28): schema-customer-booking.sql
+--    replaces this. Once that file has run (rate_calendar exists), re-running
+--    THIS file must not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.rate_calendar') is null then
+    execute $ddl$
 create or replace function check_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -357,7 +376,11 @@ begin
       and u.active
     order by d, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 8. Room availability, for per_room tenants (plan § 3 step 8, D-054).
 --
