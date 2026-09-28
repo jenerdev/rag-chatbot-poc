@@ -1,0 +1,14 @@
+[ingest] villa "Villa Amihan — Rates and Booking Schedules": 2683 chars -> 4 chunks
+[ingest] embedded 4 chunks, 1536 dims each
+[ingest] villa document 39 replaced by 305
+villa: "Villa Amihan — Rates and Booking Schedules" #39 → #305, 4 chunks
+[ingest] villa "Villa Amihan — Booking, Payment and Cancellation": 3066 chars -> 4 chunks
+[ingest] embedded 4 chunks, 1536 dims each
+[ingest] villa document 41 replaced by 306
+villa: "Villa Amihan — Booking, Payment and Cancellation" #41 → #306, 4 chunks
+villa: 8 documents now
+[ingest] harbor "Harbor Inn Guest Guide": 2885 chars -> 4 chunks
+[ingest] embedded 4 chunks, 1536 dims each
+[ingest] harbor document 228 replaced by 307
+harbor: "Harbor Inn Guest Guide" #228 → #307, 4 chunks
+harbor: 1 documents now

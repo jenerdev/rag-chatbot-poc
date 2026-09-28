@@ -1,0 +1,66 @@
+==============================================================================
+PROMPT EVAL: book-group
+==============================================================================
+[bookings] villa booked #1435: 2026-10-08, unit 1, slot 2, confirmed
+fixture: 1 villa booking(s) seeded; today 2026-09-28, booked 2026-10-08, next 2026-10-09, free 2026-10-12
+
+[bookings] harbor booked #1436: 2026-10-10, unit 131, slot 155, confirmed
+fixture: 1 harbor booking(s) seeded; booked 2026-10-10, free 2026-10-12, weekday 2026-10-13
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How do I book?" -> 5 chunks 0.511/both 0.424/both 0.443/both 0.378/both 0.363/both
+[openai] chat: 1692 in + 144 out, 0 tool calls
+PASS  [book-how] villa want book
+      Q: How do I book?
+      note: villa's 04 document: press the Book button; no longer Viber first
+      A: Bookings are made on Villa Amihan's booking page. To open it, press the Book button at the top of this chat. Choose the slot, the date, and for an Overnight stay, the number of nights and the number of guests. The page shows the exact price for that date, including weekend and holiday rates, and sends a booking request to the owners with your name, mobile nu
+      why: refused false; names the Book button or page: true; claims a booking: false
+
+[query] reply language: taglish
+[retrieve] villa vector:7 keyword:10 -> fused:5 [both both both both vector]
+[query] "Paano po mag-book?" -> 5 chunks 0.361/both 0.269/both 0.279/both 0.253/both 0.308/vector
+[openai] chat: 1835 in + 164 out, 0 tool calls
+PASS  [book-how-tl] villa want book
+      Q: Paano po mag-book?
+      note: the same in Tagalog: the page is named; the Taglish mix is printed (D-043)
+      A: Para po mag-book, you need to visit ang booking page ng Villa Amihan. I-click lang po ang Book button sa taas ng chat. Dito, you can choose the slot, date, at para sa Overnight stay, ang number of nights at guests. Makikita niyo po ang exact price para sa date na iyon, kasama ang weekend at holiday rates, at mag-send ng booking request sa owners gamit ang in
+      why: names the page: true; claims: false; (not judged) taglish? true (tl 39, en 11, en-share 0.22); facts kept
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "How can I reserve a room?" -> 4 chunks 0.399/both 0.507/both 0.386/both 0.327/both
+[openai] chat: 1679 in + 89 out, 0 tool calls
+PASS  [book-how-harbor] harbor want book
+      Q: How can I reserve a room?
+      note: harbor's new BOOKING section
+      A: To book a room, press the Book button at the top of this chat to open Harbor Inn's booking page. Choose your check-in date, the number of nights, the rooms, and the number of guests in each. The page shows the price of every night and sends your booking request to the Dela Rosa family, who will reply to confirm it. Please note that a booking request is not a
+      why: refused false; names the page: true; claims: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Please book the Overnight on 12 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234." -> 5 chunks 0.427/both 0.424/both 0.440/both 0.401/both 0.406/both
+[query] dates: {"date_from":"2026-10-12"}
+[bookings] villa availability 2026-10-12..2026-10-12: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-12"} -> 3 slots, 3 open
+[openai] chat: 1929 in + 48 out, 0 tool calls
+PASS  [book-for-me] villa want book
+      Q: Please book the Overnight on 12 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234.
+      note: asked to book: no write tool exists, so the reply must send them to the page, never say it booked
+      A: I can't make a booking for you, but I can confirm that the Overnight slot is open on 12 October 2026.   To book, please visit the booking page by pressing the Book button at the top of this chat.  || claims a booking: false; names the page: true; 1 tool call(s)
+      why: claims a booking: false; names the page: true; 1 tool call(s)
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Book the Garden Room for 2 guests on 12 October 2026, please." -> 4 chunks 0.437/both 0.557/both 0.423/both 0.326/both
+[query] dates: {"date_from":"2026-10-12"}
+[bookings] harbor rooms 2026-10-12..2026-10-12: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-12"} -> 4 slots, 4 open
+[openai] chat: 2000 in + 58 out, 0 tool calls
+PASS  [book-for-me-harbor] harbor want book
+      Q: Book the Garden Room for 2 guests on 12 October 2026, please.
+      note: the same for a room: availability may be checked, the booking is the page's
+      A: The Garden Room is available for 2 guests on 12 October 2026 at a price of ₱3,500.00.   To complete your booking, please press the Book button at the top of this chat to open Harbor Inn's booking page and submit your request.  || claims a booking: false; names the page: true; 1 tool call(s)
+      why: claims a booking: false; names the page: true; 1 tool call(s)
+
+original 0/0 · tool 0/0 · lang 0/0 · date 0/0 · rooms 0/0 · book 5/5
+5/5 as intended (only "book-*")

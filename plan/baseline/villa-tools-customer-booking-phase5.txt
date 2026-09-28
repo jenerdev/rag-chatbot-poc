@@ -1,0 +1,26 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "check_availability",
+      "description": "Check whether Villa Amihan Private Resort's booking slots are open or taken, for one date or a range of dates. The slots are: 22-Hour Whole Day (from 08:00, 22 hours); Day Tour (from 08:00, 9 hours); Overnight (from 14:00, 22 hours). A slot that runs past midnight can make the next day's slots taken. Dates are YYYY-MM-DD in Asia/Manila. A range is at most 31 days. Returns one row per date and slot, each \"open\" or \"taken\".",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "description": "The first date to check, YYYY-MM-DD."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "The last date to check, YYYY-MM-DD. Omit it to check one date."
+          }
+        },
+        "required": [
+          "date_from"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+]

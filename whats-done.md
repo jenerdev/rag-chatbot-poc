@@ -5862,3 +5862,36 @@ price in a loop. It is memoised on the slot.
 HTML and the routes were checked; the forms, the receipt and the staff
 buttons are the user's browser walk (status.md). No `next build` was run,
 because dev was running (trap 16).
+
+## Customer booking, Phase 5: the chat, measured · done 2026-09-28
+
+**What:** the chat now tells people to book on the page, and it does so
+from the DOCUMENTS, not the prompt. Villa's "How to book" says press the
+Book button, that a request is not yet a booking, and that the chat cannot
+make, change or confirm one; villa's rates document says the page shows the
+exact price; harbor's guide gained a BOOKING section. Re-ingested by
+`plan/customer-booking-phase5-docs.mjs`. Five new battery cases, `book-*`.
+
+**Why it matters:** CLAUDE.md rule 1. A prompt edit is how a helpful change
+quietly costs a refusal, so this phase changed no prompt text at all, and
+proved it by diff: Northwind's, villa's and harbor's prompts and both tool
+definitions are byte-identical to Phase 0.
+
+**Observed:**
+- full battery **53/56**: `original 9/10 · tool 9/9 · lang 9/10 · date 9/9
+  · rooms 13/13 · book 4/5`. Every existing group exactly at Phase 0's
+  49/51 (`antecedent`, `lang-followup`, the known two);
+- "How do I book?" (villa) and "How can I reserve a room?" (harbor) answer
+  with the Book button; "Please book the Overnight … for me" and "Book the
+  Garden Room …" each checked availability (1 tool call), said the chat
+  cannot book, and pointed to the page. No reply claimed a booking;
+- `book-how-tl` ("Paano po mag-book?") named the page and claimed nothing
+  in every run, and was pure Tagalog in 3 of 6 (en-share 0.02). The case
+  now prints the language mix and judges only the booking part, because the
+  lean is D-043's and `lang-*` already counts it. `book-*` 5/5 after;
+- pipeline isolation 20/20 both ways and verify 92/92 on the new chunks.
+
+**Trap avoided: a verdict you cannot read.** The failing case's reason was
+past the log's 360-character cut. The battery now prints `why:` on its own
+line, and the failure was repeated before deciding anything (R-18): the
+reason turned out to be the language counter, not the booking answer.

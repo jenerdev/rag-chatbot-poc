@@ -154,9 +154,10 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–3 done and Phase 4's code done 2026-09-28 on
+Phases 0–3 and 5 done, Phase 4's code done 2026-09-28 on
 `feat/customer-booking`; **Phase 4's browser walk is owed, by the user**
-(the list is in the session log); then Phase 5, the chat). For the MVP the chatbot only explains how to book; customers book
+(the list is in the session log); battery now 54/56 expected; next is
+Phase 6, isolation and the bundle). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1043,6 +1044,17 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 5 (the chat, measured)
+- **Edited and re-ingested:** villa 02 and 04, harbor's guide (BOOKING).
+  No prompt, tool, `language.ts` or `dates.ts` change; all three prompts
+  and both tool definitions byte-identical.
+- **Battery 53/56** on the full run (existing groups 49/51, as at Phase 0;
+  `book` 4/5). `book-how-tl` failed only its language check (pure Tagalog,
+  3 of 6 runs pass), so it now prints the mix and judges the booking part;
+  `book-*` 5/5 after. Expect 54/56.
+- **Next:** Phase 6, isolation (`rate_calendar`, `request_booking`) and the
+  bundle grep with `guest_email`. Phase 4's walk still owed.
 
 ### 2026-09-28 — customer booking Phase 4 (screens; walk owed)
 - **Built:** S-6 the booking page, S-7 Holidays, the Requests section on

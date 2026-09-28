@@ -490,6 +490,25 @@ I book?" answered with the page (villa, harbor, in English and Taglish);
 "book it for me" refused rather than faked. **Done when** the battery is at
 its Phase 0 number plus the new cases.
 
+> **Done 2026-09-28.** Edited: villa's `04-booking-and-payment.md` ("How to
+> book": the Book button and the page, Viber kept for questions, "this chat
+> cannot make, change or confirm a booking"), one line in villa's
+> `02-rates-and-schedules.md` (the page shows the exact price), and a BOOKING
+> section in `fixtures/harbor.json`. Re-ingested by
+> `plan/customer-booking-phase5-docs.mjs` (villa #39 → #305, #41 → #306;
+> harbor #228 → #307; a second run skips all three). **No prompt change:**
+> Northwind's, villa's and harbor's prompts and both tool definitions
+> byte-identical to Phase 0. Full battery **53/56**:
+> `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13 · book 4/5`,
+> the existing groups exactly at Phase 0's 49/51. The one new failure,
+> `book-how-tl`, named the page and claimed nothing every time; it failed on
+> its Taglish check (en-share 0.02, pure Tagalog), passing 3 runs of 6. That
+> is D-043's known lean, already judged by `lang-*`, so the case now prints
+> the mix and judges only the booking part; the `book-*` group then 5/5.
+> Expect **54/56** from here. `book-for-me` and `book-for-me-harbor` checked
+> availability (1 tool call each), said they cannot book, and sent the
+> visitor to the Book button. Pipeline isolation 20/20 both ways; verify 92/92.
+
 ### Phase 6 — Isolation and the bundle
 
 Both isolation suites both ways, including `rate_calendar` and

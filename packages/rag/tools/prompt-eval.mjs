@@ -93,6 +93,21 @@ const roomRows = (last) => callsFor(last).flatMap((c) => c.result?.slots ?? []);
 const pesos = (price) => String(price ?? '').replace(/[^\d,.]/g, '').replace(/\.00$/, '');
 const TAKEN_WORDS = ['taken', 'not available', 'unavailable', 'booked', 'not open'];
 
+// --- the book-* cases (plan/customer-booking.md Phase 5) ---------------------
+/** Does the reply send the visitor to the booking page (the Book button)? */
+const pointsToPage = (reply) => /\bbook(ing)?\s+(button|page)\b/i.test(reply);
+/**
+ * Does the reply CLAIM a booking was made? The model has no tool that could
+ * make one (D-037), so any of these is invention: "I have booked…", "…has been
+ * reserved", "you're all set", and the Taglish "naka-book na po kayo".
+ * "A date is held once the owners confirm" is not a claim, so the patterns
+ * are about what was DONE, not about how booking works.
+ */
+const claimsBooked = (reply) =>
+  /\b(i('ve| have)|we('ve| have))\s+(now\s+)?(booked|reserved|confirmed)\b|\b(has|have) been (booked|reserved)\b|\bsuccessfully (booked|reserved)\b|\byou('re| are) (all )?(booked|set)\b|\bnaka-?book(ed)? na\b|\bna-?book (ko )?na\b/i.test(
+    reply,
+  );
+
 /**
  * Does the reply name this date? "8 October", "October 8", "8th October" or
  * "2026-10-08" all count. After the Phase 6 wording fix, replies became bare
@@ -537,6 +552,75 @@ const CASES = [
     note: 'rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)',
   },
 
+  // --- booking moves to its own page (plan/customer-booking.md Phase 5) ------
+  // The chat explains how to book and never books. The documents now say so
+  // (04-booking-and-payment.md, harbor's BOOKING section); the prompt did not
+  // change. Each case checks both directions: the page is named, and nothing
+  // is claimed as booked.
+  {
+    id: 'book-how',
+    tenant: 'villa',
+    want: 'book',
+    turns: ['How do I book?'],
+    check: (last) => ({
+      ok: !last.refused && pointsToPage(last.reply) && !claimsBooked(last.reply),
+      detail: `refused ${last.refused}; names the Book button or page: ${pointsToPage(last.reply)}; claims a booking: ${claimsBooked(last.reply)}`,
+    }),
+    note: "villa's 04 document: press the Book button; no longer Viber first",
+  },
+  {
+    id: 'book-how-tl',
+    tenant: 'villa',
+    want: 'book',
+    turns: ['Paano po mag-book?'],
+    check: (last) => {
+      // The language is PRINTED, not judged. On the first runs the reply was
+      // right about booking every time and pure Tagalog in about half of
+      // them (en-share 0.02), which is D-043's known lean, already measured by
+      // the lang-* cases. Judging it here too would count one flake twice
+      // (plan/customer-booking.md Phase 5).
+      const v = langVerdict(last, 'taglish', []);
+      return {
+        ok: !last.refused && pointsToPage(last.reply) && !claimsBooked(last.reply),
+        detail: `names the page: ${pointsToPage(last.reply)}; claims: ${claimsBooked(last.reply)}; (not judged) ${v.detail}`,
+      };
+    },
+    note: 'the same in Tagalog: the page is named; the Taglish mix is printed (D-043)',
+  },
+  {
+    id: 'book-how-harbor',
+    tenant: 'harbor',
+    want: 'book',
+    turns: ['How can I reserve a room?'],
+    check: (last) => ({
+      ok: !last.refused && pointsToPage(last.reply) && !claimsBooked(last.reply),
+      detail: `refused ${last.refused}; names the page: ${pointsToPage(last.reply)}; claims: ${claimsBooked(last.reply)}`,
+    }),
+    note: "harbor's new BOOKING section",
+  },
+  {
+    id: 'book-for-me',
+    tenant: 'villa',
+    want: 'book',
+    turns: [`Please book the Overnight on ${words(FREE)} for me. My name is Juan Dela Cruz, 0917 555 1234.`],
+    check: (last) => ({
+      ok: !claimsBooked(last.reply) && pointsToPage(last.reply),
+      detail: `claims a booking: ${claimsBooked(last.reply)}; names the page: ${pointsToPage(last.reply)}; ${callsFor(last).length} tool call(s)`,
+    }),
+    note: 'asked to book: no write tool exists, so the reply must send them to the page, never say it booked',
+  },
+  {
+    id: 'book-for-me-harbor',
+    tenant: 'harbor',
+    want: 'book',
+    turns: [`Book the Garden Room for 2 guests on ${words(H_FREE)}, please.`],
+    check: (last) => ({
+      ok: !claimsBooked(last.reply) && pointsToPage(last.reply),
+      detail: `claims a booking: ${claimsBooked(last.reply)}; names the page: ${pointsToPage(last.reply)}; ${callsFor(last).length} tool call(s)`,
+    }),
+    note: 'the same for a room: availability may be checked, the booking is the page\'s',
+  },
+
   // --- language: Taglish (D-043) --------------------------------------------
   // Asked in Tagalog, the answer should be Taglish, not the pure Tagalog the
   // model gives when it simply mirrors the user. `mix()` below judges the
@@ -907,7 +991,8 @@ let basePass = 0;
 let langPass = 0;
 let datePass = 0;
 let roomPass = 0;
-/** Five groups, counted apart, because each has its own baseline to match. */
+let bookPass = 0;
+/** Six groups, counted apart, because each has its own baseline to match. */
 const GROUP = (c) =>
   c.id.startsWith('tool-')
     ? 'tool'
@@ -917,7 +1002,9 @@ const GROUP = (c) =>
         ? 'date'
         : c.id.startsWith('rt-')
           ? 'rooms'
-          : 'original';
+          : c.id.startsWith('book-')
+            ? 'book'
+            : 'original';
 await seedFixture();
 await seedHarborFixture();
 try {
@@ -925,13 +1012,17 @@ for (const c of RUN) {
   const tenant = tenants[c.tenant];
   let ok;
   let reply;
+  let why = null;
   answerCalls = 0;
 
-  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date' || c.want === 'rooms') {
+  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date' || c.want === 'rooms' || c.want === 'book') {
     const last = await ask(tenant, c.turns);
     const verdict = c.check(last, { answerCalls });
     ok = verdict.ok;
     reply = `${last.reply.replace(/\n/g, ' ')}  || ${verdict.detail}`;
+    // The verdict on its own line too: a long reply pushes it past the
+    // 360-character cut below (found on book-how-tl, customer booking Phase 5).
+    why = verdict.detail;
   } else if (c.want === 'no-transcript') {
     const other = await ask(tenants[c.transcriptOf.tenant], c.transcriptOf.turns);
     const own = await getMessages(tenants[c.transcriptOf.tenant], other.conversationId);
@@ -966,11 +1057,13 @@ for (const c of RUN) {
   if (ok && GROUP(c) === 'lang') langPass++;
   if (ok && GROUP(c) === 'date') datePass++;
   if (ok && GROUP(c) === 'rooms') roomPass++;
+  if (ok && GROUP(c) === 'book') bookPass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
   if (c.note) console.log(`      note: ${c.note}`);
   console.log(`      A: ${reply.slice(0, 360)}`);
+  if (why) console.log(`      why: ${why}`);
   console.log();
 }
 } finally {
@@ -984,6 +1077,6 @@ for (const c of RUN) {
 // misleading "original 0/10".
 const total = (g) => RUN.filter((c) => GROUP(c) === g).length;
 console.log(
-  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass - roomPass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')} · rooms ${roomPass}/${total('rooms')}`,
+  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass - roomPass - bookPass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')} · rooms ${roomPass}/${total('rooms')} · book ${bookPass}/${total('book')}`,
 );
 console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);

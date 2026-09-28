@@ -28,6 +28,9 @@ December 24, December 25 and December 31 carry an additional peak surcharge of
 ₱4,000 on top of the holiday rate. These three dates are usually fully booked by
 September and are not offered for rescheduling.
 
+The booking page (the Book button at the top of this chat) shows the exact price
+for any date, with the weekend, holiday and extra-guest charges already added.
+
 The rate includes the exclusive use of the whole property, the hot spring pools,
 all four air-conditioned bedrooms, the function area, the kitchen, the grilling
 area, LPG for the stove, water, electricity, Wi-Fi, and the turnover cleaning

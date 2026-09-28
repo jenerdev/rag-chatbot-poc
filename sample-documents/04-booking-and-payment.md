@@ -2,10 +2,19 @@
 
 ## How to book
 
-Booking starts with a message to 0917-845-2290 on Viber or SMS, or an email to
-villaamihan.bookings@gmail.com, stating the date, the slot, and the expected
-number of guests. The owners reply with whether the date is open, usually within
-the same day.
+Bookings are made on Villa Amihan's booking page. To open it, press the Book
+button at the top of this chat. Choose the slot, the date and, for an Overnight
+stay, the number of nights, then the number of guests. The page shows the exact
+price for that date, including weekend and holiday rates, and sends a booking
+request to the owners with your name, mobile number and email.
+
+A booking request is not yet a booking. The owners reply, usually within the
+same day, to confirm the date and to arrange the reservation fee. Questions can
+still go to 0917-845-2290 on Viber or SMS, or to
+villaamihan.bookings@gmail.com.
+
+This chat can check whether a date is open, but it cannot make, change or
+confirm a booking. Only the booking page and the owners can.
 
 A date is only held once the reservation fee is paid. Villa Amihan does not hold
 dates on a verbal or messaged promise, because doing so during the 2019 peak

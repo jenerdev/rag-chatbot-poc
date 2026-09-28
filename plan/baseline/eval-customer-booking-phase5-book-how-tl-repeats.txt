@@ -1,0 +1,6 @@
+      why: names the page: true; claims: false; taglish? true (tl 37, en 16, en-share 0.30); facts kept
+1/1 as intended (only "book-how-tl*")
+      why: names the page: true; claims: false; taglish? true (tl 35, en 17, en-share 0.33); facts kept
+1/1 as intended (only "book-how-tl*")
+      why: names the page: true; claims: false; taglish? false (tl 61, en 1, en-share 0.02); facts kept
+0/1 as intended (only "book-how-tl*")
