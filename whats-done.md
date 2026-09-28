@@ -5895,3 +5895,37 @@ definitions are byte-identical to Phase 0.
 past the log's 360-character cut. The battery now prints `why:` on its own
 line, and the failure was repeated before deciding anything (R-18): the
 reason turned out to be the language counter, not the booking answer.
+
+## Customer booking, Phase 6: isolation and the bundle · done 2026-09-28
+
+**What:** six more cross-tenant checks in `packages/bookings/tools/isolation.mjs`
+(24–29) for everything this plan added, and the bundle grep with
+`guest_email` on its list, run on two fresh builds.
+
+**Why it matters:** CLAUDE.md rule 6 says each wall must hold alone, and the
+new tables and the one new write had no cross-tenant check yet. Rule 2 says
+no secret reaches the browser, and the page now carries a guest's email.
+
+**Observed:**
+- bookings isolation **29/29**, with RLS on operator staff tokens and again
+  with `--filters-only` (service client, RLS bypassed): A sees none of B's
+  holiday days, cannot remove one (`false`, it stays), and keeps its own
+  entry on the same date; that date quotes 100000 in A and 200000 + 50000
+  in B; A's page lists A's room and calendar only, and B's room quotes with
+  exactly the message a missing room gets; northwind has no page; A's chat
+  token requesting B's room is refused with no row in either tenant; A's
+  staff see none of B's requests and get `false` on confirming or declining
+  B's, the same `false` as a made-up id, while B's stays pending; then B
+  confirms its own, and only B's room reads taken;
+- pipeline isolation 20/20 both ways;
+- two fresh `next build`s, one with `SUPABASE_SERVICE_ROLE_KEY` empty and
+  one with the full `.env`: both compiled; both scans of the 55 static files
+  found 0 of the eight names (`service_role`, `SUPABASE_SECRET`,
+  `SUPABASE_SERVICE_ROLE`, `TENANT_SIGNING_JWK`, `guest_phone`,
+  `guest_email`, `@rag/db/service`, `admin_key_hash`) and 0 of the six secret
+  values; the positive twin found `admin/holidays` and `book/request`, so the
+  scan read the bundle that has the new pages in it.
+
+**Trap avoided, again: `next build` under `next dev`.** The dev server was
+stopped first, with the user's OK, and restarted in the background after
+both builds (CLAUDE.md trap 16).

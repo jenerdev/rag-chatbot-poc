@@ -515,6 +515,23 @@ Both isolation suites both ways, including `rate_calendar` and
 `request_booking`; the bundle grep (CLAUDE.md rule 2), with `guest_email`
 added to the list it greps for.
 
+> **Done 2026-09-28.** Bookings isolation **29/29** both ways (6 new, 24–29,
+> on the two per_room probes A and B): A sees none of B's calendar days,
+> cannot remove one, and keeps its own entry on the same date; the same date
+> quotes 100000 in A and 200000 + 50000 in B (unit_price's tenant filter, in
+> SQL); A's page lists only A's room and calendar, B's room quotes exactly
+> like a missing one, and northwind has no page; A's chat token requesting
+> B's room is "No such unit or slot." with no row in either tenant, while
+> B's own request is pending in B; A's staff list none of B's requests and
+> get `false` confirming or declining B's, the same as a missing id, with
+> B's still pending; B confirms its own, A's room stays open, B's is taken.
+> Pipeline isolation 20/20 both ways. Bundle: two fresh `next build`s (the
+> dev server stopped with the user's OK, restarted after), one with
+> `SUPABASE_SERVICE_ROLE_KEY` empty and one with the full `.env`; both
+> compiled, both scans of 55 static files found none of the eight names
+> (`guest_email` now among them) and none of the six secret values, and the
+> positive twin found `admin/holidays` and `book/request` in the bundle.
+
 ### Phase 7 — The record
 
 D-069–D-073, R-24 closed, R-38–R-41, CLAUDE.md (header, layout, rules 6 and

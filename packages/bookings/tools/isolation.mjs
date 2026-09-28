@@ -9,7 +9,9 @@
 //   * a throwaway `bookings-probe` tenant with the bookings application, one
 //     unit and one slot, deleted at the end (the delete cascades);
 //   * ONE booking in villa, 300 days out, HARD-deleted at the end. Cancelling
-//     it would leave a row in villa's real history.
+//     it would leave a row in villa's real history;
+//   * (24–29, customer booking Phase 6) holiday days and web requests in the
+//     two per_room probes, gone with them.
 //
 // TWO WALLS (auth-rls Rule 1). By default staff work runs as each tenant's
 // OPERATOR member, on a staff token, as the admin routes' does, so both the
@@ -26,21 +28,31 @@ import {
   BookingConflictError,
   BookingInputError,
   BookingsNotEnabledError,
+  bookingPage,
   cancelBooking,
   checkAvailability,
   checkRoomAvailability,
+  confirmRequest,
   createAccommodation,
   createBooking,
   createBookings,
+  declineRequest,
   getAccommodation,
+  hasBookingPage,
   listAccommodations,
   listBookings,
+  listCalendar,
   listImages,
+  listRequests,
   listSlots,
   listUnits,
   localDate,
   quote,
+  quoteRequest,
+  removeCalendarDay,
   removeImage,
+  requestBooking,
+  setCalendarDay,
   setImageOrder,
   setRates,
   updateAccommodation,
@@ -403,6 +415,114 @@ try {
         && unit.standard_capacity === 2 && unit.extra_person_rate === 25000 && unit.capacity === 2,
       "rooms A: cannot change B's standard, fee or maximum, nor quote a party in B's room",
       `update ${changed} · quote "${party?.message}" · B still ${unit.standard_capacity}/${unit.capacity} +${unit.extra_person_rate}`,
+    );
+  }
+
+  // 24–29. plan/customer-booking.md Phase 6: the holiday calendar, the
+  //        public page's reads, and web requests, each across A and B.
+  //        Requests run on CHAT tokens in both modes, as the public page's
+  //        do; the staff side (list, confirm, decline) follows the mode.
+  const REQ_DATE = day(310);
+  const contact = (n) => ({ name: 'Isolation Probe', phone: `0917000${String(n).padStart(4, '0')}`, email: `iso-${n}@example.com` });
+  const webRows = async (tenant) =>
+    (await supabase.from('bookings').select('id, status, group_id').eq('tenant_id', tenant.id).eq('source', 'web')).data ?? [];
+
+  // 24. B's staff list a peak day; A's list does not show it, B's chat token
+  //     does; A cannot remove it (false, and it stays). A then lists a day of
+  //     its own on the SAME date: one date, two tenants, two entries.
+  {
+    await setCalendarDay(b, { day: REQ_DATE, kind: 'peak', label: 'B peak', surcharge: 50000 });
+    const aBefore = await listCalendar(a, { from: REQ_DATE, to: REQ_DATE });
+    const bSees = await listCalendar(chat(b), { from: REQ_DATE, to: REQ_DATE });
+    const removed = await removeCalendarDay(a, REQ_DATE);
+    await setCalendarDay(a, { day: REQ_DATE, label: 'A day' });
+    const aAfter = await listCalendar(a, { from: REQ_DATE, to: REQ_DATE });
+    const { data: bStill } = await supabase.from('rate_calendar').select('label, surcharge').eq('tenant_id', b.id).eq('day', REQ_DATE).single();
+    check(
+      aBefore.length === 0 && bSees.length === 1 && bSees[0].surcharge === 50000 && removed === false
+        && aAfter.map((d) => d.label).join(',') === 'A day' && bStill?.label === 'B peak' && bStill.surcharge === 50000,
+      "calendar: A sees none of B's days, cannot remove one, and keeps its own entry on the same date",
+      `A before ${aBefore.length} · B sees ${bSees.length} · A remove ${removed} · A after ${aAfter.map((d) => d.label).join(',')} · B still "${bStill?.label}" +${bStill?.surcharge}`,
+    );
+  }
+
+  // 25. The price follows the tenant's OWN calendar: on the same date A's
+  //     room has no surcharge and B's has ₱500 (unit_price's tenant filter,
+  //     in SQL, so the same in both modes).
+  {
+    const qa = await quoteRequest(chat(a), { slotId: aNight.id, rooms: [{ unitId: aRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1 });
+    const qb = await quoteRequest(chat(b), { slotId: bNight.id, rooms: [{ unitId: bRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1 });
+    const la = qa.lines[0];
+    const lb = qb.lines[0];
+    check(
+      la.surcharge === 0 && la.price === 100000 && la.holiday === 'A day' && lb.surcharge === 50000 && lb.price === 250000 && lb.holiday === 'B peak',
+      "calendar: each tenant's quote carries its own day and surcharge",
+      `A ${la.basePrice}+${la.surcharge}=${la.price} "${la.holiday}" · B ${lb.basePrice}+${lb.surcharge}=${lb.price} "${lb.holiday}"`,
+    );
+  }
+
+  // 26. The public page's reads on A's chat token: only A's room and A's
+  //     calendar; B's room quotes like no room; northwind has no page.
+  {
+    const page = await bookingPage(chat(a));
+    const foreign = await thrown(() => quoteRequest(chat(a), { slotId: aNight.id, rooms: [{ unitId: bRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1 }));
+    const nowhere = await thrown(() => quoteRequest(chat(a), { slotId: aNight.id, rooms: [{ unitId: 999_999_999, guests: 1 }], checkIn: REQ_DATE, nights: 1 }));
+    const hasA = await hasBookingPage(chat(a));
+    const hasNorthwind = await hasBookingPage(chat(northwind));
+    check(
+      page.units.map((u) => u.name).join(',') === 'A Room' && page.calendar.map((d) => d.label).join(',') === 'A day'
+        && foreign instanceof BookingInputError && foreign.message === nowhere?.message && hasA === true && hasNorthwind === false,
+      "page A: its own room and calendar; B's room quotes like no room; northwind has no page",
+      `units ${page.units.map((u) => u.name).join(',')} · calendar ${page.calendar.map((d) => d.label).join(',')} · "${foreign?.message}" vs "${nowhere?.message}" · pages A ${hasA}, northwind ${hasNorthwind}`,
+    );
+  }
+
+  // 27. A's chat token cannot request B's room: "No such unit or slot.", and
+  //     NO row lands in either tenant. B's own request lands, pending.
+  let bGroup = null;
+  {
+    const foreign = await thrown(() =>
+      requestBooking(chat(a), { slotId: aNight.id, rooms: [{ unitId: bRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1, ...contact(1) }),
+    );
+    const [aRows, bRows] = await Promise.all([webRows(a), webRows(b)]);
+    const own = await requestBooking(chat(b), { slotId: bNight.id, rooms: [{ unitId: bRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1, ...contact(2) });
+    const bAfter = await webRows(b);
+    bGroup = bAfter[0]?.group_id ?? null;
+    check(
+      foreign instanceof BookingInputError && foreign.message === 'No such unit or slot.' && aRows.length === 0 && bRows.length === 0
+        && /^ROO-/.test(own.reference) && own.total === 250000 && bAfter.length === 1 && bAfter[0].status === 'pending',
+      "request A→B's room: refused, nothing saved anywhere; B's own request is pending in B",
+      `"${foreign?.message}" · rows A ${aRows.length}, B ${bRows.length} · B's own ${own.reference} ${own.total} → ${bAfter.map((r) => r.status).join(',')}`,
+    );
+  }
+
+  // 28. A's staff do not see B's request, and cannot confirm or decline it:
+  //     false, like a request that does not exist, and B's stays pending.
+  {
+    const aList = await listRequests(a, { from: REQ_DATE });
+    const bList = await listRequests(b, { from: REQ_DATE });
+    const confirmed = await confirmRequest(a, bGroup);
+    const declined = await declineRequest(a, bGroup);
+    const missing = await confirmRequest(a, '00000000-0000-0000-0000-000000000000');
+    const still = (await webRows(b)).map((r) => r.status).join(',');
+    check(
+      aList.length === 0 && bList.length === 1 && bList[0].groupId === bGroup && confirmed === false && declined === false && missing === false && still === 'pending',
+      "requests A: sees none of B's; cannot confirm or decline B's (false, like a missing id); B's stays pending",
+      `A list ${aList.length} · B list ${bList.length} · confirm ${confirmed} · decline ${declined} · missing ${missing} · B still ${still}`,
+    );
+  }
+
+  // 29. The positive twin: B confirms its own request, and every row of the
+  //     group is confirmed; A's availability on that date is untouched.
+  {
+    const confirmed = await confirmRequest(b, bGroup);
+    const rows = (await webRows(b)).map((r) => r.status).join(',');
+    const aOpen = (await checkRoomAvailability(chat(a), { from: REQ_DATE })).map((r) => `${r.unit} ${r.status}`).join(',');
+    const bTaken = (await checkRoomAvailability(chat(b), { from: REQ_DATE })).map((r) => `${r.unit} ${r.status}`).join(',');
+    check(
+      confirmed === true && rows === 'confirmed' && aOpen === 'A Room open' && bTaken === 'B Room taken',
+      "requests B: confirms its own; A's room stays open, B's is taken",
+      `confirm ${confirmed} · B rows ${rows} · A ${aOpen} · B ${bTaken}`,
     );
   }
 

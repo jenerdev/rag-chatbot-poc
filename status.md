@@ -154,10 +154,10 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–3 and 5 done, Phase 4's code done 2026-09-28 on
+Phases 0–3, 5 and 6 done, Phase 4's code done 2026-09-28 on
 `feat/customer-booking`; **Phase 4's browser walk is owed, by the user**
 (the list is in the session log); battery now 54/56 expected; next is
-Phase 6, isolation and the bundle). For the MVP the chatbot only explains how to book; customers book
+Phase 7, the record, then the merge). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1044,6 +1044,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 6 (isolation and the bundle)
+- **Built:** bookings isolation 24–29 (calendar, page, requests across the
+  two per_room probes); `plan/customer-booking-phase6-bundle.mjs` (adds
+  `guest_email`).
+- **Observed** (`plan/baseline/*-customer-booking-phase6*`): bookings
+  isolation 29/29 both ways; pipeline isolation 20/20 both ways; two fresh
+  builds (service key empty, full .env) compiled, both scans clean over 55
+  static files, positive twin found. Dev stopped for the builds with the
+  user's OK and restarted in the background.
+- **Next:** Phase 7, the record (D-069–D-073, R-38–R-41, R-24 closed,
+  CLAUDE.md, flow.md); Phase 4's walk still owed; then merge.
 
 ### 2026-09-28 — customer booking Phase 5 (the chat, measured)
 - **Edited and re-ingested:** villa 02 and 04, harbor's guide (BOOKING).
