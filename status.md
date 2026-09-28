@@ -155,7 +155,7 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
 (R-30).
 
-Before that, the browser walk of D-047–D-049 is still owed.
+The browser walk of D-047–D-049 was done 2026-09-28 (session log).
 
 **Payments (booking lifecycle + manual verification): plan drafted
 2026-09-27**, in [`plan/payments.md`](./plan/payments.md). Nothing built;
@@ -1021,6 +1021,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — the browser walk of D-047–D-049
+- **Done by the user** at `/t/villa`, then read back from villa's `messages`.
+- **Observed:** "may restaurant po ba sa loob?" was stored as the internal
+  marker (as designed: `messages` keeps it, the visitor sees the fallback).
+  "salamat po" → "Walang anuman po! 😊 …", "okay" → "Sige po! 😊 …",
+  "hi" → "Hi po! 👋 Ako si Lia, …": all Taglish, and none got the refusal.
+- **Then, two more conversations:** "do you have restaurant" (replyLanguage
+  → english) and "may baboy po kayo?" (→ taglish, since Tagalog in means
+  Taglish out, D-043). Both were refused. So English and Taglish fallbacks
+  were walked.
+- **Then the Tagalog fallback:** in the same conversation, "Tagalog please"
+  → "Opo, sasagot po ako sa Tagalog. …" (replyLanguage → tagalog, asked),
+  then "may baboy po kayo?" was refused as tagalog. "english please" switched
+  back ("Of course! I'll respond in English …"). All three fallbacks and
+  D-049 walked; nothing owed for D-047–D-049.
+- **Next:** [`plan/payments.md`](./plan/payments.md), Phase 0.
 
 ### 2026-09-28 — code review of the merge (`e8fc28b..bf62ed4`), fixes
 - **Reviewed:** 4 findings; re-verified live before fixing. 1 (a room with

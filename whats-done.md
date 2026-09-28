@@ -5638,3 +5638,29 @@ rooms 20/20; walk 11/11; isolation 23/23 and 20/20 both ways.
 **Why re-verify first:** one of the four was wrong. Fixing it would have
 added code for a failure that does not happen.
 
+## Friendly refusal, fallbacks and small talk: the browser walk · done 2026-09-28
+
+**What:** the user walked D-047–D-049 at `/t/villa`. The four turns were then
+read back from villa's `messages`.
+
+**Observed:** the Taglish question the documents can't answer ("may
+restaurant po ba sa loob?") was stored as the marker, which is correct:
+`messages` and the unanswered list rely on it, and only the visitor sees the
+fallback (D-047). "salamat po", "okay" and "hi" each got a short Taglish
+reply in code ("Walang anuman po!", "Sige po!", "Hi po! … Ako si Lia"), so
+none of them fell through to the refusal (D-049).
+
+Two more conversations followed: "do you have restaurant" and "may baboy po
+kayo?", both refused. Running `replyLanguage()` on each conversation's
+history gives english and taglish, so the English and Taglish fallbacks
+(D-048) were both walked. A Tagalog question gets the TAGLISH line, because
+Tagalog in means Taglish out (D-043).
+
+Then "Tagalog please" was acknowledged in Tagalog, and the same question
+asked again was refused with `replyLanguage()` giving tagalog (asked), so
+the Tagalog line was the one shown. "english please" switched back. All
+three fallbacks are now walked, with nothing owed.
+
+**Limit of the evidence:** `messages` stores the marker, so the line shown
+is worked out from the language, not read from the database.
+
