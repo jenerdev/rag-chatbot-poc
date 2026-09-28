@@ -5947,7 +5947,7 @@ Read back from the database afterwards, not taken from memory.
   `clash: true` on both earlier ones, and the user saw the 409 on Confirm;
 - the user also saw the wrong-phone message on the page, and the Book
   button on villa and harbor with none on northwind;
-- cleanup: the 8 web rows were hard-deleted (0 left; villa back to 8
+- cleanup: the 8 web rows were hard-deleted (0 left; villa back to 5
   bookings, harbor to 3), and villa keeps 24 Dec in its calendar.
 
 **Limit of the evidence:** no multi-night stay and no declined request was

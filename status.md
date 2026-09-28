@@ -1058,7 +1058,7 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   villa and harbor, none on northwind.
 - **Not walked:** a multi-night stay and a declined request (both covered
   by verify 82–83, rooms 24–26 and the HTTP walk, not by a click).
-- **Cleanup:** the 8 web rows hard-deleted (0 web rows left; villa 8
+- **Cleanup:** the 8 web rows hard-deleted (0 web rows left; villa 5
   bookings, harbor 3, as before the walk); 24 Dec kept in villa's calendar.
 
 ### 2026-09-28 — customer booking Phase 6 (isolation and the bundle)
