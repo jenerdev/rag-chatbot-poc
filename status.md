@@ -973,6 +973,22 @@ Build order — pull from the top. Full detail in `mvp.md` § Roadmap.
 - [x] `git init` + first commit — 2026-09-20, 32 files, `.env` verified excluded
 - [x] Paragraph-aware chunking — D-018
 - [x] Streaming responses — D-019
+- [ ] **A subdomain per tenant on Vercel** (`villa.example.com` instead of
+  `/t/villa`). Possible, not built yet (noted 2026-09-28):
+  - Vercel: a custom domain with a wildcard (`*.example.com`). A wildcard needs
+    the domain on Vercel's nameservers.
+  - `apps/web/middleware.ts` (none exists today): read the `Host` header and
+    **rewrite** (not redirect) `villa.example.com/...` to `/t/villa/...`, and
+    `/api/...` to `/api/t/villa/...`. The routes, `getTenant()` and
+    `withTenantRoute()` stay as they are. An unknown subdomain must still 404,
+    never fall back (D-027).
+  - Places that build `/t/${slug}` URLs themselves need checking: the browser
+    `fetch` calls in `components/*-screen.tsx` and `reset-password.tsx`, and
+    the invite/reset `redirectTo` links in `packages/db/src/staff-auth.ts`,
+    `tools/member.mjs` and `admin/password-reset/route.ts`. Those redirect URLs
+    must also be allowed in Supabase Auth's URL settings.
+  - The staff session cookie's path/domain (`lib/admin-auth.ts`), so a login on
+    one subdomain never works on another.
 
 ---
 
