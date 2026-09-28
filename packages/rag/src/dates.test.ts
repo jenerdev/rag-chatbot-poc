@@ -333,3 +333,61 @@ describe('asksAvailability and isDateOnly', () => {
   });
 });
 
+
+describe('ranges: two dates joined, and a night count (R-15)', () => {
+  const range = (message: string, today = SUNDAY) => {
+    const found = resolveDates(message, today);
+    return found.length === 1 && !found[0]!.alternative ? `${found[0]!.from}..${found[0]!.to}` : found;
+  };
+
+  it.each([
+    ['Is anything free from 10 October to 12 October?', '2026-10-10..2026-10-12'],
+    ['Available from Oct 10 until Oct 12?', '2026-10-10..2026-10-12'],
+    ['Available ba mula 10 Oktubre hanggang 12 Oktubre?', '2026-10-10..2026-10-12'],
+    ['Free between 10 October and 12 October?', '2026-10-10..2026-10-12'],
+    ['Oct 10 - Oct 12, may bakante?', '2026-10-10..2026-10-12'],
+    ['Oct 10 – Oct 12, may bakante?', '2026-10-10..2026-10-12'],
+    ['Free from Friday to Sunday?', '2026-10-02..2026-10-04'],
+    ['Free from tomorrow through Wednesday?', '2026-09-28..2026-09-30'],
+  ])('%s → %s', (message, expected) => {
+    expect(range(message)).toBe(expected);
+  });
+
+  it.each([
+    ['Is 10 October free for 2 nights?', '2026-10-10..2026-10-11'],
+    ['Available ba 10 October, dalawang gabi?', '2026-10-10..2026-10-11'],
+    ['2 nights from Oct 10, may bakante?', '2026-10-10..2026-10-11'],
+    ['Two nights starting October 10?', '2026-10-10..2026-10-11'],
+    ['3 days 2 nights from Oct 10?', '2026-10-10..2026-10-11'],
+    ['Available bukas for 3 nights?', '2026-09-28..2026-09-30'],
+    ['Free on Friday for 1 night?', '2026-10-02..2026-10-02'],
+  ])('%s → %s', (message, expected) => {
+    expect(range(message)).toBe(expected);
+  });
+
+  it('does not join what is not a range', () => {
+    // Two dates with a plain "and" are two days, not everything between.
+    expect(resolveDates('Free on Friday and Monday?', SUNDAY)).toHaveLength(2);
+    // Out of order: not a span.
+    expect(resolveDates('From 12 October to 10 October?', SUNDAY)).toHaveLength(2);
+    // "next Friday" midweek is ambiguous, so it never joins.
+    expect(resolveDates('From next Friday to Sunday?', WEDNESDAY)).toHaveLength(2);
+    // Harbor's slot is called Night: no number, no nights.
+    expect(range('Is the Night slot free on Oct 10?')).toBe('2026-10-10..2026-10-10');
+  });
+
+  it('the connector words are gone from the rest, so a bare range is date-only', () => {
+    expect(isDateOnly('From 10 October to 12 October?', SUNDAY)).toBe(true);
+    expect(isDateOnly('How about Oct 10 for 2 nights?', SUNDAY)).toBe(true);
+    expect(isDateOnly('Is the pool open from 10 October to 12 October?', SUNDAY)).toBe(false);
+  });
+
+  it('planDates runs ONE call for the span, and the line names both ends', () => {
+    const plan = planDates('Is anything free from 10 October to 12 October?', SUNDAY, []);
+    expect(plan.calls).toEqual([{ date_from: '2026-10-10', date_to: '2026-10-12' }]);
+    expect(plan.lines[0]).toContain('date_from 2026-10-10 and date_to 2026-10-12');
+    expect(plan.lines[0]).toContain('10 October 2026 to 12 October 2026');
+    const nights = planDates('Available ba 10 October for 2 nights?', SUNDAY, []);
+    expect(nights.calls).toEqual([{ date_from: '2026-10-10', date_to: '2026-10-11' }]);
+  });
+});

@@ -137,8 +137,8 @@ packages/
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
-    src/dates.ts           relative dates ("bukas", "next Friday") resolved in code; availability turns checked up front (D-046)
-    tools/prompt-eval.mjs  the battery, 56 cases (10 + 9 tool-* + 10 lang-* + 9 date-* + 13 rt-* + 5 book-*), three tenants; seeds its own bookings
+    src/dates.ts           relative dates ("bukas", "next Friday") and ranges ("from X to Y", "X for 2 nights") resolved in code; availability turns checked up front (D-046, R-15)
+    tools/prompt-eval.mjs  the battery, 58 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-*), three tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
     tools/isolation.mjs    20 cross-tenant checks through the pipeline
   tsconfig/            shared base config
@@ -160,7 +160,7 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
 pnpm --filter @rag/db verify    # 92 checks, no API key needed
-pnpm eval                       # the prompt battery, 56 cases  ⚠ see below
+pnpm eval                       # the prompt battery, 58 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 20 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 20, code filters alone (RLS bypassed)
@@ -194,11 +194,11 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    northwind *alone*, because Villa describes parking and `absent-2` must refuse
    parking. Tenancy turned that fragile precondition into the feature (plan.md
    § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
-   but in the other tenant, is unreachable. Expect **54/56**, printed as
-   `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13 · book 5/5`:
+   but in the other tenant, is unreachable. Expect **56/58**, printed as
+   `original 9/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 5/5`:
    `antecedent` is the known model limit (D-017), and `lang-followup` leans
    Tagalog after a bare date (D-043); it passes about one run in three, which
-   gives 55/56. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
+   gives 57/58. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
    before deciding why. A different number means something moved. The five
    `book-*` cases (D-069) check both directions of "the chat does not book":
    the Book button or page is named, and no reply claims a booking was made;

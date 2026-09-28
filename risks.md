@@ -342,7 +342,7 @@ not that the check is too strict.
 
 ---
 
-## R-15 · A relative date resolved wrongly · **Visible, not prevented**
+## R-15 · A relative date resolved wrongly · **Visible, not prevented; the range half fixed 2026-09-28**
 
 **The risk:** "this Saturday" or "the 12th" becomes the wrong `date_from`, and
 the answer is right about the wrong day.
@@ -363,6 +363,20 @@ two end dates as two single days, and the model never asked the tool for the
 range: 7, 14 and 31 days all came back as 8 rows. It predates booking types
 and applies to villa too. Not fixed there, because `dates.ts` is prompt text
 and a change to it needs its own battery run.
+
+**Fixed 2026-09-28, with that battery run.** `dates.ts` now joins two
+single dates into one span when only a connector stands between them ("to",
+"until", "till", "through", "hanggang", a dash, "between … and"), rolls a
+bare weekday forward when it is the second end ("Friday to Sunday" said on a
+Sunday is the Sunday after that Friday), and reads a night count within
+three words of a date as the nights slept ("10 October for 2 nights" is the
+10th and 11th; D-073's rows). ONE call, `date_from` and `date_to`. 18 unit
+tests; battery 57/58 with two new cases, `date-range` (one call
+`2026-10-09..2026-10-12`, both ends named) and `date-nights`
+(`2026-10-12..2026-10-13`); every prompt snapshot byte-identical, because
+the lines only exist on an availability turn. What is still not prevented:
+a single date resolved wrongly, which the "Checked availability" box makes
+visible, as before.
 
 ---
 

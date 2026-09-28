@@ -36,6 +36,15 @@
 //     first; what is left is Sunday.
 //   - "may" is the English month AND Tagalog "there is" ("May 2 rooms ba?").
 //     "may" counts as the month only as "5 May" or "May 5, 2027".
+//
+// RANGES (R-15, fixed 2026-09-28): two single dates joined by "to", "until",
+// "till", "through", "hanggang", a dash, or "between … and" become ONE
+// range, so "from 10 to 12 October" is checked as date_from/date_to, not as
+// two separate days with the days between unasked. And a night count next
+// to a single date ("10 October for 2 nights", "dalawang gabi mula 10
+// October") extends it to the nights of the stay: 2 nights from the 10th is
+// the 10th and the 11th, checking out on the 12th. Both are decided here,
+// so the tool is called once for the whole span (planDates).
 
 /** One date expression found in a message, and what it resolves to. */
 export interface DateMention {
@@ -121,10 +130,39 @@ const NUMBERS: Record<string, number> = {
 const NUMBER = `\\d{1,2}|${Object.keys(NUMBERS).join('|')}`;
 const toNumber = (word: string): number => NUMBERS[word] ?? Number(word);
 
+/** What may stand between two dates to make them one range (R-15). */
+const CONNECTOR = /^\s*(?:to|until|till|through|thru|hanggang|-|–|—)\s*$/;
+/** "between <date> and <date>": "and" joins only after "between". */
+const BETWEEN_BEFORE = /\b(?:between|sa\s+pagitan\s+ng)\s*$/;
+const AND_BETWEEN = /^\s*(?:and|at)\s*$/;
+/**
+ * "… for 2 nights", "…, dalawang gabi", within three words after a date
+ * ("10 October free for 2 nights"). Group 1 is the words skipped, group 2
+ * the night count text, group 3 the number.
+ */
+const NIGHTS_AFTER = new RegExp(
+  `^(\\s*(?:[\\p{L}\\d-]+\\s+){0,3}?)(,?\\s*(?:for\\s+|ng\\s+|na\\s+|x\\s*)?(${NUMBER})(?:\\s+na)?\\s*(?:nights?|gabi)\\b)`,
+  'u',
+);
+/**
+ * "2 nights from …", "dalawang gabi mula …", within three words before a
+ * date. Group 1 is the night count text, group 2 the number, group 3 the
+ * words skipped.
+ */
+const NIGHTS_BEFORE = new RegExp(
+  `((${NUMBER})(?:\\s+na)?\\s*(?:nights?|gabi),?\\s*(?:from|starting|start|mula|simula|sa|ng|on)?\\s*(?:sa\\s+)?)((?:[\\p{L}\\d-]+\\s+){0,3}?)$`,
+  'u',
+);
+
 // --- the rules --------------------------------------------------------------------
 
 type Range = { from: string; to: string; alternative?: { from: string; to: string } };
-type Rule = { pattern: RegExp; resolve: (m: RegExpExecArray, today: string) => Range | null };
+type Rule = {
+  pattern: RegExp;
+  resolve: (m: RegExpExecArray, today: string) => Range | null;
+  /** A bare weekday name: as the second end of a range it rolls forward past the first (R-15). */
+  weekday?: true;
+};
 
 const day = (date: string): Range => ({ from: date, to: date });
 
@@ -251,6 +289,7 @@ const RULES: Rule[] = [
   {
     pattern: new RegExp(`\\b(?:this(?:\\s+coming)?|ngayong|on|sa)\\s+(${WEEKDAY})\\b(?:\\s+na\\s+ito)?|\\b(${WEEKDAY})\\b(?:\\s+na\\s+ito)?`, 'g'),
     resolve: (m, today) => day(coming(today, WEEKDAYS[(m[1] ?? m[2])!]!)),
+    weekday: true,
   },
 
   // Today, after "ngayong <day|week|weekend>" had its turn.
@@ -278,16 +317,20 @@ export function resolveDates(message: string, today: string): DateMention[] {
 /** The mentions, and the message with every one of them blanked out. */
 function scan(message: string, today: string): { mentions: DateMention[]; rest: string } {
   // Lower-cased, and apostrophes and punctuation turned to spaces, but digits,
-  // hyphens and commas kept for "2026-09-30" and "September 30, 2026".
-  let text = message.toLowerCase().replace(/[^\p{L}\d,\-\s]/gu, ' ');
-  const found: { index: number; mention: DateMention }[] = [];
+  // hyphens, dashes and commas kept for "2026-09-30", "10 – 12 Oct" and
+  // "September 30, 2026".
+  let text = message.toLowerCase().replace(/[^\p{L}\d,\-–—\s]/gu, ' ');
+  const original = text;
+  const found: { index: number; end: number; weekday?: true; mention: DateMention }[] = [];
 
   for (const rule of RULES) {
     rule.pattern.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = rule.pattern.exec(text)) !== null) {
       const range = rule.resolve(m, today);
-      if (range) found.push({ index: m.index, mention: { phrase: m[0].trim(), ...range } });
+      if (range) {
+        found.push({ index: m.index, end: m.index + m[0].length, weekday: rule.weekday, mention: { phrase: m[0].trim(), ...range } });
+      }
     }
     // Blank out what this rule matched, so a shorter rule cannot match inside
     // it ("tomorrow" inside "day after tomorrow").
@@ -299,12 +342,70 @@ function scan(message: string, today: string): { mentions: DateMention[]; rest: 
     let m: RegExpExecArray | null;
     while ((m = BUKAS.exec(text)) !== null) {
       if (OPEN_BEFORE.test(text.slice(0, m.index))) continue;
-      found.push({ index: m.index, mention: { phrase: 'bukas', ...day(addDays(today, 1)) } });
+      found.push({ index: m.index, end: m.index + 5, mention: { phrase: 'bukas', ...day(addDays(today, 1)) } });
       text = text.slice(0, m.index) + ' '.repeat(5) + text.slice(m.index + 5);
     }
   }
+  found.sort((a, b) => a.index - b.index);
+  const blank = (from: number, to: number) => {
+    text = text.slice(0, from) + ' '.repeat(to - from) + text.slice(to);
+  };
 
-  return { mentions: found.sort((a, b) => a.index - b.index).map((f) => f.mention), rest: text };
+  // RANGES (R-15). Two unambiguous single days in order, with only a
+  // connector between them, are one span from the first to the second. The
+  // connector is blanked too, so a bare "from the 10th to the 12th?" reads
+  // as date-only (isDateOnly).
+  const joined: typeof found = [];
+  for (let i = 0; i < found.length; i++) {
+    const cur = found[i]!;
+    const nxt = found[i + 1];
+    if (nxt && !cur.mention.alternative && !nxt.mention.alternative && cur.mention.from === cur.mention.to && nxt.mention.from === nxt.mention.to) {
+      const between = text.slice(cur.end, nxt.index);
+      if (CONNECTOR.test(between) || (BETWEEN_BEFORE.test(text.slice(0, cur.index)) && AND_BETWEEN.test(between))) {
+        // "Friday to Sunday" said on a Sunday: the coming Sunday is today,
+        // before that Friday. The Sunday meant is the one after the Friday.
+        let end = nxt.mention.from;
+        if (nxt.weekday) while (end <= cur.mention.from) end = addDays(end, 7);
+        if (cur.mention.from < end) {
+          blank(cur.end, nxt.index);
+          joined.push({
+            index: cur.index,
+            end: nxt.end,
+            mention: { phrase: original.slice(cur.index, nxt.end).trim(), from: cur.mention.from, to: end },
+          });
+          i++;
+          continue;
+        }
+      }
+    }
+    joined.push(cur);
+  }
+
+  // NIGHTS. "10 October for 2 nights" is the 10th and the 11th: the nights
+  // slept, which are the rows a stay is made of (customer-booking D-073).
+  for (let i = 0; i < joined.length; i++) {
+    const cur = joined[i]!;
+    if (cur.mention.alternative || cur.mention.from !== cur.mention.to) continue;
+    const after = text.slice(cur.end, joined[i + 1]?.index ?? text.length);
+    const before = text.slice(joined[i - 1]?.end ?? 0, cur.index);
+    const a = NIGHTS_AFTER.exec(after);
+    const b = a ? null : NIGHTS_BEFORE.exec(before);
+    const m = a ?? b;
+    if (!m) continue;
+    const nights = toNumber(a ? a[3]! : b![2]!);
+    if (nights < 1) continue;
+    cur.mention.to = addDays(cur.mention.from, nights - 1);
+    if (a) {
+      cur.mention.phrase = `${cur.mention.phrase} ${a[2]!.trim()}`;
+      blank(cur.end + a[1]!.length, cur.end + a[0].length);
+    } else {
+      const start = cur.index - b![0].length;
+      cur.mention.phrase = `${b![1]!.trim()} ${cur.mention.phrase}`;
+      blank(start, start + b![1]!.length);
+    }
+  }
+
+  return { mentions: joined.map((f) => f.mention), rest: text };
 }
 
 // --- is this an availability question? ------------------------------------------
@@ -330,7 +431,7 @@ export function asksAvailability(message: string): boolean {
 const FILLER = new Set(
   (
     'how about what and or the on for then ok okay so paano kung naman po ba sa eh e yung ung ang sige pala na lang ' +
-    'din rin pwede puwede ano if'
+    'din rin pwede puwede ano if from mula simula between'
   ).split(' '),
 );
 

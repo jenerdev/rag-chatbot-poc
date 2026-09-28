@@ -5982,3 +5982,40 @@ requests for one night) and trap 20 (why the older SQL files skip steps).
 
 **Observed:** nothing new was run in this phase; every number quoted is
 from the phase that measured it, and cited by check number.
+
+## R-15, the range half: "from X to Y" is one call · done 2026-09-28
+
+**What:** `packages/rag/src/dates.ts` resolves a range as a range. Two
+single dates with only a connector between them ("to", "until", "till",
+"through", "hanggang", a dash, "between … and") become one span; a bare
+weekday as the second end rolls forward past the first ("Friday to Sunday"
+on a Sunday is the Sunday after that Friday); a night count within three
+words of a date ("10 October for 2 nights", "dalawang gabi mula 10
+October") extends it to the nights slept. `planDates` then runs ONE
+`check_availability` with `date_from` and `date_to`.
+
+**Why it matters:** booking-types Phase 6 found "which rooms are free from
+X to Y?" checked as two single days, with everything between unasked, and
+7, 14 and 31 days all answered from 8 rows. Multi-night stays (D-073) made
+that the normal question.
+
+**Observed:**
+- 18 new unit tests, every shape above, plus the ones that must NOT join
+  ("Friday and Monday" stays two days; out of order stays two; an ambiguous
+  "next Friday" never joins; harbor's "Night" slot is not a night count);
+- Northwind's, villa's and harbor's prompt snapshots byte-identical: the
+  lines exist only on an availability turn, which the snapshot is not;
+- battery **57/58**: `date 11/11` with the two new cases. `date-range`
+  ("from 9 October to 12 October") made one call, `2026-10-09..2026-10-12`,
+  and named both ends; `date-nights` ("12 October for 2 nights") made one
+  call, `2026-10-12..2026-10-13`, and answered in Taglish naming the date.
+  Every other group at its baseline; `lang-followup` passed (its 1 in 3).
+
+**Trap met: "Friday to Sunday" on a Sunday.** The first test run joined
+nothing, because "Sunday" resolved to today, which is before the Friday.
+The test's expectation was right and the code was wrong: the second end,
+when it is a bare weekday, must be the next one after the first end.
+
+**Trap met: the night count is not always adjacent.** "10 October free for
+2 nights" has a word between the date and the count. Up to three words are
+skipped on either side; the skipped words are not blanked, only the count.

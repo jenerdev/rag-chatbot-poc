@@ -1045,11 +1045,25 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — R-15's range half fixed (`dates.ts`)
+- **Built:** a merge pass in `scan()`: two single dates joined by a
+  connector become one span; a bare weekday as the second end rolls
+  forward; "for N nights" / "dalawang gabi" within three words of a date
+  extends it to the nights slept. Connectors are blanked, so a bare range
+  is date-only. 18 unit tests (pipeline 301 → 319).
+- **Observed:** all three prompt snapshots byte-identical; battery **57/58**
+  (`original 9/10 · tool 9/9 · lang 10/10 · date 11/11 · rooms 13/13 ·
+  book 5/5`; `lang-followup` on its 1-in-3 pass). `date-range`: ONE call
+  `2026-10-09..2026-10-12`, both ends named; `date-nights`: `2026-10-12..
+  2026-10-13`. Expect 56/58 from here.
+- **Next:** nothing owed. Open: R-30, payments.md (on hold), subdomains.
+
 ### 2026-09-28 — customer booking merged
 - `feat/customer-booking` fast-forwarded into `master` (10 commits,
   `9bacea7..69a3ae5`) and deleted. Nothing pushed.
-- **Open:** R-15 (date ranges), R-30 (`storage-orphans.mjs`), R-38/R-39
-  when abuse is seen, payments.md (on hold), the subdomain backlog item.
+- **Open:** R-30 (`storage-orphans.mjs`), R-38/R-39 when abuse is seen,
+  payments.md (on hold), the subdomain backlog item. R-15's range half was
+  fixed the same day (below).
 
 ### 2026-09-28 — customer booking Phase 7 (the record)
 - **Written:** D-069–D-073 (D-037 and D-042 headers note the amendments),

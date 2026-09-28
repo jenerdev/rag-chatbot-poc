@@ -820,6 +820,28 @@ const CASES = [
     note: 'a past date is explained, not refused (Taglish once answered the bare refusal)',
   },
   {
+    id: 'date-range',
+    tenant: 'villa',
+    want: 'date',
+    turns: [`Is anything free from ${words(NEXT, false)} to ${words(FREE, false)}?`],
+    check: (last) => ({
+      ok: checked(last, NEXT, FREE) && namesDate(last.reply, NEXT) && namesDate(last.reply, FREE),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names both ends: ${namesDate(last.reply, NEXT)}/${namesDate(last.reply, FREE)}`,
+    }),
+    note: 'R-15: "from X to Y" is ONE call with date_from and date_to, not two single days',
+  },
+  {
+    id: 'date-nights',
+    tenant: 'villa',
+    want: 'date',
+    turns: [`Available ba kayo ${words(FREE, false)} for 2 nights?`],
+    check: (last) => ({
+      ok: checked(last, FREE, plus(15)) && namesDate(last.reply, FREE),
+      detail: `calls: ${JSON.stringify(callsFor(last).map((c) => c.args))}; names the date: ${namesDate(last.reply, FREE)}`,
+    }),
+    note: '"for 2 nights" is the two nights slept: date_from the date, date_to the day after',
+  },
+  {
     id: 'date-docs',
     tenant: 'villa',
     want: 'date',
