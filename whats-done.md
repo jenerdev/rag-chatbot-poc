@@ -5681,3 +5681,28 @@ a normal page with a form, so it can be built and tested without touching
 verify 76/76, pipeline isolation 20/20 both ways, bookings isolation 23/23
 both ways, rooms 20/20, Northwind's snapshot and villa's tool definitions
 byte-identical to their baselines. The battery was not run.
+
+## Customer booking, Phase 0: the baseline · done 2026-09-28
+
+**What:** before any change for the booking page, holiday pricing and stays
+(`plan/customer-booking.md`), saved what "unchanged" has to mean, on
+`feat/customer-booking` from `9bacea7`.
+
+**Why it matters:** Rule 1 of the plan is that the chat does not change.
+That can only be proven by a diff against something taken before the first
+edit, and § 2.5 changes what "taken" means, so today's availability had to
+be on record too.
+
+**Observed, all in `plan/baseline/*-pre-customer-booking*`:**
+- tests 13 / 14 / 72 / 301, typecheck green; verify 76/76; pipeline
+  isolation 20/20 both ways; bookings isolation 23/23 both ways; rooms 20/20;
+- Northwind's snapshot is byte-identical to `northwind-prompt-pre-bookings.txt`
+  and villa's tool definitions to `villa-tools-pre-booking-types.txt`;
+  villa's prompt differs only in its dated line. Harbor's tool definitions
+  are saved new: they no longer match the booking-types Phase 6 copy,
+  because extra-guests Phase 4 changed them;
+- availability 2026-09-28..10-11: villa 42 of 42 open, harbor 56 of 56
+  (4 active rooms × 14 days). There are no `pending` rows anywhere, which
+  § 2.5 relies on;
+- battery **49/51**, the known two (`antecedent`, D-017; `lang-followup`,
+  D-043).

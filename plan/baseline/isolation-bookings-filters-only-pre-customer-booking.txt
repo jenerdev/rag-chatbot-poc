@@ -1,0 +1,39 @@
+WALL: code filters alone (service client, RLS bypassed)
+PASS  northwind: bookings not enabled, 404  — Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind"
+PASS  villa: 1 unit, 3 slots  — Whole property · 22-Hour Whole Day 08:00, Day Tour 08:00, Overnight 14:00
+[bookings] villa booked #1077: 2027-07-25, unit 1, slot 2, confirmed
+PASS  villa: booking created  — #1077 2027-07-25 Overnight
+PASS  villa: the same slot again is a 409  — That slot on 2027-07-25 overlaps an existing booking.
+[bookings] villa availability 2027-07-25..2027-07-25: 0 open of 3
+PASS  villa: availability shows the booking as taken  — 22-Hour Whole Day taken, Day Tour taken, Overnight taken
+PASS  villa: availability carries no guest data  — keys: date,slot,status,unit
+PASS  probe: listBookings does not include villa's booking  — 0 rows
+[bookings] bookings-probe availability 2027-07-25..2027-07-25: 1 open of 1
+PASS  probe: availability shows only its own unit, all open  — Probe unit/Probe slot open
+PASS  probe: cannot cancel villa's booking  — returned false, villa's is still confirmed
+PASS  probe: a nonexistent id gives the same false  — returned false
+PASS  probe: villa's unit looks exactly like no unit  — "No such unit or slot." vs "No such unit or slot."
+PASS  villa: yesterday is refused  — 2026-09-27 is in the past. Today is 2026-09-28.
+[bookings] rooms-iso-a added room #303 "A Room"
+[bookings] rooms-iso-b added room #304 "B Room"
+[bookings] rooms-iso-a rates for room #303: slot 238 100000/100000
+[bookings] rooms-iso-b rates for room #304: slot 239 200000/200000
+[bookings] rooms-iso-b photo #190 for room #304: 162/304/6a75c7b8-187b-44e6-8945-8556d61ae8b2.png, 70 bytes
+[bookings] rooms-iso-b booked #1081: 2027-07-25, unit 304, slot 239, confirmed
+PASS  rooms A: lists only its own rooms; B's room is null  — A Room · B's room: null
+PASS  rooms A: cannot change B's room, rates or photo order  — rename null · rates null · order false · a missing room null
+PASS  rooms A: cannot remove, add or list B's photos  — remove false · add null · list 0
+PASS  rooms B: untouched by everything A tried  — {"unit":{"name":"B Room","capacity":2,"standard_capacity":2,"extra_person_rate":25000,"active":true},"rate":{"weekday_price":200000},"objects":1,"photo":{"sort_order":0}}
+PASS  rooms A: B's room quotes and books like no room, and a mixed group saves nothing  — quote "No such unit or slot." vs "No such unit or slot." · group "No such unit or slot." · A's rows 0
+PASS  rooms A: filtering by B's room shows nothing; B sees its booking  — A filtered 0 · B 1
+[bookings] rooms-iso-a rooms 2027-07-25..2027-07-25: 1 open of 1
+[bookings] rooms-iso-b rooms 2027-07-25..2027-07-25: 0 open of 1
+PASS  rooms: each tenant's room availability is its own  — A: A Room open · B: B Room taken
+[bookings] harbor rooms 2027-07-25..2027-07-25: 4 open of 4
+PASS  harbor: its rooms only, no probe's  — Garden Room, Family Room, Loft, Sea View Suite
+PASS  villa: every room function is a 404  — "villa" does not book by room | "villa" does not book by room | "villa" does not book by room
+PASS  rooms A: cannot change B's standard, fee or maximum, nor quote a party in B's room  — update null · quote "No such unit or slot." · B still 2/2 +25000
+[bookings] rooms-iso-b removed photo #190: 162/304/6a75c7b8-187b-44e6-8945-8556d61ae8b2.png
+PASS  rooms B: its own photo is served, and it can remove it  — served 200 · removed true · objects left 0
+
+ALL BOOKINGS ISOLATION CHECKS PASS

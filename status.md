@@ -154,7 +154,8 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-next is Phase 0, the baseline). For the MVP the chatbot only explains how to book; customers book
+Phase 0, the baseline, done 2026-09-28 on
+`feat/customer-booking`; next is Phase 1, the schema). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1041,6 +1042,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 0 (baseline)
+- **Observed, from `9bacea7`** (`plan/baseline/*-pre-customer-booking*`):
+  tests 13 / 14 / 72 / 301; verify 76/76; isolation 20/20 and 23/23 both
+  ways; rooms 20/20; Northwind's snapshot and villa's tools byte-identical;
+  villa 42/42 and harbor 56/56 open over 14 days; battery 49/51 (the known
+  `antecedent` and `lang-followup`).
+- **Next:** Phase 1, `schema-customer-booking.sql`.
 
 ### 2026-09-28 — payments on hold; booking moves to its own page
 - **Decided by the user:** for the MVP, booking is separate from the chat.

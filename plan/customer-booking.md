@@ -361,6 +361,17 @@ pipeline isolation 20/20 both ways, bookings isolation 23/23 both ways,
 rooms 20/20, the test counts, and villa's and harbor's availability for the
 next 14 days. **Done when** all are saved from one commit.
 
+> **Done 2026-09-28, from `9bacea7`** on `feat/customer-booking`. Tests
+> 13 / 14 / 72 / 301, typecheck green; verify 76/76; pipeline isolation
+> 20/20 both ways; bookings isolation 23/23 both ways; rooms 20/20. Northwind's
+> snapshot byte-identical to `northwind-prompt-pre-bookings.txt`; villa's
+> tool definitions byte-identical to `villa-tools-pre-booking-types.txt`;
+> villa's prompt differs from its booking-types baseline only in the
+> `Today is …` line. Availability 2026-09-28..10-11: villa 42 of 42 open,
+> harbor 56 of 56 (4 active rooms × 14). Battery **49/51**
+> (`original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13`), the
+> known two: `antecedent` and `lang-followup`.
+
 ### Phase 1 — Schema
 
 Run `schema-customer-booking.sql` (the user runs it, as before), then the

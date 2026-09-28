@@ -1,0 +1,76 @@
+$ turbo test
+• turbo 2.11.2
+
+   • Packages in scope: @rag/bookings, @rag/chunker, @rag/db, @rag/openai, @rag/pipeline, @rag/tsconfig, web
+   • Running test in 7 packages
+   • Remote caching disabled
+
+@rag/chunker:test: cache hit, replaying logs b4f3fe0bf7016d78
+@rag/openai:test: cache hit, replaying logs 4b6eb6dc52c9283a
+@rag/chunker:test: $ vitest run
+@rag/chunker:test: 
+@rag/chunker:test:  RUN  v2.1.9 C:/Users/65813/Desktop/Projects/implementations/rag-chatbot-poc/packages/chunker
+@rag/chunker:test: 
+@rag/chunker:test:  ✓ src/index.test.ts (13 tests) 23ms
+@rag/openai:test: $ vitest run
+@rag/openai:test: 
+@rag/chunker:test: 
+@rag/chunker:test:  Test Files  1 passed (1)
+@rag/chunker:test:       Tests  13 passed (13)
+@rag/openai:test:  RUN  v2.1.9 C:/Users/65813/Desktop/Projects/implementations/rag-chatbot-poc/packages/openai
+@rag/openai:test: 
+@rag/chunker:test:    Start at  18:34:48
+@rag/openai:test:  ✓ src/index.test.ts (14 tests) 70ms
+@rag/openai:test: 
+@rag/chunker:test:    Duration  4.77s (transform 1.38s, setup 0ms, collect 1.44s, tests 23ms, environment 0ms, prepare 1.57s)
+@rag/chunker:test: 
+@rag/openai:test:  Test Files  1 passed (1)
+@rag/openai:test:       Tests  14 passed (14)
+@rag/openai:test:    Start at  18:34:48
+@rag/openai:test:    Duration  4.84s (transform 1.41s, setup 0ms, collect 1.45s, tests 70ms, environment 0ms, prepare 1.59s)
+@rag/openai:test: 
+@rag/openai:build: cache hit, replaying logs 25c2dfd0d02e42be
+@rag/openai:build: $ tsc -p tsconfig.json
+@rag/chunker:build: cache hit, replaying logs 5f89fccf5eecf7b5
+@rag/chunker:build: $ tsc -p tsconfig.json
+@rag/db:build: cache hit, replaying logs f6497c8125188f1d
+@rag/db:build: $ tsc -p tsconfig.json
+@rag/bookings:test: cache hit, replaying logs 79e7290d14a9b620
+@rag/bookings:test: $ vitest run
+@rag/bookings:test: 
+@rag/bookings:test:  RUN  v2.1.9 C:/Users/65813/Desktop/Projects/implementations/rag-chatbot-poc/packages/bookings
+@rag/bookings:test: 
+@rag/bookings:test:  ✓ src/booking-types.test.ts (45 tests) 27ms
+@rag/bookings:test:  ✓ src/validate.test.ts (27 tests) 172ms
+@rag/bookings:test: 
+@rag/bookings:test:  Test Files  2 passed (2)
+@rag/bookings:test:       Tests  72 passed (72)
+@rag/bookings:test:    Start at  18:34:48
+@rag/bookings:test:    Duration  5.02s (transform 2.72s, setup 0ms, collect 2.97s, tests 199ms, environment 2ms, prepare 4.30s)
+@rag/bookings:test: 
+@rag/bookings:build: cache hit, replaying logs 3b67d1bd97a69ddd
+@rag/bookings:build: $ tsc -p tsconfig.json
+@rag/pipeline:test: cache hit, replaying logs 0ac52612e3750aff
+@rag/pipeline:test: $ vitest run
+@rag/pipeline:test: 
+@rag/pipeline:test:  RUN  v2.1.9 C:/Users/65813/Desktop/Projects/implementations/rag-chatbot-poc/packages/rag
+@rag/pipeline:test: 
+@rag/pipeline:test:  ✓ src/prompt.test.ts (7 tests) 22ms
+@rag/pipeline:test:  ✓ src/refusal.test.ts (20 tests) 24ms
+@rag/pipeline:test:  ✓ src/language.test.ts (55 tests) 48ms
+@rag/pipeline:test:  ✓ src/greeting.test.ts (101 tests) 86ms
+@rag/pipeline:test:  ✓ src/dates.test.ts (99 tests) 174ms
+@rag/pipeline:test:  ✓ src/tools.test.ts (19 tests) 136ms
+@rag/pipeline:test: 
+@rag/pipeline:test:  Test Files  6 passed (6)
+@rag/pipeline:test:       Tests  301 passed (301)
+@rag/pipeline:test:    Start at  18:34:49
+@rag/pipeline:test:    Duration  4.55s (transform 8.86s, setup 0ms, collect 9.80s, tests 490ms, environment 2ms, prepare 4.52s)
+@rag/pipeline:test: 
+@rag/pipeline:build: cache hit, replaying logs 0059e939a880a59e
+@rag/pipeline:build: $ tsc -p tsconfig.json
+
+ Tasks:    9 successful, 9 total
+Cached:    9 cached, 9 total
+  Time:    231ms >>> FULL TURBO
+

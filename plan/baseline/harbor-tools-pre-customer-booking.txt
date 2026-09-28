@@ -1,0 +1,48 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "check_availability",
+      "description": "Check which of Harbor Inn's rooms are open or taken, and what each costs, for one date or a range of dates. The rooms are: Garden Room (up to 2 guests); Family Room (up to 6 guests); Loft (up to 3 guests); Sea View Suite (up to 2 guests). The booking periods are: Night (from 14:00, 22 hours). Dates are YYYY-MM-DD in Asia/Manila. A range is at most 31 days. Returns one row per date, room and period: the room, how many guests it holds, \"open\" or \"taken\", and the room's base price for that date in PHP. The base price covers the room's included guests; each guest above that adds the room's extra guest fee, up to the most it holds. Pass guests to get the total for that party.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "description": "The first date to check, YYYY-MM-DD."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "The last date to check, YYYY-MM-DD. Omit it to check one date."
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "Night"
+            ],
+            "description": "Only this booking period. Omit it for every period."
+          },
+          "room": {
+            "type": "string",
+            "enum": [
+              "Garden Room",
+              "Family Room",
+              "Loft",
+              "Sea View Suite"
+            ],
+            "description": "Only this room, when the user names one. Omit it for every room."
+          },
+          "guests": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many guests will stay, when the user says. Only rooms that hold that many are returned, each with its total for that many guests."
+          }
+        },
+        "required": [
+          "date_from"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+]
