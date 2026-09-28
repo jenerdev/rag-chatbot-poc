@@ -151,14 +151,16 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 = total) and a booking row's breakdown. Then delete
 `walk-harbor@example.com` and merge `feat/booking-types` into `master`.
 
-**Then:** [`plan/payments.md`](./plan/payments.md), Phase 0. Also open: the
-date-range finding (R-15), and `storage-orphans.mjs`, planned but not built
-(R-30).
+**Then:** a **separate customer booking page** (decided 2026-09-28, not yet
+planned). For the MVP the chatbot only explains how to book; customers book
+on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
+is **on hold**. Also open: the date-range finding (R-15), and
+`storage-orphans.mjs`, planned but not built (R-30).
 
 The browser walk of D-047–D-049 was done 2026-09-28 (session log).
 
-**Payments (booking lifecycle + manual verification): plan drafted
-2026-09-27**, in [`plan/payments.md`](./plan/payments.md). Nothing built;
+**Payments (booking lifecycle + manual verification): ON HOLD since
+2026-09-28**; plan drafted 2026-09-27, in [`plan/payments.md`](./plan/payments.md). Nothing built;
 needs booking-types first. § 9 answered: payments are `per_room` only
 (villa keeps Viber), the model quotes and a button books, email via Resend.
 Roles, phone, proof retention and deployment deferred to their phases.
@@ -1037,6 +1039,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — payments on hold; booking moves to its own page
+- **Decided by the user:** for the MVP, booking is separate from the chat.
+  The chatbot only explains how to book; a separate customer page does the
+  booking. `plan/payments.md` is on hold (note at its top).
+- **Payments Phase 0 was started, then stopped** before the battery. Observed
+  before stopping, from `2f7cf3c`: tests 13 / 14 / 72 / 301, typecheck green,
+  verify 76/76, pipeline isolation 20/20 both ways, bookings isolation 23/23
+  both ways, rooms 20/20; Northwind's snapshot and villa's tool definitions
+  byte-identical to their baselines; villa's prompt differs only in its
+  "Today is …" line. The files were not kept and `feat/payments` was deleted.
+- **Next:** plan the customer booking page.
 
 ### 2026-09-28 — the browser walk of D-047–D-049
 - **Done by the user** at `/t/villa`, then read back from villa's `messages`.

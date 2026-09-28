@@ -5664,3 +5664,20 @@ three fallbacks are now walked, with nothing owed.
 **Limit of the evidence:** `messages` stores the marker, so the line shown
 is worked out from the language, not read from the database.
 
+
+## Payments put on hold; booking gets its own page · decided 2026-09-28
+
+**What:** the user put `plan/payments.md` on hold. For the MVP, booking is
+separate from the chat: the chatbot explains how to book, and customers book
+on a separate page (not planned yet). Payments Phase 0 had started; its
+baselines were not kept.
+
+**Why it matters:** the chat stays read-only exactly as today (D-037), with
+no quote tool and no "Book this" button in the conversation. Booking becomes
+a normal page with a form, so it can be built and tested without touching
+`buildPrompt()` or the battery.
+
+**Observed before stopping** (from `2f7cf3c`): tests 13 / 14 / 72 / 301,
+verify 76/76, pipeline isolation 20/20 both ways, bookings isolation 23/23
+both ways, rooms 20/20, Northwind's snapshot and villa's tool definitions
+byte-identical to their baselines. The battery was not run.

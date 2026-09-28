@@ -6,6 +6,11 @@
 > pending_verification → confirmed`, with `cancelled`, `expired` and
 > `completed` beside them, and a separate payment status.
 >
+> **ON HOLD since 2026-09-28** (the user's decision). For the MVP, booking is
+> separate from the chat: the chatbot only explains how to book, and
+> customers book on their own page. Nothing in this plan was built; Phase 0's
+> baseline was started and not kept. Revisit after that booking page exists.
+>
 > Written 2026-09-27, against `3eaba16` on `master`. **Status: agreed,
 > nothing built.** Payments are **`per_room` only**; the email provider is
 > Resend (§ 9). Roles, phone, retention and deployment are deferred to
