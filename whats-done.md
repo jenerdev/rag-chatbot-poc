@@ -5830,3 +5830,35 @@ holds whoever calls. All three are now observed over HTTP, not assumed.
 **Limit of the evidence:** the per-IP window is per process. `pnpm dev` is
 one process, so check 9 proves the code, not the behaviour on Vercel,
 where several instances each keep their own count (R-39).
+
+## Customer booking, Phase 4: the screens · code done 2026-09-28, walk owed
+
+**What:** S-6, the public booking page at `/t/<slug>/book`; S-7, the staff
+Holidays screen; a Requests section on the Bookings screen; and a **Book**
+button in the chat, shown only when the tenant has a page to open
+(`hasBookingPage()`, new in `@rag/bookings`).
+
+**Why it matters:** it is the whole of the MVP's new booking flow, and the
+chat stays out of it: the button is UI, not a model reply, so no prompt or
+tool changed.
+
+**Observed from the running dev server:**
+- `/t/villa/book` and `/t/harbor/book` 200; `/t/northwind/book` 404, the
+  ordinary "No such workspace"; the Holidays page likewise;
+- the chat's Book link on villa and harbor, and none on northwind;
+- villa's real data through the open quote route: a 2-night Overnight from
+  29 Oct for 32 guests is 1650000 + 2050000, and `available: false`,
+  because a real confirmed Day Tour on 30 Oct (#56, 08:00–17:00) overlaps
+  the first night (14:00 to 12:00). That is the constraint's own test, seen
+  from the page;
+- typecheck clean.
+
+**Trap avoided: a quote on every render.** The list of units offered for
+the slot was rebuilt on every render; the rooms depended on it, and the
+quote effect on the rooms, so the page would have asked the server for a
+price in a loop. It is memoised on the slot.
+
+**Limit of the evidence:** nothing here was clicked. The server-rendered
+HTML and the routes were checked; the forms, the receipt and the staff
+buttons are the user's browser walk (status.md). No `next build` was run,
+because dev was running (trap 16).

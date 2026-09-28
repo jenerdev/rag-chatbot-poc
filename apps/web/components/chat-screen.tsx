@@ -33,6 +33,12 @@ export interface ChatScreenProps {
   bannerUrl: string | null;
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
+  /**
+   * The customer booking page, or null when this tenant has none
+   * (plan/customer-booking.md § 8 q5). A button, not a link in the model's
+   * reply: the chat renders no links, and the model never books (D-037).
+   */
+  bookingUrl: string | null;
 }
 
 type Turn =
@@ -63,6 +69,7 @@ export function ChatScreen({
   logoUrl,
   bannerUrl,
   documentCount,
+  bookingUrl,
 }: ChatScreenProps) {
   const api = `/api/t/${slug}`;
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -267,6 +274,11 @@ export function ChatScreen({
         <button className="link" type="button" onClick={newChat}>
           New chat
         </button>
+        {bookingUrl && (
+          <Link className="button primary" href={bookingUrl}>
+            Book
+          </Link>
+        )}
         <Link className="button" href={`/t/${slug}/admin`}>
           Knowledge base
         </Link>

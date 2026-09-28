@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { hasBookingPage } from '@rag/bookings';
 import { countDocuments } from '@rag/pipeline';
 import { ChatScreen } from '@/components/chat-screen';
+import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { getTenant } from '@/lib/tenant';
 
@@ -15,7 +17,13 @@ export default async function TenantChatPage({ params }: { params: Promise<{ ten
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
 
-  const [branding, documentCount] = await Promise.all([loadBranding(tenant), countDocuments(tenant)]);
+  // The "Book" button appears only when the booking page would render: the
+  // bookings application, and something with a price (plan § 2.8).
+  const [branding, documentCount, canBook] = await Promise.all([
+    loadBranding(tenant),
+    countDocuments(tenant),
+    hasApplication(tenant, 'bookings').then((has) => has && hasBookingPage(tenant)),
+  ]);
 
   return (
     <ChatScreen
@@ -25,6 +33,7 @@ export default async function TenantChatPage({ params }: { params: Promise<{ ten
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
       documentCount={documentCount}
+      bookingUrl={canBook ? `/t/${tenant.slug}/book` : null}
     />
   );
 }

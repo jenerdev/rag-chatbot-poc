@@ -1,0 +1,485 @@
+'use client';
+
+// S-6 · the customer booking page (plan/customer-booking.md). PUBLIC: a
+// customer picks a slot, a date (and, for an overnight slot, how many nights),
+// what to book and for how many guests, sees the server's price, and sends a
+// REQUEST with their name, mobile number and email.
+//
+// What this screen does NOT do:
+//   - price anything. Every amount is the server's: the quote before, the
+//     stored rows after (plan Rule 3). There is no arithmetic on money here;
+//   - decide availability. The quote says whether a night is already
+//     confirmed, and the server refuses a request for one (409);
+//   - hold a date. A request holds nothing until the resort confirms it
+//     (D-070), and the page says so, before and after sending.
+//
+// Everything the server sends is a React child, so it is escaped, including
+// the tenant's own instructions text (CLAUDE.md § Conventions).
+
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
+import { BrandHeader } from '@/components/brand-header';
+import { formatMoney } from '@/lib/money';
+
+export interface BookingPageScreenProps {
+  slug: string;
+  businessName: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  page: BookingPage;
+}
+
+/** YYYY-MM-DD plus n days, on UTC midnights, so no DST edge shifts the date. */
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "Thu 12 Nov 2026". A calendar date, formatted as UTC because it has no zone. */
+function dateLabel(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** "14:00" → "2:00 PM". */
+function timeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const hour = ((h! + 11) % 12) + 1;
+  return `${hour}:${String(m).padStart(2, '0')} ${h! < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
+ * When a slot that starts at `start` and lasts `duration` ends: how many days
+ * later, and at what wall-clock time. Durations come from Postgres as
+ * "22:00:00" or "1 day 02:00:00". Only for DISPLAY: the stored booking's
+ * `during` is computed in SQL (slot_range), and the receipt shows that.
+ */
+function slotEnd(start: string, duration: string): { days: number; time: string } | null {
+  const match = /^(?:(\d+) days? )?(\d{2}):(\d{2}):\d{2}$/.exec(duration);
+  if (!match) return null;
+  const [sh, sm] = start.split(':').map(Number);
+  const total = sh! * 60 + sm! + Number(match[1] ?? 0) * 1440 + Number(match[2]) * 60 + Number(match[3]);
+  const minutes = total % 1440;
+  return { days: Math.floor(total / 1440), time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` };
+}
+
+/** An ISO instant, shown in the tenant's timezone. */
+function instantLabel(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
+}
+
+type Sent = { receipt: RequestReceipt } | null;
+
+export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page }: BookingPageScreenProps) {
+  const api = `/api/t/${slug}`;
+  const perRoom = page.bookingType === 'per_room';
+
+  // An overnight slot first: it is the one a stay is made of.
+  const [slotId, setSlotId] = useState<number>(() => (page.slots.find((s) => s.nightly) ?? page.slots[0])!.id);
+  const slot = page.slots.find((s) => s.id === slotId)!;
+  const [checkIn, setCheckIn] = useState('');
+  const [nights, setNights] = useState('1');
+  // whole_resort: one unit, one guest count. per_room: ticked rooms, each with its own.
+  const [guests, setGuests] = useState('');
+  const [chosen, setChosen] = useState<Record<number, string>>({});
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  // The honeypot (plan § 2.1): hidden from people, so only a bot fills it.
+  const [website, setWebsite] = useState('');
+
+  const [quote, setQuote] = useState<{ quote: RequestQuote | null; message: string | null }>({ quote: null, message: null });
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<Sent>(null);
+
+  // Only units priced for this slot are offered. Memoised: `rooms` below
+  // depends on it, and the quote effect on `rooms`, so a new array every
+  // render would re-ask the server on every render.
+  const units = useMemo(() => page.units.filter((u) => u.rates.some((r) => r.slotId === slotId)), [page.units, slotId]);
+  const nightCount = slot.nightly ? Number(nights) : 1;
+
+  const rooms = useMemo(() => {
+    if (!perRoom) {
+      const unit = units[0];
+      return unit && guests !== '' ? [{ unitId: unit.id, guests: Number(guests) }] : [];
+    }
+    return Object.entries(chosen)
+      .filter(([id]) => units.some((u) => u.id === Number(id)))
+      .map(([id, g]) => ({ unitId: Number(id), guests: g === '' ? NaN : Number(g) }));
+  }, [chosen, guests, perRoom, units]);
+  const roomsComplete = rooms.length > 0 && rooms.every((r) => Number.isInteger(r.guests) && r.guests > 0);
+  const nightsValid = Number.isInteger(nightCount) && nightCount >= 1 && nightCount <= page.maxNights;
+
+  // The server's price, re-asked whenever the choice changes (debounced).
+  useEffect(() => {
+    if (!checkIn || !roomsComplete || !nightsValid) {
+      setQuote({ quote: null, message: null });
+      return;
+    }
+    let stale = false;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${api}/book/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount }),
+        });
+        const body = await response.json().catch(() => null);
+        if (stale) return;
+        if (!response.ok) setQuote({ quote: null, message: body?.error ?? 'Could not get a price.' });
+        else setQuote({ quote: body as RequestQuote, message: null });
+      } catch {
+        if (!stale) setQuote({ quote: null, message: 'Could not reach the server.' });
+      }
+    }, 300);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [api, checkIn, nightCount, nightsValid, rooms, roomsComplete, slotId]);
+
+  const end = slotEnd(slot.startTime, slot.duration);
+  const checkOut = checkIn && end && nightsValid ? addDays(checkIn, nightCount - 1 + end.days) : null;
+
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSending(true);
+    try {
+      const response = await fetch(`${api}/book/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, name, phone, email, notes: notes || null, website }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(body?.error ?? `The request could not be sent (${response.status}).`);
+        return;
+      }
+      setSent({ receipt: body as RequestReceipt });
+      window.scrollTo({ top: 0 });
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function startOver() {
+    setSent(null);
+    setCheckIn('');
+    setNights('1');
+    setGuests('');
+    setChosen({});
+    setNotes('');
+    setQuote({ quote: null, message: null });
+  }
+
+  const header = (
+    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Book">
+      <Link className="button" href={`/t/${slug}`}>
+        ← Chat
+      </Link>
+    </BrandHeader>
+  );
+
+  // After sending: the receipt, from the STORED rows.
+  if (sent) {
+    const r = sent.receipt;
+    return (
+      <>
+        {header}
+        <main>
+          <section className="card receipt">
+            <h2>Request sent</h2>
+            <p>
+              Your reference is <strong className="reference">{r.reference}</strong>. Keep it: the resort will use it when they
+              contact you.
+            </p>
+            <p className="notice">
+              <strong>This is a request, not a confirmation.</strong> The date is yours once {businessName} confirms it. Until
+              then, someone else may book it.
+            </p>
+            <div className="stay-summary">
+              <div>
+                {r.slot}
+                {r.nights > 1 ? ` · ${r.nights + 1} days, ${r.nights} nights` : ''}
+              </div>
+              <div className="small muted">
+                From {instantLabel(r.startsAt, page.timezone)} to {instantLabel(r.endsAt, page.timezone)}
+              </div>
+            </div>
+            <Lines lines={r.lines} currency={r.currency} total={r.total} />
+            {r.instructions && (
+              <>
+                <h3>What happens next</h3>
+                <div className="instructions">{r.instructions}</div>
+              </>
+            )}
+            <div className="form-footer">
+              <button type="button" onClick={startOver}>
+                Make another request
+              </button>
+            </div>
+          </section>
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {header}
+      <main>
+        <section className="card">
+          <h2>Request a booking</h2>
+          <p className="small muted">
+            Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and
+            contacts you.
+          </p>
+
+          <form onSubmit={send}>
+            <div className="field-row">
+              {page.slots.length > 1 && (
+                <div className="field">
+                  <label htmlFor="slot">What</label>
+                  <select id="slot" value={slotId} onChange={(e) => setSlotId(Number(e.target.value))}>
+                    {page.slots.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — from {timeLabel(s.startTime)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="field">
+                <label htmlFor="check-in">{slot.nightly ? 'Check-in date' : 'Date'}</label>
+                <input
+                  type="date"
+                  id="check-in"
+                  required
+                  min={page.today}
+                  max={page.lastDate}
+                  value={checkIn}
+                  onChange={(e) => setCheckIn(e.target.value)}
+                />
+              </div>
+              {slot.nightly && (
+                <div className="field narrow">
+                  <label htmlFor="nights">Nights</label>
+                  <input
+                    type="number"
+                    id="nights"
+                    min={1}
+                    max={page.maxNights}
+                    step={1}
+                    required
+                    value={nights}
+                    onChange={(e) => setNights(e.target.value)}
+                  />
+                </div>
+              )}
+              {!perRoom && (
+                <div className="field narrow">
+                  <label htmlFor="guests">Guests</label>
+                  <input
+                    type="number"
+                    id="guests"
+                    min={1}
+                    max={units[0]?.capacity ?? undefined}
+                    step={1}
+                    required
+                    value={guests}
+                    onChange={(e) => setGuests(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {checkIn && end && nightsValid && (
+              <div className="small muted stay-line">
+                {slot.nightly && nightCount > 1 ? `${nightCount + 1} days, ${nightCount} nights · ` : ''}
+                {dateLabel(checkIn)}, {timeLabel(slot.startTime)} to {checkOut ? dateLabel(checkOut) : ''}, {timeLabel(end.time)}
+              </div>
+            )}
+            {!perRoom && units[0] && (
+              <div className="small muted">
+                {units[0].standardCapacity !== null && units[0].extraPersonRate
+                  ? `The rate covers ${units[0].standardCapacity} guests; each guest above that is ${formatMoney(units[0].extraPersonRate, page.currency)}. `
+                  : ''}
+                {units[0].capacity !== null ? `At most ${units[0].capacity} guests. ` : ''}
+                {page.guestHint ?? ''}
+              </div>
+            )}
+
+            {perRoom && (
+              <div className="field">
+                <label>Rooms</label>
+                {page.guestHint && <div className="small muted">{page.guestHint}</div>}
+                <div className="room-picks">
+                  {units.map((u) => {
+                    const picked = chosen[u.id] !== undefined;
+                    return (
+                      <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={picked}
+                            onChange={(e) =>
+                              setChosen((current) => {
+                                const next = { ...current };
+                                if (e.target.checked) next[u.id] = '';
+                                else delete next[u.id];
+                                return next;
+                              })
+                            }
+                          />{' '}
+                          {u.name}
+                          {u.capacity !== null && <span className="muted"> · up to {u.capacity}</span>}
+                          {u.standardCapacity !== null && u.extraPersonRate ? (
+                            <span className="muted">
+                              {' '}
+                              · {u.standardCapacity} included, +{formatMoney(u.extraPersonRate, page.currency)} each extra
+                            </span>
+                          ) : null}
+                          {u.description && <span className="room-description">{u.description}</span>}
+                        </label>
+                        {picked && (
+                          <input
+                            type="number"
+                            min={1}
+                            max={u.capacity ?? undefined}
+                            step={1}
+                            placeholder="guests"
+                            aria-label={`Guests in ${u.name}`}
+                            value={chosen[u.id]}
+                            onChange={(e) => setChosen((current) => ({ ...current, [u.id]: e.target.value }))}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(quote.quote || quote.message) && (
+              <div className={`quote${quote.message || (quote.quote && !quote.quote.available) ? ' error' : ''}`}>
+                {quote.quote ? (
+                  <>
+                    {!quote.quote.available && (
+                      <div className="quote-warning">
+                        A night in this stay is already booked. Please choose other dates.
+                      </div>
+                    )}
+                    <Lines lines={quote.quote.lines} currency={quote.quote.currency} total={quote.quote.total} />
+                  </>
+                ) : (
+                  quote.message
+                )}
+              </div>
+            )}
+
+            <h3>Your details</h3>
+            <div className="field-row">
+              <div className="field grow">
+                <label htmlFor="name">Name</label>
+                <input type="text" id="name" required autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="phone">Mobile number</label>
+                <input
+                  type="tel"
+                  id="phone"
+                  required
+                  autoComplete="tel"
+                  placeholder="0917 123 4567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div className="field grow">
+                <label htmlFor="email">Email</label>
+                <input type="email" id="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="notes">
+                Notes <span className="muted">(optional)</span>
+              </label>
+              <input type="text" id="notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+            {/* The honeypot: off-screen, not tabbable, not announced. */}
+            <div className="honeypot" aria-hidden="true">
+              <label htmlFor="website">Website</label>
+              <input type="text" id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            </div>
+
+            {error && <div className="notice error">{error}</div>}
+
+            <div className="form-footer">
+              <span className="small muted">Times are in {page.timezone}.</span>
+              <button
+                type="submit"
+                className="primary"
+                disabled={sending || !quote.quote || !quote.quote.available || !name || !phone || !email}
+              >
+                {sending ? 'Sending…' : 'Send request'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </>
+  );
+}
+
+/** A stay, night by night: each unit's rate, extra guests and holiday surcharge, then the total. */
+function Lines({ lines, currency, total }: { lines: RequestQuote['lines']; currency: string; total: number }) {
+  const dates = [...new Set(lines.map((l) => l.date))];
+  const multipleUnits = new Set(lines.map((l) => l.unitId)).size > 1;
+  return (
+    <div className="stay-lines">
+      {dates.map((date) =>
+        lines
+          .filter((l) => l.date === date)
+          .map((l) => (
+            <div key={`${date}-${l.unitId}`} className="quote-line">
+              <span>
+                {dateLabel(date)}
+                {multipleUnits ? ` · ${l.unit}` : ''}
+                {l.holiday && <span className="holiday-badge">{l.holiday}</span>}
+              </span>
+              <span>
+                {formatMoney(l.basePrice, currency)}
+                {l.extraGuestPrice > 0 && ` + ${formatMoney(l.extraGuestPrice, currency)} extra guests`}
+                {l.surcharge > 0 && ` + ${formatMoney(l.surcharge, currency)} surcharge`}
+                {l.extraGuestPrice > 0 || l.surcharge > 0 ? ` = ${formatMoney(l.price, currency)}` : ''}
+              </span>
+            </div>
+          )),
+      )}
+      <div className="quote-line quote-total">
+        <strong>Total</strong>
+        <strong>{formatMoney(total, currency)}</strong>
+      </div>
+    </div>
+  );
+}

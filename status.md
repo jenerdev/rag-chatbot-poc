@@ -154,9 +154,9 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–3 done 2026-09-28 on
-`feat/customer-booking`, verify 92/92, rooms 30/30, walk 10/10; next is
-Phase 4, the screens and the user's browser walk). For the MVP the chatbot only explains how to book; customers book
+Phases 0–3 done and Phase 4's code done 2026-09-28 on
+`feat/customer-booking`; **Phase 4's browser walk is owed, by the user**
+(the list is in the session log); then Phase 5, the chat). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1043,6 +1043,27 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 4 (screens; walk owed)
+- **Built:** S-6 the booking page, S-7 Holidays, the Requests section on
+  S-3, the chat's Book button (`hasBookingPage()`), CSS.
+- **Observed from the dev server:** book 200 for villa and harbor, 404 for
+  northwind; holidays likewise; Book link on villa and harbor chats only.
+  Villa's real quote, Overnight 29–30 Oct, 32 guests: 1650000 + 2050000,
+  unavailable because of confirmed booking #56 (Day Tour, 30 Oct).
+- **Owed, by the user in the browser:**
+  1. villa: a 2-night Overnight over a weekend (see the weekday + weekend
+     prices), send it, read the receipt and the reference;
+  2. villa: a single Day Tour;
+  3. villa, on Holidays: add 24 Dec as peak with ₱4,000, then quote a
+     24 Dec Overnight for 32 guests (expect ₱24,500);
+  4. harbor: two rooms for two nights;
+  5. on villa's Bookings screen: confirm one request; send a second
+     request for the same nights first and see its clash warning and the
+     409 if confirmed; decline one;
+  6. a phone in the wrong format on the page (expect the message);
+  7. the chat's Book button on villa, and none on northwind.
+  Then remove the walk's requests and holidays (or keep 24 Dec).
 
 ### 2026-09-28 — customer booking Phase 3 (routes)
 - **Built:** open `book/quote` and `book/request` (honeypot, per-IP limit);

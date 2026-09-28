@@ -398,3 +398,41 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 /* The quote: one line per room (rate, extra guests, room total), then the total. */
 .quote-line { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
 .quote-total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+
+/* --- customer booking (plan/customer-booking.md Phase 4) ---------------- */
+
+/* S-6's contact fields look like every other text field. */
+input[type="email"], input[type="tel"] {
+  width: 100%;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}
+input[type="email"]:focus, input[type="tel"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+a.button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+a.button.primary:hover { background: #1d4ed8; }
+
+/* S-6, the booking page. */
+.stay-line { margin: -4px 0 12px; }
+.stay-lines { display: grid; gap: 2px; }
+.quote-warning { font-weight: 600; margin-bottom: 6px; }
+.holiday-badge { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+.room-description { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.receipt .reference { font-size: 18px; letter-spacing: 0.04em; }
+.stay-summary { margin: 10px 0; }
+/* The tenant's own instructions: plain text, line breaks kept, never HTML. */
+.instructions { white-space: pre-wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+/* The honeypot: off-screen, not display:none, which some bots skip. */
+.honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+/* S-3's requests, and S-7. */
+.booking.request { margin-left: 0; }
+.request-clash { color: var(--danger); }
+.holiday { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.holiday:last-child { border-bottom: none; }
+.holiday-day { flex: 0 0 150px; font-variant-numeric: tabular-nums; }
+.holiday-label { flex: 1; }
+.holiday-surcharge { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }

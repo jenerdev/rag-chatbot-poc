@@ -22,7 +22,7 @@
 // model: the chatbot has no tool that reaches this file (D-037).
 
 import { MAX_BOOKING_ADVANCE_DAYS, MAX_STAY_NIGHTS } from './constants.js';
-import { requireConfig, listSlots } from './bookings.js';
+import { bookingsConfig, requireConfig, listSlots } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
 import type {
@@ -106,6 +106,29 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
     units: priced,
     calendar: await listCalendar(tenant, { from: today, to: lastDate }),
   };
+}
+
+/**
+ * Does this tenant have a booking page? The bookings application AND at
+ * least one active unit with a price: the same condition bookingPage() 404s
+ * on, checked cheaply, for the chat's "Book" button (plan § 8 q5). False,
+ * never an error, for a tenant without the application.
+ */
+export async function hasBookingPage(tenant: BookingTenant): Promise<boolean> {
+  if (!(await bookingsConfig(tenant))) return false;
+  const { data: units, error } = await tenant.db.from('units').select('id').eq('tenant_id', tenant.id).eq('active', true);
+  if (error) throw new Error(`Could not load units: ${error.message}`);
+  if (units.length === 0) return false;
+  const { count, error: ratesError } = await tenant.db
+    .from('unit_rates')
+    .select('unit_id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id)
+    .in(
+      'unit_id',
+      units.map((u) => u.id),
+    );
+  if (ratesError) throw new Error(`Could not load rates: ${ratesError.message}`);
+  return (count ?? 0) > 0;
 }
 
 /**

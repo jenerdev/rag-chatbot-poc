@@ -463,6 +463,24 @@ button. **Browser walk, by the user:** villa stay over a weekend, villa
 single Day Tour, villa 24 Dec, harbor two rooms two nights, a clash on
 confirm, a declined request, a phone in the wrong format.
 
+> **Code done 2026-09-28; the browser walk is owed.** S-6 `/t/<slug>/book`
+> (`components/booking-page.tsx`): slot, check-in, nights for a nightly slot
+> ("3 days, 2 nights"), guests or rooms, the server's quote night by night
+> with holiday labels, the contact form with a hidden honeypot, and a
+> receipt from the stored rows that says "a request, not a confirmation".
+> S-7 `/t/<slug>/admin/holidays`: add or edit, remove, copy ticked dates
+> from last year. S-3 gains a Requests section (Confirm / Decline, a clash
+> warning, decided ones on demand) and a Holidays link; web rows in the day
+> list say `request <reference>`. The chat shows a **Book** button when
+> `hasBookingPage()` (new, in `@rag/bookings`) is true. Checked from the
+> dev server: `/t/villa/book` and `/t/harbor/book` 200, `/t/northwind/book`
+> 404; holidays 200 for villa and harbor, 404 for northwind; the chat's
+> Book link on villa and harbor and not on northwind. Villa's quote through
+> the open route, 32 guests, Overnight 29–30 Oct: 1650000 + 2050000 and
+> `available: false`, correctly, because a real confirmed Day Tour on 30 Oct
+> (#56, 08:00–17:00) overlaps the first night. Typecheck clean; no build
+> (dev was running, trap 16).
+
 ### Phase 5 — The chat, measured
 
 Edit villa's and harbor's "how to book" documents (§ 8 q5), re-ingest them,

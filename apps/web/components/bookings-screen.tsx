@@ -20,10 +20,26 @@
 // from the server's quote, and a room filter. The price shown is ALWAYS the
 // server's (the quote before, the stored price after); this screen never adds
 // up a price of its own.
+//
+// Customer requests (plan/customer-booking.md Phase 4) come first: every
+// request sent from the public booking page, one row per request (all its
+// nights and units), with Confirm and Decline. A request holds nothing, so
+// two can ask for the same night; confirming the second is refused by the
+// server (409) and shown as-is. `clash` warns before anyone presses Confirm.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Accommodation, BookingGroup, BookingSummary, BookingType, Quote, SlotAvailability, SlotSummary, UnitSummary } from '@rag/bookings';
+import type {
+  Accommodation,
+  BookingGroup,
+  BookingRequest,
+  BookingSummary,
+  BookingType,
+  Quote,
+  SlotAvailability,
+  SlotSummary,
+  UnitSummary,
+} from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { formatMoney } from '@/lib/money';
@@ -106,7 +122,7 @@ function BookingRow({
                 ? `${formatMoney(booking.basePrice ?? 0, perRoom.currency)} + ${formatMoney(booking.extraGuestPrice, perRoom.currency)} extra guests = ${formatMoney(booking.price, perRoom.currency)}`
                 : formatMoney(booking.price, perRoom.currency)
               : null,
-            perRoom && booking.groupId ? 'group booking' : null,
+            booking.source === 'web' ? `request ${booking.reference}` : perRoom && booking.groupId ? 'group booking' : null,
             booking.status === 'confirmed' ? null : booking.status,
           ]
             .filter(Boolean)
@@ -120,6 +136,57 @@ function BookingRow({
       </div>
       {/* Notes are a React child, so whatever staff typed is escaped (CLAUDE.md § Conventions). */}
       {booking.notes && <div className="booking-notes">{booking.notes}</div>}
+    </div>
+  );
+}
+
+/** One customer request: who, what, when, the stored total, and the decision buttons. */
+function RequestRow({
+  request,
+  currency,
+  busy,
+  onDecide,
+}: {
+  request: BookingRequest;
+  currency: string;
+  busy: boolean;
+  onDecide: (request: BookingRequest, action: 'confirm' | 'decline') => void;
+}) {
+  const pending = request.status === 'pending';
+  const nights = request.nights > 1 ? `${request.nights} nights from ` : '';
+  return (
+    <div className={`booking request${pending ? '' : ` ${request.status}`}`}>
+      <div className="booking-main">
+        <span className="booking-slot">{request.reference}</span>
+        <span className="booking-guest">{request.guestName}</span>
+        <span className="booking-meta">
+          {[
+            `${request.slot}, ${nights}${dayLabel(request.checkIn)}`,
+            request.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', '),
+            request.total !== null ? formatMoney(request.total, currency) : null,
+            request.guestPhone,
+            request.guestEmail,
+            pending ? null : request.status,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+        {pending && (
+          <>
+            <button type="button" className="primary" disabled={busy || request.clash} onClick={() => onDecide(request, 'confirm')}>
+              Confirm
+            </button>
+            <button type="button" disabled={busy} onClick={() => onDecide(request, 'decline')}>
+              Decline
+            </button>
+          </>
+        )}
+      </div>
+      {pending && request.clash && (
+        <div className="booking-notes request-clash">A night of this request is already confirmed for another booking.</div>
+      )}
+      {/* Customer-typed notes are a React child, so they are escaped. */}
+      {request.notes && <div className="booking-notes">{request.notes}</div>}
     </div>
   );
 }
@@ -151,6 +218,10 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
   const [chosen, setChosen] = useState<Record<number, string>>({});
   const [quote, setQuote] = useState<{ quote: Quote | null; message: string | null }>({ quote: null, message: null });
   const [roomFilter, setRoomFilter] = useState<number | null>(null);
+
+  // Customer requests from the public booking page, from today on.
+  const [requests, setRequests] = useState<BookingRequest[] | null>(null);
+  const [showDecided, setShowDecided] = useState(false);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -209,15 +280,17 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
     let response: Response | null = null;
     try {
       const range = `from=${from}&to=${to}`;
-      const [a, b] = await Promise.all([
+      const [a, b, r] = await Promise.all([
         fetch(`${api}/bookings/availability?${range}`),
         fetch(`${api}/bookings?${range}${roomFilter === null ? '' : `&unit=${roomFilter}`}`),
+        fetch(`${api}/bookings/requests`),
       ]);
-      if (a.status === 401 || b.status === 401) return unauthorized();
-      response = a.ok ? b : a;
-      if (!a.ok || !b.ok) throw new Error('failed');
+      if (a.status === 401 || b.status === 401 || r.status === 401) return unauthorized();
+      response = !a.ok ? a : !b.ok ? b : r;
+      if (!a.ok || !b.ok || !r.ok) throw new Error('failed');
       setAvailability(await a.json());
       setBookings(await b.json());
+      setRequests(await r.json());
     } catch (error) {
       setAvailability(null);
       setBookings(null);
@@ -347,6 +420,40 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
     [api, load, unauthorized],
   );
 
+  const decide = useCallback(
+    async (req: BookingRequest, action: 'confirm' | 'decline') => {
+      const what = `${req.reference} for ${req.guestName}`;
+      if (action === 'decline' && !window.confirm(`Decline ${what}?`)) return;
+      setNotice(null);
+      setBusy(true);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/bookings/requests/${req.groupId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        setNotice({
+          message:
+            action === 'confirm'
+              ? `Confirmed ${what}. The dates are now booked; contact the guest at ${req.guestPhone ?? req.guestEmail}.`
+              : `Declined ${what}.`,
+          kind: 'ok',
+        });
+        void load();
+      } catch (error) {
+        // A 409 arrives with the server's own sentence and is not rephrased.
+        setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
+        void load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [api, load, unauthorized],
+  );
+
   // The room filter by name, because availability rows carry the unit's name.
   const filteredName = roomFilter === null ? null : (setup?.units.find((u) => u.id === roomFilter)?.name ?? null);
 
@@ -380,6 +487,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
           Rooms
         </Link>
       )}
+      <Link className="button" href={`/t/${slug}/admin/holidays`}>
+        Holidays
+      </Link>
       <Link className="button" href={`/t/${slug}/admin`}>
         Knowledge base
       </Link>
@@ -421,6 +531,35 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
 
       <main>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+
+        {requests && requests.length > 0 && (
+          <section className="card">
+            <div className="range-head">
+              <h2>Requests</h2>
+              <div className="range-nav">
+                <Link className="button" href={`/t/${slug}/book`}>
+                  Booking page
+                </Link>
+                {requests.some((r) => r.status !== 'pending') && (
+                  <button type="button" onClick={() => setShowDecided((v) => !v)}>
+                    {showDecided ? 'Hide decided' : 'Show decided'}
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="small muted">
+              Sent from the booking page. A request does not hold its dates: the first one you confirm gets them.
+            </p>
+            {requests.filter((r) => r.status === 'pending').length === 0 && (
+              <div className="small muted">No requests waiting.</div>
+            )}
+            {requests
+              .filter((r) => r.status === 'pending' || showDecided)
+              .map((r) => (
+                <RequestRow key={r.groupId} request={r} currency={setup.currency} busy={busy} onDecide={decide} />
+              ))}
+          </section>
+        )}
 
         <section className="card">
           <h2>New booking</h2>
