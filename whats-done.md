@@ -5793,3 +5793,40 @@ from the stored rows.
 NULL for the rest (CLAUDE.md trap 15) and silently clear a holiday price.
 So it is all or none, and left out entirely an upsert keeps what is stored;
 rooms 23 checks both.
+
+## Customer booking, Phase 3: the routes · done 2026-09-28
+
+**What:** the HTTP surface. Two OPEN routes for the booking page,
+`POST /api/t/<slug>/book/quote` and `POST /api/t/<slug>/book/request`, on the
+chat token like the chat itself; and staff routes beside the existing
+bookings ones: `bookings/requests` (list, and confirm or decline a whole
+request), `holidays` (list, set, remove, copy). The rates route takes an
+optional holiday price.
+
+**Why it matters:** the request route is the first open write in the app.
+It has three limits, weakest first: a honeypot field, a per-IP window in
+memory, and request_booking()'s per-contact limit in SQL, the one that
+holds whoever calls. All three are now observed over HTTP, not assumed.
+
+**Observed** (`plan/customer-booking-phase3-walk.mjs`, **10/10** against
+`pnpm dev`):
+- every staff route 401 with no cookie, while the open quote answers 200
+  (the positive twin); another tenant's staff cookie 401 on our list, and
+  404 on our request id; an unknown tenant and Northwind 404 on the open quote;
+- a 2-night quote of 625000 + 775000 = 1400000; the request 201 with
+  reference `WAL-CDQJWS` and 2 pending web rows; a filled honeypot, a
+  landline number and `nights: "two"` all 400 with nothing saved;
+- a second request for the same nights accepted, then confirming it after
+  the first is 409 and both its nights stay pending; declining it 200; a new
+  request for those nights 409 up front, nothing saved;
+- a peak day of ₱1,000: the quote is the weekend rate 750000 + 25000 +
+  100000, labelled; the other tenant's calendar shows nothing; copied to
+  next year; delete 200, then 404;
+- limits: per contact 201, 201, 201, 429; per IP ten 400s, then 429 with
+  "Too many requests from here" before any database work;
+- booking-types' own Phase 3 walk still 11/11; verify 92/92; isolation
+  20/20 and 23/23 both ways; rooms 30/30; Northwind's snapshot identical.
+
+**Limit of the evidence:** the per-IP window is per process. `pnpm dev` is
+one process, so check 9 proves the code, not the behaviour on Vercel,
+where several instances each keep their own count (R-39).

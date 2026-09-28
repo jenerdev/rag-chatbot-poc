@@ -161,6 +161,9 @@ export const setRatesSchema = z.object({
       slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
       weekdayPrice: z.number({ required_error: 'A weekday price is required', invalid_type_error: 'A weekday price is required' }),
       weekendPrice: z.number({ required_error: 'A weekend price is required', invalid_type_error: 'A weekend price is required' }),
+      // Optional (customer booking § 2.3): null = the weekend price on a
+      // holiday. All rates or none is @rag/bookings' rule (setRates).
+      holidayPrice: z.number({ invalid_type_error: 'A holiday price must be a number' }).nullish(),
     }),
     { required_error: 'Rates are required', invalid_type_error: 'Rates must be a list' },
   ),
@@ -178,6 +181,58 @@ export const imageOrderSchema = z
     sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
   })
   .refine((v) => (v.move === undefined) !== (v.sortOrder === undefined), { message: 'Send either move or sortOrder' });
+
+// --- customer booking (plan/customer-booking.md) ------------------------------
+// Types only, as above: every rule (dates, nights, phone and email shape,
+// limits) is @rag/bookings' parseRequest() and, behind it, the SQL function
+// request_booking(). No price and no status field exist to send: zod strips
+// unknown keys, and the function would not take them anyway.
+
+const requestRoom = z.object({
+  unitId: z.number({ required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
+  guests: z.number({ required_error: 'Enter the number of guests', invalid_type_error: 'Enter the number of guests' }),
+});
+
+/** A price for a stay, before sending it. */
+export const bookQuoteSchema = z.object({
+  slotId: z.number({ required_error: 'Choose a booking slot', invalid_type_error: 'Choose a booking slot' }),
+  rooms: z.array(requestRoom, { required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
+  checkIn: z.string({ required_error: 'Choose a date', invalid_type_error: 'Choose a date' }),
+  nights: z.number({ invalid_type_error: 'Nights must be a number' }).optional(),
+});
+
+/**
+ * A customer's booking request. `website` is a honeypot: a field the page
+ * hides from people, so only a form-filling bot fills it (plan § 2.1).
+ */
+export const bookRequestSchema = bookQuoteSchema.extend({
+  name: z.string({ required_error: 'Your name is required', invalid_type_error: 'Your name is required' }),
+  phone: z.string({ required_error: 'Your mobile number is required', invalid_type_error: 'Your mobile number is required' }),
+  email: z.string({ required_error: 'Your email is required', invalid_type_error: 'Your email is required' }),
+  notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
+  website: z.string().optional(),
+});
+
+/** Staff decide a request: the whole group, one action. */
+export const decideRequestSchema = z.object({
+  action: z.enum(['confirm', 'decline'], {
+    errorMap: () => ({ message: 'action is "confirm" or "decline"' }),
+  }),
+});
+
+/** A holiday or peak day. Surcharge in CENTAVOS. */
+export const holidaySchema = z.object({
+  day: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
+  kind: z.enum(['holiday', 'peak'], { errorMap: () => ({ message: 'kind is "holiday" or "peak"' }) }).optional(),
+  label: z.string({ required_error: 'A label is required', invalid_type_error: 'A label is required' }),
+  surcharge: z.number({ invalid_type_error: 'The surcharge must be a number' }).nullish(),
+});
+
+/** Copy chosen days to the same month and day of another year. */
+export const copyHolidaysSchema = z.object({
+  days: z.array(z.string(), { required_error: 'Choose dates to copy', invalid_type_error: 'Choose dates to copy' }),
+  toYear: z.number({ required_error: 'A year is required', invalid_type_error: 'A year is required' }),
+});
 
 /**
  * The first error message from a failed parse.

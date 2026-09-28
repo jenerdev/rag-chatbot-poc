@@ -354,7 +354,7 @@ nothing**: no page takes it.
 | Domain | `packages/bookings/src/bookings.ts`, `accommodations.ts` | surcharge in the breakdown; `nightly` on slots; `holiday_price` on rates |
 | Constants | `packages/bookings/src/constants.ts` | `MAX_STAY_NIGHTS`, `MAX_BOOKING_ADVANCE_DAYS`, `MAX_OPEN_REQUESTS_PER_CONTACT`, `MAX_REQUEST_ROWS` |
 | Routes | `apps/web/app/api/t/[tenant]/book/quote/route.ts`, `book/request/route.ts` | **new**, open, `withTenantRoute()` |
-| Routes | `apps/web/app/api/t/[tenant]/admin/bookings/requests/**`, `admin/holidays/**` | **new**, `requireAdmin()` + `requireApplication()` |
+| Routes | `apps/web/app/api/t/[tenant]/bookings/requests/**`, `holidays/**` | **new**, `requireAdmin()` + `requireApplication()`; beside the existing staff `bookings/` routes (built paths, Phase 3) |
 | Pages | `apps/web/app/t/[tenant]/book/page.tsx` + `components/booking-page.tsx` | **new**, S-6 |
 | Pages | `apps/web/app/t/[tenant]/admin/holidays/page.tsx` + `components/holidays-screen.tsx` | **new**, S-7 |
 | Pages | `components/bookings-screen.tsx` | a Requests tab; stays shown as one row |
@@ -439,6 +439,22 @@ Quote and request (open), Requests and Holidays (staff). An HTTP walk
 script against `pnpm dev`: the six-ish cases, including a chat token
 posting straight to PostgREST (refused), the per-contact limit, and a
 request for another tenant's unit (refused, same answer as "not there").
+
+> **Done 2026-09-28.** Open: `POST book/quote`, `POST book/request` (201;
+> honeypot `website`; a per-IP window in `lib/rate-limit.ts`, 10 per 10
+> minutes). Staff: `GET bookings/requests`, `PATCH bookings/requests/[groupId]`
+> (`confirm` | `decline`), `GET|PUT holidays`, `DELETE holidays/[day]`,
+> `POST holidays/copy`; `holidayPrice` accepted on the rates route. Walk
+> (`plan/customer-booking-phase3-walk.mjs`) **10/10** against `pnpm dev`:
+> staff routes 401 without a cookie while the open quote is 200; unknown and
+> bookings-less tenants 404; a 2-night quote 625000 + 775000; a request 201
+> with 2 pending rows, and honeypot / bad phone / bad type 400 with nothing
+> saved; a clashing confirm 409 that leaves both nights pending; another
+> tenant's staff 404 on our request id; a peak day priced at the weekend rate
+> + ₱1,000 and invisible to the other tenant; per contact 201,201,201,429;
+> per IP ten 400s then 429. booking-types' Phase 3 walk still 11/11; verify
+> 92/92; isolation 20/20 and 23/23 both ways; rooms 30/30; tests unchanged;
+> Northwind's snapshot identical.
 
 ### Phase 4 — Screens
 

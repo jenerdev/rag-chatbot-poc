@@ -154,8 +154,9 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–2 done 2026-09-28 on
-`feat/customer-booking`, verify 92/92, rooms 30/30; next is Phase 3, the routes). For the MVP the chatbot only explains how to book; customers book
+Phases 0–3 done 2026-09-28 on
+`feat/customer-booking`, verify 92/92, rooms 30/30, walk 10/10; next is
+Phase 4, the screens and the user's browser walk). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1042,6 +1043,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 3 (routes)
+- **Built:** open `book/quote` and `book/request` (honeypot, per-IP limit);
+  staff `bookings/requests` (+ `[groupId]` confirm/decline) and `holidays`
+  (+ `[day]`, `copy`); `holidayPrice` on the rates route.
+- **Observed** (`plan/baseline/*-customer-booking-phase3*`): walk 10/10;
+  booking-types walk 11/11; verify 92/92; isolation both ways; rooms 30/30.
+- **Next:** Phase 4, S-6 the booking page, S-7 Holidays, the Requests tab,
+  the chat's "Book" button; then the user's browser walk.
 
 ### 2026-09-28 — customer booking Phase 2 (`@rag/bookings`)
 - **Built:** `requests.ts`, `calendar.ts`, `BookingLimitError`, surcharge,

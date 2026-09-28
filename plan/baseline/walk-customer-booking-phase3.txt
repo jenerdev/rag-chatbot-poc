@@ -1,0 +1,12 @@
+PASS  no cookie: staff routes 401, the open quote 200  — 401 401 401 401 401 401 · quote 200
+PASS  open quote: unknown tenant and a tenant without bookings are 404  — 404 · northwind 404
+PASS  open quote: a 2-night stay priced night by night  — 200 2026-12-03 600000+25000+0=625000, 2026-12-04 750000+25000+0=775000 · total 1400000
+PASS  open request: 201 and 2 pending rows; honeypot, bad phone and bad type are 400s  — 201 WAL-CDQJWS 1400000 · rows pending,pending · honeypot 400 (0 rows) · phone 400 "Enter a mobile number like 0917 123 4567." · type 400 "Nights must be a number"
+PASS  staff list: the request with guest data; the other tenant's cookie is 401  — 200 WAL-CDQJWS pending 2n 09180000001 · other cookie 401
+PASS  decide: confirm 200/200; a clashing confirm 409, unchanged; decline 200; cross-tenant 404; bad id and action 400  — 200/200 · second 201 · clash 409 "A night of this request was confirmed for another booking. Decline it, or cancel the other booking first." → pending,pending · decline 200 · cross 404 · bad id 400 · bad action 400 "action is "confirm" or "decline"" · first confirmed,confirmed
+PASS  open request: a confirmed night is 409, nothing saved  — 409 "That date is no longer available. Please choose another." · rows 0
+PASS  holidays: set, listed, priced (holiday = weekend rate + surcharge), copied, removed; other tenant sees none  — put 200 · list 1 · other 0 · quote 750000+25000+100000 "Walk peak" · copy 200 2027-12-31 · delete 200/404 · bad kind 400
+PASS  limits: the 4th open request per contact is 429; the 11th call per IP in 10 minutes is 429  — contact 201,201,201,429 · ip 400,400,400,400,400,400,400,400,400,400,429 "Too many requests from here. Please try again in a few minutes."
+PASS  rates route: a holiday price is stored and returned  — 200 500000
+
+ALL PHASE 3 WALK CHECKS PASS
