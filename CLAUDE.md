@@ -133,6 +133,7 @@ packages/
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     tools/isolation.mjs    29 cross-tenant checks, no API key
     tools/rooms.mjs        30 checks of rooms, groups, quotes, extra guests, photos, stays, holidays and requests
+    tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
@@ -167,6 +168,7 @@ pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 20, code fi
 pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
 pnpm --filter @rag/bookings rooms       # 30 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, requests; no API key
+pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev

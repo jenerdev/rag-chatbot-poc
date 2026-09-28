@@ -1045,6 +1045,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — R-30: `storage-orphans.mjs` built and run
+- **Built:** `packages/bookings/tools/storage-orphans.mjs`
+  (`pnpm --filter @rag/bookings storage-orphans [-- --remove]`).
+- **Observed:** 2 objects, 2 rows, 2 matched, 0 orphans. Positive twin: a
+  planted object under `0/0/` (no such tenant) was listed as 1 orphan and
+  left alone by the dry run, removed 1 of 1 with `--remove`, absent after.
+- **Next:** nothing owed. The honest next step is deployment (D-013).
+
 ### 2026-09-28 — R-15's range half fixed (`dates.ts`)
 - **Built:** a merge pass in `scan()`: two single dates joined by a
   connector become one span; a bare weekday as the second end rolls
@@ -1061,9 +1069,9 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ### 2026-09-28 — customer booking merged
 - `feat/customer-booking` fast-forwarded into `master` (10 commits,
   `9bacea7..69a3ae5`) and deleted. Nothing pushed.
-- **Open:** R-30 (`storage-orphans.mjs`), R-38/R-39 when abuse is seen,
-  payments.md (on hold), the subdomain backlog item. R-15's range half was
-  fixed the same day (below).
+- **Open:** R-38/R-39 when abuse is seen, payments.md (on hold), the
+  subdomain backlog item, deployment (D-013). R-15's range half and R-30's
+  sweeper were done the same day (below).
 
 ### 2026-09-28 — customer booking Phase 7 (the record)
 - **Written:** D-069–D-073 (D-037 and D-042 headers note the amendments),

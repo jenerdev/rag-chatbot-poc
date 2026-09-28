@@ -578,12 +578,22 @@ stripping is the browser's.
 
 ---
 
-## R-30 · Objects can outlive their rows · **Low; invisible**
+## R-30 · Objects can outlive their rows · **Low; now visible (sweeper built 2026-09-28)**
 
 Deleting a tenant cascades to `unit_images`, not to Storage, and a failed
 object delete is logged, not retried. A leftover object is invisible and
-costs space. The isolation and rooms suites remove their own; there is no
-orphan sweeper yet (plan § 2.8 named one, `storage-orphans.mjs`; not built).
+costs space. The isolation and rooms suites remove their own.
+
+**The sweeper:** `pnpm --filter @rag/bookings storage-orphans` walks the
+bucket's `<tenant>/<unit>/<file>` shape, matches every object against
+`unit_images.path`, and lists what has no row (per tenant, "NO SUCH TENANT"
+for a deleted one) and what row has no object. Dry run by default;
+`-- --remove` deletes the orphans and checks the count Storage reports
+(trap 17). **Measured 2026-09-28:** 2 objects, 2 rows, 2 matched, 0
+orphans. The positive twin: a planted object under a folder of no tenant was
+found (1 orphan, dry run removed nothing), removed 1 of 1 with `--remove`,
+and gone on the next run. Still nothing runs it on a schedule; it is a
+command to run after a tenant delete or a Storage warning in the log.
 
 ---
 
@@ -690,11 +700,11 @@ read-only; plan/payments.md is the next plan). No holiday or per-head pricing
 and date ranges reach the tool as their two end dates (R-15).
 
 **After customer booking (2026-09-28):** guests book on a page, and the chat
-still cannot (D-069). Holidays and per-head pricing exist (R-24 closed). What
-is still missing: any way to verify a contact (R-38), any email to a guest
-(no sender; R-21), a guest page to look up or change a request, payment of
-any kind (payments.md, on hold), a shared rate limiter (R-39), a
-multi-night discount or minimum stay, and the orphaned-photo sweeper
-(R-30). Photos are now shown to customers on the page, so R-27's egress
-sum includes them.
+still cannot (D-069). Holidays and per-head pricing exist (R-24 closed), date
+ranges reach the tool as one call (R-15), and the orphaned-photo sweeper
+exists (R-30). What is still missing: any way to verify a contact (R-38),
+any email to a guest (no sender; R-21), a guest page to look up or change a
+request, payment of any kind (payments.md, on hold), a shared rate limiter
+(R-39), and a multi-night discount or minimum stay. Photos are now shown to
+customers on the page, so R-27's egress sum includes them.
 

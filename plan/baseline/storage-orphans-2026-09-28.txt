@@ -1,0 +1,23 @@
+bucket unit-images: 2 objects · unit_images: 2 rows · tenants: 3
+matched: 2 objects have their row
+NO ORPHANED OBJECTS
+
+$ positive twin: after planting 0/0/probe.png (tenant 0 does not exist)
+$ pnpm --filter @rag/bookings storage-orphans
+bucket unit-images: 3 objects · unit_images: 2 rows · tenants: 3
+matched: 2 objects have their row
+orphans in 0 (NO SUCH TENANT): 1, 70 bytes
+  0/0/probe.png
+1 ORPHANED OBJECT(S); nothing removed (dry run). Re-run with -- --remove to delete them.
+
+$ pnpm --filter @rag/bookings storage-orphans -- --remove
+bucket unit-images: 3 objects · unit_images: 2 rows · tenants: 3
+matched: 2 objects have their row
+orphans in 0 (NO SUCH TENANT): 1, 70 bytes
+  0/0/probe.png
+removed 1 of 1
+
+$ pnpm --filter @rag/bookings storage-orphans   (after)
+bucket unit-images: 2 objects · unit_images: 2 rows · tenants: 3
+matched: 2 objects have their row
+NO ORPHANED OBJECTS

@@ -6019,3 +6019,27 @@ when it is a bare weekday, must be the next one after the first end.
 **Trap met: the night count is not always adjacent.** "10 October free for
 2 nights" has a word between the date and the count. Up to three words are
 skipped on either side; the skipped words are not blanked, only the count.
+
+## R-30: the orphaned-photo sweeper · built and run 2026-09-28
+
+**What:** `packages/bookings/tools/storage-orphans.mjs`, the script
+booking-types § 2.8 named and nobody built. It walks the `unit-images`
+bucket in its `<tenant>/<unit>/<file>` shape (paged, 1000 a page), matches
+every object with `unit_images.path`, and reports objects with no row (by
+tenant, naming a deleted tenant as such), rows with no object, and anything
+not of that shape. Dry run by default; `-- --remove` deletes the orphans
+and compares Storage's count with what was asked.
+
+**Why it matters:** a photo is two things, a row and an object, and only the
+row is cascaded. A leftover object shows on no screen, so without a scan it
+is unknowable, and the bucket is now customer-facing.
+
+**Observed:**
+- the real bucket: 2 objects, 2 rows, 2 matched, 0 orphans, 0 broken rows;
+- the positive twin, because a zero on its own proves nothing (trap 12): a
+  70-byte PNG planted at `0/0/probe.png` (tenant 0 does not exist) showed up
+  as `orphans in 0 (NO SUCH TENANT): 1` with "nothing removed (dry run)";
+  `--remove` printed `removed 1 of 1`; the next run was back to 0.
+
+**Limit:** nothing schedules it. It is the command to run after deleting a
+tenant, or after a `WARN orphaned photo` line in the log.

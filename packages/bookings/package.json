@@ -19,7 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "isolation": "node --conditions=react-server --env-file=../../.env tools/isolation.mjs",
-    "rooms": "node --conditions=react-server --env-file=../../.env tools/rooms.mjs"
+    "rooms": "node --conditions=react-server --env-file=../../.env tools/rooms.mjs",
+    "storage-orphans": "node --conditions=react-server --env-file=../../.env tools/storage-orphans.mjs"
   },
   "dependencies": {
     "@rag/db": "workspace:*"
