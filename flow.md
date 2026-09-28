@@ -31,6 +31,7 @@ would fail the build.
 flowchart LR
     subgraph B["Browser · React Client Components"]
         IDX["components/chat-screen.tsx<br/>at /t/&lt;slug&gt;"]
+        BOOK["components/booking-page.tsx<br/>at /t/&lt;slug&gt;/book"]
         ADM["components/admin-screen.tsx<br/>at /t/&lt;slug&gt;/admin"]
         CHKB["@rag/chunker<br/>live chunk estimate"]
     end
@@ -52,6 +53,7 @@ flowchart LR
     end
 
     IDX -- "POST /api/t/&lt;slug&gt;/chat" --> RT
+    BOOK -- "book/quote, book/request" --> RT
     ADM -- "admin/session, documents" --> RT
     PAGE --> TEN
     RT --> TEN
@@ -240,6 +242,11 @@ sequenceDiagram
     how many guests the price includes and the fee per extra guest; with a
     guest count, it carries that party's extra charge and total, from
     `unit_quote()`, the one function that makes a price (plan/extra-guests.md).
+11c. **The chat never books** (D-069). "How do I book?" is answered from
+    the documents, which say to press the **Book** button; "book it for me"
+    may check availability and then points at the page. The button is a
+    Link in the header, shown when `hasBookingPage()` is true, not a line in
+    a reply: the chat renders no links, and no tool can write.
 12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 
@@ -306,6 +313,25 @@ return 404, with no redirect.
 | `PUT` | `/api/t/<slug>/accommodations/:id/rates` | set rates, in centavos | `setRates` | admin |
 | `GET` / `POST` | `/api/t/<slug>/accommodations/:id/images` | photos / upload one (multipart) | `listImages` / `addImage` | admin |
 | `PATCH` / `DELETE` | `/api/t/<slug>/accommodations/:id/images/:imageId` | reorder / remove (row, then object) | `setImageOrder` / `removeImage` | admin |
+| `GET` | `/t/<slug>/book` | the customer booking page (404 without the application or a priced unit) | `app/t/[tenant]/book/page.tsx` → `BookingPageScreen` | public |
+| `POST` | `/api/t/<slug>/book/quote` | a stay's price night by night, and whether it is still open | `quoteRequest` | open |
+| `POST` | `/api/t/<slug>/book/request` | send a request: `pending` rows via `request_booking()`; honeypot + per-IP window | `requestBooking` | open |
+| `GET` | `/api/t/<slug>/bookings/requests` | customers' requests, one per group, with `clash` | `listRequests` | admin |
+| `PATCH` | `/api/t/<slug>/bookings/requests/:groupId` | `{ action: confirm \| decline }`, the whole group; 409 on a clash | `confirmRequest` / `declineRequest` | admin |
+| `GET` / `PUT` | `/api/t/<slug>/holidays` | the holiday calendar / add or change a day | `listCalendar` / `setCalendarDay` | admin |
+| `DELETE` | `/api/t/<slug>/holidays/:day` | remove a day (404 if not there) | `removeCalendarDay` | admin |
+| `POST` | `/api/t/<slug>/holidays/copy` | copy chosen days to another year | `copyCalendarDays` | admin |
+| `GET` | `/t/<slug>/admin/holidays` | the Holidays screen | `app/t/[tenant]/admin/holidays/page.tsx` → `HolidaysScreen` | public page, admin data |
+
+**The booking page** (plan/customer-booking.md) is the one place a stranger
+WRITES. The page's Server Component reads `bookingPage()` on the chat token
+(units, rates, the calendar, never a booking row); the browser asks
+`book/quote` as the choice changes (read-only, `unit_quote()` per night) and
+sends `book/request` once. That route is `withTenantRoute()` with no
+`requireAdmin()`, by design, and it calls `request_booking()`, a definer
+function that can only insert `pending` rows (D-071). A request holds
+nothing (D-070): staff see it in the Requests section of S-3 and confirm or
+decline the whole group; `bookings_no_overlap` decides a clash at confirm.
 
 "Admin" means `tenant = await requireAdmin(request, tenant)`.
 - The request must carry this tenant's signed session cookie, and its user

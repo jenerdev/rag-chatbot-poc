@@ -154,9 +154,10 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–6 done 2026-09-28 on `feat/customer-booking`, the user's
-browser walk included; battery now 54/56 expected; next is Phase 7, the
-record, then the merge into `master`). For the MVP the chatbot only explains how to book; customers book
+**COMPLETE**, Phases 0–7 done 2026-09-28 on `feat/customer-booking`,
+the user's browser walk included; battery 54/56 expected; D-069–D-073,
+R-38–R-41, R-24 closed; **next: merge `feat/customer-booking` into
+`master`**). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1043,6 +1044,16 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 7 (the record)
+- **Written:** D-069–D-073 (D-037 and D-042 headers note the amendments),
+  R-38–R-41, R-24 closed, the "after customer booking" paragraph; CLAUDE.md
+  (header, layout, commands, rules 1/6/8, traps 19–21, conventions);
+  flow.md (the big picture, 11c, the routes, the booking-page paragraph);
+  the plan's header says complete.
+- **Next:** merge `feat/customer-booking` into `master` (fast-forward:
+  master has not moved since `9bacea7`), then delete the branch. Open after
+  that: R-15, R-30, payments.md (on hold), the subdomain backlog item.
 
 ### 2026-09-28 — customer booking Phase 4, the browser walk (done by the user)
 - **Read back from the database after the walk:** villa, 3 web requests,

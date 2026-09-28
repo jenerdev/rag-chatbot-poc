@@ -1262,7 +1262,7 @@ R-14 and R-18.
 
 ---
 
-## D-037 · Chatbot tools are read-only, results carry no PII, and every call is shown · **Added 2026-09-24 (bookings Phases 1, 6, 7)**
+## D-037 · Chatbot tools are read-only, results carry no PII, and every call is shown · **Added 2026-09-24 (bookings Phases 1, 6, 7). Still holds after D-069: booking is the page's, not the chat's**
 
 **Decision:** the only tool is `check_availability`. Its result is
 `SlotAvailability { date, unit, slot, status }`, a type with no guest field.
@@ -1419,7 +1419,7 @@ documents, or the reverse. Add `role`, and make `app_is_admin()` role-aware.
 
 ---
 
-## D-042 · `security definer` for exactly two functions, `tenant_public` and `check_availability`, both with `search_path = ''` · **Added 2026-09-26 (auth-rls Phase 1)**
+## D-042 · `security definer` for exactly two functions, `tenant_public` and `check_availability`, both with `search_path = ''` · **Added 2026-09-26 (auth-rls Phase 1). Amended by D-054 (three) and D-071 (four)**
 
 **Decision:**
 - **`tenant_public(slug)`** returns the seven public tenant columns, and anon
@@ -2038,3 +2038,116 @@ trigger checks the unit first, so another tenant's room still says "No such
 unit or slot." even with no guest count; a pre-check would have answered it
 with the guest-count message and told the two apart.
 
+
+## D-069 · Customers book on a page, not in the chat; the chat only explains how · **Added 2026-09-28 (customer-booking Phases 4–5, the user's decision)**
+
+**Decision:** every tenant with the bookings application and a priced unit
+gets a public page, `/t/<slug>/book`, where a customer picks a date, sees
+the database's price and sends a request. The chat gets a **Book** button
+(UI, not a model reply) and its "how to book" documents point at the page.
+No tool was added and no prompt text changed. `plan/payments.md`, which had
+the model quote and a button book from inside the chat, is on hold.
+
+**Why:** the user chose it for the MVP: booking and payment are a page's
+job; the chat's is to answer. It keeps D-037 exactly as it was (tools stay
+read-only) and needs no prompt edit, which rule 1 says is where a helpful
+change costs a refusal.
+
+**Measured:** Northwind's, villa's and harbor's prompts and both tool
+definitions byte-identical to before the plan; battery 53/56 on the full run
+with every existing group at its 49/51 (`book-*` 4/5, then 5/5 once the
+Tagalog case judged only the booking part). "Please book … for me" checked
+availability, said it cannot book, and pointed at the Book button, on villa
+and on harbor.
+
+---
+
+## D-070 · A request holds nothing; only `confirmed` is in `bookings_no_overlap` · **Added 2026-09-28 (customer-booking Phase 1, § 8 q1)**
+
+**Decision:** the constraint's predicate is `status = 'confirmed'` (it was
+`<> 'cancelled'`). A web request is `pending` and blocks no date.
+`check_availability` and `check_room_availability` count confirmed rows
+only. Two customers may request the same night; the one staff confirm
+first gets it, and confirming the second is 23P01 → 409, the whole group
+refused in one statement.
+
+**Why:** villa's own policy ("a date is only held once the reservation fee is
+paid"), and because a holding request would be a free, anonymous way to block
+every date with fake names. A hold needs expiry and a verified contact, both
+of which are payments.md's.
+
+**Measured:** no `pending` row existed when the constraint was re-created
+(villa 3 confirmed + 2 cancelled, harbor 3 confirmed), so nothing changed;
+verify 83 (availability open with a request on the night, a staff booking
+lands, the confirm is 23P01 and both nights stay pending); rooms 25–26; the
+HTTP walk's 409; the user's walk on harbor.
+
+---
+
+## D-071 · `request_booking()`, the one public write, a fourth `security definer` function · **Added 2026-09-28 (customer-booking Phase 1). Amends D-042 and D-054**
+
+**Decision:** a chat token has no insert policy on `bookings`. The only way
+a stranger's input becomes a row is `request_booking(p_tenant_id, …)`:
+definer, `search_path = ''`, `p_tenant_id` must equal `app_tenant_id()`
+(service_role excepted, for the tools), and it inserts `pending`, `web`
+rows only. The caller chooses the slot, units, guests, date, nights and
+contact details; never the status, price, group or reference. It validates
+everything the page validates, and holds the four limits (14 nights, 365
+days, 3 open requests per contact, 70 rows) under a per-tenant advisory
+lock. Its errors are mapped once, in `@rag/bookings`.
+
+**Why:** the same reason as D-042: one function whose column list and
+checks are the boundary, rather than a policy that would let a chat token
+insert whatever shape it likes.
+
+**Measured:** verify 81 (a chat token's direct insert 42501, anon cannot
+call it), 82 (a 2-night request is 2 pending rows, one group, priced per
+night), 85 (another tenant's id 42501, villa's unit 23503, nothing saved),
+86–89 (14 yes, 15 no; format; the 4th open request 54000; an unpriced slot
+refused). Bookings isolation 27–28 both ways.
+
+---
+
+## D-072 · Holidays are a per-tenant calendar of dates with a surcharge, read by `unit_price()` · **Added 2026-09-28 (customer-booking Phases 1–2, § 8 q2). Reverses booking-types § 8 q2; closes R-24**
+
+**Decision:** `rate_calendar (tenant_id, day, kind, label, surcharge)`. On a
+listed day a rate's `holiday_price` applies, or its `weekend_price` when
+that is null (villa's rule: "weekends and holidays"), plus the day's
+surcharge once per night per unit, stored as `bookings.surcharge` beside
+the rest of the breakdown. A calendar change never reprices a stored row.
+Staff type the dates (Holy Week moves; special days are proclaimed) and can
+copy ticked fixed dates to another year.
+
+**Why:** a page that shows a price has to show the right one on 24 Dec, and
+a holiday cannot be computed. `unit_quote()` stays the only arithmetic:
+holidays enter through `unit_price()`, which it already called.
+
+**Measured:** verify 79 (villa's 24 Dec, 32 guests: 2000000 + 50000 +
+400000 = 2450000; a holiday_price wins: 2950000), 80 (stored, forged values
+ignored); rooms 22–23; the user's walk stored 24 Dec as 2000000 + 0 +
+400000 with "Christmas Eve" typed on S-7; isolation 24–25 (one date, two
+tenants, two prices).
+
+---
+
+## D-073 · A stay is N rows of a nightly slot in one group, each priced for its own date; `whole_resort` is priced once its unit has rates · **Added 2026-09-28 (customer-booking Phases 1–2, § 8 q3). Reverses booking-types § 8 q3**
+
+**Decision:** `slots.nightly` marks the slot a stay is made of (villa's
+Overnight, harbor's Night). "3 days 2 nights" is two rows on consecutive
+dates, one `group_id`, one reference, inserted in ONE statement so a clash
+on any night saves none. The total is the sum of the stored rows, never a
+recomputation; no multi-night discount, no minimum stay. Villa's unit got
+its rates (Day Tour 9,500/12,000; Overnight 16,000/20,000; 22-Hour
+22,000/27,000), 30 guests included, 45 at most, ₱250 each above; the trigger
+prices a whole_resort booking when a rate exists and leaves `null` when
+none does, so every older villa booking keeps `price null`.
+
+**Why:** the existing exclusion constraint already refuses a clash per
+night, so a stay needs no new availability model; and the page shows villa
+a price only if the database has one.
+
+**Measured:** verify 78 (unpriced until a rate, an older booking stays
+null), 82 (Thursday 1650000 + Friday 2050000, check-out 12:00 on day
+three); rooms 21, 24; the HTTP walk 625000 + 775000; villa's 5 older
+bookings still unpriced. The 12:00–14:00 gap inside a stay is unsellable
+today because no slot fits in it (R-40).

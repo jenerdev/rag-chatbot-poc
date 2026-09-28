@@ -5960,3 +5960,25 @@ button is disabled by `clash`, so the 409 is reachable only from a stale
 list (a second tab, or a confirm racing another). That is the case the
 constraint exists for: the button is a courtesy, `bookings_no_overlap` is
 the guard.
+
+## Customer booking, Phase 7: the record · done 2026-09-28
+
+**What:** the plan's decisions and risks written down where the next
+reader will look: D-069 (booking is the page's, the chat explains), D-070
+(a request holds nothing), D-071 (`request_booking`, the fourth definer
+function), D-072 (the holiday calendar; R-24 closed), D-073 (a stay is N
+rows; villa priced); R-38–R-41 (fake requests bounded, the per-IP limit
+weak by design, the gap inside a stay, villa's rates in two places).
+CLAUDE.md gained the header paragraph, the new files and commands, the
+54/56 battery line, `rate_calendar` and `request_booking` in rules 6 and 8,
+traps 19–21 and two conventions; flow.md the new node, step 11c and nine
+routes.
+
+**Why it matters:** "if someone asks why does this work, the answer must be
+in the code, not in a dependency", and for a decision, in these files. The
+two that most need to be findable later are D-070 (why a request does not
+block a date, which will look like a bug to the first person who sees two
+requests for one night) and trap 20 (why the older SQL files skip steps).
+
+**Observed:** nothing new was run in this phase; every number quoted is
+from the phase that measured it, and cited by check number.

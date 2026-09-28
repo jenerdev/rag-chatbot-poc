@@ -20,8 +20,9 @@
 > resort: N consecutive nights of the tenant's overnight slot, stored as N
 > rows in one group, each priced for its own date.
 >
-> Written 2026-09-28, against `08f78b8` on `master`. **Status: agreed
-> 2026-09-28, nothing built.** § 8 answered: every recommendation taken.
+> Written 2026-09-28, against `08f78b8` on `master`. **Status: complete,
+> 2026-09-28, walk included.** § 8 answered: every recommendation taken.
+> Decisions D-069–D-073, risks R-38–R-41, R-24 closed.
 > [`payments.md`](./payments.md) is on hold; this plan takes the parts of it
 > that a request with no payment needs (the public write, the reference) and
 > leaves the rest (payment statuses, proofs, email, expiry) out.

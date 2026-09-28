@@ -513,12 +513,16 @@ the TOOL's price for that row. 30/30 over three runs. The same shape as R-14.
 
 ---
 
-## R-24 · Base rate only: holidays and surcharges are not modelled · **Accepted (booking-types § 8 q2)**
+## R-24 · Base rate only: holidays and surcharges are not modelled · **Closed 2026-09-28 (customer-booking, D-072)**
 
-**The risk:** a per_room tenant with holiday rates gets too low a quote on a
-holiday. **Accepted:** weekday/weekend was enough for the first tenant. The
-tool calls it a base rate; the fix is a `rate_overrides (unit, slot, date)`
-table, read by `unit_price()`.
+**The risk was:** a per_room tenant with holiday rates gets too low a quote
+on a holiday. Accepted at booking types (weekday/weekend was enough for the
+first tenant), closed by `rate_calendar` and `unit_rates.holiday_price`,
+read by `unit_price()`: villa's 24 Dec prices at 2000000 + 400000 (verify
+79, the user's walk). What remains is a DATA risk: an empty calendar prices
+a holiday as an ordinary day, exactly as before, so a tenant that types no
+dates has R-24 back. The Holidays screen's "copy last year's" exists for
+that.
 
 ---
 
@@ -593,6 +597,51 @@ failure (CLAUDE.md trap 18).
 
 ---
 
+## R-38 · Fake requests with real-looking contact details · **Bounded, not prevented**
+
+**The risk:** the booking page is open, and a form cannot tell a real name,
+phone or email from a made-up one (customer-booking § 2.7). **Bounded:** a
+request holds nothing (D-070), so the worst is noise in the staff list; the
+per-contact limit in `request_booking()` caps each phone or email at 3 open
+requests (verify 88); staff contact the guest before confirming, as villa
+did over Viber. **Not prevented:** an SMS code or an email link needs a
+sender this project does not have (R-21; Resend is payments.md's). The
+formats are checked, and "+63 917…" and "0917…" count as one contact.
+
+---
+
+## R-39 · The per-IP limit is per server instance · **Weak by design**
+
+`lib/rate-limit.ts` keeps its windows in memory, so on Vercel each instance
+has its own count and a sender spread across instances gets several
+allowances. It only slows a script hammering one process before any
+database work (the HTTP walk: ten 400s then 429). The limit that holds is
+R-38's, in SQL. A shared limiter (a table, or the platform's firewall) when
+abuse is actually seen.
+
+---
+
+## R-40 · The 12:00–14:00 gap inside a multi-night stay · **Unsellable today**
+
+A stay is N rows of a 14:00 + 22 h slot, so between two nights there is a
+two-hour gap no row covers. Nothing can be sold in it: villa's Day Tour
+(08:00–17:00) overlaps both nights, and harbor has only Night. A tenant that
+adds a short daytime slot would make the gap sellable, and a stay would then
+have to be one range, not N rows. Watch for the first two-hour slot.
+
+---
+
+## R-41 · Villa's rates live in two places · **Accepted (customer-booking § 8 q4)**
+
+The database (`unit_rates`, what the page and the trigger use) and
+`02-rates-and-schedules.md` (what the chat answers from). The user chose to
+keep both; the document now says the page shows the exact price for a date.
+If staff change a rate on the screen and not in the document, the chat quotes
+the old one. Nothing detects the drift; `lang-tagalog` (₱16,000) would catch
+a change to the Overnight rate in the document only.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product
@@ -625,4 +674,13 @@ If all three pass, nothing significant is left to derisk — the rest is assembl
 read-only; plan/payments.md is the next plan). No holiday or per-head pricing
 (R-24), no orphaned-photo sweeper (R-30), photos only on the staff screen,
 and date ranges reach the tool as their two end dates (R-15).
+
+**After customer booking (2026-09-28):** guests book on a page, and the chat
+still cannot (D-069). Holidays and per-head pricing exist (R-24 closed). What
+is still missing: any way to verify a contact (R-38), any email to a guest
+(no sender; R-21), a guest page to look up or change a request, payment of
+any kind (payments.md, on hold), a shared rate limiter (R-39), a
+multi-night discount or minimum stay, and the orphaned-photo sweeper
+(R-30). Photos are now shown to customers on the page, so R-27's egress
+sum includes them.
 

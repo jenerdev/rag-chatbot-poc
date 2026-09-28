@@ -44,6 +44,18 @@
 > ONE SQL function, `unit_quote()`, makes every price; the trigger, the staff
 > quote and the chatbot's tool all call it, and nothing adds one up anywhere
 > else.
+>
+> **Customers book on a page, not in the chat,** since 2026-09-28
+> ([`plan/customer-booking.md`](./plan/customer-booking.md), Phases 0–7, all
+> done, walk included). Every tenant with the bookings application and a
+> priced unit has `/t/<slug>/book`: a stay of N nights (D-073), the price
+> from the database including a per-tenant **holiday calendar** with
+> surcharges (D-072), and a **request** that holds nothing until staff
+> confirm it on the bookings screen (D-070). `request_booking()` is the ONE
+> public write, a fourth definer function (D-071). Villa now has its rates
+> in the database. The chat only explains how to book, from its documents;
+> no prompt text changed (D-069). Read that plan's § 0 before touching a
+> request, a holiday, a price or the page.
 
 ## What this is
 
@@ -87,10 +99,14 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/accommodations/page.tsx  S-5 rooms — 404 unless the tenant books per_room
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
+  app/t/[tenant]/book/page.tsx   S-6 the customer booking page — PUBLIC; 404 unless the tenant has a priced unit
+  app/t/[tenant]/admin/holidays/page.tsx  S-7 the holiday calendar — 404 unless the tenant has the application
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
-  components/                    chat-screen, admin-screen, bookings-screen, accommodations-screen, unanswered-screen, admin-login, reset-password (Client), brand-header, sources-panel
+                                 book/quote and book/request are OPEN (no requireAdmin), like chat/
+  components/                    chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel
   lib/route.ts           withRoute(): validation + the ONE error→status map
+  lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → a CHAT TenantContext, 404 on a miss
   lib/admin-auth.ts      the staff session cookie; requireAdmin() re-checks the membership → a STAFF context
   lib/applications.ts    requireApplication(): 404 unless the tenant has it switched on
@@ -102,25 +118,27 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (8 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (9 files), and server-only
     src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     75 checks (24 through tenant tokens: RLS), no API key
+    tools/verify.mjs     92 checks (77–92 are customer booking: holidays, stays, request_booking), no API key
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type — a new tenant has no members until member:add
     tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
     tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
-    src/accommodations.ts  rooms and their rates, staff only (per_room)
+    src/accommodations.ts  rooms and their rates (+ holiday_price), staff only (per_room)
     src/images.ts          room photos in the `unit-images` bucket, staff only
-    tools/isolation.mjs    23 cross-tenant checks, no API key
-    tools/rooms.mjs        19 checks of rooms, groups, quotes, extra guests and photos on a staff token
+    src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline
+    src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
+    tools/isolation.mjs    29 cross-tenant checks, no API key
+    tools/rooms.mjs        30 checks of rooms, groups, quotes, extra guests, photos, stays, holidays and requests
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
     src/dates.ts           relative dates ("bukas", "next Friday") resolved in code; availability turns checked up front (D-046)
-    tools/prompt-eval.mjs  the battery, 51 cases (10 + 9 tool-* + 10 lang-* + 9 date-* + 13 rt-*), three tenants; seeds its own bookings
+    tools/prompt-eval.mjs  the battery, 56 cases (10 + 9 tool-* + 10 lang-* + 9 date-* + 13 rt-* + 5 book-*), three tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
     tools/isolation.mjs    20 cross-tenant checks through the pipeline
   tsconfig/            shared base config
@@ -130,6 +148,9 @@ plan/                    the migration plan and its evidence; plan.md is tenancy
 fixtures/villa-bookings.json  the battery's booking fixture, seeded and removed by pnpm eval
 fixtures/harbor.json, harbor-units.json  tenant harbor's corpus and rooms (per_room); loaded by plan/booking-types-phase6-harbor.mjs
 fixtures/harbor-bookings.json  harbor's booking fixture, seeded and removed by pnpm eval
+plan/customer-booking-villa-rates.mjs  villa's unit, rates and nightly slots; idempotent
+plan/customer-booking-phase5-docs.mjs  re-ingests the "how to book" documents when they differ from the files
+plan/customer-booking-phase3-walk.mjs  10 HTTP checks of the booking and holiday routes, against pnpm dev
 scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/service under apps/ or packages/*/src
 ```
 
@@ -138,14 +159,16 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 75 checks, no API key needed
-pnpm eval                       # the prompt battery, 51 cases  ⚠ see below
+pnpm --filter @rag/db verify    # 92 checks, no API key needed
+pnpm eval                       # the prompt battery, 56 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 20 cross-tenant checks, on chat tokens  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 20, code filters alone (RLS bypassed)
-pnpm --filter @rag/bookings isolation   # 23 cross-tenant booking checks, on operator staff tokens, no API key
-pnpm --filter @rag/bookings isolation -- --filters-only   # the same 23, code filters alone
-pnpm --filter @rag/bookings rooms       # 19 checks: rooms, groups, quotes, extra guests, photos, on a staff token, no API key
+pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
+pnpm --filter @rag/bookings rooms       # 30 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, requests; no API key
+(cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db tenant:fallback -- <slug> <english|taglish|tagalog> "<message>"   # what the chat says when it cannot answer (D-048)
@@ -171,12 +194,16 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    northwind *alone*, because Villa describes parking and `absent-2` must refuse
    parking. Tenancy turned that fragile precondition into the feature (plan.md
    § 2.5): `leak-1`/`leak-2`/`leak-3` now assert that a fact in the database,
-   but in the other tenant, is unreachable. Expect **49/51**, printed as
-   `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13`:
+   but in the other tenant, is unreachable. Expect **54/56**, printed as
+   `original 9/10 · tool 9/9 · lang 9/10 · date 9/9 · rooms 13/13 · book 5/5`:
    `antecedent` is the known model limit (D-017), and `lang-followup` leans
    Tagalog after a bare date (D-043); it passes about one run in three, which
-   gives 50/51. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
-   before deciding why. A different number means something moved.
+   gives 55/56. `lang-tagalog-2` flips now and then (1 run in 7); repeat it
+   before deciding why. A different number means something moved. The five
+   `book-*` cases (D-069) check both directions of "the chat does not book":
+   the Book button or page is named, and no reply claims a booking was made;
+   `book-how-tl` prints its Taglish mix but judges only the booking part.
+   Every verdict's reason is on a `why:` line, so read it before rewording.
    **`packages/rag/src/language.ts` and `dates.ts` are prompt text too**:
    their lines are appended to `buildPrompt()`, so an edit there means
    re-running the battery. The nine `tool-*` cases seed
@@ -232,11 +259,14 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
      tenant.
    - A new table needs its own policy, or tokens read nothing from it (R-22). The same applies
    to `tenant_applications`, `units`, `slots`, `bookings`, `unanswered_resolutions` (staff-only, D-045),
-   `unit_rates`, `unit_images` and the `unit-images` bucket's `storage.objects` policies
-   (`pnpm --filter @rag/bookings isolation`, 23 checks). **The model never
+   `unit_rates`, `unit_images`, `rate_calendar` (any token reads, admins write) and the `unit-images` bucket's `storage.objects` policies
+   (`pnpm --filter @rag/bookings isolation`, 29 checks). **The model never
    supplies a tenant.** No tool's argument schema has a tenant, unit or
    booking id; the executor takes `tenant` from the server (plan/bookings.md
-   Rule 2).
+   Rule 2). **A customer never supplies one either:** `request_booking()`
+   takes `p_tenant_id` from the route (wall 1) and refuses one that is not
+   the token's (wall 2); a chat token has no insert policy on `bookings`, so
+   that function is the only way in (D-071).
 7. **A tool result carries nothing the chat user may not see.** It goes into a
    prompt, and a prompt-injected model can recite it. `check_availability`
    returns `date, unit, slot, status` and nothing else, and rows are mapped
@@ -254,10 +284,11 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
 
    Chat tokens carry **no `sub`**. Staff tokens carry the user and
    `app_admin`, and Postgres's `app_is_admin()` still demands a
-   `memberships` row for that tenant on every write. Only two functions
+   `memberships` row for that tenant on every write. Only four functions
    are `security definer` (`tenant_public`, `check_availability`,
-   `check_room_availability`; D-042 as amended by D-054), and each checks
-   the tenant itself.
+   `check_room_availability`, `request_booking`; D-042 as amended by D-054
+   and D-071), and each checks the tenant itself. `request_booking` is the
+   only one that writes, and it can write `pending` rows only.
 
 ## Traps that will actually cost you time
 
@@ -335,6 +366,24 @@ All are expanded in `risks.md`.
     linker), so D-046's up-front check never ran. When a case that names a
     date fails, check `[query] dates:` in the log before rewording anything
     (extra-guests Phase 4).
+19. **A trigger inherits its caller's `search_path`.** `bookings_compute_during`
+    named `units` and `slots` bare and worked for years of staff inserts.
+    Fired from inside `request_booking()`, whose `search_path` is `''`, it
+    would have been "relation does not exist" on every web request. Every
+    trigger and function now has `set search_path = ''` and qualifies every
+    name (customer-booking Phase 1, caught by reading before the first run).
+20. **Re-running an older schema file can put an older function back.**
+    `schema-customer-booking.sql` replaces five definitions from two earlier
+    files. Those steps are guarded on `to_regclass('public.rate_calendar')`
+    so a re-run skips them; without that, `schema-extra-guests.sql` would
+    fail (`unit_quote` changed its return type) and `schema-booking-types.sql`
+    would quietly restore a price function with no holidays. When a file
+    replaces a definition, guard the old one on the new file's marker.
+21. **A request does not hold a date, and the screen's disabled button is
+    not the guard.** Once the list reloads, a clashing request's Confirm is
+    disabled by `clash`; a stale list (a second tab) still reaches the
+    server, and `bookings_no_overlap` answers 409 there (D-070). Never add a
+    "check, then confirm" in code to make the button smarter (trap 8).
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.
@@ -356,7 +405,14 @@ All are expanded in `risks.md`.
   tenant)`, which re-checks the membership and swaps in a STAFF context, so no
   later line can touch the database as the chat token. Then
   `requireApplication()` if the route belongs to an application. The chat
-  route stays open.
+  route stays open, and so do `book/quote` and `book/request`: they run on
+  the chat token, read only what any token of the tenant may read, and write
+  only through `request_booking()`. Their limits are, weakest first, a
+  honeypot field, the in-memory per-IP window, and the per-contact limit in
+  SQL, which is the one that holds.
+- Money is bigint **centavos**, and every price is `unit_quote()`'s: a
+  quote before, the stored rows after. A screen never adds up a total; a
+  receipt's total is the sum of what was STORED (customer-booking Rule 3).
 - Every tenant-owned query carries `.eq('tenant_id', tenant.id)` — rule 6.
   "Not yours" and "not there" must look identical (`[]`, `null`, 404), or ids
   can be enumerated across tenants.
