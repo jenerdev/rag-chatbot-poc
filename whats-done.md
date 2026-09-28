@@ -5754,3 +5754,42 @@ definitions. The two files that made them now skip those steps once
 would fail (`unit_quote` changed its return type) and re-running
 `schema-booking-types.sql` would quietly put back a price function with no
 holidays and an availability check that counts requests as taken.
+
+## Customer booking, Phase 2: `@rag/bookings` · done 2026-09-28
+
+**What:** the package the routes will call. `requests.ts`: the public page's
+reads (`bookingPage`, `quoteRequest`) and its one write (`requestBooking`,
+through `request_booking()`), all on a chat token; and for staff,
+`listRequests`, `confirmRequest`, `declineRequest`. `calendar.ts`: the
+holiday list. The surcharge in every breakdown, `nightly` on slots, a
+holiday price on rates, and `BookingLimitError` (429).
+
+**Why it matters:** the page and the staff screen now have one tested set
+of functions, with the same errors and messages whichever route calls them,
+and none of them adds up a price: quotes come from `unit_quote()`, receipts
+from the stored rows.
+
+**Observed:**
+- rooms **30/30**, the 10 new ones through a real chat token for everything
+  the public page will do: a Thursday + Friday stay quoted 1650000 +
+  2050000; a peak Thursday exactly 2450000 (villa's 24 Dec shape); a
+  holiday at the weekend rate until a holiday_price is set, then 2500000;
+  a receipt of 3700000 equal to its two stored rows;
+- a request holds nothing: a second request for the same nights is
+  accepted; once the first is confirmed, the second shows `clash`,
+  confirming it is a 409 that leaves it pending, and a new request for those
+  nights is refused up front with nothing saved;
+- the walls: villa's unit id is "No such unit or slot.", the same as a
+  missing one; a chat token's confirm and calendar remove are `false`
+  (RLS updates nothing), its calendar write an error;
+- unit tests 72 → 94: `parseRequest` (today and day 365 accepted, the day
+  before and after refused; 14 nights yes, 15 no; 70 room-nights; one unit
+  for whole_resort), and the phone and email normalisers;
+- verify 92/92, isolation 20/20 and 23/23 both ways; all three prompts and
+  both tool definitions byte-identical to Phase 0.
+
+**Trap avoided: an optional column in an upsert.** `setRates` gained
+`holidayPrice`. Sent for some rates and not others, PostgREST would send
+NULL for the rest (CLAUDE.md trap 15) and silently clear a holiday price.
+So it is all or none, and left out entirely an upsert keeps what is stored;
+rooms 23 checks both.

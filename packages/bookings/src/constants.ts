@@ -67,3 +67,22 @@ export const IMAGE_BUCKET = 'unit-images';
 export const DEFAULT_STANDARD_CAPACITY = 2;
 export const DEFAULT_MAX_CAPACITY = 4;
 export const DEFAULT_EXTRA_PERSON_RATE = 25_000; // centavos: ₱250 per extra guest, per booking
+
+// --- customer booking (plan/customer-booking.md) ------------------------------
+// POLICY, not measurements (plan § 8 q8, agreed 2026-09-28). The SQL function
+// request_booking() enforces the same four numbers, and it is the wall: these
+// copies let the page and this package say so first, in their own words.
+// verify.mjs checks 14 nights accepted and 15 refused, so a change on one side
+// only shows up. Change both together (schema-customer-booking.sql § 11).
+export const MAX_STAY_NIGHTS = 14;
+export const MAX_BOOKING_ADVANCE_DAYS = 365;
+export const MAX_OPEN_REQUESTS_PER_CONTACT = 3;
+/** units × nights in one request: 5 rooms × 14 nights */
+export const MAX_REQUEST_ROWS = 70;
+// The contact fields' bounds, the same as the SQL function's.
+export const MAX_REQUEST_NAME = 100;
+export const MIN_REQUEST_NAME = 2;
+export const MAX_REQUEST_EMAIL = 254;
+export const MAX_REQUEST_NOTES = 1000;
+// A holiday's label, as rate_calendar_label_length.
+export const MAX_CALENDAR_LABEL = 100;

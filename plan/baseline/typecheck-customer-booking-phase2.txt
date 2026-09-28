@@ -1,0 +1,35 @@
+$ node scripts/check-service-imports.mjs && turbo typecheck
+check-service-imports: OK — no @rag/db/service import under apps/ or packages/*/src (6 roots).
+• turbo 2.11.2
+
+   • Packages in scope: @rag/bookings, @rag/chunker, @rag/db, @rag/openai, @rag/pipeline, @rag/tsconfig, web
+   • Running typecheck in 7 packages
+   • Remote caching disabled
+
+@rag/db:typecheck: cache hit, replaying logs e2a4eaa8f74af157
+@rag/openai:typecheck: cache hit, replaying logs 520c16ac873b1e7d
+@rag/chunker:typecheck: cache hit, replaying logs d954a0edee91c9a0
+@rag/chunker:build: cache hit, replaying logs 49475566ff496770
+@rag/db:typecheck: $ tsc -p tsconfig.json --noEmit
+@rag/openai:typecheck: $ tsc -p tsconfig.json --noEmit
+@rag/chunker:typecheck: $ tsc -p tsconfig.json --noEmit
+@rag/chunker:build: $ tsc -p tsconfig.json
+@rag/openai:build: cache hit, replaying logs 9085586e409651de
+@rag/openai:build: $ tsc -p tsconfig.json
+@rag/db:build: cache hit, replaying logs b7b02c49f1c465d6
+@rag/db:build: $ tsc -p tsconfig.json
+@rag/bookings:typecheck: cache miss, executing 0d2bbab23d9c6dde
+@rag/bookings:build: cache hit, replaying logs 788d33a1c66a25f6
+@rag/bookings:build: $ tsc -p tsconfig.json
+@rag/pipeline:typecheck: cache miss, executing 517d11813dd0335d
+@rag/pipeline:build: cache hit, replaying logs 25fad61ba5370e26
+@rag/pipeline:build: $ tsc -p tsconfig.json
+web:typecheck: cache miss, executing 83f212576e0486ca
+@rag/bookings:typecheck: $ tsc -p tsconfig.json --noEmit
+@rag/pipeline:typecheck: $ tsc -p tsconfig.json --noEmit
+web:typecheck: $ tsc --noEmit
+
+ Tasks:    11 successful, 11 total
+Cached:    8 cached, 11 total
+  Time:    2.22s 
+

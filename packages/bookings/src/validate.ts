@@ -5,7 +5,17 @@
 // tool executor, and only one of them has a zod schema in front of it. The
 // other one's arguments were written by a model.
 
-import { MAX_PRICE, MAX_UNITS_PER_BOOKING } from './constants.js';
+import {
+  MAX_BOOKING_ADVANCE_DAYS,
+  MAX_PRICE,
+  MAX_REQUEST_EMAIL,
+  MAX_REQUEST_NAME,
+  MAX_REQUEST_NOTES,
+  MAX_REQUEST_ROWS,
+  MAX_STAY_NIGHTS,
+  MAX_UNITS_PER_BOOKING,
+  MIN_REQUEST_NAME,
+} from './constants.js';
 import { BookingInputError } from './errors.js';
 import type { BookingType, BookingsConfig } from './types.js';
 
@@ -194,6 +204,129 @@ export function parseRooms(input: { unitId?: unknown; rooms?: unknown; guestCoun
     throw new BookingInputError('The same room is listed twice.');
   }
   return rooms;
+}
+
+/** YYYY-MM-DD plus `days`, as UTC midnights, so no DST. */
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * A Philippine mobile number, normalised to 09XXXXXXXXX, or null.
+ *
+ * Spaces, dashes, dots and brackets are dropped, and +63 becomes 0: the same
+ * normalisation as request_booking(), so the per-contact limit counts
+ * "+63 917 123 4567" and "0917-123-4567" as one contact. FORMAT only: whether
+ * the number is real, a form cannot know (plan § 2.7).
+ */
+export function normalisePhone(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  let phone = value.replace(/[\s().-]/g, '');
+  if (phone.startsWith('+63')) phone = `0${phone.slice(3)}`;
+  return /^09\d{9}$/.test(phone) ? phone : null;
+}
+
+/** An email of the usual shape, lower-cased, or null. Shape only, as above. */
+export function normaliseEmail(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const email = value.trim().toLowerCase();
+  return email.length <= MAX_REQUEST_EMAIL && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null;
+}
+
+/** A customer's request, checked. What request_booking() receives. */
+export interface ParsedRequest {
+  slotId: number;
+  rooms: { unitId: number; guests: number }[];
+  checkIn: string;
+  nights: number;
+  name: string;
+  phone: string;
+  email: string;
+  notes: string | null;
+}
+
+/**
+ * Check a customer's booking request before it reaches the database.
+ *
+ * request_booking() checks all of this again, and is the wall (plan Rule 2).
+ * This copy exists so a person gets a clear message in the page's words, and
+ * so the rules can be unit-tested without a database. `today` is the TENANT'S
+ * (CLAUDE.md trap 9). The first night starting later today is allowed here;
+ * whether it has already started is the function's call, from the slot time.
+ *
+ * `rooms` is `[{ unitId, guests }]`; a whole-resort tenant sends one.
+ */
+export function parseRequest(
+  input: {
+    slotId?: unknown;
+    rooms?: unknown;
+    checkIn?: unknown;
+    nights?: unknown;
+    name?: unknown;
+    phone?: unknown;
+    email?: unknown;
+    notes?: unknown;
+  },
+  { today, bookingType }: { today: string; bookingType: BookingType },
+): ParsedRequest {
+  const slotId = positiveInt(input.slotId, 'Slot');
+
+  if (!Array.isArray(input.rooms) || input.rooms.length === 0) {
+    throw new BookingInputError(bookingType === 'per_room' ? 'Choose at least one room.' : 'Choose what to book.');
+  }
+  if (bookingType === 'whole_resort' && input.rooms.length !== 1) {
+    throw new BookingInputError('This business is booked as a whole, one booking at a time.');
+  }
+  if (input.rooms.length > MAX_UNITS_PER_BOOKING) {
+    throw new BookingInputError(`One request holds at most ${MAX_UNITS_PER_BOOKING} rooms.`);
+  }
+  const rooms = input.rooms.map((room: unknown) => {
+    const r = (room ?? {}) as { unitId?: unknown; guests?: unknown };
+    return { unitId: positiveInt(r.unitId, 'Room'), guests: positiveInt(r.guests, 'Guests') };
+  });
+  if (new Set(rooms.map((r) => r.unitId)).size !== rooms.length) {
+    throw new BookingInputError('The same room is listed twice.');
+  }
+
+  if (!isIsoDate(input.checkIn)) throw new BookingInputError(`"${String(input.checkIn)}" is not a date. Use YYYY-MM-DD.`);
+  const checkIn = input.checkIn;
+  if (checkIn < today) throw new BookingInputError(`${checkIn} is in the past. Today is ${today}.`);
+  const lastDate = addDays(today, MAX_BOOKING_ADVANCE_DAYS);
+  if (checkIn > lastDate) {
+    throw new BookingInputError(`Bookings open ${MAX_BOOKING_ADVANCE_DAYS} days ahead, so the latest date is ${lastDate}.`);
+  }
+
+  const nights = input.nights === undefined || input.nights === null || input.nights === '' ? 1 : positiveInt(input.nights, 'Nights');
+  if (nights > MAX_STAY_NIGHTS) throw new BookingInputError(`A stay is at most ${MAX_STAY_NIGHTS} nights.`);
+  if (rooms.length * nights > MAX_REQUEST_ROWS) {
+    throw new BookingInputError(`That is ${rooms.length * nights} room-nights; one request holds at most ${MAX_REQUEST_ROWS}.`);
+  }
+
+  if (typeof input.name !== 'string') throw new BookingInputError('Your name is required.');
+  const name = input.name.trim();
+  if (name.length < MIN_REQUEST_NAME || name.length > MAX_REQUEST_NAME) {
+    throw new BookingInputError(`Your name must be ${MIN_REQUEST_NAME} to ${MAX_REQUEST_NAME} characters.`);
+  }
+  const phone = normalisePhone(input.phone);
+  if (!phone) throw new BookingInputError('Enter a mobile number like 0917 123 4567.');
+  const email = normaliseEmail(input.email);
+  if (!email) throw new BookingInputError('Enter a valid email address.');
+  const notes = optionalText(input.notes, 'Notes', MAX_REQUEST_NOTES);
+
+  return { slotId, rooms, checkIn, nights, name, phone, email, notes };
+}
+
+/**
+ * The booking page's text from the bookings config: `booking_page.instructions`
+ * and `booking_page.guest_hint`, validated on write by the
+ * tenant_applications_booking_page trigger. Absent is null.
+ */
+export function pageSettings(raw: unknown): { instructions: string | null; guestHint: string | null } {
+  const page = ((raw ?? {}) as Record<string, unknown>).booking_page as Record<string, unknown> | undefined;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  return { instructions: text(page?.instructions), guestHint: text(page?.guest_hint) };
 }
 
 /** What a stored photo is, by its first bytes. Its name and Content-Type are only what the sender typed. */

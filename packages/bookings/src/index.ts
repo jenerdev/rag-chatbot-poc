@@ -19,6 +19,9 @@
 //                  availability, several rooms at once, quotes
 //   accommodations.ts   rooms and their rates, for staff (per_room)
 //   images.ts      room photos in Storage, for staff (per_room)
+//   calendar.ts    holiday and peak days, read by unit_price() (customer booking)
+//   requests.ts    the public booking page's reads and its one write; staff
+//                  confirm or decline a request (customer booking)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -37,8 +40,23 @@ export {
   DEFAULT_EXTRA_PERSON_RATE,
   DEFAULT_MAX_CAPACITY,
   DEFAULT_STANDARD_CAPACITY,
+  MAX_BOOKING_ADVANCE_DAYS,
+  MAX_CALENDAR_LABEL,
+  MAX_OPEN_REQUESTS_PER_CONTACT,
+  MAX_REQUEST_EMAIL,
+  MAX_REQUEST_NAME,
+  MAX_REQUEST_NOTES,
+  MAX_REQUEST_ROWS,
+  MAX_STAY_NIGHTS,
+  MIN_REQUEST_NAME,
 } from './constants.js';
-export { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
+export {
+  BookingConflictError,
+  BookingInputError,
+  BookingLimitError,
+  BookingsNotEnabledError,
+  PerRoomOnlyError,
+} from './errors.js';
 export {
   bookingsConfig,
   cancelBooking,
@@ -61,13 +79,18 @@ export {
   updateAccommodation,
 } from './accommodations.js';
 export { addImage, listImages, moveImage, removeImage, setImageOrder } from './images.js';
-export { isIsoDate, localDate, sniffImageType, validateRange } from './validate.js';
+export { bookingPage, confirmRequest, declineRequest, listRequests, quoteRequest, requestBooking } from './requests.js';
+export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
+export { addDays, isIsoDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
 
 export type {
   Accommodation,
   AccommodationInput,
   BookingGroup,
+  BookingPage,
+  BookingRequest,
   BookingStatus,
+  CalendarDay,
   BookingSummary,
   BookingTenant,
   BookingType,
@@ -76,6 +99,9 @@ export type {
   NewBooking,
   Quote,
   RateSummary,
+  RequestLine,
+  RequestQuote,
+  RequestReceipt,
   RoomAvailability,
   SlotAvailability,
   SlotSummary,

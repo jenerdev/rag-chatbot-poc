@@ -10,7 +10,9 @@
 //   * a throwaway `rooms-probe` tenant, per_room, with one slot;
 //   * a probe user who is its member (the staff token is minted for it, as
 //     requireAdmin() does), deleted at the end;
-//   * photos in the bucket under the probe's folder, removed at the end.
+//   * photos in the bucket under the probe's folder, removed at the end;
+//   * (20–29) web requests and holiday days in the probe, and a second
+//     throwaway tenant, rooms-bare, for the unpriced-page check.
 // Villa is only READ (as its operator), for the whole-resort and
 // cross-tenant checks.
 //
@@ -19,12 +21,23 @@
 // Run:  pnpm --filter @rag/bookings rooms
 
 import { randomBytes } from 'node:crypto';
-import { staffClient } from '@rag/db';
+import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, supabase } from '@rag/db/service';
 import {
   addImage,
   BookingConflictError,
   BookingInputError,
+  bookingPage,
+  BookingsNotEnabledError,
+  confirmRequest,
+  copyCalendarDays,
+  declineRequest,
+  listCalendar,
+  listRequests,
+  quoteRequest,
+  removeCalendarDay,
+  requestBooking,
+  setCalendarDay,
   checkRoomAvailability,
   createAccommodation,
   createBookings,
@@ -355,6 +368,211 @@ try {
       'photos: new ones take the next place; a move swaps neighbours',
       `orders on upload ${orders} · → ${label(afterRight)} (${afterRight.map((i) => i.sortOrder).join(',')}) · past the end ${pastEnd} · ← ${label(afterLeft)}`,
     );
+  }
+
+  // 20–29 are customer booking Phase 2 (plan/customer-booking.md): the
+  //        booking page's reads, quotes, requests and the holiday calendar,
+  //        through the PACKAGE. Requests go through a CHAT token, as the
+  //        public page will; confirm and decline through the staff token.
+  //        A "Hall" room priced like villa: 30 included, 45 at most, ₱250
+  //        above 30, ₱16,000 weekday / ₱20,000 weekend.
+  {
+    await supabase.from('slots').update({ nightly: true }).eq('tenant_id', probe.id).eq('id', night.id);
+    const chat = { id: probe.id, slug: probe.slug, db: scopedClient(mintTenantToken({ tenantId: probe.id })) };
+    const hall = await createAccommodation(probe, { name: 'Hall', capacity: 45, standardCapacity: 30, extraPersonRate: 25000, sortOrder: 20 });
+    await setRates(probe, hall.id, [{ slotId: night.id, weekdayPrice: 1600000, weekendPrice: 2000000 }]);
+    const THU = firstOf(100, [4]);
+    const next = (iso, n) => {
+      const d = new Date(`${iso}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const FRI = next(THU, 1);
+    const PEAK = firstOf(130, [4]);
+    const HOLIDAY = firstOf(140, [2]);
+    const contact = (n) => ({ name: 'Rooms Probe', phone: `0917000${String(n).padStart(4, '0')}`, email: `rooms-probe-${n}@example.com` });
+    const stay = (overrides = {}) => ({ slotId: night.id, rooms: [{ unitId: hall.id, guests: 32 }], checkIn: THU, nights: 2, ...contact(1), ...overrides });
+
+    // 20. The page, on a chat token: priced active rooms only (the Loft,
+    //     retired in 6, is not offered), the night slot marked nightly, 14 nights.
+    //     A whole_resort tenant with no rates has no page: 404.
+    {
+      const page = await bookingPage(chat);
+      const names = page.units.map((u) => u.name);
+      const { data: bare } = await supabase.from('tenants').insert({ slug: 'rooms-bare', business_name: 'bare', assistant_name: 'x' }).select('id, slug').single();
+      let bareError = null;
+      try {
+        await supabase.from('tenant_applications').insert({ tenant_id: bare.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+        await supabase.from('units').insert({ tenant_id: bare.id, name: 'Whole property' });
+        bareError = await thrown(() => bookingPage({ id: bare.id, slug: bare.slug, db: scopedClient(mintTenantToken({ tenantId: bare.id })) }));
+      } finally {
+        await supabase.from('tenants').delete().eq('id', bare.id);
+      }
+      check(
+        names.includes('Hall') && !names.includes('Loft') && page.slots.every((s) => s.nightly) && page.maxNights === 14
+          && page.units.every((u) => u.rates.length > 0) && bareError instanceof BookingsNotEnabledError,
+        'booking page: priced active units only, nightly slot, 14 nights; an unpriced tenant is a 404',
+        `${names.join(', ')} · slots ${page.slots.map((s) => `${s.name}${s.nightly ? '*' : ''}`).join(',')} · unpriced: ${described(bareError)}`,
+      );
+    }
+
+    // 21. A weekday + weekend stay, quoted on the chat token: 1650000 + 2050000.
+    {
+      const q = await quoteRequest(chat, stay());
+      const got = q.lines.map((l) => `${l.date} ${l.basePrice}+${l.extraGuestPrice}+${l.surcharge}=${l.price}`).join(', ');
+      check(
+        q.available && q.total === 3700000 && got === `${THU} 1600000+50000+0=1650000, ${FRI} 2000000+50000+0=2050000`,
+        'quote: a Thursday + Friday stay is priced night by night',
+        `${got} · total ${q.total} · available ${q.available}`,
+      );
+    }
+
+    // 22. The calendar through the package: staff add a peak day with ₱4,000
+    //     and a plain holiday; the chat token reads both and cannot write.
+    //     Villa's 24 Dec shape, on a Thursday: the weekend rate + ₱500 +
+    //     ₱4,000 = ₱24,500 exactly.
+    {
+      await setCalendarDay(probe, { day: PEAK, kind: 'peak', label: 'Probe peak', surcharge: 400000 });
+      await setCalendarDay(probe, { day: HOLIDAY, label: 'Probe holiday' });
+      const seen = await listCalendar(chat, { from: PEAK, to: HOLIDAY });
+      const chatWrite = await thrown(() => setCalendarDay(chat, { day: PEAK, label: 'Chat', surcharge: 0 }));
+      const peak = await quoteRequest(chat, stay({ checkIn: PEAK, nights: 1 }));
+      const line = peak.lines[0];
+      check(
+        seen.map((d) => `${d.day} ${d.kind} ${d.surcharge}`).join(', ') === `${PEAK} peak 400000, ${HOLIDAY} holiday 0`
+          && chatWrite !== null && !(chatWrite instanceof BookingInputError)
+          && `${line.basePrice}+${line.extraGuestPrice}+${line.surcharge}=${line.price}` === '2000000+50000+400000=2450000' && line.holiday === 'Probe peak',
+        "calendar: staff write, chat reads; a peak Thursday is ₱24,500 (villa's 24 Dec)",
+        `${seen.map((d) => d.day).join(',')} · chat write: ${described(chatWrite)} · ${line.basePrice}+${line.extraGuestPrice}+${line.surcharge}=${line.price} "${line.holiday}"`,
+      );
+    }
+
+    // 23. A holiday with no holiday_price is the weekend rate; with one, that
+    //     price. A holidayPrice sent for some rates but not all is refused,
+    //     and a rate edit that leaves it out keeps it.
+    {
+      const before = (await quoteRequest(chat, stay({ checkIn: HOLIDAY, nights: 1 }))).lines[0].basePrice;
+      await setRates(probe, hall.id, [{ slotId: night.id, weekdayPrice: 1600000, weekendPrice: 2000000, holidayPrice: 2500000 }]);
+      const after = (await quoteRequest(chat, stay({ checkIn: HOLIDAY, nights: 1 }))).lines[0].basePrice;
+      const weekday = (await quoteRequest(chat, stay({ checkIn: THU, nights: 1 }))).lines[0].basePrice;
+      const mixed = await thrown(() =>
+        setRates(probe, family.id, [
+          { slotId: night.id, weekdayPrice: 1, weekendPrice: 1, holidayPrice: 5 },
+          { slotId: night.id + 100000, weekdayPrice: 1, weekendPrice: 1 },
+        ]),
+      );
+      const kept = (await setRates(probe, hall.id, [{ slotId: night.id, weekdayPrice: 1600000, weekendPrice: 2000000 }])).rates[0].holidayPrice;
+      check(
+        before === 2000000 && after === 2500000 && weekday === 1600000 && mixed instanceof BookingInputError && kept === 2500000,
+        'holiday rate: weekend when unset, holiday_price when set; a rate edit without it keeps it',
+        `unset ${before} · set ${after} · weekday ${weekday} · mixed: ${described(mixed)} · kept ${kept}`,
+      );
+    }
+
+    // 24. THE request, on the chat token: 2 pending rows, one reference, the
+    //     receipt's total is the sum of the STORED prices, check-out 12:00
+    //     (04:00 UTC) on the third day.
+    let receipt;
+    {
+      receipt = await requestBooking(chat, stay());
+      const stored = (await listBookings(probe, { from: THU, to: FRI })).filter((b) => b.reference === receipt.reference);
+      const sum = stored.reduce((t, b) => t + b.price, 0);
+      check(
+        /^ROO-[A-Z2-9]{6}$/.test(receipt.reference) && stored.length === 2 && stored.every((b) => b.status === 'pending' && b.source === 'web')
+          && receipt.total === sum && sum === 3700000 && receipt.endsAt === `${next(FRI, 1)}T04:00:00+00:00`,
+        'request: 2 pending web rows, one reference, total = the stored prices',
+        `${receipt.reference} · ${stored.length} rows ${stored.map((b) => b.status).join(',')} · receipt ${receipt.total}, stored ${sum} · ends ${receipt.endsAt}`,
+      );
+    }
+
+    // 25. Staff see it as ONE request; a second request for the same nights
+    //     is accepted too (a request holds nothing), and neither clashes yet.
+    {
+      const second = await requestBooking(chat, stay(contact(2)));
+      const list = await listRequests(probe, { from: THU });
+      const mine = list.filter((r) => [receipt.reference, second.reference].includes(r.reference));
+      check(
+        mine.length === 2 && mine.every((r) => r.status === 'pending' && r.nights === 2 && r.total === 3700000 && !r.clash && r.bookingIds.length === 2)
+          && mine.some((r) => r.guestEmail === 'rooms-probe-1@example.com'),
+        'staff list: one row per request; two requests for the same nights, no clash yet',
+        mine.map((r) => `${r.reference} ${r.status} ${r.nights}n ${r.total} clash=${r.clash}`).join(' · '),
+      );
+    }
+
+    // 26. Confirm the first: true, and true again. The second then clashes,
+    //     and confirming it is a 409 that changes nothing; declining it is
+    //     true. A quote for those nights now says unavailable, and a new
+    //     request for them is refused up front (409), nothing saved.
+    {
+      const find = async (email) => (await listRequests(probe, { from: THU })).find((r) => r.guestEmail === email);
+      const firstId = (await find('rooms-probe-1@example.com')).groupId;
+      const secondId = (await find('rooms-probe-2@example.com')).groupId;
+      const confirmed = await confirmRequest(probe, firstId);
+      const again = await confirmRequest(probe, firstId);
+      const clashing = await find('rooms-probe-2@example.com');
+      const refusedConfirm = await thrown(() => confirmRequest(probe, secondId));
+      const stillPending = (await find('rooms-probe-2@example.com')).status;
+      const declined = await declineRequest(probe, secondId);
+      const afterDecline = (await find('rooms-probe-2@example.com')).status;
+      const quoteAfter = await quoteRequest(chat, stay());
+      const before = (await listBookings(probe, { from: THU, to: FRI })).length;
+      const late = await thrown(() => requestBooking(chat, stay(contact(3))));
+      const after = (await listBookings(probe, { from: THU, to: FRI })).length;
+      check(
+        confirmed && again && clashing.clash && refusedConfirm instanceof BookingConflictError && refusedConfirm.status === 409
+          && stillPending === 'pending' && declined && afterDecline === 'cancelled'
+          && !quoteAfter.available && late instanceof BookingConflictError && after === before,
+        'confirm: whole group; a clashing confirm is 409 and changes nothing; decline; the nights are gone',
+        `confirm ${confirmed}/${again} · clash ${clashing.clash} · ${described(refusedConfirm)} · then ${stillPending} · decline ${declined} → ${afterDecline} · quote available ${quoteAfter.available} · late ${described(late)} · rows ${before} → ${after}`,
+      );
+    }
+
+    // 27. The walls, through the package: villa's unit id is "No such unit or
+    //     slot.", exactly as a missing one; a chat token's confirm is false
+    //     (RLS: it updates nothing), never an error that tells them apart.
+    {
+      const foreignUnit = await thrown(() => requestBooking(chat, stay({ rooms: [{ unitId: villaRoom.id, guests: 2 }], ...contact(4) })));
+      const foreignQuote = await thrown(() => quoteRequest(chat, stay({ rooms: [{ unitId: villaRoom.id, guests: 2 }] })));
+      const anyId = (await listRequests(probe, { from: THU }))[0]?.groupId ?? '00000000-0000-0000-0000-000000000000';
+      const chatConfirm = await confirmRequest(chat, anyId);
+      check(
+        foreignUnit?.message === 'No such unit or slot.' && foreignQuote?.message === 'No such unit or slot.' && chatConfirm === false,
+        "walls: villa's unit is 'No such unit or slot.'; a chat token's confirm is false",
+        `${described(foreignUnit)} | ${described(foreignQuote)} | chat confirm: ${chatConfirm}`,
+      );
+    }
+
+    // 28. The contact limit through the package is a 429 (BookingLimitError):
+    //     contact 5 sends 3 requests, the 4th is refused.
+    {
+      const codes = [];
+      for (const offset of [200, 210, 220, 230]) {
+        const error = await thrown(() => requestBooking(chat, stay({ checkIn: firstOf(offset, [1]), nights: 1, ...contact(5) })));
+        codes.push(error ? `${error.name} ${error.status}` : 'ok');
+      }
+      check(
+        codes.join(',') === 'ok,ok,ok,BookingLimitError 429',
+        'request: the 4th open request from one contact is a 429',
+        codes.join(','),
+      );
+    }
+
+    // 29. Copying a fixed date to next year, and removing a day, counted: a
+    //     second remove is false, and so is a chat token's (RLS: 0 rows).
+    {
+      const year = Number(PEAK.slice(0, 4)) + 1;
+      const copied = await copyCalendarDays(probe, { days: [PEAK], toYear: year });
+      const removed = await removeCalendarDay(probe, HOLIDAY);
+      const again = await removeCalendarDay(probe, HOLIDAY);
+      const chatRemove = await removeCalendarDay(chat, PEAK);
+      const left = await listCalendar(probe, { from: PEAK, to: `${year}-12-31` });
+      check(
+        copied.length === 1 && copied[0].day === `${year}${PEAK.slice(4)}` && copied[0].surcharge === 400000
+          && removed && !again && !chatRemove && left.map((d) => d.day).join(',') === `${PEAK},${year}${PEAK.slice(4)}`,
+        'calendar: a date copied to next year; remove is counted (again false, chat token false)',
+        `copied ${copied.map((d) => d.day).join(',')} · removed ${removed}/${again} · chat ${chatRemove} · left ${left.map((d) => d.day).join(',')}`,
+      );
+    }
   }
 
   // 14. A whole-resort tenant has no rooms to manage, and cannot book several.

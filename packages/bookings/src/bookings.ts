@@ -225,7 +225,7 @@ export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
   await requireConfig(tenant);
   const { data, error } = await tenant.db
     .from('slots')
-    .select('id, name, start_time, duration')
+    .select('id, name, start_time, duration, nightly')
     .eq('tenant_id', tenant.id)
     .order('start_time')
     .order('name');
@@ -235,6 +235,7 @@ export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
     name: s.name,
     startTime: s.start_time.slice(0, 5),
     duration: s.duration,
+    nightly: s.nightly,
   }));
 }
 
@@ -266,7 +267,9 @@ export async function listBookings(
 
   let query = tenant.db
     .from('bookings')
-    .select('id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, base_price, extra_guest_price, group_id, created_at')
+    .select(
+      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
+    )
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
     .lte('booked_date', to);
@@ -295,7 +298,11 @@ export async function listBookings(
     price: b.price,
     basePrice: b.base_price,
     extraGuestPrice: b.extra_guest_price,
+    surcharge: b.surcharge,
     groupId: b.group_id,
+    source: b.source,
+    reference: b.reference,
+    guestEmail: b.guest_email,
     createdAt: b.created_at,
   }));
 }
@@ -379,8 +386,10 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
   if (bookings.length !== ids.size) throw new Error(`Bookings ${[...ids].join(', ')} were saved but could not be read back`);
 
   // The total is read back from what was STORED, never computed here: the
-  // trigger's price is the only price (plan Rule 2).
-  const total = bookingType === 'per_room' ? bookings.reduce((sum, b) => sum + (b.price ?? 0), 0) : null;
+  // trigger's price is the only price (plan Rule 2). A whole_resort tenant is
+  // priced too once its unit has a rate (customer booking § 2.4), so the
+  // total is null only when a row has no price.
+  const total = bookings.every((b) => b.price !== null) ? bookings.reduce((sum, b) => sum + (b.price ?? 0), 0) : null;
   return { groupId, bookings, total };
 }
 
@@ -455,6 +464,7 @@ export async function quote(
         basePrice: q.base_price,
         extraGuests: q.extra_guests,
         extraGuestPrice: q.extra_guest_price,
+        surcharge: q.surcharge,
         price: q.price,
       };
     }),

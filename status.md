@@ -154,8 +154,8 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0 and 1 done 2026-09-28 on
-`feat/customer-booking`, verify 92/92; next is Phase 2, `@rag/bookings`). For the MVP the chatbot only explains how to book; customers book
+Phases 0–2 done 2026-09-28 on
+`feat/customer-booking`, verify 92/92, rooms 30/30; next is Phase 3, the routes). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1042,6 +1042,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 2 (`@rag/bookings`)
+- **Built:** `requests.ts`, `calendar.ts`, `BookingLimitError`, surcharge,
+  `nightly`, `holidayPrice`; rooms 20–29; `requests.test.ts`.
+- **Observed** (`plan/baseline/*-customer-booking-phase2*`): rooms 30/30;
+  unit tests 13 / 14 / 94 / 301; verify 92/92; isolation 20/20 and 23/23
+  both ways; prompts and tool definitions byte-identical.
+- **Next:** Phase 3, the open quote/request routes and the staff Requests
+  and Holidays routes, with an HTTP walk against `pnpm dev`.
 
 ### 2026-09-28 — customer booking Phase 1 (schema)
 - **Built:** `schema-customer-booking.sql` (holiday calendar, holiday_price,

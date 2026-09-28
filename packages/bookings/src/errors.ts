@@ -1,4 +1,4 @@
-// errors.ts — the three ways a booking call fails on purpose.
+// errors.ts — the ways a booking call fails on purpose.
 //
 // Each carries `status`, because that is the one property the web app's error
 // map reads (apps/web/lib/route.ts), exactly as OpenAIError and AdminAuthError
@@ -57,5 +57,18 @@ export class PerRoomOnlyError extends Error {
   constructor(slug: string) {
     super(`"${slug}" does not book by room`);
     this.name = 'PerRoomOnlyError';
+  }
+}
+
+/**
+ * This phone or email already has as many open requests as a contact may
+ * (MAX_OPEN_REQUESTS_PER_CONTACT). HTTP 429. Raised for Postgres 54000 from
+ * request_booking(), which is the limit's real home (plan § 2.1).
+ */
+export class BookingLimitError extends Error {
+  readonly status = 429;
+  constructor(message: string) {
+    super(message);
+    this.name = 'BookingLimitError';
   }
 }

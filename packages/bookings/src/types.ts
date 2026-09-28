@@ -61,11 +61,17 @@ export interface BookingSummary {
   notes: string | null;
   /** centavos, the TOTAL, set by the database; null for whole_resort and for bookings made before prices existed */
   price: number | null;
-  /** its two parts (extra-guests D-068): the rate, and the extra-guest fee. Null likewise */
+  /** its parts (extra-guests D-068): the rate, the extra-guest fee, and the holiday surcharge. Null likewise */
   basePrice: number | null;
   extraGuestPrice: number | null;
-  /** shared by every room of one multi-room booking; null for a single room */
+  surcharge: number | null;
+  /** shared by every room of one multi-room booking, and by every night of a web request; null for a single staff booking */
   groupId: string | null;
+  /** 'web' for a customer's request (request_booking), 'staff' otherwise */
+  source: 'staff' | 'web';
+  /** a web request's reference, for people; null for staff bookings */
+  reference: string | null;
+  guestEmail: string | null;
   createdAt: string;
 }
 
@@ -83,6 +89,8 @@ export interface SlotSummary {
   startTime: string;
   /** Postgres interval text, e.g. "22:00:00" */
   duration: string;
+  /** a stay of several nights is several rows of this slot (customer booking § 2.2) */
+  nightly: boolean;
 }
 
 /** What createBooking accepts. Loose types on purpose: this package validates them itself. */
@@ -131,9 +139,9 @@ export interface RoomAvailability {
   extraPersonRate: number | null;
   slot: string;
   status: 'open' | 'taken';
-  /** centavos, the base rate for that date: weekday or weekend, nothing else (R-24) */
+  /** centavos, the base rate for that date: weekday, weekend or holiday (R-24 closed by customer booking § 2.3) */
   price: number;
-  /** for the guests asked about (0 when none were): the fee, and base + fee */
+  /** for the guests asked about (0 when none were): the fee, and base + fee + that day's surcharge */
   extraGuestPrice: number;
   total: number;
 }
@@ -153,7 +161,16 @@ export interface Quote {
   slotId: number;
   slot: string;
   /** one line per room: the rate, the guests above standard and their fee, and the room's total */
-  lines: { unitId: number; unit: string; guests: number | null; basePrice: number; extraGuests: number; extraGuestPrice: number; price: number }[];
+  lines: {
+    unitId: number;
+    unit: string;
+    guests: number | null;
+    basePrice: number;
+    extraGuests: number;
+    extraGuestPrice: number;
+    surcharge: number;
+    price: number;
+  }[];
   /** centavos */
   total: number;
   currency: string;
@@ -165,6 +182,8 @@ export interface RateSummary {
   /** centavos */
   weekdayPrice: number;
   weekendPrice: number;
+  /** on a rate_calendar day; null means the weekend price (customer booking § 2.3) */
+  holidayPrice: number | null;
 }
 
 export interface ImageSummary {
@@ -204,4 +223,115 @@ export interface AccommodationInput {
   extraPersonRate?: unknown;
   active?: unknown;
   sortOrder?: unknown;
+}
+
+// --- customer booking (plan/customer-booking.md) ------------------------------
+
+/** A holiday or peak day, per tenant. Readable by the tenant's chat token (the page shows it). */
+export interface CalendarDay {
+  /** YYYY-MM-DD */
+  day: string;
+  kind: 'holiday' | 'peak';
+  label: string;
+  /** centavos, added once per night per unit on this day */
+  surcharge: number;
+}
+
+/**
+ * What the public booking page may show, and nothing else: the business's
+ * bookable units and slots, their public prices, and the page's own text.
+ * No bookings, no guest data (plan Rule 4). For a chat token.
+ */
+export interface BookingPage {
+  bookingType: BookingType;
+  timezone: string;
+  currency: string;
+  /** the tenant's today, where the date picker starts */
+  today: string;
+  /** the last date a stay may start on */
+  lastDate: string;
+  maxNights: number;
+  instructions: string | null;
+  guestHint: string | null;
+  slots: SlotSummary[];
+  units: {
+    id: number;
+    name: string;
+    description: string | null;
+    capacity: number | null;
+    standardCapacity: number | null;
+    extraPersonRate: number | null;
+    /** only the slots this unit has a price for */
+    rates: RateSummary[];
+  }[];
+  /** holiday and peak days from today to lastDate */
+  calendar: CalendarDay[];
+}
+
+/** One unit on one night of a request or a quote. */
+export interface RequestLine {
+  date: string;
+  unitId: number;
+  unit: string;
+  guests: number;
+  basePrice: number;
+  extraGuestPrice: number;
+  surcharge: number;
+  /** centavos: base + extra + surcharge */
+  price: number;
+  /** a holiday or peak label for this date, or null */
+  holiday: string | null;
+}
+
+/** A price for a stay before it is requested. Read-only; nothing is held. */
+export interface RequestQuote {
+  slotId: number;
+  slot: string;
+  checkIn: string;
+  nights: number;
+  lines: RequestLine[];
+  /** centavos, the sum of the lines */
+  total: number;
+  currency: string;
+  /** false when a night is already CONFIRMED for one of the units; a request would be refused */
+  available: boolean;
+}
+
+/** What a customer gets back after sending a request: the stored rows, never recomputed. */
+export interface RequestReceipt {
+  reference: string;
+  slot: string;
+  checkIn: string;
+  nights: number;
+  /** ISO instants of the first night's start and the last night's end */
+  startsAt: string;
+  endsAt: string;
+  lines: RequestLine[];
+  /** centavos, the sum of the STORED prices */
+  total: number;
+  currency: string;
+  instructions: string | null;
+}
+
+/** A web request as staff see it: one group, all its nights. Guest data, so staff only. */
+export interface BookingRequest {
+  groupId: string;
+  reference: string;
+  /** every row of a group has the same status (confirm and decline are one statement) */
+  status: BookingStatus;
+  guestName: string;
+  guestPhone: string | null;
+  guestEmail: string | null;
+  notes: string | null;
+  createdAt: string;
+  slotId: number;
+  slot: string;
+  checkIn: string;
+  nights: number;
+  units: { unitId: number; unit: string; guests: number | null }[];
+  bookingIds: number[];
+  /** centavos, the sum of the stored prices */
+  total: number | null;
+  /** true when a night is now CONFIRMED for another booking of one of these units: confirming would be refused */
+  clash: boolean;
 }

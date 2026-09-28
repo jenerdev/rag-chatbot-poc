@@ -42,7 +42,7 @@ export async function listAccommodations(tenant: BookingTenant): Promise<Accommo
   await requirePerRoom(tenant);
   const [units, rates, slots] = await Promise.all([
     tenant.db.from('units').select(UNIT_COLUMNS).eq('tenant_id', tenant.id).order('sort_order').order('name'),
-    tenant.db.from('unit_rates').select('unit_id, slot_id, weekday_price, weekend_price').eq('tenant_id', tenant.id),
+    tenant.db.from('unit_rates').select('unit_id, slot_id, weekday_price, weekend_price, holiday_price').eq('tenant_id', tenant.id),
     tenant.db.from('slots').select('id, name, start_time').eq('tenant_id', tenant.id).order('start_time').order('name'),
   ]);
   if (units.error) throw new Error(`Could not load rooms: ${units.error.message}`);
@@ -71,6 +71,7 @@ export async function listAccommodations(tenant: BookingTenant): Promise<Accommo
           slot: slotName.get(r.slot_id) ?? '(unknown slot)',
           weekdayPrice: r.weekday_price,
           weekendPrice: r.weekend_price,
+          holidayPrice: r.holiday_price,
         }),
       ),
     images: images.filter((i) => i.unitId === u.id),
@@ -193,17 +194,25 @@ export async function setRates(
   const unitId = positiveInt(id, 'Room');
   if (!Array.isArray(rates) || rates.length === 0) throw new BookingInputError('Send at least one rate.');
 
-  const rows = rates.map((rate: unknown) => {
-    const r = (rate ?? {}) as { slotId?: unknown; weekdayPrice?: unknown; weekendPrice?: unknown };
-    return {
-      tenant_id: tenant.id,
-      unit_id: unitId,
-      slot_id: positiveInt(r.slotId, 'Slot'),
-      weekday_price: parsePrice(r.weekdayPrice, 'Weekday price'),
-      weekend_price: parsePrice(r.weekendPrice, 'Weekend price'),
-      updated_at: new Date().toISOString(),
-    };
-  });
+  // The holiday price is optional (null = the weekend price on a calendar
+  // day). Sent for all rates or for none: a key some rows lack would reach
+  // PostgREST as NULL for those rows (CLAUDE.md trap 15), silently clearing a
+  // holiday price nobody meant to touch. Left out entirely, an upsert leaves
+  // the stored holiday prices as they are.
+  const typed = rates.map((rate: unknown) => (rate ?? {}) as { slotId?: unknown; weekdayPrice?: unknown; weekendPrice?: unknown; holidayPrice?: unknown });
+  const withHoliday = typed.filter((r) => r.holidayPrice !== undefined).length;
+  if (withHoliday !== 0 && withHoliday !== typed.length) {
+    throw new BookingInputError('Send a holiday price (or null) for every slot, or for none.');
+  }
+  const rows = typed.map((r) => ({
+    tenant_id: tenant.id,
+    unit_id: unitId,
+    slot_id: positiveInt(r.slotId, 'Slot'),
+    weekday_price: parsePrice(r.weekdayPrice, 'Weekday price'),
+    weekend_price: parsePrice(r.weekendPrice, 'Weekend price'),
+    ...(withHoliday ? { holiday_price: r.holidayPrice === null || r.holidayPrice === '' ? null : parsePrice(r.holidayPrice, 'Holiday price') } : {}),
+    updated_at: new Date().toISOString(),
+  }));
   if (new Set(rows.map((r) => r.slot_id)).size !== rows.length) throw new BookingInputError('The same slot is listed twice.');
 
   // Checked first, so "not yours" is null (a 404 at the route) and not the

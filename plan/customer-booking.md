@@ -416,6 +416,23 @@ night refused whole; confirm of a clashing request → 409. **Done when**
 rooms, isolation both ways and verify pass, and unit tests cover the
 validation in `request_booking`.
 
+> **Done 2026-09-28.** `requests.ts` (`bookingPage`, `quoteRequest`,
+> `requestBooking` on a chat token; `listRequests`, `confirmRequest`,
+> `declineRequest` for staff), `calendar.ts` (list, set, remove, copy chosen
+> days to another year), `BookingLimitError` (429), the surcharge in every
+> breakdown, `nightly` on slots, `holidayPrice` on rates (sent for all rates
+> or none, trap 15; left out, it is kept). rooms **30/30** (10 new, 20–29):
+> a Thursday + Friday stay 1650000 + 2050000; a peak Thursday exactly
+> 2000000 + 50000 + 400000 = 2450000; holiday = weekend rate until a
+> holiday_price is set (2500000); a request's receipt total equals its stored
+> rows (3700000); a second request for the same nights accepted, then a 409
+> on confirming it after the first was confirmed, nothing changed; the 4th
+> open request per contact a 429. Unit tests 72 → 94 (22 new, `parseRequest`
+> and the normalisers). verify 92/92, isolation 20/20 and 23/23 both ways;
+> all three prompts and both tool definitions byte-identical to Phase 0.
+> Read back: villa's page offers its three slots with prices, Overnight
+> nightly; harbor's offers four rooms, Night nightly.
+
 ### Phase 3 — Routes
 
 Quote and request (open), Requests and Holidays (staff). An HTTP walk
