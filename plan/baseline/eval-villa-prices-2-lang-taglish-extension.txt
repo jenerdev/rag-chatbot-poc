@@ -1,0 +1,12 @@
+== lang-taglish (extension) run 1
+PASS  [lang-taglish] villa want lang
+      A: Usually po, hindi puwedeng mag-extend after checkout. Pero kung walang booking sa next slot, puwede po mag-extend at ang charge is ₱1,000 per hour or any part of an hour.  || taglish? true (tl 9, en 5, en-share 0.36); facts kept
+      why: taglish? true (tl 9, en 5, en-share 0.36); facts kept
+== lang-taglish (extension) run 2
+PASS  [lang-taglish] villa want lang
+      A: Usually po, hindi puwedeng mag-extend after checkout. Pero kung walang booking sa next slot, puwede po mag-extend at ang charge is ₱1,000 per hour or any part of an hour.  || taglish? true (tl 9, en 5, en-share 0.36); facts kept
+      why: taglish? true (tl 9, en 5, en-share 0.36); facts kept
+== lang-taglish (extension) run 3
+PASS  [lang-taglish] villa want lang
+      A: Usually po, hindi puwede mag-extend after checkout. Pero kung walang booking sa next slot, puwede po mag-extend at ang charge is ₱1,000 per hour or any part of an hour.  || taglish? true (tl 10, en 5, en-share 0.33); facts kept
+      why: taglish? true (tl 10, en 5, en-share 0.33); facts kept

@@ -337,6 +337,14 @@ $$;
 --     one change. Same signature and return type, so `create or replace`
 --     keeps its grants. `total` now includes the surcharge, because it is
 --     unit_quote()'s price; `price` stays the BASE price.
+--
+--     VILLA PRICES (2026-09-28, D-074): the `booking_type_of() <> 'per_room'`
+--     gate is gone. Rows come for ANY tenant whose active units have a rate
+--     for a slot: villa's one unit now does, so its chatbot tool can carry a
+--     price from the database instead of the documents. A tenant with no
+--     rates still gets zero rows (the lateral unit_quote() yields none), the
+--     same answer as before, so a whole_resort tenant with prices only in
+--     its documents is unchanged.
 create or replace function check_room_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -383,7 +391,7 @@ begin
   select config->>'timezone' into v_timezone
   from public.tenant_applications
   where tenant_id = p_tenant_id and application_key = 'bookings';
-  if v_timezone is null or public.booking_type_of(p_tenant_id) <> 'per_room' then
+  if v_timezone is null then
     return;
   end if;
 

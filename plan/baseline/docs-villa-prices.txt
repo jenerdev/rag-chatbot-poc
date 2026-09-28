@@ -1,0 +1,7 @@
+villa: "Villa Amihan — Rates and Booking Schedules" #305 → #319, 4 chunks
+villa: "Villa Amihan — Booking, Payment and Cancellation" #306 → #320, 4 chunks
+villa: "Villa Amihan — House Rules" #42 → #321, 4 chunks
+villa: "Villa Amihan — Frequently Asked Questions" #124 → #322, 4 chunks
+villa: 8 documents now
+harbor: "Harbor Inn Guest Guide" (#307) unchanged, skipped
+harbor: 1 documents now

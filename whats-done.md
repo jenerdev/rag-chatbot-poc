@@ -6043,3 +6043,60 @@ is unknowable, and the bucket is now customer-facing.
 
 **Limit:** nothing schedules it. It is the command to run after deleting a
 tenant, or after a `WARN orphaned photo` line in the log.
+
+## Villa's prices from the tool, one source of truth · done 2026-09-28 (D-074)
+
+**What:** villa's `check_availability` now carries the price for each slot
+and date from `unit_quote()`, the included guests, the extra-guest fee and,
+with `guests`, the total; the six rates, the ₱250/30-guest fee and the
+₱4,000 December surcharge left `02-rates-and-schedules.md`, `05-house-rules.md`
+and `08-faq.md`; villa's calendar holds its fixed dates and Holy Week 2027.
+`check_room_availability`'s `per_room` gate became "has a rate", the user
+re-ran the file, and `checkPricedAvailability()` exposes it for any tenant.
+
+**Why it matters:** the page priced from the database and the chat from
+prose, and a rate edit on one side silently changed the other (R-41). Now
+every peso a guest sees is one function's.
+
+**Observed:**
+- verify 92/92; rooms 30/30; bookings isolation 29/29 both ways; pipeline
+  isolation 20/20 both ways, its villa check now asserting the three rows
+  are ₱9,500 / ₱16,000 / ₱22,000 on a weekday, from villa's own rates and
+  none of harbor's;
+- Northwind's and harbor's prompts and harbor's tool definitions
+  byte-identical; villa's differ by design and are the new baseline;
+- battery **59/61**: `price-villa` quoted the tool's ₱16,000.00 for the
+  Overnight on 12 October; `price-villa-guests` the tool's ₱10,000.00 total
+  for 32 on a Day Tour, naming the ₱500.00 extra charge; `price-villa-tl`
+  resolved "sa Sabado" in code and quoted the tool's ₱20,000.00 for that
+  Saturday. Every other group at its baseline; the two known failures.
+
+**Trap met: an up-front check without the party size.** The first full run
+was 51/61. "How much is the Loft for 3 guests on …" had become an
+availability turn (the new price words), so D-046 ran `check_availability`
+before the model's turn, WITHOUT the guests, and the prompt told the model
+to answer from that result. It did: rows with no total, and it added one up
+itself, on harbor (rt-extra) and on villa (price-villa-guests): R-37 by
+another door. `dates.ts` now reads "for 3 guests", "32 kami", "kaming lima"
+and the count rides on the call; both cases then quoted the tool's total.
+
+**Trap met: language cases that measured a fact the plan removed.** Five
+`lang-*` cases asked villa's rates as their fact. With the figures gone,
+two asked for a date in pure Tagalog and two refused; all were right about
+prices and wrong as language cases. They now ask the deposit, the
+extension and the cook. `lang-taglish`'s first replacement (the corkage)
+answered in noun-Taglish the function-word counter reads as Tagalog, 3 of
+3; the extension question reads as Taglish 3 of 3 ("Usually po, hindi
+puwedeng mag-extend after checkout. Pero kung walang booking sa next
+slot…").
+
+**Cost recorded, not hidden:** `lang-tool`'s opening sentence changed from
+"Yes po, the Overnight slot is open pa sa …" to "Yes po, may bakante pa sa
+…", 3 runs of 3, once the price lines were in villa's block. Both are
+Taglish to a reader; the second has one English function word. The case now
+asks for Tagalog present and not pure English, and prints the mix. Nothing
+in the prompt was reworded to satisfy the counter (trap 10).
+
+**Limit:** `rt-leak-2` failed once on wording ("there is no specific
+mention of a Garden Room, but the entire property is available", which the
+check read as a claim) and passed 3 of 3 on repeat; unchanged.

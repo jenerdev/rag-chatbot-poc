@@ -390,7 +390,7 @@ booking (D-034), and the bot must say so rather than confirm.
 
 ---
 
-## R-17 · Price is still answered from the documents · **Deliberate**
+## R-17 · Price is still answered from the documents · **Closed 2026-09-28 (D-074): villa's prices come from the tool**
 
 **The risk:** holiday rates, the 24/25/31 December surcharge and the per-head
 charge are in `02-rates-and-schedules.md`. The bot prices from those, not from
@@ -655,7 +655,7 @@ have to be one range, not N rows. Watch for the first two-hour slot.
 
 ---
 
-## R-41 · Villa's rates live in two places · **Accepted (customer-booking § 8 q4)**
+## R-41 · Villa's rates live in two places · **Closed 2026-09-28 (D-074): the figures left the documents**
 
 The database (`unit_rates`, what the page and the trigger use) and
 `02-rates-and-schedules.md` (what the chat answers from). The user chose to
@@ -698,6 +698,11 @@ If all three pass, nothing significant is left to derisk — the rest is assembl
 read-only; plan/payments.md is the next plan). No holiday or per-head pricing
 (R-24), no orphaned-photo sweeper (R-30), photos only on the staff screen,
 and date ranges reach the tool as their two end dates (R-15).
+
+**After villa prices (2026-09-28, D-074):** every price a guest sees, on the
+page or in the chat, is `unit_quote()`'s; villa's documents hold rules, not
+figures. Figures the database does not hold (the reservation fee, the
+deposit, corkage, pets, add-ons) are still prose, and still only in prose.
 
 **After customer booking (2026-09-28):** guests book on a page, and the chat
 still cannot (D-069). Holidays and per-head pricing exist (R-24 closed), date

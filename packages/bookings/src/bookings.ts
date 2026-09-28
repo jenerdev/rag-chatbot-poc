@@ -140,6 +140,30 @@ export async function checkRoomAvailability(
   query: { from: unknown; to?: unknown; slot?: unknown; unit?: unknown; guests?: unknown },
 ): Promise<RoomAvailability[]> {
   const { timezone } = await requirePerRoom(tenant);
+  return pricedAvailability(tenant, timezone, query);
+}
+
+/**
+ * The same rows for ANY tenant with the bookings application: a whole-resort
+ * tenant whose unit has rates (villa, since D-074) gets its one unit priced
+ * per slot and date; one with no rates gets `[]`. The chatbot's executor
+ * calls this for whole_resort tenants; checkRoomAvailability keeps its
+ * per_room-only contract (404 otherwise) for the routes and the tool's
+ * room branch.
+ */
+export async function checkPricedAvailability(
+  tenant: BookingTenant,
+  query: { from: unknown; to?: unknown; slot?: unknown; unit?: unknown; guests?: unknown },
+): Promise<RoomAvailability[]> {
+  const { timezone } = await requireConfig(tenant);
+  return pricedAvailability(tenant, timezone, query);
+}
+
+async function pricedAvailability(
+  tenant: BookingTenant,
+  timezone: string,
+  query: { from: unknown; to?: unknown; slot?: unknown; unit?: unknown; guests?: unknown },
+): Promise<RoomAvailability[]> {
   const { from, to } = validateRange(query, {
     today: localDate(timezone),
     maxDays: MAX_AVAILABILITY_DAYS,

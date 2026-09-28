@@ -22,6 +22,7 @@
 import { asOperator, supabase } from '../packages/db/dist/service.js';
 
 const VILLA_UNIT = { standard_capacity: 30, capacity: 45, extra_person_rate: 25000 };
+const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
 const VILLA_RATES = {
   'Day Tour': { weekday_price: 950000, weekend_price: 1200000 },
   Overnight: { weekday_price: 1600000, weekend_price: 2000000 },
@@ -77,7 +78,37 @@ const rows = Object.entries(VILLA_RATES).map(([name, rate]) => {
   console.log(`rates: villa ${data.map((r) => `${nameOf[r.slot_id]} ${r.weekday_price}/${r.weekend_price}`).join(' · ')}`);
 }
 
-// 3. The effect, read back through villa's own token: one quote per slot on a
+// 3. Villa's holiday calendar (D-074): the dates 02-rates-and-schedules.md
+//    names, now that the ₱4,000 figure has left the document. Fixed dates
+//    for this year and next; Holy Week only for 2027 (25–28 March: it moves,
+//    so staff type each year's on S-7). An upsert on (tenant, day): a row
+//    staff already typed (24 Dec, "Christmas Eve") is kept as theirs.
+{
+  const year = Number(localToday.slice(0, 4));
+  const fixed = [];
+  for (const y of [year, year + 1]) {
+    fixed.push(
+      { day: `${y}-12-24`, kind: 'peak', label: 'Christmas Eve', surcharge: 400000 },
+      { day: `${y}-12-25`, kind: 'peak', label: 'Christmas Day', surcharge: 400000 },
+      { day: `${y}-12-31`, kind: 'peak', label: "New Year's Eve", surcharge: 400000 },
+      { day: `${y}-01-01`, kind: 'holiday', label: "New Year's Day", surcharge: 0 },
+      { day: `${y}-02-12`, kind: 'holiday', label: 'Calamba city fiesta', surcharge: 0 },
+    );
+  }
+  const holyWeek2027 = ['2027-03-25', '2027-03-26', '2027-03-27', '2027-03-28'].map((day) => ({ day, kind: 'holiday', label: 'Holy Week', surcharge: 0 }));
+  const rows = [...fixed, ...holyWeek2027].filter((r) => r.day >= localToday).map((r) => ({ tenant_id: villa.id, ...r }));
+  const { data: existing } = await villa.db.from('rate_calendar').select('day').eq('tenant_id', villa.id);
+  const have = new Set((existing ?? []).map((d) => d.day));
+  const missing = rows.filter((r) => !have.has(r.day));
+  if (missing.length) {
+    const { error } = await villa.db.from('rate_calendar').insert(missing);
+    if (error) throw new Error(`villa calendar: ${error.code} ${error.message}`);
+  }
+  const { data: all } = await villa.db.from('rate_calendar').select('day, kind, label, surcharge').eq('tenant_id', villa.id).gte('day', localToday).order('day');
+  console.log(`calendar: villa ${all.length} upcoming days (${missing.length} added): ${all.map((d) => `${d.day} ${d.label}${d.surcharge ? ` +${d.surcharge}` : ''}`).join(' · ')}`);
+}
+
+// 4. The effect, read back through villa's own token: one quote per slot on a
 //    Monday and a Saturday, 32 guests (2 above the standard 30). Not "the
 //    command succeeded": the price the trigger will store.
 for (const [date, label] of [['2026-10-05', 'Mon'], ['2026-10-10', 'Sat']]) {

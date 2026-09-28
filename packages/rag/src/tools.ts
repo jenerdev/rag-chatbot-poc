@@ -23,7 +23,9 @@ import {
   BookingInputError,
   bookingsConfig,
   checkAvailability,
+  checkPricedAvailability,
   checkRoomAvailability,
+  hasBookingPage,
   listRooms,
   listSlots,
   localDate,
@@ -93,10 +95,14 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
   if (!config) return NO_TOOLS;
 
   // A per_room tenant gets its own description and instructions, below. The
-  // whole-resort branch that follows is untouched, so villa's tool text and
-  // prompt are byte-identical to before booking types (plan/booking-types.md
-  // Rule 1, checked by diff in Phase 6).
+  // whole-resort branch that follows was byte-identical to before booking
+  // types (plan/booking-types.md Rule 1) until D-074: a whole-resort tenant
+  // whose unit HAS a rate (villa, since customer booking) now gets a price
+  // in each row, a `guests` argument and three price lines, and its
+  // baseline is plan/baseline/villa-*-post-villa-prices.txt. One with no
+  // rate gets the tool exactly as it was.
   if (config.bookingType === 'per_room') return roomTools(tenant, config, slots);
+  const priced = await hasBookingPage(tenant);
 
   const today = localDate(config.timezone);
   const slotList = slots.map((s) => `${s.name} (from ${s.startTime}, ${hoursOf(s.duration)})`).join('; ');
@@ -106,15 +112,28 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
     function: {
       name: 'check_availability',
       description:
-        `Check whether ${tenant.businessName}'s booking slots are open or taken, for one date or a range of dates. ` +
+        `Check whether ${tenant.businessName}'s booking slots are open or taken${priced ? ', and what each costs' : ''}, for one date or a range of dates. ` +
         `The slots are: ${slotList}. A slot that runs past midnight can make the next day's slots taken. ` +
         `Dates are YYYY-MM-DD in ${config.timezone}. A range is at most ${MAX_AVAILABILITY_DAYS} days. ` +
-        'Returns one row per date and slot, each "open" or "taken".',
+        'Returns one row per date and slot, each "open" or "taken".' +
+        (priced
+          ? ` Each row also carries the slot's price for that date in ${config.currency}, how many guests that price includes, ` +
+            'and the fee per guest above that, up to the most the property holds. Pass guests to get the total for that party.'
+          : ''),
       parameters: {
         type: 'object',
         properties: {
           date_from: { type: 'string', description: 'The first date to check, YYYY-MM-DD.' },
           date_to: { type: 'string', description: 'The last date to check, YYYY-MM-DD. Omit it to check one date.' },
+          ...(priced
+            ? {
+                guests: {
+                  type: 'integer',
+                  minimum: 1,
+                  description: 'How many guests will come, when the user says. Each row then carries the total for that many guests.',
+                },
+              }
+            : {}),
         },
         required: ['date_from'],
         additionalProperties: false,
@@ -172,6 +191,7 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
         'If a tool result has an "error", tell the user what it says, for',
         'example that the date is in the past. A tool error is an answer to',
         'pass on, not a reason to reply "I don\'t know".',
+        ...(priced ? PRICE_LINES : []),
       ],
       today,
       weekday: weekdayOf(today),
@@ -179,6 +199,27 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
     },
   };
 }
+
+/**
+ * The price lines for a whole-resort tenant whose unit has a rate (D-074).
+ * The same three rules harbor's block has, in villa's slot vocabulary, and
+ * in the shape the battery measured to work: what TO write, with an example
+ * (D-017). Each answers a case: price-villa and price-villa-tl (R-23, a rate
+ * from the documents or memory), price-villa-guests (R-37, a total the model
+ * adds up), lang-tagalog (a price asked with no date).
+ */
+const PRICE_LINES = [
+  'For what a slot costs on a date, ALWAYS call check_availability; the',
+  'documents do not hold the rates. Quote a price only from the tool result,',
+  "never from the documents or from memory. Write each open slot's price",
+  'after it, for example "Open: Overnight ₱16,000.00; Day Tour ₱9,500.00".',
+  'If the user says how many guests, pass it as guests, and quote the',
+  '"total" from the result, naming the extra guest charge, for example',
+  '"Overnight (32 guests): ₱16,000.00 + ₱500.00 for 2 extra guests =',
+  '₱16,500.00". Never add up a total yourself.',
+  'If the user asks a price without giving a date, your whole reply is one',
+  'question asking which date they mean, because the rate depends on it.',
+];
 
 /** 350000 centavos → "₱3,500.00". The model reads prices as a person would, never as raw centavos. */
 function money(centavos: number, currency: string): string {
@@ -350,14 +391,12 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
       // Which branch is decided HERE, from the database, not from which tool
       // text the model happened to be given (the enablement rule above).
       const config = await bookingsConfig(tenant);
-      if (config?.bookingType === 'per_room') {
-        const rooms = await checkRoomAvailability(tenant, {
-          from: args.date_from,
-          to: args.date_to,
-          slot: args.slot,
-          unit: args.room,
-          guests: args.guests,
-        });
+      // D-074: a whole-resort tenant with a rate is priced the same way, from
+      // the same function; its tool has no slot or room argument to pass.
+      const perRoom = config?.bookingType === 'per_room';
+      if (config && (perRoom || (await hasBookingPage(tenant)))) {
+        const query = { from: args.date_from, to: args.date_to, slot: args.slot, unit: args.room, guests: args.guests };
+        const rooms = perRoom ? await checkRoomAvailability(tenant, query) : await checkPricedAvailability(tenant, query);
         // Mapped field by field (Rule 3): the price becomes text a person
         // reads, and nothing else is added.
         // plan/extra-guests.md: what the base price covers, the fee per guest

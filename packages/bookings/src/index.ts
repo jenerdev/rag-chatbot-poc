@@ -61,6 +61,7 @@ export {
   bookingsConfig,
   cancelBooking,
   checkAvailability,
+  checkPricedAvailability,
   checkRoomAvailability,
   createBooking,
   createBookings,

@@ -242,6 +242,11 @@ sequenceDiagram
     how many guests the price includes and the fee per extra guest; with a
     guest count, it carries that party's extra charge and total, from
     `unit_quote()`, the one function that makes a price (plan/extra-guests.md).
+    **Villa gets the same columns since D-074:** a whole-resort tenant whose
+    unit has a rate is priced from the same function
+    (`checkPricedAvailability`), its tool takes `guests`, and its documents
+    hold the rules but not the figures. A whole-resort tenant with no rate
+    keeps the four-column result.
 11c. **The chat never books** (D-069). "How do I book?" is answered from
     the documents, which say to press the **Book** button; "book it for me"
     may check availability and then points at the page. The button is a

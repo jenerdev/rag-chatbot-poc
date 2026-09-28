@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, dateInstructions, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -270,9 +270,17 @@ describe('which messages get check_availability run up front (planDates)', () =>
   });
 
   it('a documents question with a date gets NOTHING, no call and no prompt line: trap 10', () => {
-    for (const message of ['What time is check-in bukas?', 'Is the pool open tomorrow?', 'Magkano po ang Day Tour sa Friday?']) {
+    for (const message of ['What time is check-in bukas?', 'Is the pool open tomorrow?', 'Anong oras ang check-out sa Friday?']) {
       expect(planDates(message, SUNDAY, [])).toEqual({ lines: [], calls: [] });
     }
+  });
+
+  // D-074: villa's rates come from the tool, so a price asked for a date is
+  // checked up front like an availability question. Before, "Magkano po ang
+  // Day Tour sa Friday?" was a documents question (the rate was in them).
+  it('a PRICE question with a date is checked up front (D-074)', () => {
+    expect(calls('Magkano po ang Day Tour sa Friday?')).toEqual([{ date_from: '2026-10-02' }]);
+    expect(calls('How much is the Overnight tomorrow?')).toEqual([{ date_from: '2026-09-28' }]);
   });
 
   it('no date, no call: the model asks, as before', () => {
@@ -295,8 +303,12 @@ describe('which messages get check_availability run up front (planDates)', () =>
     expect(calls('Paano kung sa Friday naman po?', earlier)).toEqual([{ date_from: '2026-10-02' }]);
   });
 
-  it('the same bare date after a pricing question is not', () => {
-    expect(calls('Paano kung sa Friday?', ['Magkano po ang Day Tour?'])).toEqual([]);
+  it('the same bare date after a pricing question is one too (D-074)', () => {
+    expect(calls('Paano kung sa Friday?', ['Magkano po ang Day Tour?'])).toEqual([{ date_from: '2026-10-02' }]);
+  });
+
+  it('a bare date after a documents question is still nothing', () => {
+    expect(calls('Paano kung sa Friday?', ['Anong oras ang check-in?'])).toEqual([]);
   });
 
   it('at most MAX_DATE_CHECKS dates', () => {
@@ -309,8 +321,12 @@ describe('asksAvailability and isDateOnly', () => {
     for (const m of ['available?', 'may bakante?', 'fully booked na ba', 'pa-book po', 'reserve ko', 'any slots']) {
       expect(asksAvailability(m)).toBe(true);
     }
-    for (const m of ['What time is check-in?', 'Is the pool open?', 'Magkano po?']) {
+    for (const m of ['What time is check-in?', 'Is the pool open?', 'Anong oras ang check-out?']) {
       expect(asksAvailability(m)).toBe(false);
+    }
+    // D-074: price words count too, English and Tagalog.
+    for (const m of ['Magkano po?', 'How much is the Overnight?', 'What is the rate?', 'presyo ng Day Tour']) {
+      expect(asksAvailability(m)).toBe(true);
     }
   });
 
@@ -389,5 +405,27 @@ describe('ranges: two dates joined, and a night count (R-15)', () => {
     expect(plan.lines[0]).toContain('10 October 2026 to 12 October 2026');
     const nights = planDates('Available ba 10 October for 2 nights?', SUNDAY, []);
     expect(nights.calls).toEqual([{ date_from: '2026-10-10', date_to: '2026-10-11' }]);
+  });
+});
+
+describe('the guest count rides on the up-front call (D-074, R-37)', () => {
+  it.each([
+    ['How much is the Loft for 3 guests on 12 October 2026?', 3],
+    ['Available ba kayo bukas, 32 kami?', 32],
+    ['Kaming lima, may room ba sa Friday?', 5],
+    ['Free on Oct 10 for 4 pax?', 4],
+    ['Is 10 October free for 2 nights?', null],
+    ['Available bukas?', null],
+  ])('%s → %s', (message, guests) => {
+    expect(guestCount(message)).toBe(guests);
+  });
+
+  it('planDates passes it, and the line names it', () => {
+    const plan = planDates('How much is the Day Tour on 12 October 2026 for 32 guests?', SUNDAY, []);
+    expect(plan.calls).toEqual([{ date_from: '2026-10-12', guests: 32 }]);
+    expect(plan.lines[0]).toContain('date_from 2026-10-12 and guests 32');
+    const stay = planDates('2 nights from Oct 10 for 4 guests, available?', SUNDAY, []);
+    expect(stay.calls).toEqual([{ date_from: '2026-10-10', date_to: '2026-10-11', guests: 4 }]);
+    expect(planDates('Is 10 October free?', SUNDAY, []).calls).toEqual([{ date_from: '2026-10-10' }]);
   });
 });

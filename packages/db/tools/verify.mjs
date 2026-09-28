@@ -698,14 +698,15 @@ async function bookingTypeChecks(probeId) {
     check(!inactive.error, 'whole_resort: a second inactive unit is allowed', inactive.error ? `${inactive.error.code} ${inactive.error.message}` : 'inserted');
   }
 
-  // 53. check_room_availability gives a whole_resort tenant nothing, while
-  //     check_availability still gives it rows (the twin).
+  // 53. check_room_availability gives a tenant with NO RATES nothing (the
+  //     verify-probe is whole_resort with none; since D-074 the gate is the
+  //     rate, not the type), while check_availability still gives it rows.
   {
     const rooms = await supabase.rpc('check_room_availability', { p_tenant_id: probeId, p_from: '2026-10-01', p_to: '2026-10-02', p_slot: null, p_unit: null, p_guests: null });
     const slots = await supabase.rpc('check_availability', { p_tenant_id: probeId, p_from: '2026-10-01', p_to: '2026-10-02' });
     check(
       !rooms.error && rooms.data.length === 0 && !slots.error && slots.data.length > 0,
-      'check_room_availability(whole_resort) returns 0 rows',
+      'check_room_availability(no rates) returns 0 rows',
       `${rooms.error?.message ?? `${rooms.data.length} rows`}; check_availability ${slots.error?.message ?? `${slots.data.length} rows`}`,
     );
   }

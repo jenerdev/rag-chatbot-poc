@@ -1045,6 +1045,19 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-28 — villa's prices from the tool (D-074, `plan/villa-prices.md`)
+- **Built:** `check_room_availability`'s gate is the rate, not the type
+  (the user re-ran `schema-customer-booking.sql`); `checkPricedAvailability`
+  in `@rag/bookings`; villa's tool priced with `guests` and three price
+  lines; price words and a party size in `dates.ts`; the figures out of
+  villa's 02, 05 and 08 (re-ingested); villa's calendar (12 upcoming days).
+- **Observed:** verify 92/92, rooms 30/30, isolation 20/20 and 29/29 both
+  ways (the pipeline's villa check rewritten: priced from villa's own rates,
+  none of harbor's); Northwind's and harbor's prompts and harbor's tools
+  byte-identical; villa's the new baseline. Battery 51/61 → 56/61 → **59/61**
+  (`price 3/3`; the two known). What the first run taught is in D-074.
+- **Next:** nothing owed. Open: R-38/R-39, payments.md, subdomains, deployment.
+
 ### 2026-09-28 — R-30: `storage-orphans.mjs` built and run
 - **Built:** `packages/bookings/tools/storage-orphans.mjs`
   (`pnpm --filter @rag/bookings storage-orphans [-- --remove]`).
@@ -1070,8 +1083,8 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - `feat/customer-booking` fast-forwarded into `master` (10 commits,
   `9bacea7..69a3ae5`) and deleted. Nothing pushed.
 - **Open:** R-38/R-39 when abuse is seen, payments.md (on hold), the
-  subdomain backlog item, deployment (D-013). R-15's range half and R-30's
-  sweeper were done the same day (below).
+  subdomain backlog item, deployment (D-013). R-15's range half, R-30's
+  sweeper and villa's prices (D-074) were done the same day (below).
 
 ### 2026-09-28 — customer booking Phase 7 (the record)
 - **Written:** D-069–D-073 (D-037 and D-042 headers note the amendments),

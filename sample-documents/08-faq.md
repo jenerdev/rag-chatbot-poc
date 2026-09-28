@@ -23,7 +23,8 @@ Not for food and drinks the guests bring themselves, including alcohol. ₱1,500
 applies only when an outside caterer sets up and serves on the property.
 
 **How many people can we bring?**
-The rate covers 30. Beyond 30 it is ₱250 per head, paid in cash at the gate. The
+The rate covers a standard number of guests, shown with every price. Beyond that
+it is a per-head fee, paid in cash at the gate. The
 hard maximum is 45, including children and drivers, because of the septic system's
 rated load.
 
@@ -53,7 +54,7 @@ seven days' notice, to a date within 60 days.
 
 **Can we book 31 December?**
 Yes, from 1 September of that year, first-come first-served on payment of the
-reservation fee. That date carries a ₱4,000 peak surcharge on top of the holiday
+reservation fee. That date carries a peak surcharge on top of the holiday
 rate and cannot be rescheduled.
 
 **Can a bus or coaster get to the resort?**

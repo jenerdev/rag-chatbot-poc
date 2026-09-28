@@ -95,13 +95,20 @@ check(!wifiV.reply.includes('saltwater-lantern-58') && wifiV.sources.every((s) =
   "harbor's Wi-Fi password: harbor answers it, villa cannot", `villa: ${wifiV.reply.slice(0, 70)} | harbor: ${wifiH.reply.slice(0, 70)}`);
 // The tool, through executeTool exactly as the chat runs it. Each tenant's
 // rows are its own: harbor gets rooms (with capacity and price), villa gets
-// its whole-property slots, and neither holds a unit name of the other's.
+// its whole-property slots (priced too since D-074, from villa's OWN rates:
+// the price must be one of villa's three, never harbor's), and neither
+// holds a unit name of the other's.
 const soon = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
 const call = { id: 'iso', name: 'check_availability', arguments: JSON.stringify({ date_from: soon }) };
 const tH = (await executeTool(harbor, call)).record.result?.slots ?? [];
 const tV = (await executeTool(villa, call)).record.result?.slots ?? [];
 check(tH.length > 0 && tH.every((r) => r.unit !== 'Whole property' && 'price' in r) && !tH.some((r) => r.slot === 'Overnight'),
   "harbor's tool: its rooms only, priced", [...new Set(tH.map((r) => r.unit))].join(', '));
-check(tV.length > 0 && tV.every((r) => r.unit === 'Whole property' && !('price' in r)),
-  "villa's tool: its whole property only, unpriced", [...new Set(tV.map((r) => `${r.unit}/${r.slot}`))].join(', '));
+const villaPrices = new Set(['₱9,500.00', '₱12,000.00', '₱16,000.00', '₱20,000.00', '₱22,000.00', '₱27,000.00']);
+const harborPrices = new Set(tH.map((r) => r.price));
+check(
+  tV.length === 3 && tV.every((r) => r.unit === 'Whole property' && villaPrices.has(r.price) && !harborPrices.has(r.price)),
+  "villa's tool: its whole property only, priced from its own rates, none of harbor's",
+  tV.map((r) => `${r.slot} ${r.price}`).join(', '),
+);
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');

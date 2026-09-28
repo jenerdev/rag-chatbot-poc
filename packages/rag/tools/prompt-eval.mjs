@@ -552,6 +552,58 @@ const CASES = [
     note: 'rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)',
   },
 
+  // --- villa's prices come from the tool (D-074) -----------------------------
+  // The figures left 02-rates-and-schedules.md; check_availability now carries
+  // price, included guests, the fee, and with `guests` the total, from
+  // unit_quote(). Each case compares the reply with the TOOL's row, never a
+  // typed number (CLAUDE.md rule 1).
+  {
+    id: 'price-villa',
+    tenant: 'villa',
+    want: 'price',
+    turns: [`How much is the Overnight on ${words(FREE)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === FREE && r.slot === 'Overnight');
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.price)) && namesDate(last.reply, FREE),
+        detail: `tool: Overnight ${FREE} ${row?.price ?? '(no row)'}; quoted: ${row ? last.reply.includes(pesos(row.price)) : false}; names the date: ${namesDate(last.reply, FREE)}`,
+      };
+    },
+    note: "villa's price from the tool for that date; the documents no longer have one",
+  },
+  {
+    id: 'price-villa-guests',
+    tenant: 'villa',
+    want: 'price',
+    turns: [`How much is the Day Tour on ${words(FREE)} for 32 guests?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === FREE && r.slot === 'Day Tour' && r.total);
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.total)) && last.reply.includes(pesos(row.extra_guest_charge)),
+        detail: `tool: Day Tour ${FREE} total ${row?.total ?? '(no row with a total)'} (extra ${row?.extra_guest_charge}); quoted total: ${row ? last.reply.includes(pesos(row.total)) : false}, extra: ${row ? last.reply.includes(pesos(row.extra_guest_charge)) : false}`,
+      };
+    },
+    note: 'guests passed to the tool; the total and the extra-guest charge are the TOOL\'s (R-37)',
+  },
+  {
+    id: 'price-villa-tl',
+    tenant: 'villa',
+    want: 'price',
+    turns: ['Magkano po ang Overnight sa Sabado?'],
+    check: (last) => {
+      const saturday = plus((5 - DOW + 7) % 7);
+      const row = roomRows(last).find((r) => r.date === saturday && r.slot === 'Overnight');
+      // The language is printed, not judged (the D-043 lean, counted by
+      // lang-*): a one-line price answer has too few function words to judge.
+      const v = langVerdict(last, 'taglish', []);
+      return {
+        ok: Boolean(row) && last.reply.includes(pesos(row.price)),
+        detail: `tool: Overnight ${saturday} ${row?.price ?? '(no row)'}; quoted: ${row ? last.reply.includes(pesos(row.price)) : false}; (not judged) ${v.detail}`,
+      };
+    },
+    note: '"sa Sabado" resolved in code and checked up front; the price is the tool\'s for that Saturday',
+  },
+
   // --- booking moves to its own page (plan/customer-booking.md Phase 5) ------
   // The chat explains how to book and never books. The documents now say so
   // (04-booking-and-payment.md, harbor's BOOKING section); the prompt did not
@@ -633,9 +685,13 @@ const CASES = [
     id: 'lang-tagalog',
     tenant: 'villa',
     want: 'lang',
-    turns: ['Magkano po ang Overnight?'],
-    check: (last) => langVerdict(last, 'taglish', ['16,000']),
-    note: 'pure Tagalog in, Taglish out, and the rate from 02-rates-and-schedules',
+    // D-074: the rates left the documents, so this asks a fact that is still
+    // in them (the deposit, 04-booking-and-payment). The first run with
+    // "Magkano po ang Overnight?" answered a bare Tagalog question ("Anong
+    // date po…"), which is right about prices and wrong for a language case.
+    turns: ['Magkano po ang security deposit?'],
+    check: (last) => langVerdict(last, 'taglish', ['2,000']),
+    note: 'pure Tagalog in, Taglish out, and the deposit from 04-booking-and-payment',
   },
   {
     id: 'lang-tagalog-2',
@@ -649,24 +705,24 @@ const CASES = [
     id: 'lang-taglish',
     tenant: 'villa',
     want: 'lang',
-    turns: ['How much po yung Day Tour pag weekend?'],
-    check: (last) => langVerdict(last, 'taglish', ['12,000']),
-    note: 'Taglish in, Taglish out',
+    turns: ['Pwede po ba mag-extend after checkout? Magkano po?'],
+    check: (last) => langVerdict(last, 'taglish', ['1,000']),
+    note: 'Taglish in, Taglish out (the extension fee from 08-faq; the rates left the documents, D-074)',
   },
   {
     id: 'lang-english',
     tenant: 'villa',
     want: 'lang',
-    turns: ['How much is the Overnight rate on weekends?'],
-    check: (last) => langVerdict(last, 'english', ['20,000']),
+    turns: ['How much does a cook cost per day?'],
+    check: (last) => langVerdict(last, 'english', ['1,500']),
     note: 'English in, English out: the language block must not Taglish-ify English users',
   },
   {
     id: 'lang-ask-tagalog',
     tenant: 'villa',
     want: 'lang',
-    turns: ['Tagalog lang po sana ang sagot.', 'Magkano po ang Day Tour kapag weekday?'],
-    check: (last) => langVerdict(last, 'tagalog', ['9,500']),
+    turns: ['Tagalog lang po sana ang sagot.', 'Magkano po ang security deposit?'],
+    check: (last) => langVerdict(last, 'tagalog', ['2,000']),
     note: 'an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default',
   },
   {
@@ -686,9 +742,9 @@ const CASES = [
       'Anong oras po ang Day Tour?',
       'Magkano po ang Overnight?',
       'Pwede po bang magdala ng aso?',
-      'Magkano po ang 22-Hour kapag weekend?',
+      'Magkano po ang corkage kapag may caterer?',
     ],
-    check: (last) => langVerdict(last, 'tagalog', ['27,000']),
+    check: (last) => langVerdict(last, 'tagalog', ['1,500']),
     note: 'the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window',
   },
   {
@@ -710,10 +766,19 @@ const CASES = [
     turns: [`May bakante pa po ba sa ${words(NEXT)}?`],
     check: (last) => {
       const status = slotStatus(last, NEXT, 'Overnight');
+      // D-074's price lines turned the opening sentence from "Yes po, the
+      // Overnight slot is open pa sa …" (en 3) into "Yes po, may bakante pa
+      // sa …" (en 1), 3 runs of 3, with the list of slots and prices after
+      // it. Both are Taglish to a reader; the second has too few English
+      // function words for the two-of-each band. So this case asks for
+      // Tagalog present and not pure English, prints the mix, and keeps the
+      // fact and the tool. Measured, not hidden (whats-done, villa prices).
       const v = langVerdict(last, 'taglish', ['overnight']);
-      return { ok: status === 'open' && v.ok, detail: `tool says Overnight ${NEXT} is ${status ?? '(no call)'}; ${v.detail}` };
+      const m = mix(last.reply);
+      const told = m.tagalog >= 2 && m.english >= 1 && !last.refused && last.reply.toLowerCase().includes('overnight');
+      return { ok: status === 'open' && told, detail: `tool says Overnight ${NEXT} is ${status ?? '(no call)'}; ${v.detail}` };
     },
-    note: 'availability asked in Tagalog: the tool is called, its result told in Taglish',
+    note: 'availability asked in Tagalog: the tool is called, its result told with Tagalog in it (the mix is printed)',
   },
   {
     id: 'lang-absent',
@@ -1014,7 +1079,8 @@ let langPass = 0;
 let datePass = 0;
 let roomPass = 0;
 let bookPass = 0;
-/** Six groups, counted apart, because each has its own baseline to match. */
+let pricePass = 0;
+/** Seven groups, counted apart, because each has its own baseline to match. */
 const GROUP = (c) =>
   c.id.startsWith('tool-')
     ? 'tool'
@@ -1026,7 +1092,9 @@ const GROUP = (c) =>
           ? 'rooms'
           : c.id.startsWith('book-')
             ? 'book'
-            : 'original';
+            : c.id.startsWith('price-')
+              ? 'price'
+              : 'original';
 await seedFixture();
 await seedHarborFixture();
 try {
@@ -1037,7 +1105,7 @@ for (const c of RUN) {
   let why = null;
   answerCalls = 0;
 
-  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date' || c.want === 'rooms' || c.want === 'book') {
+  if (c.want === 'tool' || c.want === 'lang' || c.want === 'date' || c.want === 'rooms' || c.want === 'book' || c.want === 'price') {
     const last = await ask(tenant, c.turns);
     const verdict = c.check(last, { answerCalls });
     ok = verdict.ok;
@@ -1080,6 +1148,7 @@ for (const c of RUN) {
   if (ok && GROUP(c) === 'date') datePass++;
   if (ok && GROUP(c) === 'rooms') roomPass++;
   if (ok && GROUP(c) === 'book') bookPass++;
+  if (ok && GROUP(c) === 'price') pricePass++;
 
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${c.id}] ${c.tenant} want ${c.want}`);
   console.log(`      Q: ${c.turns?.[c.turns.length - 1] ?? '(transcript read)'}`);
@@ -1099,6 +1168,6 @@ for (const c of RUN) {
 // misleading "original 0/10".
 const total = (g) => RUN.filter((c) => GROUP(c) === g).length;
 console.log(
-  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass - roomPass - bookPass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')} · rooms ${roomPass}/${total('rooms')} · book ${bookPass}/${total('book')}`,
+  `original ${basePass}/${total('original')} · tool ${pass - basePass - langPass - datePass - roomPass - bookPass - pricePass}/${total('tool')} · lang ${langPass}/${total('lang')} · date ${datePass}/${total('date')} · rooms ${roomPass}/${total('rooms')} · book ${bookPass}/${total('book')} · price ${pricePass}/${total('price')}`,
 );
 console.log(`${pass}/${RUN.length} as intended${only ? ` (only "${only}*")` : ''}`);

@@ -27,6 +27,9 @@ const WANT = {
   villa: [
     { title: 'Villa Amihan — Rates and Booking Schedules', source: 'sample-documents/02-rates-and-schedules.md', content: file('sample-documents/02-rates-and-schedules.md') },
     { title: 'Villa Amihan — Booking, Payment and Cancellation', source: 'sample-documents/04-booking-and-payment.md', content: file('sample-documents/04-booking-and-payment.md') },
+    // Villa prices (D-074): the figures the database holds left these three.
+    { title: 'Villa Amihan — House Rules', source: 'sample-documents/05-house-rules.md', content: file('sample-documents/05-house-rules.md') },
+    { title: 'Villa Amihan — Frequently Asked Questions', source: 'sample-documents/08-faq.md', content: file('sample-documents/08-faq.md') },
   ],
   harbor: [{ title: harbor.title, source: harbor.source, content: harbor.content }],
 };

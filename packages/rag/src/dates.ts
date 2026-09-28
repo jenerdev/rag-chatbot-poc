@@ -419,9 +419,13 @@ function scan(message: string, today: string): { mentions: DateMention[]; rest: 
  * "bakante(?:ng)?": Tagalog joins an adjective to its noun with the linker
  * "-ng", so "a vacant room" is "bakanteng kwarto". `\bbakante\b` missed that,
  * and the check never ran (found by rt-tagalog, plan/extra-guests.md Phase 4).
+ *
+ * PRICE words too (D-074): since villa's prices come from the tool, "How
+ * much is the Overnight on Saturday?" needs the same up-front check as "Is
+ * Saturday free?"; without a date the model asks for one, as before.
  */
 const AVAILABILITY =
-  /\b(?:available|availability|avail|vacant|vacancy|bakante(?:ng)?|free|fully\s+booked|booked|book|booking|mag-?book|magpa-?book|pa-?book|i-?book|reserve|reservation|reserba|slots?|taken|may\s+(?:room|kwarto|cottage))\b/;
+  /\b(?:available|availability|avail|vacant|vacancy|bakante(?:ng)?|free|fully\s+booked|booked|book|booking|mag-?book|magpa-?book|pa-?book|i-?book|reserve|reservation|reserba|slots?|taken|may\s+(?:room|kwarto|cottage)|how\s+much|magkano|price|rate|rates|cost|costs|presyo)\b/;
 
 export function asksAvailability(message: string): boolean {
   return AVAILABILITY.test(message.toLowerCase());
@@ -473,7 +477,26 @@ export interface DatePlan {
   /** Placed right after the tools block's "Today is …" line. */
   lines: string[];
   /** check_availability arguments, run before the model's first turn. */
-  calls: { date_from: string; date_to?: string }[];
+  calls: { date_from: string; date_to?: string; guests?: number }[];
+}
+
+/**
+ * A party size stated in the message: "for 3 guests", "32 pax", "kaming
+ * lima", "30 kami". Since D-074 a price question with a date is checked up
+ * front, and a check run WITHOUT the guests hands the model rows with no
+ * total, which it then adds up itself (R-37: rt-extra and price-villa-guests
+ * both failed that way on the first run). So the count rides on the call.
+ * "2 nights" is not a party: nights are not in the list.
+ */
+const GUESTS = new RegExp(
+  `\\b(${NUMBER})(?:\\s+na)?\\s*(?:guests?|people|persons?|pax|adults?|heads?|tao|katao)\\b|\\b(${NUMBER})\\s+kami\\b|\\bkami(?:ng)?\\s+(${NUMBER})\\b`,
+);
+
+export function guestCount(message: string): number | null {
+  const m = GUESTS.exec(message.toLowerCase());
+  if (!m) return null;
+  const n = toNumber((m[1] ?? m[2] ?? m[3])!);
+  return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
 const NOTHING: DatePlan = { lines: [], calls: [] };
@@ -503,11 +526,16 @@ export function planDates(message: string, today: string, earlierQuestions: stri
   const about =
     asksAvailability(message) || (isDateOnly(message, today) && earlierQuestions.some((q) => asksAvailability(q)));
   if (!about) return NOTHING;
+  const guests = guestCount(message);
   return {
-    lines: dateInstructions(mentions, today),
+    lines: dateInstructions(mentions, today, guests),
     calls: mentions
       .filter((m) => !m.alternative)
-      .map((m) => (m.from === m.to ? { date_from: m.from } : { date_from: m.from, date_to: m.to })),
+      .map((m) => ({
+        date_from: m.from,
+        ...(m.from === m.to ? {} : { date_to: m.to }),
+        ...(guests === null ? {} : { guests }),
+      })),
   };
 }
 
@@ -527,7 +555,7 @@ export function planDates(message: string, today: string, earlierQuestions: stri
  *   - otherwise: check_availability was already run for it (planDates), so
  *     answer from that result and name the date.
  */
-export function dateInstructions(mentions: DateMention[], today: string): string[] {
+export function dateInstructions(mentions: DateMention[], today: string, guests: number | null = null): string[] {
   return mentions.map((m) => {
     const lead = `In the user's latest message, "${m.phrase}"`;
     if (m.alternative) {
@@ -537,7 +565,9 @@ export function dateInstructions(mentions: DateMention[], today: string): string
     if (m.to < today) {
       return `${lead} means ${describe(m)}, which has already passed. Tell the user that ${named} is in the past, so it cannot be checked or booked.`;
     }
-    const args = m.from === m.to ? `date_from ${m.from}` : `date_from ${m.from} and date_to ${m.to}`;
+    const args =
+      (m.from === m.to ? `date_from ${m.from}` : `date_from ${m.from} and date_to ${m.to}`) +
+      (guests === null ? '' : ` and guests ${guests}`);
     return (
       `${lead} means ${describe(m)}. check_availability was already called with ${args}; ` +
       `answer from its result, and name ${named} in your answer. Do not ask which date they mean.`

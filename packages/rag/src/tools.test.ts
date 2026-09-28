@@ -14,7 +14,9 @@ vi.mock('@rag/bookings', () => {
   return {
     BookingInputError,
     checkAvailability: vi.fn(),
+    checkPricedAvailability: vi.fn(),
     checkRoomAvailability: vi.fn(),
+    hasBookingPage: vi.fn(),
     listRooms: vi.fn(),
     bookingsConfig: vi.fn(),
     listSlots: vi.fn(),
@@ -27,13 +29,15 @@ vi.mock('./applications.js', () => ({
   enabledApplications: vi.fn(async () => ['bookings']),
 }));
 
-import { BookingInputError, bookingsConfig, checkAvailability, checkRoomAvailability } from '@rag/bookings';
+import { BookingInputError, bookingsConfig, checkAvailability, checkPricedAvailability, checkRoomAvailability, hasBookingPage } from '@rag/bookings';
 import { planDates } from './dates.js';
 import { executeTool } from './tools.js';
 import type { TenantContext } from './types.js';
 
 const TENANT = { id: 3, slug: 'villa', businessName: 'Villa Amihan', assistantName: 'Lia', fallbackMessages: {}, db: {} } as unknown as TenantContext;
 const check = vi.mocked(checkAvailability);
+const priced = vi.mocked(checkPricedAvailability);
+const hasPage = vi.mocked(hasBookingPage);
 const SLOTS = [{ date: '2026-09-28', unit: 'Villa', slot: 'Overnight', status: 'open' }];
 
 /** The tool calls answer.ts builds from a plan, the same way (withDates). */
@@ -47,6 +51,9 @@ const precheck = (message: string, earlier: string[] = []) =>
 beforeEach(() => {
   check.mockReset();
   check.mockResolvedValue(SLOTS as never);
+  // No priced unit unless a test says so: the unpriced whole-resort path.
+  hasPage.mockResolvedValue(false);
+  priced.mockReset();
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
 });
 
@@ -190,11 +197,48 @@ describe('per_room: check_availability checks rooms', () => {
     expect(record.result).toEqual({ error: 'That is 200 results, more than 150.' });
   });
 
-  it('a whole_resort tenant still gets the slots check, untouched', async () => {
+  it('a whole_resort tenant with no rate still gets the slots check, untouched', async () => {
     config.mockResolvedValue({ timezone: 'Asia/Manila', bookingType: 'whole_resort', weekendDays: [5, 6, 7], currency: 'PHP' } as never);
     await executeTool(TENANT, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28"}' });
     expect(check).toHaveBeenCalled();
     expect(rooms).not.toHaveBeenCalled();
+    expect(priced).not.toHaveBeenCalled();
+  });
+
+  // D-074: a whole-resort tenant whose unit has a rate (villa) is priced from
+  // the same function as a room, and its rows carry the price as text.
+  it('a whole_resort tenant WITH a rate gets priced rows, from checkPricedAvailability', async () => {
+    config.mockResolvedValue({ timezone: 'Asia/Manila', bookingType: 'whole_resort', weekendDays: [5, 6, 7], currency: 'PHP' } as never);
+    hasPage.mockResolvedValue(true);
+    priced.mockResolvedValue([
+      {
+        date: '2026-09-28',
+        unit: 'Whole property',
+        capacity: 45,
+        standardCapacity: 30,
+        extraPersonRate: 25000,
+        slot: 'Overnight',
+        status: 'open',
+        price: 1600000,
+        extraGuestPrice: 50000,
+        total: 1650000,
+      },
+    ] as never);
+    const { record } = await executeTool(TENANT, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28","guests":32}' });
+    expect(priced).toHaveBeenCalledWith(TENANT, expect.objectContaining({ from: '2026-09-28', guests: 32 }));
+    expect(check).not.toHaveBeenCalled();
+    expect(rooms).not.toHaveBeenCalled();
+    const [row] = (record.result as { slots: Record<string, unknown>[] }).slots;
+    expect(row).toMatchObject({
+      unit: 'Whole property',
+      slot: 'Overnight',
+      status: 'open',
+      included_guests: 30,
+      extra_guest_fee: '₱250.00',
+      price: '₱16,000.00',
+      extra_guest_charge: '₱500.00',
+      total: '₱16,500.00',
+    });
   });
 });
 

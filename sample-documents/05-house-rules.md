@@ -12,7 +12,7 @@ The restriction is on amplified sound, not on being awake.
 ## Guest count
 
 The number of guests declared at booking is what the caretakers expect at the
-gate. Guests above the declared number are admitted and charged ₱250 per head in
+gate. Guests above the declared number are admitted and charged the per-head fee in
 cash at the gate; they are not turned away.
 
 The hard cap of 45 people includes children of every age and any drivers who stay

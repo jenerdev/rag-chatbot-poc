@@ -2151,3 +2151,48 @@ null), 82 (Thursday 1650000 + Friday 2050000, check-out 12:00 on day
 three); rooms 21, 24; the HTTP walk 625000 + 775000; villa's 5 older
 bookings still unpriced. The 12:00–14:00 gap inside a stay is unsellable
 today because no slot fits in it (R-40).
+
+## D-074 · Villa's prices come from the database, through the tool; the figures left its documents · **Added 2026-09-28 (villa-prices). Closes R-41 and R-17; amends D-054 (the gate is the rate, not the type)**
+
+**Decision:** `check_room_availability` returns rows for any tenant whose
+active units have a rate for a slot, not only `per_room` ones, so villa's one
+unit is priced per slot and date from `unit_quote()` like a room. Villa's
+`check_availability` tool carries `price`, `included_guests`,
+`extra_guest_fee` and, with a `guests` argument, `extra_guest_charge` and
+`total`, as text, and its tools block gets the three price lines harbor's
+has (quote only from the tool, never add up a total, ask for a date when a
+price is asked without one). The six slot rates, "30 guests / ₱250" and
+the ₱4,000 December surcharge left `02-rates-and-schedules.md`,
+`05-house-rules.md` and `08-faq.md`; the rules stayed. Villa's calendar
+got its fixed dates and Holy Week 2027. A whole-resort tenant with no rate
+gets the tool exactly as before. "How much", "magkano", "price", "rate",
+"cost" and "presyo" now make a dated question an availability turn, and a
+stated party size ("for 3 guests", "32 kami") rides on that up-front call.
+
+**Why:** the user asked for one source of truth. With the page pricing from
+`unit_rates` and the chat from prose, a rate edit on one side silently
+changed what a guest was told on the other (R-41), and R-17 had deferred a
+price tool since bookings. A figure that the database holds and a document
+repeats is a drift waiting to happen; a rule in prose is not.
+
+**Measured (`plan/baseline/*villa-prices*`):** verify 92/92; rooms 30/30;
+both isolation suites both ways (pipeline's villa check now asserts the
+rows are priced from villa's OWN rates, none of harbor's); Northwind's and
+harbor's prompts and harbor's tool definitions byte-identical; villa's
+differ by design, the new baseline `villa-tools-post-villa-prices.txt`.
+Battery **59/61**: `price 3/3` (the Overnight on a date quoted as the
+tool's ₱16,000.00; 32 guests on a Day Tour as the tool's ₱10,000.00 with
+its ₱500.00 extra charge; "sa Sabado" resolved in code and quoted at
+₱20,000.00), every other group at its baseline.
+
+**What the first run taught (51/61):** the price words made "How much is
+the Loft for 3 guests on …" an up-front check run WITHOUT the guests, so
+the model got rows with no total and added one up itself (rt-extra,
+price-villa-guests: R-37 exactly). The guest count now rides on the call.
+And five `lang-*` cases had asked villa's RATES as their fact; with the
+figures gone they asked for a date or refused, so they now ask facts that
+are still in the documents (the deposit, the extension, the cook). One
+cost is recorded, not hidden: `lang-tool`'s opening sentence went from
+"Yes po, the Overnight slot is open pa sa …" to "Yes po, may bakante pa sa
+…", 3 runs of 3, and the case now judges Tagalog-present rather than the
+two-of-each band.

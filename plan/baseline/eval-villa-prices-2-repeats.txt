@@ -1,0 +1,36 @@
+== rt-leak-2 run 1
+PASS  [rt-leak-2] villa want rooms
+      A: Yes, the Villa Amihan Private Resort is open on 12 October 2026.   Open:  - 22-Hour Whole Day ₱22,000.00 - Day Tour ₱9,500.00 - Overnight ₱16,000.00  There is no specific mention of a "Garden Room," as the booking covers the whole property.  || harbor rows in villa's tool results: 0; 
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: false
+== rt-leak-2 run 2
+PASS  [rt-leak-2] villa want rooms
+      A: Yes, the whole property is open on 12 October 2026.   Open:  - 22-Hour Whole Day ₱22,000.00 - Day Tour ₱9,500.00 - Overnight ₱16,000.00  There is no specific mention of a "Garden Room," as the bookings are for the whole property.  || harbor rows in villa's tool results: 0; the reply c
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: false
+== rt-leak-2 run 3
+PASS  [rt-leak-2] villa want rooms
+      A: Yes, the whole property is open on 12 October 2026.   Open:  - 22-Hour Whole Day ₱22,000.00  - Day Tour ₱9,500.00  - Overnight ₱16,000.00   There is no specific mention of a "Garden Room," as the rates cover the exclusive use of the whole property.  || harbor rows in villa's tool resu
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: false
+== lang-taglish run 1
+FAIL  [lang-taglish] villa want lang
+      A: Yes po, may corkage fee na ₱1,500 kung may outside caterer na nag-set up at nag-serve sa property. Ang fee na ito ay dahil gumagamit ang caterer ng kitchen, tables, at water, at nag-iiwan ng maraming cleaning.  || taglish? false (tl 13, en 1, en-share 0.07); facts kept
+      why: taglish? false (tl 13, en 1, en-share 0.07); facts kept
+== lang-taglish run 2
+FAIL  [lang-taglish] villa want lang
+      A: Yes po, may corkage fee na ₱1,500 kung may outside caterer na nag-set up at nagsisilbi sa property. Ang fee na ito ay dahil gumagamit ang caterer ng kitchen, tables, at water, at nag-iiwan ng maraming cleaning.  || taglish? false (tl 13, en 1, en-share 0.07); facts kept
+      why: taglish? false (tl 13, en 1, en-share 0.07); facts kept
+== lang-taglish run 3
+FAIL  [lang-taglish] villa want lang
+      A: Yes po, may corkage fee na ₱1,500 kung may outside caterer na nag-set up at nagsisilbi sa property. Ang fee na ito ay dahil gumagamit sila ng kitchen, tables, at water, at nag-iiwan ng maraming cleaning.  || taglish? false (tl 13, en 1, en-share 0.07); facts kept
+      why: taglish? false (tl 13, en 1, en-share 0.07); facts kept
+== lang-tool run 1
+FAIL  [lang-tool] villa want lang
+      A: Yes po, may bakante pa sa 9 October 2026.   Open: Overnight ₱20,000.00   Taken: 22-Hour Whole Day ₱27,000.00; Day Tour ₱12,000.00  || tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+      why: tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+== lang-tool run 2
+FAIL  [lang-tool] villa want lang
+      A: Yes po, may bakante pa sa 9 October 2026.   Open: Overnight ₱20,000.00   Taken: 22-Hour Whole Day ₱27,000.00; Day Tour ₱12,000.00  || tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+      why: tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+== lang-tool run 3
+FAIL  [lang-tool] villa want lang
+      A: Yes po, may bakante pa sa 9 October 2026.   Open: Overnight ₱20,000.00   Taken: 22-Hour Whole Day ₱27,000.00; Day Tour ₱12,000.00  || tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
+      why: tool says Overnight 2026-10-09 is open; taglish? false (tl 3, en 1, en-share 0.25); facts kept
