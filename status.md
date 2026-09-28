@@ -151,8 +151,10 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 = total) and a booking row's breakdown. Then delete
 `walk-harbor@example.com` and merge `feat/booking-types` into `master`.
 
-**Then:** a **separate customer booking page** (decided 2026-09-28, not yet
-planned). For the MVP the chatbot only explains how to book; customers book
+**Then:** a **separate customer booking page**, drafted 2026-09-28 in
+[`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
+multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
+next is Phase 0, the baseline). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1050,7 +1052,9 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   both ways, rooms 20/20; Northwind's snapshot and villa's tool definitions
   byte-identical to their baselines; villa's prompt differs only in its
   "Today is …" line. The files were not kept and `feat/payments` was deleted.
-- **Next:** plan the customer booking page.
+- **Next:** plan the customer booking page. Drafted the same day:
+  `plan/customer-booking.md`; § 8 agreed with every recommendation. Next:
+  its Phase 0 (baseline).
 
 ### 2026-09-28 — the browser walk of D-047–D-049
 - **Done by the user** at `/t/villa`, then read back from villa's `messages`.
