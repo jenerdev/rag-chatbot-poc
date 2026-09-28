@@ -156,8 +156,8 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
 **COMPLETE**, Phases 0–7 done 2026-09-28 on `feat/customer-booking`,
 the user's browser walk included; battery 54/56 expected; D-069–D-073,
-R-38–R-41, R-24 closed; **next: merge `feat/customer-booking` into
-`master`**). For the MVP the chatbot only explains how to book; customers book
+R-38–R-41, R-24 closed; **merged into `master` 2026-09-28** as a
+fast-forward, the branch deleted). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1044,6 +1044,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking merged
+- `feat/customer-booking` fast-forwarded into `master` (10 commits,
+  `9bacea7..69a3ae5`) and deleted. Nothing pushed.
+- **Open:** R-15 (date ranges), R-30 (`storage-orphans.mjs`), R-38/R-39
+  when abuse is seen, payments.md (on hold), the subdomain backlog item.
 
 ### 2026-09-28 — customer booking Phase 7 (the record)
 - **Written:** D-069–D-073 (D-037 and D-042 headers note the amendments),
