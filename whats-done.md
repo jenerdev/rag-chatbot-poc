@@ -5929,3 +5929,34 @@ no secret reaches the browser, and the page now carries a guest's email.
 **Trap avoided, again: `next build` under `next dev`.** The dev server was
 stopped first, with the user's OK, and restarted in the background after
 both builds (CLAUDE.md trap 16).
+
+## Customer booking, Phase 4: the browser walk · done 2026-09-28 (by the user)
+
+**What:** the user walked S-6, S-7 and the Requests section in the browser.
+Read back from the database afterwards, not taken from memory.
+
+**Observed:**
+- villa: three requests sent from the page and confirmed on S-3. A Friday
+  Overnight for 31 guests stored as 2000000 + 25000 = 2025000 (the weekend
+  rate, one guest above the 30 included); a Tuesday Day Tour at 950000; and
+  24 Dec, after "Christmas Eve" (+₱4,000) was typed on S-7, stored as
+  2000000 + 0 + 400000 = 2400000 for 2 guests: the holiday rate is the
+  weekend rate, plus the surcharge, exactly as § 2.3 says;
+- harbor: two requests for Garden + Family Room on the same night, then a
+  third for the Garden Room alone, confirmed. `listRequests` then reads
+  `clash: true` on both earlier ones, and the user saw the 409 on Confirm;
+- the user also saw the wrong-phone message on the page, and the Book
+  button on villa and harbor with none on northwind;
+- cleanup: the 8 web rows were hard-deleted (0 left; villa back to 8
+  bookings, harbor to 3), and villa keeps 24 Dec in its calendar.
+
+**Limit of the evidence:** no multi-night stay and no declined request was
+clicked; those paths are proven by verify 82–83, rooms 24–26 and the HTTP
+walk. The 409, the phone message and the button are the user's report; the
+database shows the state that makes the 409 the only possible answer.
+
+**Worth knowing:** once the list reloads, a clashing request's Confirm
+button is disabled by `clash`, so the 409 is reachable only from a stale
+list (a second tab, or a confirm racing another). That is the case the
+constraint exists for: the button is a courtesy, `bookings_no_overlap` is
+the guard.

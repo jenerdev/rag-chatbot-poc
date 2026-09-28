@@ -154,10 +154,9 @@ Max guests / Per extra guest inputs, the per-room quote (rate + extra guests
 **Then:** a **separate customer booking page**, drafted 2026-09-28 in
 [`plan/customer-booking.md`](./plan/customer-booking.md) (holiday pricing and
 multi-night stays included; § 8 agreed 2026-09-28, recommendations taken;
-Phases 0–3, 5 and 6 done, Phase 4's code done 2026-09-28 on
-`feat/customer-booking`; **Phase 4's browser walk is owed, by the user**
-(the list is in the session log); battery now 54/56 expected; next is
-Phase 7, the record, then the merge). For the MVP the chatbot only explains how to book; customers book
+Phases 0–6 done 2026-09-28 on `feat/customer-booking`, the user's
+browser walk included; battery now 54/56 expected; next is Phase 7, the
+record, then the merge into `master`). For the MVP the chatbot only explains how to book; customers book
 on their own page, not in the chat. [`plan/payments.md`](./plan/payments.md)
 is **on hold**. Also open: the date-range finding (R-15), and
 `storage-orphans.mjs`, planned but not built (R-30).
@@ -1044,6 +1043,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-28 — customer booking Phase 4, the browser walk (done by the user)
+- **Read back from the database after the walk:** villa, 3 web requests,
+  all confirmed on S-3: `VIL-3YHXNB` Overnight Fri 2 Oct, 31 guests,
+  2000000 + 25000 = 2025000; `VIL-E7J2S2` Day Tour Tue 29 Sep, 950000;
+  `VIL-3CSW6P` Overnight 24 Dec, 2 guests, 2000000 + 0 + 400000 = 2400000,
+  with "Christmas Eve" (holiday, +400000) typed on S-7. Harbor, two
+  two-room requests (Garden + Family, 29 Sep, 350000 + 600000) left
+  pending, and `HAR-YJD9C3` Garden Room that night confirmed; both pending
+  ones then read `clash: true` from `listRequests`.
+- **Reported by the user:** the 409 on Confirm of a clashing request; the
+  "Enter a mobile number like 0917 123 4567." message; the Book button on
+  villa and harbor, none on northwind.
+- **Not walked:** a multi-night stay and a declined request (both covered
+  by verify 82–83, rooms 24–26 and the HTTP walk, not by a click).
+- **Cleanup:** the 8 web rows hard-deleted (0 web rows left; villa 8
+  bookings, harbor 3, as before the walk); 24 Dec kept in villa's calendar.
 
 ### 2026-09-28 — customer booking Phase 6 (isolation and the bundle)
 - **Built:** bookings isolation 24–29 (calendar, page, requests across the

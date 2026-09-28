@@ -463,7 +463,15 @@ button. **Browser walk, by the user:** villa stay over a weekend, villa
 single Day Tour, villa 24 Dec, harbor two rooms two nights, a clash on
 confirm, a declined request, a phone in the wrong format.
 
-> **Code done 2026-09-28; the browser walk is owed.** S-6 `/t/<slug>/book`
+> **Done 2026-09-28, walk included** (the walk is recorded in status.md's
+> session log and whats-done.md: three villa requests confirmed, including
+> 24 Dec at 2000000 + 400000 with "Christmas Eve" typed on S-7; two harbor
+> two-room requests, then a Garden Room request confirmed over them, both
+> flagged `clash`, the 409 seen on Confirm; the wrong-phone message; the
+> Book button on villa and harbor, none on northwind; the 8 rows removed
+> after, 24 Dec kept). The code note as written before the walk follows.
+>
+> **Code done 2026-09-28.** S-6 `/t/<slug>/book`
 > (`components/booking-page.tsx`): slot, check-in, nights for a nightly slot
 > ("3 days, 2 nights"), guests or rooms, the server's quote night by night
 > with holiday labels, the contact form with a hidden honeypot, and a
