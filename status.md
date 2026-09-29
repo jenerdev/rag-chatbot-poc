@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-30 (tenant management complete on `feat/tenant-management`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-30 (tenant management complete and merged into `master` at `46dfb24`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -112,8 +112,9 @@ archive not delete, existing accounts only in the browser, operators stay
   [x] **Phase 8 — the record** (2026-09-30): D-075–D-079, D-041 reversed,
   D-042 at ten, R-42–R-44, CLAUDE.md (header, layout, commands, rules 3 and
   8, traps 22–24, conventions), flow.md (routes, "Admin", "Platform").
-  **The plan is complete on `feat/tenant-management`**; merge into `master`
-  is the user's call.
+  **Merged into `master` by fast-forward on 2026-09-30** (`46dfb24`, 13
+  commits from `924c255`, no merge commit); `feat/tenant-management` still
+  exists.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
 on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
@@ -1103,6 +1104,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-30 — tenant management merged
+- **Did:** `git merge --ff-only feat/tenant-management` on `master`: master is
+  at `46dfb24`, 13 commits, no merge commit, the working tree clean before
+  and after. The branch is kept.
 
 ### 2026-09-30 — tenant management Phases 7 and 8 (the walk, the record)
 - **Phase 7, by the user:** "all as described". The full script of the plan
