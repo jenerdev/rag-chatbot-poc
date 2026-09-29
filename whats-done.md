@@ -6274,3 +6274,41 @@ which is why every db script carries `--conditions=react-server` (rule 4).
 test can import `tenant-client.ts` directly; the test signs with a
 throwaway P-256 key, because the claims are what is under test and the
 signature is verify's, live.
+
+## Tenant management, Phase 3: the guards in `apps/web` · done 2026-09-29
+
+**What:** one permission table (`lib/permissions.ts`), a required
+`permission` argument on `requireAdmin()` named at all 31 call sites, a 403
+that says which role lacks which permission, the platform session
+(`lib/platform-auth.ts`: its own cookie, path and payload kind, one HMAC
+helper shared with the staff cookie, `requirePlatform()` and
+`withPlatformRoute()`), the theme rules moved into a pure module the form
+can import, the session GET answering with the role, and the two screens
+that had something to hide hiding it: the knowledge base's form and its
+Edit and Delete for a role without `documents:write`, and the bookings
+screen's Rooms and Holidays tabs for a role without those reads.
+
+**Why it matters:** wall 1 of plan Rule 2. Postgres refuses a staff write
+already (Phase 1); now the route refuses it first, with a reason a person
+can act on, and the compiler refuses a route that forgot to say what it
+needs. The screens hide what the route would refuse, which is a courtesy,
+not a guard, and the comments say so.
+
+**Observed:**
+- typecheck clean, after the compiler listed every unnamed call;
+- `apps/web` tests 17/17: for each of the twelve permissions the roles
+  `can()` grants equal the roles the policies let through, listed by hand
+  from `schema-roles.sql`; roles only add upward; the colour regex, the
+  read-side `themeVars()` and the form's `parseTheme()`;
+- staff-cases 13/13 against `pnpm dev`: the session names the role
+  (staff → staff, admin → admin); staff POST /documents → 403 "Your role
+  (staff) may not do this (documents:write). Ask an owner of "villa" to
+  change it."; staff bookings 200, rooms 403, documents read 200; the
+  original cases unchanged;
+- verify 109/109; every package's tests unchanged; both changed screens 200.
+
+**Worth knowing: a GET needs an honest permission too.** The plan's table
+had nine permissions and no read for rooms or holidays; naming
+`rooms:write` on a GET would have been a lie the compiler accepts. Three
+more permissions (`session`, `rooms:read`, `holidays:read`) let every call
+site say what it does, and the test pins each to its policy.

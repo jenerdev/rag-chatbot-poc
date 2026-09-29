@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /** A room's photos, in order. Another tenant's room gives `[]`. */
 export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:read');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid room id');
@@ -33,7 +33,7 @@ export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, par
  *   - the bucket: size and type again; the database: 6 photos per room.
  */
 export const POST = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid room id');

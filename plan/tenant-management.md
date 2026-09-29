@@ -593,7 +593,19 @@ works (the operator is `admin`; eval and both isolation suites still seed).
 tests pass; a `mintPlatformToken()` unit test shows the claims have no
 `tenant_id` and no `app_admin`.
 
-### Phase 3 — The guards in `apps/web`
+### Phase 3 — The guards in `apps/web` · **done 2026-09-29**
+
+Observed: typecheck clean once all 31 call sites named a permission (the
+compiler listed them, as intended); `apps/web` gained vitest and 17 tests
+(`permissions.test.ts`: the code view of every permission equals the
+Postgres view written by hand from `schema-roles.sql`; the theme regex and
+parsers); staff-cases **13/13** over HTTP (three new: the session names the
+role, staff POST /documents → 403 "Your role (staff) may not do this
+(documents:write)…", staff bookings 200 · rooms 403 · documents read 200);
+verify 109/109; every package's tests unchanged; the two changed screens
+render 200. The permission table grew by three: `session` (any member, for
+the session GET), `rooms:read` and `holidays:read` (admin-only, because
+those screens are), so every GET names an honest permission.
 
 `lib/permissions.ts`, `lib/theme.ts`, `requireAdmin(request, tenant,
 permission)` at all 31 call sites (the compiler lists them), 403 in the

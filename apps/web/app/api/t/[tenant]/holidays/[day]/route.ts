@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  * or not there. A booking already stored keeps its price (§ 2.3).
  */
 export const DELETE = withTenantRoute<{ day: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'holidays:write');
   await requireApplication(tenant, 'bookings');
 
   if (!(await removeCalendarDay(tenant, params.day))) {

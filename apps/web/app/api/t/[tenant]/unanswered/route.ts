@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * bookings list, even though the chat token's policy could read them.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'unanswered:read');
   const resolved = new URL(request.url).searchParams.get('resolved') === '1';
   return NextResponse.json(await listUnanswered(tenant, { resolved }));
 });

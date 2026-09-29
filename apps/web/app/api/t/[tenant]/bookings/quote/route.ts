@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  * differ from what is stored (plan Rule 2). A POST because it takes a list.
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
   const parsed = quoteSchema.safeParse(await request.json().catch(() => null));

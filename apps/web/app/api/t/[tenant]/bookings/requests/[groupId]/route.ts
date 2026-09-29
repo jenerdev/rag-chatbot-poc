@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
  *        (bookings_no_overlap's 23P01, through the one error map)
  */
 export const PATCH = withTenantRoute<{ groupId: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:write');
   await requireApplication(tenant, 'bookings');
 
   const parsed = decideRequestSchema.safeParse(await request.json().catch(() => null));

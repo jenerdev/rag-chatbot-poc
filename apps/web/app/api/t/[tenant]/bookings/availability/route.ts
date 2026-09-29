@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * reach it through the pipeline, not over HTTP.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
   const url = new URL(request.url);

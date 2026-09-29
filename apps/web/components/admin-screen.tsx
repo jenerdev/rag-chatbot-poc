@@ -31,6 +31,7 @@ import type { ChunkSummary, DocumentDetail, DocumentSummary } from '@rag/pipelin
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
 export interface AdminScreenProps {
@@ -61,6 +62,7 @@ function DocumentRow({
   onUnauthorized,
   onEdit,
   editing,
+  readOnly,
 }: {
   api: string;
   doc: DocumentSummary;
@@ -69,6 +71,8 @@ function DocumentRow({
   onEdit: (doc: DocumentSummary) => void;
   /** This row is the one in the form: deleting it mid-edit would make Save a 404. */
   editing: boolean;
+  /** The member may read but not write (staff): no Edit, no Delete. The route refuses anyway (403). */
+  readOnly: boolean;
   onUnauthorized: () => void;
   onError: (message: string) => void;
   onClearNotice: () => void;
@@ -127,12 +131,16 @@ function DocumentRow({
           )}
           {` · ${new Date(doc.created_at).toLocaleDateString()}`}
         </span>
-        <button type="button" title="Edit this document" disabled={deleting || editing} onClick={() => onEdit(doc)}>
-          ✎
-        </button>
-        <button type="button" title="Delete this document" disabled={deleting || editing} onClick={remove}>
-          🗑
-        </button>
+        {!readOnly && (
+          <>
+            <button type="button" title="Edit this document" disabled={deleting || editing} onClick={() => onEdit(doc)}>
+              ✎
+            </button>
+            <button type="button" title="Delete this document" disabled={deleting || editing} onClick={remove}>
+              🗑
+            </button>
+          </>
+        )}
       </div>
 
       <div className={`doc-chunks${open ? '' : ' hidden'}`}>
@@ -172,6 +180,11 @@ function DocumentRow({
 export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEnabled }: AdminScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
+  // What this member is (tenant management Phase 3). Staff reads the knowledge
+  // base and gets no form and no Edit or Delete; the routes refuse a staff
+  // write with a 403 whatever the screen shows (lib/permissions.ts).
+  const [role, setRole] = useState<Role | null>(null);
+  const canWrite = role !== null && can(role, 'documents:write');
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listMessage, setListMessage] = useState('Loading documents…');
   const [notice, setNotice] = useState<Notice>(null);
@@ -197,6 +210,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
         const response = await fetch(`${api}/admin/session`);
         const body = await response.json();
         setAuth(body.admin === true ? 'in' : 'out');
+        setRole(isRole(body.role) ? body.role : null);
       } catch {
         setAuth('out');
       }
@@ -348,7 +362,18 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
-            <LoginForm api={api} slug={slug} onLoggedIn={() => setAuth('in')} />
+            <LoginForm
+              api={api}
+              slug={slug}
+              onLoggedIn={() => {
+                setAuth('in');
+                // The login route says only "admin: true"; the role is the session GET's.
+                void fetch(`${api}/admin/session`)
+                  .then((r) => r.json())
+                  .then((body) => setRole(isRole(body.role) ? body.role : null))
+                  .catch(() => setRole(null));
+              }}
+            />
           )}
         </main>
       </>
@@ -362,6 +387,16 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
       <main>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
+        {!canWrite && role && (
+          <section className="card">
+            <p className="small muted">
+              You are {ROLE_LABELS[role].toLowerCase()} here: you can read the knowledge base and see what each answer was
+              built from. Adding or editing documents is for an admin or owner.
+            </p>
+          </section>
+        )}
+
+        {canWrite && (
         <section className="card">
           <h2>{editing ? `Edit “${editing.title}”` : 'Add a document'}</h2>
           <form onSubmit={submit}>
@@ -428,6 +463,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
             </div>
           </form>
         </section>
+        )}
 
         <section className="card">
           <h2>Documents{documents ? ` (${documents.length})` : ''}</h2>
@@ -436,7 +472,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
             <div className="small">{listMessage}</div>
           ) : documents.length === 0 ? (
             <div className="small muted">
-              No documents yet. Paste something above to give the bot something to know.
+              {canWrite ? 'No documents yet. Paste something above to give the bot something to know.' : 'No documents yet.'}
             </div>
           ) : (
             <div>
@@ -449,6 +485,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
                   onChanged={loadDocuments}
                   onEdit={startEdit}
                   editing={editing?.id === doc.id}
+                  readOnly={!canWrite}
                   onClearNotice={() => setNotice(null)}
                   onError={(message) => setNotice({ message, kind: 'error' })}
                 />

@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  * not there.
  */
 export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid room id');

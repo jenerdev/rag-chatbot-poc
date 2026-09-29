@@ -84,7 +84,15 @@ archive not delete, existing accounts only in the browser, operators stay
   tests. Every suite unchanged (109 · 20+20 · 29+29 · 30). CLI walked on a
   throwaway tenant. `platform_admins` still empty: run `super:add` for
   your own email before Phase 4's walk.
-- [ ] Phase 3 — the guards ·
+- [x] **Phase 3 — the guards** (2026-09-29). `lib/permissions.ts` (12
+  permissions, one table), `lib/theme.ts` (pure; branding.ts reads through
+  it), `requireAdmin(request, tenant, permission)` → `StaffContext` at 31
+  call sites, 403 in the error map, `lib/platform-auth.ts` (`rag_platform`
+  cookie, `requirePlatform`, `withPlatformRoute`), session GET returns
+  `role`; the knowledge-base screen hides the form and Edit/Delete from
+  staff, the bookings screen hides Rooms and Holidays. 17 web unit tests;
+  staff-cases 13/13; verify 109; typecheck clean.
+-
   [ ] Phase 4 — platform and members routes · [ ] Phase 5 — screens ·
   [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
@@ -1076,6 +1084,40 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 3 (the guards in `apps/web`)
+- **Did:** `lib/permissions.ts`: 12 permissions, three roles, `can()`,
+  `isRole()`, `ROLE_LABELS`; pure, so screens import it too. `lib/theme.ts`:
+  the five keys, the regex, `themeVars()` (moved out of the server-only
+  branding.ts) and `parseTheme()` for the form. `requireAdmin(request,
+  tenant, permission)` returns a `StaffContext` (`role` on it) and throws a
+  403 `PermissionError` naming the role and the permission; the 31 call
+  sites each name theirs (rooms:read/write, bookings:read/write,
+  documents:read/write, holidays:read/write, unanswered:read/write, session);
+  403 joins the error map. `lib/platform-auth.ts`: the `rag_platform` cookie
+  on `/api/platform`, payload `platform.<user>.<expiry>.<mac>`, one HMAC
+  helper shared with the staff cookie (`signSessionPayload`,
+  `verifySessionPayload`), `requirePlatform()` → `{ db, userId }` through
+  `platformClient()`, `checkPlatformLogin()`, `withPlatformRoute()`. The
+  session GET answers `{ admin, role }`. Screens: the knowledge base hides
+  the form and Edit/Delete for a role without `documents:write` and says
+  so in one sentence; the bookings screen shows Rooms and Holidays only to a
+  role with the reads; both re-ask the session after a login for the role.
+- **Observed:** typecheck clean; web tests 17/17 (the code view of every
+  permission equals the hand-written Postgres view; roles only add upward;
+  the theme regex and parsers); every package's tests unchanged (13 · 14 ·
+  5 · 94 · 329); verify 109/109; staff-cases **13/13**: "staff → staff,
+  admin → admin"; staff POST /documents 403 `Your role (staff) may not do
+  this (documents:write). Ask an owner of "villa" to change it.`; staff
+  bookings 200 · rooms 403 · documents 200; the six original cases
+  unchanged; `/t/villa/admin` and `/t/villa/admin/bookings` render 200.
+- **Three permissions the plan did not list** were needed for honest GETs:
+  `session` (any member), `rooms:read` and `holidays:read` (admin-only,
+  because the screens are). The test pins all twelve against the policies.
+- **Next:** Phase 4, the platform routes (`/api/platform/session`,
+  `/tenants`, `/tenants/[id]`, `/archive`, `/applications/[key]`,
+  `/members`) and the tenant Members routes, with a walk script against
+  `pnpm dev`.
 
 ### 2026-09-29 — tenant management Phase 2 (`@rag/db` and the CLI)
 - **Did:** `staffClient()` returns `{ db, role }` (the role read from the

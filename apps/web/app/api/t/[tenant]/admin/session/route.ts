@@ -27,15 +27,18 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 });
 
 /**
- * Is this browser logged in as a member of this tenant? Lets the admin page
- * choose between the login form and the list. It re-checks the membership,
- * the same way every admin route does, so a removed member sees the login
- * form, not a list that fails row by row.
+ * Is this browser logged in as a member of this tenant, and as WHAT? Lets
+ * the admin page choose between the login form and the list, and hide what
+ * the role cannot do (lib/permissions.ts). It re-checks the membership, the
+ * same way every admin route does, so a removed member sees the login form,
+ * not a list that fails row by row, and a demoted one sees fewer buttons on
+ * the next load. The role in the answer is a courtesy to the screen; every
+ * route decides for itself.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
   try {
-    await requireAdmin(request, tenant);
-    return NextResponse.json({ admin: true });
+    const { role } = await requireAdmin(request, tenant, 'session');
+    return NextResponse.json({ admin: true, role });
   } catch (error) {
     // Only "not logged in" becomes false. A database error is still an
     // error, with its real message (architecture.md § 9).

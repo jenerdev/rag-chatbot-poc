@@ -17,7 +17,7 @@ const notFound = (imageId: number) => NextResponse.json({ error: `No photo with 
 
 /** Remove a photo: its row, then its object in the bucket. */
 export const DELETE = withTenantRoute<Params>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   const imageId = parseId(params.imageId);
@@ -32,7 +32,7 @@ export const DELETE = withTenantRoute<Params>(async (request, { tenant, params }
  * the order can change; a photo is replaced, not edited.
  */
 export const PATCH = withTenantRoute<Params>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   const imageId = parseId(params.imageId);

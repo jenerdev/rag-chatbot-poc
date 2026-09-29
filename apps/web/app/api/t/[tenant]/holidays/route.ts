@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
  * bookingPage() in its Server Component, not over this route.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'holidays:read');
   await requireApplication(tenant, 'bookings');
 
   const url = new URL(request.url);
@@ -29,7 +29,7 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
 });
 
 export const PUT = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'holidays:write');
   await requireApplication(tenant, 'bookings');
 
   const parsed = holidaySchema.safeParse(await request.json().catch(() => null));

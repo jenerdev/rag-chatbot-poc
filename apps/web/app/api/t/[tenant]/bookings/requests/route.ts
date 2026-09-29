@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * this one would be refused (plan/customer-booking.md § 2.5).
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
   const from = new URL(request.url).searchParams.get('from') ?? undefined;

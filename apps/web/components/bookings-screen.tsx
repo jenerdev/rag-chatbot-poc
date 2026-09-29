@@ -42,6 +42,7 @@ import type {
 } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { can, isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
 
 export interface BookingsScreenProps {
@@ -194,6 +195,9 @@ function RequestRow({
 export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: BookingsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
+  // What this member is, from the session check. Hides the tabs a role cannot
+  // open (the routes behind them refuse anyway, with a 403 that names why).
+  const [role, setRole] = useState<Role | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
   const [from, setFrom] = useState<string | null>(null);
   const [availability, setAvailability] = useState<SlotAvailability[] | null>(null);
@@ -236,6 +240,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
         const response = await fetch(`${api}/admin/session`);
         const body = await response.json();
         setAuth(body.admin === true ? 'in' : 'out');
+        setRole(isRole(body.role) ? body.role : null);
       } catch {
         setAuth('out');
       }
@@ -482,14 +487,16 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
           Log out
         </button>
       )}
-      {perRoom && (
+      {perRoom && role && can(role, 'rooms:read') && (
         <Link className="button" href={`/t/${slug}/admin/accommodations`}>
           Rooms
         </Link>
       )}
-      <Link className="button" href={`/t/${slug}/admin/holidays`}>
-        Holidays
-      </Link>
+      {role && can(role, 'holidays:read') && (
+        <Link className="button" href={`/t/${slug}/admin/holidays`}>
+          Holidays
+        </Link>
+      )}
       <Link className="button" href={`/t/${slug}/admin`}>
         Knowledge base
       </Link>
@@ -507,7 +514,17 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
-            <LoginForm api={api} slug={slug} onLoggedIn={() => setAuth('in')} />
+            <LoginForm
+              api={api}
+              slug={slug}
+              onLoggedIn={() => {
+                setAuth('in');
+                void fetch(`${api}/admin/session`)
+                  .then((r) => r.json())
+                  .then((body) => setRole(isRole(body.role) ? body.role : null))
+                  .catch(() => setRole(null));
+              }}
+            />
           )}
         </main>
       </>

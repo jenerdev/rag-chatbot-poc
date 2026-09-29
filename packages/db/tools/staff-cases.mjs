@@ -22,13 +22,13 @@ const idOf = Object.fromEntries(tenants.map((t) => [t.slug, t.id]));
 
 const stamp = Date.now();
 const users = {};
-async function makeUser(name, memberOf) {
+async function makeUser(name, memberOf, role = 'admin') {
   const email = `staff-case-${name}-${stamp}@example.com`;
   const password = randomBytes(18).toString('base64url');
   const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) throw new Error(`create ${name}: ${error.message}`);
   for (const slug of memberOf) {
-    const { error: memberError } = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: idOf[slug], role: 'admin' });
+    const { error: memberError } = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: idOf[slug], role });
     if (memberError) throw new Error(`membership ${name}/${slug}: ${memberError.message}`);
   }
   users[name] = { id: data.user.id, email, password };
@@ -49,6 +49,7 @@ try {
   await makeUser('member', ['villa']);
   await makeUser('outsider', []); // a real account, member of nothing
   await makeUser('northwinder', ['northwind']);
+  await makeUser('staffer', ['villa'], 'staff'); // tenant management Phase 3: the narrowest role
 
   // 1. The right password, as a member → 200, and a cookie.
   const ok = await login('villa', users.member.email, users.member.password);
@@ -99,6 +100,34 @@ try {
       `book ${booked.status}${row ? ` #${row.id}` : ` "${await errorOf(booked)}"`}, list ${listed.status} (${rows.length} on ${date})`,
     );
     if (row) await supabase.from('bookings').delete().eq('tenant_id', idOf.villa).eq('id', row.id);
+  }
+
+  // 7–9. Roles over HTTP (tenant management Phase 3, plan Rule 2's wall 1).
+  //     The session says what the member is; a staff member is refused a
+  //     document write with a 403 that names the permission, and is NOT
+  //     refused the bookings list (the daily work). The admin above already
+  //     proved the twin: add and delete a document, 201 and 200.
+  {
+    const staffLogin = await login('villa', users.staffer.email, users.staffer.password);
+    const staffCookie = cookieOf(staffLogin);
+    const who = await (await asCookie(staffCookie, '/api/t/villa/admin/session')).json();
+    const mine = await (await asCookie(cookie, '/api/t/villa/admin/session')).json();
+    check(who.admin === true && who.role === 'staff' && mine.role === 'admin', '7. the session names the role', `staff → ${who.role}, admin → ${mine.role}`);
+    const denied = await asCookie(staffCookie, '/api/t/villa/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'staff-cases probe', content: 'must never exist' }),
+    });
+    const why = await errorOf(denied);
+    check(denied.status === 403 && /documents:write/.test(why ?? ''), '8. staff POST /documents → 403 naming the permission', `${denied.status} "${why}"`);
+    const allowed = await asCookie(staffCookie, '/api/t/villa/bookings?from=2027-01-01&to=2027-01-02');
+    const rooms = await asCookie(staffCookie, '/api/t/villa/accommodations');
+    const reads = await asCookie(staffCookie, '/api/t/villa/documents');
+    check(
+      allowed.status === 200 && rooms.status === 403 && reads.status === 200,
+      '9. staff: bookings 200, rooms 403, documents (read) 200',
+      `bookings ${allowed.status} · rooms ${rooms.status} · documents ${reads.status}`,
+    );
   }
 
   // 6. Another tenant's cookie, sent by hand to villa → 401.

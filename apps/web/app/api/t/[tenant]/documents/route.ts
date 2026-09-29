@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export const POST = withTenantRoute(async (request, { tenant }) => {
   // Admin only (Phase 6). The chat route is the product and stays open. Editing
   // the knowledge base behind it needs a member of this tenant (auth-rls Phase 5).
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:write');
   const parsed = createDocumentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
@@ -24,6 +24,6 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 
 /** List the tenant's documents with their chunk counts. Admin only. */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:read');
   return NextResponse.json(await listDocuments(tenant));
 });

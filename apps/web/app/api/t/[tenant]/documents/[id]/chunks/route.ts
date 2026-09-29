@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** The chunks of one document, for the expandable row on the admin page. */
 export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:read');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
 

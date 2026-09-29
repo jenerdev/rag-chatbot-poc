@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
  * an error: it matches nothing, the same `[]` as a room with no bookings.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
   const url = new URL(request.url);
@@ -48,7 +48,7 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
  * insert trigger would overwrite one anyway (plan/booking-types.md Rule 2).
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:write');
   await requireApplication(tenant, 'bookings');
 
   const parsed = createBookingSchema.safeParse(await request.json().catch(() => null));

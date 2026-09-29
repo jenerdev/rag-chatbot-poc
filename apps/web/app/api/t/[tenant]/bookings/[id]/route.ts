@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * booked is the tenant's record, and a cancelled row frees its slot anyway.
  */
 export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid booking id');

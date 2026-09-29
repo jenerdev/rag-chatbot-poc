@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 const notFound = (id: number) => NextResponse.json({ error: `No room with id ${id}` }, { status: 404 });
 
 export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:read');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid room id');
@@ -28,7 +28,7 @@ export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, par
 
 /** Change any of name, description, capacity, order; `active: false` retires the room. */
 export const PATCH = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid room id');

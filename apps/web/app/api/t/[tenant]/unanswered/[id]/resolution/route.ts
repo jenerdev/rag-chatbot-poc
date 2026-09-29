@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 // message ids cannot be enumerated across tenants.
 
 export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'unanswered:write');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid question id');
 
@@ -25,7 +25,7 @@ export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, par
 });
 
 export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'unanswered:write');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid question id');
 

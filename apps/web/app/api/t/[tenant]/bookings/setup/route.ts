@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
  * otherwise default the form to the wrong day (plan/bookings.md § 2.3).
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
   const [config, units, slots] = await Promise.all([bookingsConfig(tenant), listUnits(tenant), listSlots(tenant)]);

@@ -20,14 +20,14 @@ export const dynamic = 'force-dynamic';
 
 /** Every room, active or not, with its rates and photos. */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:read');
   await requireApplication(tenant, 'bookings');
   return NextResponse.json(await listAccommodations(tenant));
 });
 
 /** Add a room. 201 with it. It cannot be booked until it has a rate. */
 export const POST = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'rooms:write');
   await requireApplication(tenant, 'bookings');
 
   const parsed = createAccommodationSchema.safeParse(await request.json().catch(() => null));

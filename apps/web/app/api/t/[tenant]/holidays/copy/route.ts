@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * never copied (plan/customer-booking.md § 2.3). Returns the copies.
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'holidays:write');
   await requireApplication(tenant, 'bookings');
 
   const parsed = copyHolidaysSchema.safeParse(await request.json().catch(() => null));

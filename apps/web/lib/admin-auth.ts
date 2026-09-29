@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { signInStaff, staffClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
+import { can, type Permission, type Role } from './permissions';
 
 // Staff sessions (auth-rls Phase 5, D-040; the cookie is D-028's).
 //
@@ -22,9 +23,14 @@ import type { TenantContext } from '@rag/pipeline';
 // (tenants_slug_shape) and a uuid has none, so `.` is a safe separator.
 //
 // A request that passes requireAdmin() gets a STAFF context back: a token
-// with this user as `sub` and `app_admin`. Postgres's app_is_admin() then
-// checks the membership AGAIN on every write, so even a bug here cannot
-// write for a non-member.
+// with this user as `sub` and `app_admin`, and the member's ROLE. Postgres's
+// app_role() then reads the membership AGAIN on every write, so even a bug
+// here cannot write for a non-member, or for a role the policy refuses.
+//
+// THE PERMISSION IS A REQUIRED ARGUMENT (tenant management Phase 3). Every
+// admin route names what it needs, from the one table in lib/permissions.ts,
+// and a call that forgets is a compile error, not a route that lets everyone
+// in (D-027's argument, applied to roles). Wall 1; Postgres is wall 2.
 //
 // THE PATH IS PART OF THE SECURITY
 // --------------------------------
@@ -57,9 +63,19 @@ function secret(): string {
   return value;
 }
 
-function sign(payload: string): string {
+/** HMAC a session payload. Shared with the platform cookie (lib/platform-auth.ts): one secret, one algorithm, two payload kinds. */
+export function signSessionPayload(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url');
 }
+
+/** Constant-time check of a payload's MAC. `timingSafeEqual`, never `===`. */
+export function verifySessionPayload(payload: string, mac: string): boolean {
+  const expected = Buffer.from(signSessionPayload(payload));
+  const given = Buffer.from(mac);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+const sign = signSessionPayload;
 
 /** The cookie value for a fresh session. */
 export function signSession(slug: string, userId: string, expiresAt: number): string {
@@ -89,9 +105,7 @@ export function readSession(request: Request, tenant: TenantContext): string | n
   const [slug, userId, expiry, mac, ...extra] = decodeURIComponent(raw).split('.');
   if (!slug || !userId || !expiry || !mac || extra.length > 0) return null;
 
-  const expected = Buffer.from(sign(`${slug}.${userId}.${expiry}`));
-  const given = Buffer.from(mac);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (!verifySessionPayload(`${slug}.${userId}.${expiry}`, mac)) return null;
 
   return slug === tenant.slug && Number(expiry) > Date.now() ? userId : null;
 }
@@ -102,24 +116,43 @@ class AdminAuthError extends Error {
 }
 
 /**
+ * A 403: logged in, a member, and still not allowed. Names the permission,
+ * so the person (a member, who already knows this tenant exists) learns
+ * what to ask their owner for. Not a 404: "not yours = not there" is for
+ * strangers enumerating ids, not for colleagues.
+ */
+class PermissionError extends Error {
+  readonly status = 403;
+}
+
+/** A tenant context on a staff token, plus what the member is. */
+export interface StaffContext extends TenantContext {
+  role: Role;
+}
+
+/**
  * Guard an admin-only handler, and hand back the STAFF context it runs on.
  *
  * Throws a 401 unless the request has a session for this tenant AND the
- * user is still a member. Callers replace their chat context with the result:
+ * user is still a member; a 403 if the member's role lacks `permission`.
+ * Callers replace their chat context with the result:
  *
- *     tenant = await requireAdmin(request, tenant);
+ *     tenant = await requireAdmin(request, tenant, 'documents:write');
  *
  * so no line after the guard can reach the database as the chat token by
  * mistake. A throw rather than a returned response, so a guarded handler is
- * one line and cannot forget to `return` it.
+ * one line and cannot forget to `return` it. The role comes from the same
+ * membership row Postgres reads inside every policy (plan Rule 4).
  */
-export async function requireAdmin(request: Request, tenant: TenantContext): Promise<TenantContext> {
+export async function requireAdmin(request: Request, tenant: TenantContext, permission: Permission): Promise<StaffContext> {
   const userId = readSession(request, tenant);
   if (!userId) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
   const staff = await staffClient(tenant.id, userId);
   if (!staff) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
-  // staff.role is read here and used in Phase 3 (requireAdmin's permission argument).
-  return { ...tenant, db: staff.db };
+  if (!can(staff.role, permission)) {
+    throw new PermissionError(`Your role (${staff.role}) may not do this (${permission}). Ask an owner of "${tenant.slug}" to change it.`);
+  }
+  return { ...tenant, db: staff.db, role: staff.role };
 }
 
 /**

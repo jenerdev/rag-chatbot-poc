@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * the same question again, and the bot must stop knowing the answer.
  */
 export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:write');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
 
@@ -29,7 +29,7 @@ export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, 
 
 /** One document with its full text, for the edit form. Admin only. */
 export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:read');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
 
@@ -46,7 +46,7 @@ export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, par
  * refuse.
  */
 export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant);
+  tenant = await requireAdmin(request, tenant, 'documents:write');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid document id');
   const parsed = createDocumentSchema.safeParse(await request.json().catch(() => null));

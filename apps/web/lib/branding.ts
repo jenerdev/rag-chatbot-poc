@@ -1,8 +1,8 @@
 import 'server-only';
 import type { CSSProperties } from 'react';
-import { z } from 'zod';
 import { anonClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
+import { themeVars } from './theme';
 
 // Per-tenant branding: server data becoming markup (plan.md § 2.4).
 //
@@ -14,21 +14,10 @@ import type { TenantContext } from '@rag/pipeline';
 // each value must pass a strict colour regex, so a string that is not a colour
 // never reaches the page at all.
 
-/**
- * The ONLY theme keys that exist. Each maps to a custom property that
- * globals.css already uses everywhere. That is why five keys are enough, and
- * why nothing here writes CSS rules, only variables.
- */
-const THEME_KEYS = {
-  accent: '--accent',
-  accentSoft: '--accent-soft',
-  bg: '--bg',
-  panel: '--panel',
-  ink: '--ink',
-} as const;
-
-/** #rgb or #rrggbb. Nothing else: no url(), no var(), no semicolons, no expressions. */
-const colour = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+// The theme's keys, regex and `themeVars()` live in lib/theme.ts since tenant
+// management Phase 3: the platform form writes themes now, and it must
+// validate with the SAME rule this page reads with. That file is pure, so the
+// form (a Client Component) can import it; this one stays server-only.
 
 /** An absolute https: URL, or nothing. An unvalidated `<img src>` is the same class of hole as unvalidated CSS. */
 function httpsUrl(value: unknown): string | null {
@@ -50,22 +39,7 @@ export interface Branding {
   themeStyle: CSSProperties;
 }
 
-/**
- * Turn the `theme` jsonb into custom properties.
- *
- * Unknown keys are ignored, and invalid values are DROPPED rather than
- * rejected, so a bad theme degrades to the default look instead of taking the
- * page down.
- */
-export function themeVars(theme: unknown): CSSProperties {
-  const style: Record<string, string> = {};
-  if (theme === null || typeof theme !== 'object') return style;
-  for (const [key, property] of Object.entries(THEME_KEYS)) {
-    const parsed = colour.safeParse((theme as Record<string, unknown>)[key]);
-    if (parsed.success) style[property] = parsed.data;
-  }
-  return style as CSSProperties;
-}
+export { themeVars };
 
 /**
  * Load a tenant's branding, validated on READ as well as on write.
