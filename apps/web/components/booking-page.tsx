@@ -129,6 +129,13 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   }, [chosen, guests, perRoom, units]);
   const roomsComplete = rooms.length > 0 && rooms.every((r) => Number.isInteger(r.guests) && r.guests > 0);
   const nightsValid = Number.isInteger(nightCount) && nightCount >= 1 && nightCount <= page.maxNights;
+  // Closed dates (D-080), from the calendar the page already has. Said up
+  // front, and again when the stay touches one; the server refuses it anyway.
+  const closedDays = useMemo(() => page.calendar.filter((c) => c.kind === 'closed'), [page.calendar]);
+  const closedInStay =
+    checkIn && nightsValid
+      ? closedDays.find((c) => c.day >= checkIn && c.day <= addDays(checkIn, nightCount - 1)) ?? null
+      : null;
 
   // The server's price, re-asked whenever the choice changes (debounced).
   useEffect(() => {
@@ -285,6 +292,11 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 <div className={`small${checkIn > page.lastDate ? ' field-error' : ' muted'}`}>
                   {checkIn > page.lastDate ? 'Too far ahead: the latest is' : 'Up to'} {dateLabel(page.lastDate)}
                 </div>
+                {closedInStay && (
+                  <div className="small field-error">
+                    Closed on {dateLabel(closedInStay.day)} ({closedInStay.label}). Choose other dates.
+                  </div>
+                )}
               </div>
               {slot.nightly && (
                 <div className="field narrow">
@@ -322,6 +334,12 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
               )}
             </div>
 
+            {closedDays.length > 0 && (
+              <div className="small muted">
+                Closed on {closedDays.slice(0, 6).map((c) => dateLabel(c.day)).join(', ')}
+                {closedDays.length > 6 ? `, and ${closedDays.length - 6} more date${closedDays.length === 7 ? '' : 's'}` : ''}.
+              </div>
+            )}
             {checkIn && end && nightsValid && (
               <div className="small muted stay-line">
                 {slot.nightly && nightCount > 1 ? `${nightCount + 1} days, ${nightCount} nights · ` : ''}

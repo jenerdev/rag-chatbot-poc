@@ -220,10 +220,10 @@ export const decideRequestSchema = z.object({
   }),
 });
 
-/** A holiday or peak day. Surcharge in CENTAVOS. */
+/** A holiday, peak or closed day (D-080). Surcharge in CENTAVOS; a closed day has none. */
 export const holidaySchema = z.object({
   day: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
-  kind: z.enum(['holiday', 'peak'], { errorMap: () => ({ message: 'kind is "holiday" or "peak"' }) }).optional(),
+  kind: z.enum(['holiday', 'peak', 'closed'], { errorMap: () => ({ message: 'kind is "holiday", "peak" or "closed"' }) }).optional(),
   label: z.string({ required_error: 'A label is required', invalid_type_error: 'A label is required' }),
   surcharge: z.number({ invalid_type_error: 'The surcharge must be a number' }).nullish(),
 });

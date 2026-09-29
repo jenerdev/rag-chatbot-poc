@@ -178,7 +178,7 @@ function RequestRow({
         </span>
         {pending && (
           <>
-            <button type="button" className="primary" disabled={busy || request.clash} onClick={() => onDecide(request, 'confirm')}>
+            <button type="button" className="primary" disabled={busy || request.clash || request.closed} onClick={() => onDecide(request, 'confirm')}>
               Confirm
             </button>
             <button type="button" disabled={busy} onClick={() => onDecide(request, 'decline')}>
@@ -189,6 +189,9 @@ function RequestRow({
       </div>
       {pending && request.clash && (
         <div className="booking-notes request-clash">A night of this request is already confirmed for another booking.</div>
+      )}
+      {pending && request.closed && (
+        <div className="booking-notes request-clash">A night of this request is on a closed date. Decline it, or reopen the date on the Holidays screen.</div>
       )}
       {/* Customer-typed notes are a React child, so they are escaped. */}
       {request.notes && <div className="booking-notes">{request.notes}</div>}
@@ -776,7 +779,13 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                       <span
                         key={`${s.unit}/${s.slot}`}
                         className={`slot-chip ${s.status}`}
-                        title={s.status === 'taken' ? 'Overlaps a booking — maybe one from another day' : 'Free to book'}
+                        title={
+                          s.status === 'closed'
+                            ? 'Closed on the Holidays screen — nothing can be booked'
+                            : s.status === 'taken'
+                              ? 'Overlaps a booking — maybe one from another day'
+                              : 'Free to book'
+                        }
                       >
                         {multipleUnits || perRoom ? `${s.unit} · ` : ''}
                         {s.slot}: {s.status}

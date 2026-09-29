@@ -573,6 +573,101 @@ try {
         `copied ${copied.map((d) => d.day).join(',')} · removed ${removed}/${again} · chat ${chatRemove} · left ${left.map((d) => d.day).join(',')}`,
       );
     }
+
+    // 30–33 are closed dates (D-080, schema-closed-days.sql). CLOSED is a
+    //        Tuesday with nothing on it; BUSY is a Wednesday that gets a
+    //        confirmed booking first. Every refusal has its twin.
+    const CLOSED = firstOf(300, [2]);
+    const BUSY = next(CLOSED, 1);
+    const PENDING = firstOf(320, [4]);
+    const code = async (fn) => {
+      const { error } = await fn();
+      return error ? `${error.code} ${error.message}` : 'ok';
+    };
+
+    // 30. A date with a confirmed booking cannot be closed (the message
+    //     counts them); an empty date can, with no surcharge; a closed date
+    //     with a surcharge is refused by the table too.
+    {
+      await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: BUSY, guestName: 'Busy' });
+      const busy = await thrown(() => setCalendarDay(probe, { day: BUSY, kind: 'closed', label: 'Probe closed' }));
+      const closed = await setCalendarDay(probe, { day: CLOSED, kind: 'closed', label: 'Probe maintenance' });
+      const pricey = await thrown(() => setCalendarDay(probe, { day: CLOSED, kind: 'closed', label: 'x', surcharge: 100 }));
+      const tableSurcharge = await code(() =>
+        supabase.from('rate_calendar').update({ surcharge: 100 }).eq('tenant_id', probe.id).eq('day', CLOSED),
+      );
+      check(
+        busy instanceof BookingInputError && /has 1 confirmed booking\. Cancel or move it/.test(busy.message)
+          && closed.kind === 'closed' && closed.surcharge === 0
+          && pricey instanceof BookingInputError && tableSurcharge.startsWith('23514'),
+        'closing: a date with a confirmed booking is refused; an empty one closes; no surcharge on a closed date',
+        `${described(busy)} · ${closed.day} ${closed.kind} · ${described(pricey)} · table: ${tableSurcharge.slice(0, 60)}`,
+      );
+    }
+
+    // 31. Nothing lands on a closed date. Staff through the package get the
+    //     reason in words; the SAME insert straight into the table, on the
+    //     staff token and on service_role, meets the trigger alone (wall 2).
+    //     Twin: the day after is bookable.
+    {
+      const staff = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: CLOSED, guestName: 'Closed' }));
+      const row = { tenant_id: probe.id, unit_id: garden.id, slot_id: night.id, booked_date: CLOSED, status: 'confirmed', guest_name: 'Raw', guest_count: 1 };
+      const rawStaff = await code(() => probe.db.from('bookings').insert(row));
+      const rawService = await code(() => supabase.from('bookings').insert(row));
+      const dayAfter = await createBookings(probe, { unitId: family.id, guestCount: 2, slotId: night.id, date: next(CLOSED, 2), guestName: 'Twin' });
+      check(
+        staff instanceof BookingInputError && staff.message === `Closed on ${CLOSED} (Probe maintenance). Choose another date.`
+          && rawStaff.startsWith('23514 closed on') && rawService.startsWith('23514 closed on') && dayAfter.bookings.length === 1,
+        'closed date: staff refused in words; a raw insert on the staff token and on service_role meets the trigger; the day after books',
+        `${described(staff)} · staff raw: ${rawStaff} · service raw: ${rawService} · twin ${dayAfter.bookings[0]?.date}`,
+      );
+    }
+
+    // 32. A customer: the quote and the request are refused in words, and
+    //     request_booking() called straight on the chat token meets the
+    //     trigger (wall 2). The availability says 'closed' on that date
+    //     only. Twin: a stay that ends the night before is quoted.
+    {
+      const quoteClosed = await thrown(() => quoteRequest(chat, stay({ checkIn: next(CLOSED, -1), nights: 2 })));
+      const requestClosed = await thrown(() => requestBooking(chat, stay({ checkIn: CLOSED, nights: 1, ...contact(6) })));
+      const raw = await code(() =>
+        chat.db.rpc('request_booking', {
+          p_tenant_id: probe.id, p_slot_id: night.id, p_unit_ids: [hall.id], p_guests: [32], p_check_in: CLOSED, p_nights: 1,
+          p_name: 'Rooms Probe', p_phone: '09170000007', p_email: 'rooms-probe-7@example.com', p_notes: null,
+        }),
+      );
+      const rows = await checkRoomAvailability(chat, { from: next(CLOSED, -1), to: next(CLOSED, 1), slot: 'Night' });
+      const byDay = (d) => [...new Set(rows.filter((r) => r.date === d).map((r) => r.status))].join('/');
+      const twin = await quoteRequest(chat, stay({ checkIn: next(CLOSED, -2), nights: 2 }));
+      check(
+        quoteClosed instanceof BookingInputError && quoteClosed.message.startsWith(`Closed on ${CLOSED}`)
+          && requestClosed instanceof BookingInputError && raw.startsWith('23514 closed on')
+          && byDay(CLOSED) === 'closed' && byDay(next(CLOSED, -1)) !== 'closed' && twin.lines.length === 2,
+        "customer: a closed date is refused by quote, request and request_booking() itself; availability says 'closed' that day only",
+        `${described(quoteClosed)} · ${described(requestClosed)} · rpc: ${raw.slice(0, 50)} · ${next(CLOSED, -1)} ${byDay(next(CLOSED, -1))}, ${CLOSED} ${byDay(CLOSED)} · twin ${twin.lines.length} lines`,
+      );
+    }
+
+    // 33. A request made BEFORE its date was closed: staff see `closed`, its
+    //     confirm is refused in words and changes nothing, and decline works.
+    //     Reopening the date (remove) makes it bookable again.
+    {
+      const pending = await requestBooking(chat, stay({ checkIn: PENDING, nights: 1, ...contact(8) }));
+      await setCalendarDay(probe, { day: PENDING, kind: 'closed', label: 'Probe late closure' });
+      const find = async () => (await listRequests(probe, { from: PENDING })).find((r) => r.reference === pending.reference);
+      const listed = await find();
+      const confirm = await thrown(() => confirmRequest(probe, listed.groupId));
+      const still = (await find()).status;
+      const declined = await declineRequest(probe, listed.groupId);
+      const reopened = await removeCalendarDay(probe, CLOSED);
+      const afterReopen = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: CLOSED, guestName: 'Reopened' });
+      check(
+        listed.closed && !listed.clash && confirm instanceof BookingInputError && /Decline this request, or reopen the date/.test(confirm.message)
+          && still === 'pending' && declined && reopened && afterReopen.bookings.length === 1,
+        'a request on a date closed later: flagged, confirm refused in words, decline works; reopening makes the date bookable',
+        `closed ${listed.closed} · ${described(confirm)} · still ${still} · declined ${declined} · reopened ${reopened} · booked ${afterReopen.bookings[0]?.date}`,
+      );
+    }
   }
 
   // 14. A whole-resort tenant has no rooms to manage, and cannot book several.

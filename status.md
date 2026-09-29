@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-30 (one role-aware header nav on every tenant page; before that, tenant management complete and merged into `master` at `46dfb24`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-30 (closed dates, D-080; one role-aware header nav on every tenant page; before that, tenant management complete and merged into `master` at `46dfb24`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -55,6 +55,17 @@
 ---
 
 ## ▶ Next up (do this next)
+
+**Closed dates (done 2026-09-30, D-080, browser walk owed):** a
+`closed` kind on the Holidays screen. `schema-closed-days.sql` was run by
+the user. Owed: a walk as admin. Close a date and see it on the booking
+page, a stay touching it flagged, the Bookings screen's chips struck
+through, and a pending request on it with Confirm disabled; then reopen
+it. Also owed: `verify` check "roles: an owner changes a role in its
+tenant only" fails because villa now has a STAFF member (added
+2026-09-26). The check assumes villa has none, and it has not leaked
+(across tenants: 0 rows). Either change that member's role or relax the
+check.
 
 **Header nav (done 2026-09-30, browser walk owed):** every tenant page's
 header is now `components/tenant-nav.tsx`: Chat, Book, then every staff page
@@ -1111,6 +1122,37 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-30 — closed dates (D-080)
+- **Asked:** dates the resort is not operating. The user chose whole
+  property, refuse to close a date with confirmed bookings, no staff
+  override, and the chatbot says "closed".
+- **Did:** `schema-closed-days.sql` adds the `closed` kind (no surcharge),
+  `rate_calendar_closed_check` and `bookings_not_on_closed_day`, with one
+  advisory lock per tenant between them. No earlier function was
+  replaced. `@rag/bookings` `closed.ts`: every write path refuses in words
+  first, and every availability read says `closed`. `listRequests()`
+  flags `closed`. The Holidays screen has Closed and Reopen. The booking
+  page lists closed dates and flags a stay touching one. The Bookings
+  screen strikes the chips through and disables Confirm.
+- **Observed:** rooms 34/34 (30–33 new); bookings isolation 29/29 both
+  ways; pipeline isolation both ways pass; tests 99 + 329 + 23;
+  typecheck 11/11. verify: 1 failure, the roles check above, which is
+  data, not this change.
+- **The chatbot, measured:** "closed" in the tool DESCRIPTION moved
+  `rt-leak-2` from 3/4 to 1/4. The description plus an instruction line
+  moved it to 0/6, and the model invented "the Garden Room is part of the
+  whole property". With the text left alone, a closed date was listed
+  under "Taken:" (3/3). So the meaning goes in the RESULT, only when a
+  row is closed (`closedNote()`). Live: villa said "closed" 3/3 and
+  harbor 2/2, and the day after was open each time. Tool text is
+  byte-identical to both baselines, and northwind's prompt too.
+- **Battery:** 57/61 on the final code (`antecedent`, `lang-followup`,
+  `tool-leak`, `leak-2`). Before the fix it was also 57/61, with
+  `rt-leak-2` and `book-for-me-harbor` in place of `leak-2` and
+  `lang-followup`. `leak-2` repeated 3/3 fail, all with northwind
+  correctly refusing and villa's control refusing the Wi-Fi question on
+  an unchanged prompt: trap 24's flip.
 
 ### 2026-09-30 — the booking page honours the tenant's max stay
 - **Found:** `config.max_stay_nights` (D-078) was enforced only by

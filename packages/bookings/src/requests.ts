@@ -34,6 +34,7 @@ import type {
   RequestQuote,
   RequestReceipt,
 } from './types.js';
+import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { addDays, localDate, pageSettings, parseRequest } from './validate.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -182,6 +183,8 @@ export async function quoteRequest(
 
   const dates = Array.from({ length: request.nights }, (_, n) => addDays(request.checkIn, n));
   const lastNight = dates[dates.length - 1]!;
+  // A stay that touches a closed date is refused before it is priced (D-080).
+  await refuseClosedDays(tenant, dates);
   const [calendar, availability] = await Promise.all([
     listCalendar(tenant, { from: request.checkIn, to: lastNight }),
     tenant.db.rpc('check_availability', { p_tenant_id: tenant.id, p_from: request.checkIn, p_to: lastNight }),
@@ -264,6 +267,12 @@ export async function requestBooking(
     maxNights: config.maxStayNights,
     maxAdvanceDays: config.maxAdvanceDays,
   });
+
+  // Said first, in words; the bookings trigger refuses it anyway (D-080).
+  await refuseClosedDays(
+    tenant,
+    Array.from({ length: request.nights }, (_, n) => addDays(request.checkIn, n)),
+  );
 
   const { data, error } = await tenant.db.rpc('request_booking', {
     p_tenant_id: tenant.id,
@@ -374,6 +383,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
   const last = requests.reduce((max, g) => (g.rows[g.rows.length - 1]!.booked_date > max ? g.rows[g.rows.length - 1]!.booked_date : max), from);
   const spanDays = Math.round((Date.parse(`${last}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
   const taken = new Set<string>();
+  const closed = await closedDays(tenant, from, last);
   // check_availability refuses a range over 366 days; requests stay inside it
   // (365 days ahead), but a very old "from" could not, so it is chunked.
   for (let start = 0; start <= spanDays; start += 300) {
@@ -413,6 +423,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
         total: rows.every((r) => r.price !== null) ? rows.reduce((sum, r) => sum + (r.price ?? 0), 0) : null,
         // Only a pending request can clash; a confirmed one IS the taken night.
         clash: status === 'pending' && rows.some((r) => taken.has(`${r.booked_date}|${unitName.get(r.unit_id)}|${slot}`)),
+        closed: status === 'pending' && rows.some((r) => closed.has(r.booked_date)),
       };
     })
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
@@ -451,6 +462,8 @@ async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' |
   if (error?.code === '23P01') {
     throw new BookingConflictError('A night of this request was confirmed for another booking. Decline it, or cancel the other booking first.');
   }
+  const closedNight = error ? closedError(error) : null;
+  if (closedNight) throw new BookingInputError(`${closedNight.message.replace(' Choose another date.', '')} Decline this request, or reopen the date first.`);
   if (error) throw new Error(`Could not ${to === 'confirmed' ? 'confirm' : 'decline'} the request: ${error.message}`);
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} request ${groupId} → ${to} (${data.length} row(s))`);
@@ -475,6 +488,8 @@ async function pageSettingsOf(tenant: BookingTenant) {
  * propagates as a plain Error, so a real fault is never dressed up as input.
  */
 function requestError(error: { code?: string; message: string }): Error {
+  const closed = closedError(error);
+  if (closed) return closed;
   if (error.code === '22023') return new BookingInputError(error.message);
   if (error.code === '23P01') return new BookingConflictError('That date is no longer available. Please choose another.');
   if (error.code === '54000') return new BookingLimitError(error.message);

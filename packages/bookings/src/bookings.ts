@@ -21,6 +21,7 @@ import {
   MAX_NOTES,
   MAX_UNIT_NAME,
 } from './constants.js';
+import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
 import type {
   BookingGroup,
@@ -45,6 +46,11 @@ import {
   requireText,
   validateRange,
 } from './validate.js';
+
+/** A row's status, with a closed date (D-080) winning over whatever its bookings say. */
+function statusOn(date: string, status: 'open' | 'taken', closed: Map<string, string>): 'open' | 'taken' | 'closed' {
+  return closed.has(date) ? 'closed' : status;
+}
 
 /**
  * This tenant's bookings configuration, or null if the application is off.
@@ -113,14 +119,18 @@ export async function checkAvailability(
     p_to: to,
   });
   if (error) throw new Error(`Could not check availability: ${error.message}`);
+  // A closed date (D-080) is 'closed' whatever its bookings say. Only the
+  // status changes: the label staff typed is not put into a prompt.
+  const closed = await closedDays(tenant, from, to);
 
-  const open = data.filter((r) => r.status === 'open').length;
-  console.log(`[bookings] ${tenant.slug} availability ${from}..${to}: ${open} open of ${data.length}`);
+  const rows = data.map((r) => ({ date: r.booked_date, unit: r.unit, slot: r.slot, status: statusOn(r.booked_date, r.status, closed) }));
+  const open = rows.filter((r) => r.status === 'open').length;
+  console.log(`[bookings] ${tenant.slug} availability ${from}..${to}: ${open} open of ${rows.length}${closed.size ? `, ${closed.size} day(s) closed` : ''}`);
 
   // Mapped field by field, not spread. Spreading a row is how a column added
   // to the SQL function later would reach the prompt without anyone deciding
   // that it should.
-  return data.map((r) => ({ date: r.booked_date, unit: r.unit, slot: r.slot, status: r.status }));
+  return rows;
 }
 
 /**
@@ -183,11 +193,12 @@ async function pricedAvailability(
     p_guests: guests,
   });
   if (error) throw new Error(`Could not check room availability: ${error.message}`);
+  const closed = await closedDays(tenant, from, to);
 
-  const open = data.filter((r) => r.status === 'open').length;
+  const open = data.filter((r) => statusOn(r.booked_date, r.status, closed) === 'open').length;
   console.log(
     `[bookings] ${tenant.slug} rooms ${from}..${to}${slot ? ` ${slot}` : ''}${unit ? ` ${unit}` : ''}` +
-      `${guests ? ` ${guests} guests` : ''}: ${open} open of ${data.length}`,
+      `${guests ? ` ${guests} guests` : ''}: ${open} open of ${data.length}${closed.size ? `, ${closed.size} day(s) closed` : ''}`,
   );
   if (data.length > MAX_AVAILABILITY_ROWS) {
     throw new BookingInputError(
@@ -202,7 +213,7 @@ async function pricedAvailability(
     standardCapacity: r.standard_capacity,
     extraPersonRate: r.extra_person_rate,
     slot: r.slot,
-    status: r.status,
+    status: statusOn(r.booked_date, r.status, closed),
     price: r.price,
     extraGuestPrice: r.extra_guest_price,
     total: r.total,
@@ -375,6 +386,9 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
   const today = localDate(timezone);
   if (date < today) throw new BookingInputError(`${date} is in the past. Today is ${today}.`);
 
+  // Said before the insert, in words; the trigger refuses it anyway (D-080).
+  await refuseClosedDays(tenant, [date]);
+
   const guestName = requireText(input.guestName, 'Guest name', MAX_GUEST_NAME);
   const guestPhone = optionalText(input.guestPhone, 'Guest phone', MAX_GUEST_PHONE);
   const notes = optionalText(input.notes, 'Notes', MAX_NOTES);
@@ -459,6 +473,7 @@ export async function quote(
   if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
   if (!slot.data || units.data.length !== rooms.length) throw new BookingInputError('No such unit or slot.');
   const slotName = slot.data.name;
+  await refuseClosedDays(tenant, [date]);
 
   const byId = new Map(units.data.map((u) => [u.id, u]));
   const lines = await Promise.all(
@@ -502,6 +517,8 @@ export async function quote(
  * as a plain Error, so a real fault is never dressed up as bad input.
  */
 function writeError(error: { code?: string; message: string }, date: string): Error {
+  const closed = closedError(error);
+  if (closed) return closed;
   if (error.code === '23P01') return new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
   if (error.code === '23503') return new BookingInputError('No such unit or slot.');
   if (error.code === '23514' && /holds at most/.test(error.message)) {

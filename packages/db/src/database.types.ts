@@ -351,7 +351,7 @@ export interface Database {
           tenant_id: number;
           /** `date`, as "YYYY-MM-DD" */
           day: string;
-          kind: 'holiday' | 'peak';
+          kind: 'holiday' | 'peak' | 'closed';
           label: string;
           surcharge: number;
           created_at: string;
@@ -359,7 +359,7 @@ export interface Database {
         Insert: {
           tenant_id: number;
           day: string;
-          kind?: 'holiday' | 'peak';
+          kind?: 'holiday' | 'peak' | 'closed';
           label: string;
           surcharge?: number;
           created_at?: string;
@@ -367,7 +367,7 @@ export interface Database {
         Update: {
           tenant_id?: never;
           day?: string;
-          kind?: 'holiday' | 'peak';
+          kind?: 'holiday' | 'peak' | 'closed';
           label?: string;
           surcharge?: number;
           created_at?: string;

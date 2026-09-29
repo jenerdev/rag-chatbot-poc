@@ -78,6 +78,17 @@
 > tenant's max stay and booking horizon are in its bookings config (D-078).
 > Archive is a button; delete is a command (D-077). Read that plan's § 0
 > before touching a role, a policy, a token or a tenant's record.
+>
+> **A tenant can close dates** since 2026-09-30 (D-080). A closed date is a
+> holiday-calendar row with `kind = 'closed'`, set on the Holidays screen. It
+> closes the whole property for every slot starting that day. Postgres refuses
+> any pending or confirmed booking on it, from anyone, and refuses to close a
+> date that has confirmed bookings (`sql/schema-closed-days.sql`, two triggers
+> and one advisory lock per tenant). Every availability read says `closed`, so
+> the chatbot says so too. The tool's TEXT is unchanged, and its baselines
+> with it: a closed date is explained in the tool RESULT only, and only when
+> one is in it (`closedNote()` in `tools.ts`). Putting "closed" in the
+> description moved `rt-leak-2` from 3 of 4 to 0 of 6.
 
 ## What this is
 
@@ -150,7 +161,7 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (10 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (11 files), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
@@ -164,8 +175,9 @@ packages/
     src/images.ts          room photos in the `unit-images` bucket, staff only
     src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
+    src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
     tools/isolation.mjs    29 cross-tenant checks, no API key
-    tools/rooms.mjs        30 checks of rooms, groups, quotes, extra guests, photos, stays, holidays and requests
+    tools/rooms.mjs        34 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, requests and closed dates
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -204,7 +216,7 @@ pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 20 of them, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
-pnpm --filter @rag/bookings rooms       # 30 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, requests; no API key
+pnpm --filter @rag/bookings rooms       # 34 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, requests, closed dates; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev

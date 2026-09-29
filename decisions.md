@@ -2366,3 +2366,58 @@ tests.
 **Reverse if:** never wholesale. A permission moves between roles by
 editing the table, the policy and the test together, and the test fails
 until all three agree.
+
+---
+
+## D-080 · A closed date is a holiday-calendar row, and closed is closed: nothing pending or confirmed lands on it, from anyone · **Added 2026-09-30 (closed dates)**
+
+**Decision:** a date the business is not operating is a `rate_calendar`
+row with `kind = 'closed'` and no surcharge. It closes the WHOLE property
+for every slot that starts on that date; a single room is taken out by
+making it inactive, as before. Staff set it on the Holidays screen
+(admins and owners, the calendar's existing policies).
+- **Wall 2, Postgres** (`schema-closed-days.sql`): `bookings_not_on_closed_day`
+  refuses any insert, or any move into `pending` or `confirmed`, on a
+  closed date. That covers staff bookings, `request_booking()` and a
+  staff confirm alike. `rate_calendar_closed_check` refuses to close a
+  date that has confirmed bookings, and says how many. Both take one
+  advisory lock per tenant first, so a closure and a booking cannot both
+  pass their checks at once (write skew).
+- **Wall 1, the code** (`@rag/bookings`, `closed.ts`): every write path
+  says why before it writes, in the same words the trigger's refusal is
+  mapped to. Every availability read reports the date as `closed`, so the
+  Bookings screen, the booking page and the chatbot's tool all say so.
+- **The chatbot's tool TEXT is unchanged.** A closed date is explained in
+  the tool RESULT (`closed: { dates, meaning }`), and only when a row is
+  closed. Dates only: the label staff typed is not put into a prompt.
+- **No SQL function was replaced.** The `closed` status is applied in
+  `checkAvailability()` and `pricedAvailability()`, not in
+  `check_availability()` or `check_room_availability()`. So no older file
+  needs a guard (CLAUDE.md trap 20), and the ten definer functions stay
+  ten.
+
+**Why:** the user's four answers, 2026-09-30: whole property; refuse to
+close a date with confirmed bookings; no staff override; the chatbot says
+"closed". The calendar already had the right shape (one row per tenant
+and day, for every unit, read by any token, written by admins), so a new
+table would have repeated its policies. Pending requests do not block a
+closure because they hold nothing (D-070); they cannot be confirmed, and
+staff decline them.
+
+**Measured:** rooms 34/34 (30–33 new). The same raw insert is refused on
+a staff token and on service_role, and a raw `request_booking()` on a chat
+token is refused too, so the trigger holds alone. Its twin books the day
+after.
+- **Where the chatbot learns it, measured three ways on `rt-leak-2`**
+  ("Is the Garden Room free?" asked of villa). The original text passed
+  3 of 4. With "closed" in the description, 1 of 4. With the description
+  and an instruction line, 0 of 6, and the model invented "the Garden Room
+  is part of the whole property".
+- **The result note instead.** With the text unchanged and no note, a
+  closed villa date was listed under "Taken:" (3 of 3). With the note,
+  villa said "closed on 16 March 2027" 3 of 3 and harbor 2 of 2, and the
+  open day after was answered as open each time. The tool definitions are
+  byte-identical to both baselines, and so is northwind's prompt.
+
+**Reverse if:** a tenant needs to close one room on a date, not the whole
+property. That is a `unit_id` on the closure, and it changes every check.

@@ -41,7 +41,8 @@ export interface SlotAvailability {
   date: string;
   unit: string;
   slot: string;
-  status: 'open' | 'taken';
+  /** 'closed': the business is closed that day (D-080), whatever the bookings */
+  status: 'open' | 'taken' | 'closed';
 }
 
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
@@ -142,7 +143,8 @@ export interface RoomAvailability {
   standardCapacity: number | null;
   extraPersonRate: number | null;
   slot: string;
-  status: 'open' | 'taken';
+  /** 'closed': the business is closed that day (D-080) */
+  status: 'open' | 'taken' | 'closed';
   /** centavos, the base rate for that date: weekday, weekend or holiday (R-24 closed by customer booking § 2.3) */
   price: number;
   /** for the guests asked about (0 when none were): the fee, and base + fee + that day's surcharge */
@@ -235,7 +237,8 @@ export interface AccommodationInput {
 export interface CalendarDay {
   /** YYYY-MM-DD */
   day: string;
-  kind: 'holiday' | 'peak';
+  /** 'closed' (D-080): nothing may be booked on it, and its surcharge is 0 */
+  kind: 'holiday' | 'peak' | 'closed';
   label: string;
   /** centavos, added once per night per unit on this day */
   surcharge: number;
@@ -338,4 +341,6 @@ export interface BookingRequest {
   total: number | null;
   /** true when a night is now CONFIRMED for another booking of one of these units: confirming would be refused */
   clash: boolean;
+  /** a night of it is on a closed date (D-080); Postgres refuses the confirm, so decline it */
+  closed: boolean;
 }

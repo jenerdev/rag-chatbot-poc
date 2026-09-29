@@ -6521,3 +6521,25 @@ for two bad configs refused.
 `request_booking()`. The date field says "Up to <date>". Villa set to 30
 days showed "Up to Fri, 30 Oct 2026" and refused 1 December. Restored, it
 quoted 1 December again. Bookings tests 97/97.
+
+## Closed dates · done 2026-09-30 (D-080)
+
+**What:** staff mark a date Closed on the Holidays screen, and nothing can
+be booked on it, by a customer or by staff, until it is reopened. A date
+with confirmed bookings cannot be closed, and the message says how many.
+The booking page lists closed dates, the Bookings screen shows them, and
+the chatbot says the business is closed that day.
+
+**Why it matters:** before, the only way to stop bookings on a day was to
+book it out by hand, and the chatbot would have called it taken.
+
+**Observed:** the trigger holds alone. The same raw insert is refused on a
+staff token and on service_role (`23514 closed on …`), and so is
+`request_booking()` called straight on a chat token. Their twin, the day
+after, books. A request made before its date was closed is flagged, its
+confirm refused, and decline works (rooms 30–33).
+
+**Trap avoided:** a new sentence in the tool text looked harmless and cost
+a leak case (0/6). The explanation went into the tool result instead,
+where only a closed date brings it in, and the tool text stayed
+byte-identical to its baselines.

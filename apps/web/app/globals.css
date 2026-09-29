@@ -339,6 +339,8 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 }
 .slot-chip.open { background: var(--ok-soft); border-color: #bbf7d0; color: var(--ok); }
 .slot-chip.taken { background: var(--danger-soft); border-color: #fecaca; color: var(--danger); }
+/* A closed date (D-080): nothing is sold, whatever the bookings say. */
+.slot-chip.closed { background: var(--panel); border-color: var(--line); color: var(--muted); text-decoration: line-through; }
 
 .booking { margin: 8px 0 0 104px; padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .booking-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -428,6 +430,7 @@ a.button.primary:hover { background: #1d4ed8; }
 .stay-lines { display: grid; gap: 2px; }
 .quote-warning { font-weight: 600; margin-bottom: 6px; }
 .holiday-badge { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+.holiday-badge.closed { background: var(--danger-soft); color: var(--danger); border-color: #fecaca; }
 .room-description { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
 .receipt .reference { font-size: 18px; letter-spacing: 0.04em; }
 .stay-summary { margin: 10px 0; }

@@ -12,6 +12,12 @@
 //
 // A change here never reprices a request or booking already made: each keeps
 // the price it was stored with.
+//
+// A CLOSED date (D-080) is the same list, kind 'closed': nothing may be
+// booked on it, by a customer or by staff, and it has no surcharge. Postgres
+// refuses to close a date that has confirmed bookings (the message says how
+// many), and refuses every booking on a closed date whatever this screen
+// shows. Removing it reopens the date.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { CalendarDay } from '@rag/bookings';
@@ -64,7 +70,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   // The form. The surcharge is typed in pesos and sent as centavos.
   const [day, setDay] = useState('');
-  const [kind, setKind] = useState<'holiday' | 'peak'>('holiday');
+  const [kind, setKind] = useState<CalendarDay['kind']>('holiday');
   const [label, setLabel] = useState('');
   const [surcharge, setSurcharge] = useState('');
   // Copying last year's fixed dates.
@@ -139,7 +145,8 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setNotice(null);
-    const amount = surcharge.trim() === '' ? 0 : parseMoneyInput(surcharge);
+    // A closed date has no surcharge; the field is disabled for it.
+    const amount = kind === 'closed' || surcharge.trim() === '' ? 0 : parseMoneyInput(surcharge);
     if (amount === null) {
       setNotice({ message: 'The surcharge must be an amount such as 4000 or 4000.50.', kind: 'error' });
       return;
@@ -169,7 +176,11 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   }
 
   async function remove(entry: CalendarDay) {
-    if (!window.confirm(`Remove ${entry.label} on ${dayLabel(entry.day)}? Bookings already made keep their price.`)) return;
+    const question =
+      entry.kind === 'closed'
+        ? `Reopen ${dayLabel(entry.day)} (${entry.label})? Customers can book it again.`
+        : `Remove ${entry.label} on ${dayLabel(entry.day)}? Bookings already made keep their price.`;
+    if (!window.confirm(question)) return;
     setNotice(null);
     setBusy(true);
     let response: Response | null = null;
@@ -177,7 +188,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       response = await fetch(`${api}/holidays/${entry.day}`, { method: 'DELETE' });
       if (response.status === 401) return unauthorized();
       if (!response.ok) throw new Error('failed');
-      setNotice({ message: `Removed ${dayLabel(entry.day)}.`, kind: 'ok' });
+      setNotice({ message: entry.kind === 'closed' ? `Reopened ${dayLabel(entry.day)}.` : `Removed ${dayLabel(entry.day)}.`, kind: 'ok' });
       void load();
     } catch (error) {
       setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
@@ -251,10 +262,14 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         <section className="card">
-          <h2>Add a holiday</h2>
+          <h2>Add a holiday or a closed date</h2>
           <p className="small muted">
-            On these dates every room is priced at its holiday rate, or its weekend rate if it has none, plus the surcharge
-            for each night. Bookings already made keep their price.
+            On a holiday or peak date every room is priced at its holiday rate, or its weekend rate if it has none, plus the
+            surcharge for each night. Bookings already made keep their price.
+          </p>
+          <p className="small muted">
+            On a closed date nothing can be booked, by a customer or by staff, and the chat says you are closed. A date that
+            already has confirmed bookings cannot be closed until they are cancelled or moved.
           </p>
           <form onSubmit={save}>
             <div className="field-row">
@@ -264,9 +279,18 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               </div>
               <div className="field">
                 <label htmlFor="kind">Kind</label>
-                <select id="kind" value={kind} onChange={(e) => setKind(e.target.value as 'holiday' | 'peak')}>
+                <select
+                  id="kind"
+                  value={kind}
+                  onChange={(e) => {
+                    const next = e.target.value as CalendarDay['kind'];
+                    setKind(next);
+                    if (next === 'closed') setSurcharge('');
+                  }}
+                >
                   <option value="holiday">Holiday</option>
                   <option value="peak">Peak</option>
+                  <option value="closed">Closed</option>
                 </select>
               </div>
               <div className="field grow">
@@ -276,7 +300,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   id="label"
                   required
                   maxLength={100}
-                  placeholder="Christmas Eve"
+                  placeholder={kind === 'closed' ? 'Maintenance' : 'Christmas Eve'}
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                 />
@@ -290,6 +314,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   id="surcharge"
                   inputMode="decimal"
                   placeholder="0"
+                  disabled={kind === 'closed'}
                   value={surcharge}
                   onChange={(e) => setSurcharge(e.target.value)}
                 />
@@ -309,7 +334,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           {upcoming === null ? (
             <div className="small">{loadMessage}</div>
           ) : upcoming.length === 0 ? (
-            <div className="small muted">No holidays listed. Every date is priced as a weekday or a weekend.</div>
+            <div className="small muted">No holidays or closed dates listed. Every date is open and priced as a weekday or a weekend.</div>
           ) : (
             upcoming.map((d) => (
               <div key={d.day} className="holiday">
@@ -317,6 +342,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                 <span className="holiday-label">
                   {d.label}
                   {d.kind === 'peak' && <span className="holiday-badge">peak</span>}
+                  {d.kind === 'closed' && <span className="holiday-badge closed">closed</span>}
                 </span>
                 <span className="holiday-surcharge">{d.surcharge > 0 ? `+${formatMoney(d.surcharge, setup.currency)} a night` : ''}</span>
                 <button
@@ -334,7 +360,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   Edit
                 </button>
                 <button type="button" disabled={busy} onClick={() => remove(d)}>
-                  Remove
+                  {d.kind === 'closed' ? 'Reopen' : 'Remove'}
                 </button>
               </div>
             ))
@@ -355,7 +381,10 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   onChange={(e) => setTicked((current) => (e.target.checked ? [...current, d.day] : current.filter((x) => x !== d.day)))}
                 />
                 <span className="holiday-day">{dayLabel(d.day)}</span>
-                <span className="holiday-label">{d.label}</span>
+                <span className="holiday-label">
+                  {d.label}
+                  {d.kind === 'closed' && <span className="holiday-badge closed">closed</span>}
+                </span>
                 <span className="holiday-surcharge">{d.surcharge > 0 ? `+${formatMoney(d.surcharge, setup.currency)}` : ''}</span>
               </label>
             ))}

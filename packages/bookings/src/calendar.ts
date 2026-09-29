@@ -51,20 +51,23 @@ export async function setCalendarDay(
   input: { day?: unknown; kind?: unknown; label?: unknown; surcharge?: unknown },
 ): Promise<CalendarDay> {
   await requireConfig(tenant);
+  const kind = calendarKind(input.kind);
   const row = {
     tenant_id: tenant.id,
     day: calendarDate(input.day),
-    kind: calendarKind(input.kind),
+    kind,
     label: requireText(input.label, 'Label', MAX_CALENDAR_LABEL),
     // Centavos, bounded by MAX_PRICE like every amount (a typo guard).
     surcharge: input.surcharge === undefined || input.surcharge === null || input.surcharge === '' ? 0 : parsePrice(input.surcharge, 'Surcharge'),
   };
+  // Nothing is sold on a closed date, so it has no surcharge (the table says so too).
+  if (kind === 'closed' && row.surcharge !== 0) throw new BookingInputError('A closed date has no surcharge.');
   const { data, error } = await tenant.db
     .from('rate_calendar')
     .upsert(row, { onConflict: 'tenant_id,day' })
     .select('day, kind, label, surcharge')
     .single();
-  if (error) throw new Error(`Could not save ${row.day}: ${error.message}`);
+  if (error) throw calendarError(error, `Could not save ${row.day}`);
   console.log(`[bookings] ${tenant.slug} calendar ${row.day} ${row.kind} "${row.label}" +${row.surcharge}`);
   return { day: data.day, kind: data.kind, label: data.label, surcharge: data.surcharge };
 }
@@ -120,7 +123,7 @@ export async function copyCalendarDays(
     .from('rate_calendar')
     .upsert(rows, { onConflict: 'tenant_id,day' })
     .select('day, kind, label, surcharge');
-  if (saveError) throw new Error(`Could not copy the dates: ${saveError.message}`);
+  if (saveError) throw calendarError(saveError, 'Could not copy the dates');
   console.log(`[bookings] ${tenant.slug} calendar copied ${saved.length} date(s) to ${toYear}`);
   return saved
     .map((d) => ({ day: d.day, kind: d.kind, label: d.label, surcharge: d.surcharge }))
@@ -132,8 +135,25 @@ function calendarDate(value: unknown): string {
   return value;
 }
 
-function calendarKind(value: unknown): 'holiday' | 'peak' {
+function calendarKind(value: unknown): 'holiday' | 'peak' | 'closed' {
   if (value === undefined || value === null || value === '') return 'holiday';
-  if (value === 'holiday' || value === 'peak') return value;
-  throw new BookingInputError('Kind must be "holiday" or "peak".');
+  if (value === 'holiday' || value === 'peak' || value === 'closed') return value;
+  throw new BookingInputError('Kind must be "holiday", "peak" or "closed".');
+}
+
+/**
+ * A calendar write Postgres refused on purpose: closing a date that has
+ * confirmed bookings (rate_calendar_closed_check, D-080). Its message says
+ * how many, and what to do. Anything else stays a plain Error.
+ */
+function calendarError(error: { code?: string; message: string }, what: string): Error {
+  if (error.code === '23514' && /confirmed booking/.test(error.message)) {
+    const match = /^(\d{4}-\d{2}-\d{2}) has (\d+) confirmed/.exec(error.message);
+    return new BookingInputError(
+      match
+        ? `${match[1]} has ${match[2]} confirmed booking${match[2] === '1' ? '' : 's'}. Cancel or move ${match[2] === '1' ? 'it' : 'them'} before closing the date.`
+        : error.message,
+    );
+  }
+  return new Error(`${what}: ${error.message}`);
 }

@@ -406,6 +406,7 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
         // number it could mistake for the party's price.
         const guests = args.guests !== undefined && args.guests !== null;
         return done({
+          ...closedNote(rooms),
           slots: rooms.map((r) => ({
             date: r.date,
             unit: r.unit,
@@ -420,7 +421,7 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
         });
       }
       const slots = await checkAvailability(tenant, { from: args.date_from, to: args.date_to });
-      return done({ slots });
+      return done({ ...closedNote(slots), slots });
     } catch (error) {
       if (error instanceof BookingInputError) return done({ error: error.message });
       throw error;
@@ -429,6 +430,30 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
 
   // A name in the registry with no branch here is a code bug, not a model mistake.
   throw new Error(`Tool "${call.name}" is registered to ${owner} but has no executor`);
+}
+
+/**
+ * Closed dates (D-080), said in the RESULT, and only when there are some.
+ * The tool's description and instructions are unchanged on purpose: adding
+ * "closed" there moved rt-leak-2 from 3 of 4 to 0 of 6 (the model began
+ * calling a harbor room "part of the whole property"). Here it reaches the
+ * model only when a row IS closed, which no battery case asks about. Without
+ * it, the model listed a closed date's slots under "Taken:" (3 of 3).
+ *
+ * Dates only. The label staff typed is tenant-written free text, and does
+ * not go into a prompt (Rule 3).
+ */
+function closedNote(rows: { date: string; status: string }[]): { closed?: { dates: string[]; meaning: string } } {
+  const dates = [...new Set(rows.filter((r) => r.status === 'closed').map((r) => r.date))];
+  if (dates.length === 0) return {};
+  return {
+    closed: {
+      dates,
+      meaning:
+        'The business is closed on these dates, so nothing can be booked on them. Say that it is closed on that date, ' +
+        'not that the slots are taken, and offer to check another date.',
+    },
+  };
 }
 
 /** One line for the log: "3 slots, 1 open" or "error: …". */
