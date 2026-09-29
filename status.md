@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-29 (tenant management and roles planned, `plan/tenant-management.md`; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-30 (tenant management complete on `feat/tenant-management`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -108,7 +108,12 @@ archive not delete, existing accounts only in the browser, operators stay
   tenant content through the pipeline, RLS only) · bookings isolation 29+29 ·
   rooms 30 · verify 109 · staff-cases 13 · walk 12 · battery 56/61 (Phase 0's
   four + `leak-2`'s CONTROL, a model flip on an identical prompt; the leak
-  half held) · the tenant-filter grep read · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
+  half held) · the tenant-filter grep read · [x] **Phase 7 — the walk** (2026-09-30, the user: "all as described") ·
+  [x] **Phase 8 — the record** (2026-09-30): D-075–D-079, D-041 reversed,
+  D-042 at ten, R-42–R-44, CLAUDE.md (header, layout, commands, rules 3 and
+  8, traps 22–24, conventions), flow.md (routes, "Admin", "Platform").
+  **The plan is complete on `feat/tenant-management`**; merge into `master`
+  is the user's call.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
 on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
@@ -1098,6 +1103,28 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-30 — tenant management Phases 7 and 8 (the walk, the record)
+- **Phase 7, by the user:** "all as described". The full script of the plan
+  with the real super account; villa as staff used the user's own account
+  (`member:add … staff`, then `member:remove`) because the test account's
+  password was lost, which is the intended path anyway: an existing account
+  sends no email.
+- **Phase 8:** decisions D-075 (three roles, read from the row; reverses
+  D-041 on its own terms), D-076 (the platform: a table and a second
+  token shape; amends D-039, D-042 → ten definer functions, rule 8), D-077
+  (archive in the browser, delete at the CLI with the sweeper), D-078
+  (per-tenant booking limits in the config; amends customer-booking § 8
+  q8), D-079 (one permission table, two walls; extends D-038). Risks R-42
+  (email probing by owners), R-43 (a super account is a master account),
+  R-44 (one cookie secret for two cookies). CLAUDE.md: the header
+  paragraph, layout, commands, rules 3 and 8, traps 22 (a write under RLS
+  reaches only what the token can read; the policy recursion), 23 (a
+  dropped default breaks every writer) and 24 (an identical prompt, a
+  different answer), the staff convention. flow.md: the new routes,
+  "Admin" with the permission, "Platform".
+- **The plan is complete** on `feat/tenant-management`, 12 commits from
+  `924c255`. Merge into `master` is the user's call, as before.
 
 ### 2026-09-29 — tenant management Phase 6 (proving the walls; bundle grep owed)
 - **Did:** `packages/rag/tools/isolation.mjs` gained an RLS-only check:

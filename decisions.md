@@ -1292,7 +1292,7 @@ seriously first.
 
 ---
 
-## D-038 · Two walls between tenants, code filters and RLS, and each is tested alone · **Added 2026-09-26 (auth-rls Phases 1, 3, 5)**
+## D-038 · Two walls between tenants, code filters and RLS, and each is tested alone · **Added 2026-09-26 (auth-rls Phases 1, 3, 5). Extended to permissions by D-079**
 
 **Decision:** every `tenant_id` filter in application code stays, and RLS
 policies keyed on the token's `tenant_id` claim sit behind them. Neither is
@@ -1317,7 +1317,7 @@ the day to run `--filters-only`, not to delete it.
 
 ---
 
-## D-039 · Server-minted, 5-minute tenant tokens, signed ES256 with our own key imported as a Supabase standby key · **Added 2026-09-26 (auth-rls Phase 0)**
+## D-039 · Server-minted, 5-minute tenant tokens, signed ES256 with our own key imported as a Supabase standby key · **Added 2026-09-26 (auth-rls Phase 0). Amended by D-076: a second, tenant-less shape from the same signer**
 
 **Decision:** every request will reach Postgres with a short-lived token
 that the server signs itself, including anonymous chat:
@@ -1404,7 +1404,7 @@ cookie and membership check stay.
 
 ---
 
-## D-041 · One role: a membership row is admin · **Added 2026-09-26 (auth-rls Phase 1)**
+## D-041 · One role: a membership row is admin · **Added 2026-09-26 (auth-rls Phase 1). Reversed 2026-09-29 by D-075, on the terms its "Reverse if" set**
 
 **Decision:** `memberships (user_id, tenant_id)` with no role column. A
 member can manage the tenant's documents and bookings. Rows are written only
@@ -1419,7 +1419,7 @@ documents, or the reverse. Add `role`, and make `app_is_admin()` role-aware.
 
 ---
 
-## D-042 · `security definer` for exactly two functions, `tenant_public` and `check_availability`, both with `search_path = ''` · **Added 2026-09-26 (auth-rls Phase 1). Amended by D-054 (three) and D-071 (four)**
+## D-042 · `security definer` for exactly two functions, `tenant_public` and `check_availability`, both with `search_path = ''` · **Added 2026-09-26 (auth-rls Phase 1). Amended by D-054 (three), D-071 (four) and D-076 (ten)**
 
 **Decision:**
 - **`tenant_public(slug)`** returns the seven public tenant columns, and anon
@@ -1448,6 +1448,18 @@ forgotten.
 **Amended 2026-09-27 by D-054:** a third, `check_room_availability`, for the
 same reason `check_availability` is definer (it must see `bookings`, which a
 chat token cannot read), with the same five properties.
+
+**Amended 2026-09-29 by D-076 (tenant management Phase 1):** ten. The four
+above and `request_booking` (D-071), plus `app_role()` (a read policy on
+`memberships` calls it, and as invoker it would read `memberships` under
+that policy: "infinite recursion detected"; it reads the caller's own row
+only), three trigger functions that count rows the caller cannot see
+(`tenant_applications_validate`, `tenant_applications_no_delete_live`,
+`memberships_keep_an_owner`: a platform token sees 0 bookings, an owner
+sees only its tenant's rows), and two lookups into `auth.users`
+(`member_emails`, `user_id_by_email`), each checking its caller itself.
+Every one has `search_path = ''` and qualifies every name. "Try a policy
+first" was tried: the recursion is why `app_role()` could not be one.
 
 ---
 
@@ -2196,3 +2208,161 @@ cost is recorded, not hidden: `lang-tool`'s opening sentence went from
 "Yes po, the Overnight slot is open pa sa …" to "Yes po, may bakante pa sa
 …", 3 runs of 3, and the case now judges Tagalog-present rather than the
 two-of-each band.
+
+---
+
+## D-075 · Three roles on `memberships`, read from the row on every request, never from a claim · **Added 2026-09-29 (tenant management Phases 1–3). Reverses D-041**
+
+**Decision:** `memberships.role` is `owner | admin | staff` (every row that
+existed became `admin`, what D-041 said a row meant). `app_role()` reads it
+inside Postgres; `app_is_admin()` keeps its name and now means owner or
+admin, so the thirty policies that name it changed meaning without an
+edit; `app_is_staff()` (any member) is asked only by the six bookings and
+unanswered policies. In code, `staffClient()` returns the same row's role,
+`requireAdmin(request, tenant, permission)` refuses with a 403 that names
+the role and the permission, and `lib/permissions.ts` is the ONE table of
+what each role may do: owner everything plus members; admin the knowledge
+base, rooms, rates, photos, holidays and bookings; staff bookings and
+unanswered, the knowledge base read-only. A staff token carries `sub` and
+`app_admin`, as before, and NO role: a demotion, like a removal, takes
+effect on the next request. The request's names (`BUSINESS_OWNER` …)
+became `owner | admin | staff`, because the row's `tenant_id` already says
+"business", and the screens label them Owner, Admin, Staff (§ 8 q1).
+
+**Why:** the user asked for role-based access. D-041 named the reversal
+condition ("staff who can see bookings but not edit documents") and the
+route ("add `role`, make `app_is_admin()` role-aware"), and that is what
+was done. Reading the role from the row rather than a claim is what lets
+a token never outrank the database.
+
+**Measured:** verify 109/109 (a staff token cannot insert a document, an
+admin can; a staff token inserts and reads a booking; an owner changes a
+role in its tenant only, 1 row, and staff or a cross-tenant update 0);
+staff-cases 13/13 ("Your role (staff) may not do this (documents:write)…",
+bookings 200, rooms 403, documents read 200); `permissions.test.ts` pins
+the roles `can()` grants for each of twelve permissions to the roles the
+policies let through, listed by hand from `schema-roles.sql`.
+
+**Reverse if:** a tenant needs a role between these (a "front desk" that
+confirms requests but does not create bookings). Add the value to the
+check constraint, a row to `ROLE_PERMISSIONS`, and a line to the test; the
+policies need no change unless the new role's writes cut across
+`app_is_admin()` / `app_is_staff()`.
+
+---
+
+## D-076 · The platform is a table and a second, tenant-less token shape; it manages every tenant's record and reads no tenant's content · **Added 2026-09-29 (tenant management Phases 1–4). Amends D-039 and D-042, and CLAUDE.md rule 8**
+
+**Decision:** a super user is a `platform_admins` row, not a membership.
+`mintPlatformToken({ userId })` mints `{ role: authenticated, sub,
+app_super: true }` with NO `tenant_id`, from the same signer as the tenant
+token, still with no role parameter and still five minutes. With no tenant
+claim, every tenant policy is false for it; the `*_super_*` policies on
+`tenants`, `tenant_applications` and `memberships` open those three
+tables, and each asks `app_is_super()`, the claim AND the row, on every
+read and write. It has its own cookie (`rag_platform`, path
+`/api/platform`, payload kind `platform`), its own area (`/platform`), and
+its own routes under `withPlatformRoute()`. To open a tenant's screens a
+super user makes itself an owner there, one click on the members panel
+(§ 8 q5), and from then on it is an ordinary staff session.
+
+**Why:** "a super user is an owner of every tenant" fails on the token: a
+staff token names a tenant, and the platform's work (list, create) has none
+yet. A separate shape keeps the two lanes provable: a platform cookie at a
+tenant route is a 401, a tenant cookie at the platform is a 401, and the
+platform reads 0 documents, chunks and bookings while managing every
+record. `tenants` gets its first policy, and it is false for every token
+but this one.
+
+**Measured:** verify: a platform token with its row lists all tenants
+(count = service_role's) and 0 documents, chunks and bookings; the same
+token with the row deleted lists 0 tenants; the pipeline isolation suite
+21/21: villa's context on a platform token reads 0, 0, null, null through
+the routes' own functions; the Phase 4 walk 12/12; the bundle holds
+neither `app_super` nor `platform_admins` nor `rag_platform` nor any key
+value. Five unit tests pin both shapes' claim lists.
+
+**Reverse if:** the platform ever needs to read tenant content (support
+staff reading a chat). Do not widen the token; make the super user an
+owner of that tenant, which is what "Make me an owner" is for.
+
+---
+
+## D-077 · Archive, not delete, in the browser; hard delete is the CLI's, and it sweeps Storage · **Added 2026-09-29 (tenant management Phases 1, 2, 5). § 8 q7's rule for applications**
+
+**Decision:** the platform form archives (`tenants.archived_at`) and
+unarchives. `tenant_public()` adds one clause, `archived_at is null`, so
+every page, route and chat of an archived tenant answers 404 at once,
+while the platform still reads it by id. Nothing is deleted. Hard delete is
+`tenant:remove -- <slug> --yes`: it prints thirteen counts, insists on
+`--yes`, cascades, then runs `storage-orphans -- --remove` and reports the
+count. Switching an application off is refused by a trigger while a
+booking has not ended, and the rows stay for when it comes back.
+
+**Why:** `tenants` cascades to bookings (names, phones, emails) and to
+`unit_images` rows, whose Storage objects do not cascade (R-30). A Delete
+button is one click from all of that; a command that prints what it is
+about to take and sweeps after is the right distance.
+
+**Measured:** `tenant:remove` on `cli-probe` and `probe-tm`: the counts,
+the cascade through both new triggers (the last-owner and no-delete-live
+guards let a cascade through because the tenants row is already gone), the
+sweeper reporting 2 objects with their 2 rows and no orphans; the walk:
+archived → page, admin and chat 404, platform GET 200, unarchive → 200.
+
+**Reverse if:** a real tenant asks for its data to be deleted from the
+browser. Then a two-step confirm on the form that names the counts, still
+never on the same click as archive.
+
+---
+
+## D-078 · A tenant's booking limits live in its bookings config; absent means 14 nights and 365 days · **Added 2026-09-29 (tenant management Phase 1). Amends customer-booking § 8 q8 ("policy, not measurements")**
+
+**Decision:** `config.max_stay_nights` (1–60) and `config.max_advance_days`
+(1–730), validated by `tenant_applications_validate` and read by
+`request_booking()` with `coalesce(…, 14)` and `coalesce(…, 365)`, from
+the row it already reads the timezone from. `bookingsConfig()` applies the
+same defaults in the one place it defaults the other keys, and the page's
+`maxNights` and `lastDate` follow. The TypeScript constants are the
+DEFAULTS and the test pins them to SQL's.
+
+**Why:** the user's form has "max booking date" and "max days/night" per
+tenant, and the two numbers were constants in SQL and TypeScript, pinned
+equal by a test. The D-050 pattern (absent means the old behaviour) means
+no tenant changed when the file ran.
+
+**Measured:** verify: `max_stay_nights: 3` → 3 nights accepted, 4 refused
+naming 3, and 250 days out refused naming 200; the silent config still 14
+and 15; four bad values refused by the trigger and 7 / 90 accepted; the
+walk: 0 nights → "a whole number of nights from 1 to 60", 3 and 60 stored.
+
+**Reverse if:** a limit should differ per unit rather than per tenant.
+That is a column on `units`, and `request_booking()` would take the
+minimum across the units asked for.
+
+---
+
+## D-079 · One permission table, two walls: every admin route names its permission, and Postgres asks the same role again · **Added 2026-09-29 (tenant management Phases 1, 3, 6). Extends D-038**
+
+**Decision:** `lib/permissions.ts` holds twelve permissions for three
+roles, pure enough for the browser to import. `requireAdmin()`'s third
+argument is REQUIRED, so a route that forgets does not compile (D-027's
+argument applied to roles), and a 403 names the role and the permission (a
+member already knows the tenant exists, so "not yours = not there" does not
+apply). The screens hide by `can()` and decide nothing. Behind every route
+the policies ask `app_is_admin()` or `app_is_staff()`, and
+`permissions.test.ts` pins the two views to each other permission by
+permission, by hand. Three permissions the plan did not list exist so that
+every GET names an honest one: `session`, `rooms:read`, `holidays:read`.
+
+**Why:** D-038's rule, each wall tested alone, applied to permissions. A
+permission only the code knows is a wall nobody tests; a permission only
+Postgres knows is a 42501 with no sentence a person can act on.
+
+**Measured:** typecheck listed all 31 call sites when the argument became
+required; staff-cases 13/13 over HTTP; verify 109/109 in SQL; 17 web
+tests.
+
+**Reverse if:** never wholesale. A permission moves between roles by
+editing the table, the policy and the test together, and the test fails
+until all three agree.

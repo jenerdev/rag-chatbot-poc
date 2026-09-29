@@ -327,6 +327,16 @@ return 404, with no redirect.
 | `DELETE` | `/api/t/<slug>/holidays/:day` | remove a day (404 if not there) | `removeCalendarDay` | admin |
 | `POST` | `/api/t/<slug>/holidays/copy` | copy chosen days to another year | `copyCalendarDays` | admin |
 | `GET` | `/t/<slug>/admin/holidays` | the Holidays screen | `app/t/[tenant]/admin/holidays/page.tsx` → `HolidaysScreen` | public page, admin data |
+| `GET` | `/t/<slug>/admin/members` | the Members screen (S-8) | `app/t/[tenant]/admin/members/page.tsx` → `MembersScreen` | public page, OWNER data |
+| `GET` / `POST` / `PATCH` / `DELETE` | `/api/t/<slug>/members` | list with emails / add an existing account / change a role / remove | `listMembers` … `removeMember` (`@rag/pipeline` members.ts) | owner (`members:manage`) |
+| `GET` | `/platform`, `/platform/reset` | the platform screen; where a super user's invite lands | `app/platform/…` → `PlatformScreen`, `ResetPassword` | public page, PLATFORM data |
+| `POST` / `GET` / `DELETE` | `/api/platform/session` | log in / status (with `userId`) / log out | `lib/platform-auth.ts` | open |
+| `POST` | `/api/platform/password-reset`, `…/password` | email a reset link / set the password | `@rag/db` `staff-auth.ts` | open |
+| `GET` / `POST` | `/api/platform/tenants` | every tenant, archived included / create one | `listTenants` / `createTenant` (platform.ts) | platform |
+| `GET` / `PATCH` | `/api/platform/tenants/:id` | one tenant with its configs / edit names, urls, theme, fallbacks | `getTenant` / `updateTenant` | platform |
+| `POST` / `DELETE` | `/api/platform/tenants/:id/archive` | archive (a 404 everywhere) / unarchive | `archiveTenant` | platform |
+| `PUT` / `DELETE` | `/api/platform/tenants/:id/applications/:key` | switch on with a config, or replace it / switch off (409 while a booking is live) | `setApplication` / `removeApplication` | platform |
+| `GET` / `POST` / `PATCH` / `DELETE` | `/api/platform/tenants/:id/members` | any tenant's members, the same four verbs; `POST { userId }` is "Make me an owner" | members.ts, on the platform token | platform |
 
 **The booking page** (plan/customer-booking.md) is the one place a stranger
 WRITES. The page's Server Component reads `bookingPage()` on the chat token
@@ -338,12 +348,26 @@ function that can only insert `pending` rows (D-071). A request holds
 nothing (D-070): staff see it in the Requests section of S-3 and confirm or
 decline the whole group; `bookings_no_overlap` decides a clash at confirm.
 
-"Admin" means `tenant = await requireAdmin(request, tenant)`.
+"Admin" means `tenant = await requireAdmin(request, tenant, permission)`.
 - The request must carry this tenant's signed session cookie, and its user
   must still be a member.
-- The handler then runs on a **staff** token, so Postgres checks the
-  membership again on every write (`app_is_admin()`).
+- The member's ROLE (`memberships.role`, read from the row on every
+  request) must hold the permission, from the one table in
+  `lib/permissions.ts`: owner everything; admin the knowledge base, rooms,
+  holidays and bookings; staff bookings and unanswered, the knowledge base
+  read-only. Otherwise a 403 that names both.
+- The handler then runs on a **staff** token, so Postgres reads the same
+  row again on every write (`app_role()` under `app_is_admin()` and
+  `app_is_staff()`).
 - Otherwise the request gets a 401.
+
+"Platform" means `withPlatformRoute()`: the `rag_platform` cookie, then
+`platformClient()`, which mints a token with `app_super` and NO tenant and
+reads the `platform_admins` row through it. Under RLS that token reads and
+writes `tenants`, `tenant_applications` and `memberships` (the `*_super_*`
+policies) and nothing of any tenant's documents, chunks or bookings: there
+is no tenant claim for those policies to match (D-076). A platform cookie
+at a tenant route, or a tenant cookie at the platform, is a 401.
 
 ---
 

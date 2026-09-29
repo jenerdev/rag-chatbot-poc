@@ -6438,3 +6438,37 @@ and none of five secret values read from `.env` (the service and secret
 keys, the cookie secret, the OpenAI key, the signing key's private `d`);
 the positive twin, `members:manage` from the client-side permission table,
 is in 4 of them, so the grep looked at the right files.
+
+## Tenant management, Phase 7: the browser walk · done 2026-09-30 (by the user)
+
+**What:** the plan's script, with the real super account: a tenant created
+at `/platform`, its theme previewed live, bookings switched on with the
+new limits, "Make me an owner", every tab as owner including Members, the
+last-owner refusal, villa as staff with the knowledge base read-only and
+the Rooms and Holidays tabs gone, archive (chat 404) and unarchive,
+`tenant:remove --yes` with the counts and the sweeper. The user's verdict:
+"all as described".
+
+**Why it matters:** every earlier phase proved a route or a policy; this is
+the feature as a person meets it, and the one check no script makes (the
+preview, the hidden tabs, the sentences on screen).
+
+**Observed:** nothing did not match. The villa-as-staff step used the
+user's own account (`member:add … staff`, then `member:remove`) because
+the test account's password was lost; that path sends no email, which is
+the path the plan recommends anyway (§ 8 q3).
+
+## Tenant management, Phase 8: the record · done 2026-09-30
+
+**What:** D-075–D-079 in `decisions.md`, D-041 marked reversed, D-039 and
+D-038 marked amended and extended, D-042 amended to ten definer functions
+with the reason each one is; R-42–R-44 in `risks.md` and an "after tenant
+management" paragraph; CLAUDE.md's header paragraph, layout, commands,
+rules 3 and 8, traps 22–24 and the staff convention; flow.md's route table,
+"Admin" and a new "Platform" paragraph; the plan's Phases 7 and 8 and its
+status line.
+
+**Why it matters:** CLAUDE.md is what the next session reads first, and it
+now says that roles exist, that the platform is a second token shape that
+reads no content, that a route names its permission or does not compile,
+and which three traps this plan met.

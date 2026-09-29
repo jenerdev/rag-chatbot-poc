@@ -20,9 +20,11 @@
 >    reaches the documents route by hand is refused by the database too.
 >    Owners manage their tenant's members on a new Members screen.
 >
-> Written 2026-09-29, against `ebe9812` on `master`. **Status: decided,
-> not started.** § 8's eight questions were answered 2026-09-29: every
-> recommendation taken, by the user's instruction. Phase 0 is next.
+> Written 2026-09-29, against `ebe9812` on `master`. **Status: complete,
+> 2026-09-30, walk included** (Phases 0–8 on `feat/tenant-management`).
+> § 8's eight questions were answered 2026-09-29: every recommendation
+> taken, by the user's instruction. Decisions D-075–D-079, risks R-42–R-44,
+> D-041 reversed, D-042 amended to ten definer functions.
 >
 > Read [§ 0](#0-the-five-rules) first, then § 1, which lists what the
 > request assumes and what the code actually has.
@@ -729,7 +731,17 @@ platform's list), and with one everywhere else.
 - plan.md Phase 3's grep: every new query carries a tenant, or is a
   platform query on a table that has no tenant (`tenants`, `platform_admins`).
 
-### Phase 7 — The browser walk
+### Phase 7 — The browser walk · **done 2026-09-30, by the user: "all as described"**
+
+With the real super account: `probe-tm` created at `/platform`, two theme
+colours and the preview, bookings on with max stay 3 and horizon 60, "Make
+me an owner" and every tab on `/t/probe-tm/admin` including Members, the
+last-owner refusal on `/t/probe-tm/admin/members`, villa as `staff` (the
+user's own account added with `member:add … staff`, since the test
+account's password was lost): the knowledge base read-only and Rooms and
+Holidays gone; archive → chat 404; unarchive; `tenant:remove --yes` with
+the counts and the sweeper. The invite detour of Phase 2 is closed by
+`/platform/reset`.
 
 As super: log in at `/platform`, create `probe-tm`, set its theme and
 watch the preview, enable bookings, set max stay 3 and horizon 60, add the
@@ -740,7 +752,7 @@ read-only, bookings still writable; a hand-made POST to documents → 403
 with the permission named. Archive: `/t/probe-tm` and its chat are 404.
 `tenant:remove -- probe-tm --yes`: the counts print, the sweeper says 0.
 
-### Phase 8 — The record
+### Phase 8 — The record · **done 2026-09-30**
 
 - `decisions.md`: D-075 roles (reverses D-041 as it said it would),
   D-076 the platform token (amends D-039 and rule 8), D-077 archive not

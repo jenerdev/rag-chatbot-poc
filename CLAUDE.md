@@ -64,6 +64,20 @@
 > `unit_quote()`, and the figures the database holds LEFT its documents
 > (R-41, R-17 closed). Villa's tool text is therefore no longer the
 > pre-booking-types baseline: it is `plan/baseline/villa-tools-post-villa-prices.txt`.
+>
+> **A super user manages tenants in the browser, and staff have roles,**
+> since 2026-09-29 ([`plan/tenant-management.md`](./plan/tenant-management.md),
+> Phases 0–8, all done, walk included). `/platform` is where a
+> `platform_admins` row (a **super user**, a second, tenant-less token
+> shape, D-076) creates, edits and archives tenants, switches applications
+> on and off, and manages any tenant's members. `memberships.role` is
+> `owner | admin | staff` (D-075), read from the row on every request;
+> `requireAdmin(request, tenant, permission)` names what a route needs from
+> the ONE table in `lib/permissions.ts`, and Postgres asks the same role
+> again (D-079). Owners manage members at `/t/<slug>/admin/members`. A
+> tenant's max stay and booking horizon are in its bookings config (D-078).
+> Archive is a button; delete is a command (D-077). Read that plan's § 0
+> before touching a role, a policy, a token or a tenant's record.
 
 ## What this is
 
@@ -109,14 +123,22 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
   app/t/[tenant]/book/page.tsx   S-6 the customer booking page — PUBLIC; 404 unless the tenant has a priced unit
   app/t/[tenant]/admin/holidays/page.tsx  S-7 the holiday calendar — 404 unless the tenant has the application
+  app/t/[tenant]/admin/members/page.tsx   S-8 the tenant's members — for OWNERS (members:manage); others see one sentence
+  app/platform/page.tsx          the platform: login → tenant list → the tenant form (super users only; not linked from /)
+  app/platform/reset/page.tsx    where a super user's invite or reset email lands
+  app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members — every one on withPlatformRoute() but the three session/password ones
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel
+  components/                    chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+                                 platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → a CHAT TenantContext, 404 on a miss
-  lib/admin-auth.ts      the staff session cookie; requireAdmin() re-checks the membership → a STAFF context
+  lib/admin-auth.ts      the staff session cookie; requireAdmin(request, tenant, permission) re-checks the membership and the ROLE → a STAFF context, or 401 / 403
+  lib/platform-auth.ts   the platform session cookie (rag_platform, /api/platform); requirePlatform() → { db, userId }; withPlatformRoute()
+  lib/permissions.ts     the ONE table of what each role may do — pure, imported by routes (the guard) and screens (the courtesy)
+  lib/theme.ts           the five theme keys, the colour regex, themeVars() and parseTheme() — pure, shared by the page and the platform form
   lib/applications.ts    requireApplication(): 404 unless the tenant has it switched on
   lib/branding.ts        the five-key theme allowlist, https-only image URLs
   lib/env.ts             fail-fast config (D-023)
@@ -126,14 +148,15 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (9 files), and server-only
-    src/tenant-client.ts mintTenantToken (ES256, D-039), scopedClient, anonClient
+  db/                  @rag/db — tenant-token clients, the types, sql/ (10 files), and server-only
+    src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
-    src/staff-auth.ts    signInStaff, staffClient (membership → staff token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     92 checks (77–92 are customer booking: holidays, stays, request_booking), no API key
-    tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type — a new tenant has no members until member:add
-    tools/member.mjs     member:add / remove / list / operator — who may administer a tenant
-    tools/staff-cases.mjs  the six login cases over HTTP, against pnpm dev
+    src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
+    tools/verify.mjs     109 checks (77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups), no API key
+    tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
+    tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
+    tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
+    tools/staff-cases.mjs  the six login cases and three role cases over HTTP, against pnpm dev
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     src/accommodations.ts  rooms and their rates (+ holiday_price), staff only (per_room)
     src/images.ts          room photos in the `unit-images` bucket, staff only
@@ -149,7 +172,9 @@ packages/
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
     tools/prompt-eval.mjs  the battery, 61 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-* + 3 price-*), three tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
-    tools/isolation.mjs    20 cross-tenant checks through the pipeline
+    src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
+    src/members.ts         list (with emails), add an existing account, change a role, remove — shared by owners and the platform
+    tools/isolation.mjs    21 cross-tenant checks through the pipeline (the 21st, RLS only: a platform token reads nothing)
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -160,6 +185,8 @@ fixtures/harbor-bookings.json  harbor's booking fixture, seeded and removed by p
 plan/customer-booking-villa-rates.mjs  villa's unit, rates and nightly slots; idempotent
 plan/customer-booking-phase5-docs.mjs  re-ingests the "how to book" documents when they differ from the files
 plan/customer-booking-phase3-walk.mjs  10 HTTP checks of the booking and holiday routes, against pnpm dev
+plan/tenant-management-phase4-walk.mjs 12 HTTP checks of the platform and members routes, against pnpm dev
+plan/tenant-management-phase0-shapes.mjs  the constraints of schema-roles.sql, dry-run against every live row
 scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/service under apps/ or packages/*/src
 ```
 
@@ -168,27 +195,34 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 92 checks, no API key needed
+pnpm --filter @rag/db verify    # 109 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 20 cross-tenant checks, on chat tokens  ⚠ rule 6
-pnpm --filter @rag/pipeline isolation -- --filters-only   # the same 20, code filters alone (RLS bypassed)
+pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # 20 of them, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
 pnpm --filter @rag/bookings rooms       # 30 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, requests; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
-node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) the six login cases, needs pnpm dev
+node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) six login and three role cases, needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/tenant-management-phase4-walk.mjs)   # the platform and members routes over HTTP, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db tenant:fallback -- <slug> <english|taglish|tagalog> "<message>"   # what the chat says when it cannot answer (D-048)
 pnpm --filter @rag/db tenant:fallback -- <slug>                  # show all three; `<language> --clear` or `--clear` = the default
 pnpm --filter @rag/db tenant:booking-type -- <slug> [whole_resort|per_room]   # show or switch; refused while bookings are live (D-055)
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/booking-types-phase6-harbor.mjs)   # harbor's corpus and rooms, idempotent
-pnpm --filter @rag/db member:add -- <slug> <email>        # invites a new account; the link sets a password
+pnpm --filter @rag/db member:add -- <slug> <email> [owner|admin|staff]   # default admin; invites a new account (the link sets a password); an existing member keeps its role
+pnpm --filter @rag/db member:role -- <slug> <email> <owner|admin|staff>  # the last owner cannot step down (Postgres says so)
 pnpm --filter @rag/db member:remove -- <slug> <email>     # effective on their NEXT request
-pnpm --filter @rag/db member:list -- <slug>
-pnpm --filter @rag/db member:operator -- <slug>           # the tools' own member; eval and isolation need it
+pnpm --filter @rag/db member:list -- <slug>               # with the role
+pnpm --filter @rag/db member:operator -- <slug>           # the tools' own member (admin); eval and isolation need it
+pnpm --filter @rag/db super:add -- <email>                # who runs the platform; a new address is invited to /platform/reset
+pnpm --filter @rag/db super:remove -- <email>             # effective on their NEXT request
+pnpm --filter @rag/db super:list
+pnpm --filter @rag/db tenant:archive -- <slug> [--undo]   # a 404 everywhere, reversible; the platform form does this too
+pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 13 counts, cascades, sweeps the photo bucket. CLI only, on purpose (D-077)
 ```
 
 ## The rules you will be tempted to break
@@ -247,6 +281,12 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    slug (404 on a miss, never a fallback) and wraps `withRoute()`. Nothing
    enforces it. An unwrapped handler answers with a generic 500 instead of the
    real reason — or, worse, runs without knowing its tenant.
+   **Every handler under `app/api/platform/` is wrapped in `withPlatformRoute()`**
+   (the session and password ones, which run before a session exists, use
+   `withRoute()` and say so). **Every admin handler names its permission:**
+   `requireAdmin(request, tenant, 'documents:write')`, from `lib/permissions.ts`;
+   the argument is required, so a route that forgets does not compile
+   (D-079), and a member whose role lacks it gets a 403 that names both.
 4. **Any Node script that touches `@rag/db` needs `--conditions=react-server`.**
    That is the cost of rule 2. Every script in `package.json` carries it already.
 5. **`@rag/chunker` has no dependencies and no I/O.** That is what lets the same
@@ -298,12 +338,20 @@ pnpm --filter @rag/db member:operator -- <slug>           # the tools' own membe
    - it lasts five minutes.
 
    Chat tokens carry **no `sub`**. Staff tokens carry the user and
-   `app_admin`, and Postgres's `app_is_admin()` still demands a
-   `memberships` row for that tenant on every write. Only four functions
-   are `security definer` (`tenant_public`, `check_availability`,
-   `check_room_availability`, `request_booking`; D-042 as amended by D-054
-   and D-071), and each checks the tenant itself. `request_booking` is the
-   only one that writes, and it can write `pending` rows only.
+   `app_admin`, and Postgres's `app_role()` reads the `memberships` row for
+   that tenant on every write: the ROLE is never a claim (D-075).
+   **A second shape since tenant management (D-076):** `mintPlatformToken()`,
+   in the same file, mints `{ sub, app_super }` with NO tenant, still
+   `authenticated`, still five minutes, still no role parameter; with no
+   tenant claim every tenant policy is false for it, and `app_is_super()`
+   demands a `platform_admins` row. Ten functions are `security definer`
+   (`tenant_public`, `check_availability`, `check_room_availability`,
+   `request_booking`, `app_role`, `tenant_applications_validate`,
+   `tenant_applications_no_delete_live`, `memberships_keep_an_owner`,
+   `member_emails`, `user_id_by_email`; D-042 as amended by D-054, D-071
+   and D-076), each with `search_path = ''` and each checking its caller
+   itself. `request_booking` is still the only one that writes for a
+   stranger, and it can write `pending` rows only.
 
 ## Traps that will actually cost you time
 
@@ -399,6 +447,28 @@ All are expanded in `risks.md`.
     disabled by `clash`; a stale list (a second tab) still reaches the
     server, and `bookings_no_overlap` answers 409 there (D-070). Never add a
     "check, then confirm" in code to make the button smarter (trap 8).
+22. **A write under RLS reaches only rows the token can SELECT.** The owner
+    policies on `memberships` were right and updated 0 rows: an owner could
+    select its own row only. verify's positive twin (1 row promoted) is what
+    showed it; the negative checks alone had passed. The fix, a tenant-wide
+    read policy, then met the recursion rule: **a policy that calls a
+    function that reads the same table under that policy is "infinite
+    recursion detected"**, so `app_role()` is `security definer` (tenant
+    management Phase 1).
+23. **Dropping a column default breaks every writer at once, silently.**
+    `memberships.role` lost its default and nine tool inserts failed with
+    23502 unreported; the symptom was every staff write refused everywhere,
+    because the probe users were never members. Every insert names its role
+    now. When a column loses a default, grep every insert before the first
+    run.
+24. **An identical prompt can get a different answer.** `leak-2`'s control
+    flipped with the same five chunks, the same scores and the same
+    1957-token prompt, 4 of 4 (tenant management Phase 6). When retrieval,
+    prompt and data are byte-for-byte the same and only the reply moves,
+    the cause is the model; record it, and do not reword anything to chase
+    it. `tool-leak` and `book-for-me-harbor` flip with the DATE the battery
+    asks about (Phase 0); read `[retrieve]` before deciding which kind of
+    flip you have.
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.
@@ -410,10 +480,16 @@ All are expanded in `risks.md`.
   (`lib/money.ts`, and `money()` in the tool result).
 - Validate at the route boundary, throw in the pipeline, map errors to status
   codes in exactly one place (`apps/web/lib/route.ts`).
-- Staff are managed with `member:add|remove|list` (removal takes effect on
-  their next request). Tools that do staff work run as the tenant's
-  **operator** member (`member:operator`), on a staff token, not as
-  `service_role` (plan/auth-rls.md § 2.7).
+- Staff are managed by an OWNER on the Members screen (`/t/<slug>/admin/members`:
+  list, add an existing account, change a role, remove) or with
+  `member:add [role] | member:role | member:remove | member:list`; a
+  change takes effect on the person's next request, and a tenant always
+  keeps one owner (a trigger). Inviting a NEW account is the CLI's alone
+  (it needs the service key). The platform (`super:add`) manages any
+  tenant's members and its record at `/platform`, and reads no tenant's
+  content unless it makes itself an owner there (D-076). Tools that do
+  staff work run as the tenant's **operator** member (`member:operator`,
+  an admin), on a staff token, not as `service_role` (plan/auth-rls.md § 2.7).
 - Every Route Handler lives under `app/api/t/[tenant]/` and is wrapped in
   `withTenantRoute()` (which wraps `withRoute()`), which hands it a CHAT
   context. Admin-only handlers start with `tenant = await requireAdmin(request,

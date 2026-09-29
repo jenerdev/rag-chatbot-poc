@@ -666,6 +666,40 @@ a change to the Overnight rate in the document only.
 
 ---
 
+## R-42 · `user_id_by_email()` tells an owner whether an address has an account · **Accepted 2026-09-29 (tenant management § 8 q4)**
+
+The members panel adds an EXISTING account by email, and the definer
+lookup answers "found" or "not found". An owner can therefore learn whether
+any address has an account here. It is owner-only (`app_role() = 'owner'`)
+or the platform, never staff or a chat token (verify: 42501 for staff), and
+an owner is trusted staff of a paying tenant. The alternative, "always say
+added", would hide typos from the person fixing them.
+
+---
+
+## R-43 · A super account is a master account · **Accepted 2026-09-29 (tenant management)**
+
+Its password opens every tenant's record: names, themes, applications,
+members, and one click to owner of any tenant. It is still not the service
+key (it reads no document, chunk or booking as itself, D-076), and
+`super:remove` takes effect on the next request. There is no MFA, no
+audit log of platform actions beyond `[platform]` and `[members]` log
+lines, and the built-in email sender for its invite (R-21). Custom SMTP and
+MFA come before a second super user who is not the operator.
+
+---
+
+## R-44 · The platform cookie and the staff cookie share `ADMIN_COOKIE_SECRET` · **Accepted 2026-09-29 (tenant management Phase 3)**
+
+One HMAC secret signs both payload kinds. A leaked secret forges either.
+What keeps them apart is the payload's first field (`platform` versus a
+slug) and each cookie's path, checked on both sides; what would make a
+leak worse is that a forged platform cookie still needs a `platform_admins`
+row for its `sub`, which the forger cannot add. Rotating the secret logs
+everyone out, staff and platform alike.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product
@@ -713,3 +747,11 @@ request, payment of any kind (payments.md, on hold), a shared rate limiter
 (R-39), and a multi-night discount or minimum stay. Photos are now shown to
 customers on the page, so R-27's egress sum includes them.
 
+
+**After tenant management (2026-09-29):** the platform invites no new
+account and deletes no tenant from the browser (both need the service key
+or take guest data with them: D-077, § 8 q3); slots are still a script
+(§ 8 q6); owners do not edit their own branding (§ 8 q2); `tool-leak` and
+`book-for-me-harbor` are date-driven flips and `leak-2`'s control a model
+flip on an identical prompt, all three recorded in the plan's Phase 0 and
+Phase 6 and none of them this plan's to fix.
