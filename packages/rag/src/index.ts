@@ -18,6 +18,8 @@
 //   applications.ts  which applications (bookings, …) a tenant has switched on
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
 //   unanswered.ts  the questions the documents could not answer, for staff
+//   platform.ts    what a super user does to tenants: list, create, edit, archive, applications
+//   members.ts     who administers a tenant and as what, for owners and the platform alike
 
 export {
   MATCH_COUNT,
@@ -61,6 +63,23 @@ export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { executeTool, toolsFor } from './tools.js';
 export { listUnanswered, reopenUnanswered, resolveUnanswered, UNANSWERED_LIMIT } from './unanswered.js';
+export {
+  archiveTenant,
+  createTenant,
+  fromPostgrest,
+  getTenant,
+  listTenants,
+  PlatformConflictError,
+  PlatformForbiddenError,
+  PlatformInputError,
+  PlatformNotFoundError,
+  removeApplication,
+  setApplication,
+  updateTenant,
+} from './platform.js';
+export type { NewTenant, PlatformContext, TenantDetail, TenantPatch, TenantSummary } from './platform.js';
+export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
+export type { Member } from './members.js';
 export type { PromptTools, TenantTools, ToolExecution } from './tools.js';
 export type { ApplicationKey } from './applications.js';
 

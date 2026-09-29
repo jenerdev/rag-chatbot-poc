@@ -617,7 +617,23 @@ hidden by `can()`, and the tabs to S-5 and S-7 are hidden for `staff`.
 (§ 6) and passes against `pnpm dev`; every existing screen still works for
 an `owner` (the walk is Phase 7).
 
-### Phase 4 — Platform routes and the Members routes
+### Phase 4 — Platform routes and the Members routes · **done 2026-09-29**
+
+Observed: the walk **11/11** against `pnpm dev` (its output is the record:
+a bad slug refused by zod in the form's words and a reserved one by Postgres
+in its own; the theme applied and visible in the page's `--accent`; the
+trigger's own sentences for a missing timezone and for 0 nights; "Tenant
+334 would be left with no owner"; an admin at the members route told
+"Your role (admin) may not do this (members:manage)"; an archived tenant's
+page, admin and chat all 404 while the platform still GETs it by id; the
+super row deleted mid-session → 401 on the next request); typecheck clean;
+tests unchanged; staff-cases 13/13; verify 109/109. The logic lives in two
+new `@rag/pipeline` modules, `platform.ts` and `members.ts` (HTTP in
+`apps/web`, D-032's split), with ONE PostgREST-error map, `fromPostgrest()`:
+23505 → 409, 23514 → 400 or 409 for the two change-refusing triggers,
+22023 → 400, 23503 → 404, 42501 → 403. The members functions are shared by
+the owner route (staff token) and the platform route (platform token); only
+the client differs.
 
 The routes of § 4.3, zod schemas in `lib/schemas.ts`, every error from
 Postgres passed through with its message (the triggers are the rules). A

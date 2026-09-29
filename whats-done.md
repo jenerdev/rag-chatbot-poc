@@ -6312,3 +6312,51 @@ had nine permissions and no read for rooms or holidays; naming
 `rooms:write` on a GET would have been a lie the compiler accepts. Three
 more permissions (`session`, `rooms:read`, `holidays:read`) let every call
 site say what it does, and the test pins each to its policy.
+
+## Tenant management, Phase 4: the platform and members routes · done 2026-09-29
+
+**What:** the HTTP half of tenant management. Two pipeline modules hold the
+work: `platform.ts` (list, get, create, edit, archive, applications) on a
+`PlatformContext`, and `members.ts` (list with emails, add an existing
+account, change a role, remove) on whichever client calls, an owner's staff
+token or the platform's. Seven route files put them on the web: the platform
+session, tenants, one tenant, archive, applications, any tenant's members,
+and a tenant's own members for its owners. One function, `fromPostgrest()`,
+turns a PostgREST error code into a status, and the message stays Postgres's,
+because the rule that refused is Postgres's.
+
+**Why it matters:** this is where "a super user creates a tenant in the
+browser" becomes possible, and where the two tokens are proven to stay in
+their lanes over HTTP: a platform cookie at a tenant route is a 401, a tenant
+cookie at the platform is a 401, and the platform reads no tenant's content
+while managing every tenant's record.
+
+**Observed** (`plan/tenant-management-phase4-walk.mjs`, 11/11 on `pnpm dev`):
+- login 200 with a four-part `rag_platform` cookie; a non-super account, a
+  wrong password and an unknown email each 401 with one message;
+- create: a bad slug 400 in zod's words, `platform` 400 in Postgres's,
+  `probe-tm` 201 with 0 members, the same slug again 409;
+- edit: the new name and `--accent:#0f766e` in the rendered chat page; a
+  bad colour, an http logo and a slug edit each 400;
+- applications: no timezone → the trigger's own sentence; on → 200;
+  `max_stay_nights: 0` → "a whole number of nights from 1 to 60"; 3 and 60
+  stored and returned; an unknown key 400;
+- members from the platform: unknown email 404 naming `member:add`, an
+  owner 201 (case-insensitive email), a staffer 201 and two listed with
+  emails, a duplicate 409, demoting the only owner 409 "Tenant 334 would be
+  left with no owner";
+- the owner's own route: lists 2, promotes the staffer to admin; that admin
+  gets 403 "Your role (admin) may not do this (members:manage)" there and
+  200 on the documents list;
+- archive: page, admin page and chat route 404; the platform GETs the
+  tenant by id with `archivedAt` set; unarchive brings the page back;
+- bookings off 200 with no key left, again 404;
+- the `platform_admins` row deleted mid-session → 401 on the next request
+  and the session GET says `platform: false`;
+- typecheck clean, tests unchanged, staff-cases 13/13, verify 109/109.
+
+**Worth knowing: the dev server compiled what `tsc` refused.** The walk
+passed 11/11 before the build did: Next's dev compiler let an update row
+typed `Record<string, unknown>` through, and `tsc` did not. Typed as the
+table's own `Update`, a typo'd column is now a compile error, which is the
+point of the hand-written types.

@@ -243,3 +243,67 @@ export const copyHolidaysSchema = z.object({
 export function firstError(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'Invalid request';
 }
+
+// --- tenant management (plan/tenant-management.md Phase 4) ------------------
+// Shape only, as everywhere in this file: the slug's reserved words, the
+// theme's five keys, the fallback messages' 500 characters and every
+// application config rule are Postgres's (schema-tenancy.sql, schema-auth.sql,
+// schema-roles.sql), and the routes pass its message through. The regexes
+// repeated here exist to say so FIRST, in the form, with the same rule.
+
+import { ROLES } from './permissions';
+import { COLOUR, THEME_KEYS } from './theme';
+
+/** The same shape as tenants_slug_shape: lower-case, digits and hyphens, 3–32, no hyphen at either end. */
+export const SLUG = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
+
+const httpsUrl = z
+  .string()
+  .trim()
+  .max(2048, 'That URL is too long')
+  .url('That is not a URL')
+  .refine((value) => value.startsWith('https://'), 'Only an https:// URL is allowed')
+  .nullable();
+
+const themeSchema = z
+  .object(Object.fromEntries(Object.keys(THEME_KEYS).map((key) => [key, z.string().regex(COLOUR, 'A colour is #rgb or #rrggbb').optional()])))
+  .strict();
+
+const fallbackText = z.string().trim().min(1, 'A fallback message cannot be empty').max(500, 'A fallback message is at most 500 characters');
+const fallbackMessagesSchema = z
+  .object({ english: fallbackText.optional(), taglish: fallbackText.optional(), tagalog: fallbackText.optional() })
+  .strict()
+  .nullable();
+
+export const createTenantSchema = z.object({
+  slug: z
+    .string({ required_error: 'A slug is required', invalid_type_error: 'A slug is required' })
+    .trim()
+    .regex(SLUG, 'A slug is 3–32 lower-case letters, digits and hyphens, not starting or ending with a hyphen'),
+  businessName: z.string({ required_error: 'A business name is required' }).trim().min(1, 'A business name is required').max(100, 'A business name is at most 100 characters'),
+  assistantName: z.string({ required_error: 'An assistant name is required' }).trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters'),
+});
+
+export const updateTenantSchema = z
+  .object({
+    businessName: z.string().trim().min(1, 'A business name is required').max(100, 'A business name is at most 100 characters').optional(),
+    assistantName: z.string().trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters').optional(),
+    logoUrl: httpsUrl.optional(),
+    bannerUrl: httpsUrl.optional(),
+    theme: themeSchema.optional(),
+    fallbackMessages: fallbackMessagesSchema.optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
+
+/** An application's config: an object. What it must hold is the trigger's to say. */
+export const applicationConfigSchema = z.object({
+  config: z.record(z.unknown(), { required_error: 'A config object is required', invalid_type_error: 'A config object is required' }),
+});
+
+const role = z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) });
+const userId = z.string({ required_error: 'A user id is required' }).uuid('That is not a user id');
+
+export const addMemberSchema = z.object({ email, role });
+export const memberRoleSchema = z.object({ userId, role });
+export const removeMemberSchema = z.object({ userId });

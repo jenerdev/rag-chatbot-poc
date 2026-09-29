@@ -93,7 +93,11 @@ archive not delete, existing accounts only in the browser, operators stay
   staff, the bookings screen hides Rooms and Holidays. 17 web unit tests;
   staff-cases 13/13; verify 109; typecheck clean.
 -
-  [ ] Phase 4 — platform and members routes · [ ] Phase 5 — screens ·
+  [x] **Phase 4 — platform and members routes** (2026-09-29): `@rag/pipeline`
+  `platform.ts` + `members.ts`, seven route files (`/api/platform/session`,
+  `/tenants`, `/tenants/[id]`, `/archive`, `/applications/[key]`,
+  `/members`; `/api/t/[tenant]/members`), six zod schemas; walk 11/11;
+  typecheck, tests, staff-cases 13/13, verify 109 unchanged · [ ] Phase 5 — screens ·
   [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
@@ -1084,6 +1088,38 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 4 (platform and members routes)
+- **Did:** `packages/rag/src/platform.ts` (`listTenants`, `getTenant`,
+  `createTenant`, `updateTenant`, `archiveTenant`, `setApplication`,
+  `removeApplication`, four error classes, `fromPostgrest()`: the ONE place
+  a PostgREST code becomes a status) and `members.ts` (`listMembers`,
+  `addMember`, `setMemberRole`, `removeMember`; shared by owner and
+  platform). Routes: `/api/platform/session` (POST/GET/DELETE on
+  `withRoute`, since they run before a session exists), `/tenants`
+  (GET/POST), `/tenants/[id]` (GET/PATCH), `/archive` (POST/DELETE),
+  `/applications/[key]` (PUT/DELETE), `/members` (GET/POST/PATCH/DELETE), all
+  on `withPlatformRoute()`; `/api/t/[tenant]/members` on `members:manage`.
+  Schemas: `createTenantSchema` (the slug regex, `SLUG`), `updateTenantSchema`
+  (strict; https urls; the five theme keys with `COLOUR`; three fallback
+  languages ≤ 500), `applicationConfigSchema`, `addMemberSchema`,
+  `memberRoleSchema`, `removeMemberSchema`. `plan/tenant-management-phase4-walk.mjs`.
+- **Observed:** walk **11/11** (probe-tm was tenant 334): login 200 with a
+  4-part `rag_platform` cookie, three failures one message; bad slug 400
+  (zod), reserved 400 (`tenants_slug_reserved`), 201 with 0 members, dup
+  409; the edited name and `--accent:#0f766e` in the rendered page; bookings
+  without a timezone 400 with the trigger's sentence, 0 nights 400 "1 to
+  60", 3/60 stored; an unknown email 404 naming `member:add`; the last-owner
+  demotion 409 "Tenant 334 would be left with no owner"; the owner's route
+  lists 2 and promotes; the admin gets 403 "may not do this
+  (members:manage)"; each cookie refused at the other's routes (401 both
+  ways); archived → page, admin and chat 404 while the platform GETs it by
+  id; bookings off 200 then 404; the super row deleted mid-session → 401
+  and the session GET says false. typecheck clean (one fix: the update row
+  typed as the table's own `Update`, not `Record<string, unknown>`); tests
+  unchanged; staff-cases 13/13; verify 109/109.
+- **Next:** Phase 5, the screens: `/platform` (login, list, form with the
+  theme preview), `/platform/reset`, `/t/<slug>/admin/members`.
 
 ### 2026-09-29 — tenant management Phase 3 (the guards in `apps/web`)
 - **Did:** `lib/permissions.ts`: 12 permissions, three roles, `can()`,
