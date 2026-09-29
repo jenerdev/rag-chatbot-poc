@@ -144,6 +144,8 @@ const DEFAULT_WEEKEND = [5, 6, 7];
  *   booking_type absent  → 'whole_resort' (every existing tenant, D-050)
  *   weekend_days absent  → [5, 6, 7], Friday to Sunday
  *   currency absent      → 'PHP'
+ *   max_stay_nights absent → MAX_STAY_NIGHTS (14), the number request_booking() defaults to
+ *   max_advance_days absent → MAX_BOOKING_ADVANCE_DAYS (365), the same
  */
 export function parseConfig(raw: unknown, slug: string): BookingsConfig {
   const config = (raw ?? {}) as Record<string, unknown>;
@@ -165,7 +167,27 @@ export function parseConfig(raw: unknown, slug: string): BookingsConfig {
     throw new Error(`The bookings configuration for "${slug}" has currency ${JSON.stringify(currency)}`);
   }
 
-  return { timezone, bookingType: type as BookingType, weekendDays: days as number[], currency };
+  // The trigger allows 1 to 60 (schema-roles.sql); request_booking() reads
+  // the same key with the same default, so the page and the wall agree.
+  const maxStay = config.max_stay_nights ?? MAX_STAY_NIGHTS;
+  if (typeof maxStay !== 'number' || !Number.isInteger(maxStay) || maxStay < 1 || maxStay > 60) {
+    throw new Error(`The bookings configuration for "${slug}" has max_stay_nights ${JSON.stringify(maxStay)}`);
+  }
+
+  // 1 to 730, like the trigger; request_booking() counts it from the tenant's today.
+  const maxAdvance = config.max_advance_days ?? MAX_BOOKING_ADVANCE_DAYS;
+  if (typeof maxAdvance !== 'number' || !Number.isInteger(maxAdvance) || maxAdvance < 1 || maxAdvance > 730) {
+    throw new Error(`The bookings configuration for "${slug}" has max_advance_days ${JSON.stringify(maxAdvance)}`);
+  }
+
+  return {
+    timezone,
+    bookingType: type as BookingType,
+    weekendDays: days as number[],
+    currency,
+    maxStayNights: maxStay,
+    maxAdvanceDays: maxAdvance,
+  };
 }
 
 /** One room of a booking, as createBookings inserts it. */
@@ -269,7 +291,12 @@ export function parseRequest(
     email?: unknown;
     notes?: unknown;
   },
-  { today, bookingType }: { today: string; bookingType: BookingType },
+  {
+    today,
+    bookingType,
+    maxNights,
+    maxAdvanceDays,
+  }: { today: string; bookingType: BookingType; maxNights: number; maxAdvanceDays: number },
 ): ParsedRequest {
   const slotId = positiveInt(input.slotId, 'Slot');
 
@@ -293,13 +320,13 @@ export function parseRequest(
   if (!isIsoDate(input.checkIn)) throw new BookingInputError(`"${String(input.checkIn)}" is not a date. Use YYYY-MM-DD.`);
   const checkIn = input.checkIn;
   if (checkIn < today) throw new BookingInputError(`${checkIn} is in the past. Today is ${today}.`);
-  const lastDate = addDays(today, MAX_BOOKING_ADVANCE_DAYS);
+  const lastDate = addDays(today, maxAdvanceDays);
   if (checkIn > lastDate) {
-    throw new BookingInputError(`Bookings open ${MAX_BOOKING_ADVANCE_DAYS} days ahead, so the latest date is ${lastDate}.`);
+    throw new BookingInputError(`Bookings open ${maxAdvanceDays} day${maxAdvanceDays === 1 ? '' : 's'} ahead, so the latest date is ${lastDate}.`);
   }
 
   const nights = input.nights === undefined || input.nights === null || input.nights === '' ? 1 : positiveInt(input.nights, 'Nights');
-  if (nights > MAX_STAY_NIGHTS) throw new BookingInputError(`A stay is at most ${MAX_STAY_NIGHTS} nights.`);
+  if (nights > maxNights) throw new BookingInputError(`A stay is at most ${maxNights} night${maxNights === 1 ? '' : 's'}.`);
   if (rooms.length * nights > MAX_REQUEST_ROWS) {
     throw new BookingInputError(`That is ${rooms.length * nights} room-nights; one request holds at most ${MAX_REQUEST_ROWS}.`);
   }

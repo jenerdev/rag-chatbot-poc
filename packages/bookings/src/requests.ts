@@ -21,7 +21,7 @@
 // (CLAUDE.md rule 6). The unit and slot ids come from a form, not from the
 // model: the chatbot has no tool that reaches this file (D-037).
 
-import { MAX_BOOKING_ADVANCE_DAYS, MAX_STAY_NIGHTS } from './constants.js';
+import { MAX_STAY_NIGHTS } from './constants.js';
 import { bookingsConfig, requireConfig, listSlots } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
@@ -91,7 +91,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
 
   const offered = new Set(priced.flatMap((u) => u.rates.map((r) => r.slotId)));
   const today = localDate(config.timezone);
-  const lastDate = addDays(today, MAX_BOOKING_ADVANCE_DAYS);
+  const lastDate = addDays(today, config.maxAdvanceDays);
   const settings = pageSettings(app.data.config);
   return {
     bookingType: config.bookingType,
@@ -99,7 +99,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
     currency: config.currency,
     today,
     lastDate,
-    maxNights: MAX_STAY_NIGHTS,
+    maxNights: config.maxStayNights,
     instructions: settings.instructions,
     guestHint: settings.guestHint,
     slots: slots.filter((s) => offered.has(s.id)),
@@ -152,7 +152,7 @@ export async function quoteRequest(
   const today = localDate(config.timezone);
   const request = parseRequest(
     { ...input, name: 'Quote', phone: '09000000000', email: 'quote@example.com' },
-    { today, bookingType: config.bookingType },
+    { today, bookingType: config.bookingType, maxNights: config.maxStayNights, maxAdvanceDays: config.maxAdvanceDays },
   );
 
   const [units, slot] = await Promise.all([
@@ -258,7 +258,12 @@ export async function requestBooking(
   },
 ): Promise<RequestReceipt> {
   const config = await requireConfig(tenant);
-  const request = parseRequest(input, { today: localDate(config.timezone), bookingType: config.bookingType });
+  const request = parseRequest(input, {
+    today: localDate(config.timezone),
+    bookingType: config.bookingType,
+    maxNights: config.maxStayNights,
+    maxAdvanceDays: config.maxAdvanceDays,
+  });
 
   const { data, error } = await tenant.db.rpc('request_booking', {
     p_tenant_id: tenant.id,

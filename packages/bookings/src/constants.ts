@@ -74,7 +74,9 @@ export const DEFAULT_EXTRA_PERSON_RATE = 25_000; // centavos: ₱250 per extra g
 // copies let the page and this package say so first, in their own words.
 // verify.mjs checks 14 nights accepted and 15 refused, so a change on one side
 // only shows up. Change both together (schema-customer-booking.sql § 11).
+/** the DEFAULT: a tenant's config.max_stay_nights replaces it (D-078), on both sides */
 export const MAX_STAY_NIGHTS = 14;
+/** the DEFAULT too: a tenant's config.max_advance_days replaces it (D-078), on both sides */
 export const MAX_BOOKING_ADVANCE_DAYS = 365;
 export const MAX_OPEN_REQUESTS_PER_CONTACT = 3;
 /** units × nights in one request: 5 rooms × 14 nights */

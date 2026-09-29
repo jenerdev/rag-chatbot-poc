@@ -281,6 +281,10 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   value={checkIn}
                   onChange={(e) => setCheckIn(e.target.value)}
                 />
+                {/* The tenant's booking horizon, said up front, and again the moment it is passed. */}
+                <div className={`small${checkIn > page.lastDate ? ' field-error' : ' muted'}`}>
+                  {checkIn > page.lastDate ? 'Too far ahead: the latest is' : 'Up to'} {dateLabel(page.lastDate)}
+                </div>
               </div>
               {slot.nightly && (
                 <div className="field narrow">
@@ -295,6 +299,10 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                     value={nights}
                     onChange={(e) => setNights(e.target.value)}
                   />
+                  {/* The tenant's max stay, said up front, and again the moment it is passed. */}
+                  <div className={`small${nightCount > page.maxNights ? ' field-error' : ' muted'}`}>
+                    {nightCount > page.maxNights ? 'At most' : 'Up to'} {page.maxNights} night{page.maxNights === 1 ? '' : 's'}
+                  </div>
                 </div>
               )}
               {!perRoom && (

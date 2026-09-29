@@ -122,6 +122,10 @@ export interface BookingsConfig {
   weekendDays: number[];
   /** three letters, for formatting only; every amount is centavos */
   currency: string;
+  /** the longest stay one request may be, in nights (D-078); absent in config means MAX_STAY_NIGHTS */
+  maxStayNights: number;
+  /** how many days after the tenant's today a stay may start (D-078); absent in config means MAX_BOOKING_ADVANCE_DAYS */
+  maxAdvanceDays: number;
 }
 
 /**
@@ -248,7 +252,7 @@ export interface BookingPage {
   currency: string;
   /** the tenant's today, where the date picker starts */
   today: string;
-  /** the last date a stay may start on */
+  /** the last date a stay may start on: the tenant's today plus its max_advance_days */
   lastDate: string;
   maxNights: number;
   instructions: string | null;

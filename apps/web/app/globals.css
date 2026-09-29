@@ -317,6 +317,8 @@ select:focus, input[type="date"]:focus, input[type="number"]:focus { outline: 2p
 .field-row > .field { flex: 1 1 160px; }
 .field-row > .field.grow { flex: 2 1 240px; }
 .field-row > .field.narrow { flex: 0 1 110px; }
+/* A limit passed, said beside the field (the booking page's max stay). */
+.field .field-error { color: var(--danger); font-weight: 600; }
 
 .range-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .range-head h2 { margin: 0; }

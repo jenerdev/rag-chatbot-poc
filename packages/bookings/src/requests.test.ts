@@ -22,7 +22,7 @@ const valid = {
   notes: '',
 };
 const parse = (overrides: Record<string, unknown> = {}, bookingType: 'whole_resort' | 'per_room' = 'whole_resort') =>
-  parseRequest({ ...valid, ...overrides }, { today: TODAY, bookingType });
+  parseRequest({ ...valid, ...overrides }, { today: TODAY, bookingType, maxNights: MAX_STAY_NIGHTS, maxAdvanceDays: MAX_BOOKING_ADVANCE_DAYS });
 const refused = (overrides: Record<string, unknown>, bookingType: 'whole_resort' | 'per_room' = 'whole_resort') => {
   try {
     parse(overrides, bookingType);
@@ -61,12 +61,21 @@ describe('parseRequest', () => {
     expect(parse({ checkIn: addDays(TODAY, MAX_BOOKING_ADVANCE_DAYS), nights: 1 }).checkIn).toBe('2027-09-28');
     expect(refused({ checkIn: '2026-09-27' })).toMatch(/in the past/);
     expect(refused({ checkIn: '2027-09-29' })).toMatch(/365 days ahead/);
+    // A tenant's own horizon (D-078) replaces the default, counted from ITS today.
+    const horizon = { today: TODAY, bookingType: 'whole_resort' as const, maxNights: 14, maxAdvanceDays: 30 };
+    expect(parseRequest({ ...valid, checkIn: '2026-10-28', nights: 1 }, horizon).checkIn).toBe('2026-10-28');
+    expect(() => parseRequest({ ...valid, checkIn: '2026-10-29', nights: 1 }, horizon)).toThrow(/30 days ahead, so the latest date is 2026-10-28/);
     expect(refused({ checkIn: '2026-02-30' })).toMatch(/not a date/);
   });
 
   it('accepts 14 nights and refuses 15 and 0', () => {
     expect(parse({ nights: 14 }).nights).toBe(14);
     expect(refused({ nights: 15 })).toMatch(/at most 14 nights/);
+    // A tenant's own max stay (D-078) replaces the default.
+    expect(() => parseRequest({ ...valid, nights: 4 }, { today: TODAY, bookingType: 'whole_resort', maxNights: 3, maxAdvanceDays: 365 })).toThrow(
+      /at most 3 nights/,
+    );
+    expect(parseRequest({ ...valid, nights: 3 }, { today: TODAY, bookingType: 'whole_resort', maxNights: 3, maxAdvanceDays: 365 }).nights).toBe(3);
     expect(refused({ nights: 0 })).toMatch(/positive whole number/);
     expect(refused({ nights: 1.5 })).toMatch(/positive whole number/);
   });

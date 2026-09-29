@@ -16,13 +16,15 @@ describe('parseConfig', () => {
       bookingType: 'whole_resort',
       weekendDays: [5, 6, 7],
       currency: 'PHP',
+      maxStayNights: 14,
+      maxAdvanceDays: 365,
     });
   });
 
   it('reads a per_room config as written', () => {
     expect(
-      parseConfig({ timezone: 'Asia/Manila', booking_type: 'per_room', weekend_days: [6, 7], currency: 'USD' }, 'harbor'),
-    ).toEqual({ timezone: 'Asia/Manila', bookingType: 'per_room', weekendDays: [6, 7], currency: 'USD' });
+      parseConfig({ timezone: 'Asia/Manila', booking_type: 'per_room', weekend_days: [6, 7], currency: 'USD', max_stay_nights: 3, max_advance_days: 90 }, 'harbor'),
+    ).toEqual({ timezone: 'Asia/Manila', bookingType: 'per_room', weekendDays: [6, 7], currency: 'USD', maxStayNights: 3, maxAdvanceDays: 90 });
   });
 
   it.each([
@@ -33,6 +35,9 @@ describe('parseConfig', () => {
     [{ timezone: 'Asia/Manila', weekend_days: ['6'] }, 'a weekday as text'],
     [{ timezone: 'Asia/Manila', weekend_days: 6 }, 'not an array'],
     [{ timezone: 'Asia/Manila', currency: 'php' }, 'lower-case currency'],
+    [{ timezone: 'Asia/Manila', max_stay_nights: 0 }, 'a zero-night max stay'],
+    [{ timezone: 'Asia/Manila', max_stay_nights: '7' }, 'a max stay as text'],
+    [{ timezone: 'Asia/Manila', max_advance_days: 731 }, 'a horizon past two years'],
   ])('refuses %j (%s), because SQL would have', (config) => {
     // Not a BookingInputError: a row that fails here was written around the
     // trigger, which is a fault, not a user's bad input.

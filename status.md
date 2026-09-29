@@ -1112,6 +1112,30 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-09-30 — the booking page honours the tenant's max stay
+- **Found:** `config.max_stay_nights` (D-078) was enforced only by
+  `request_booking()` in SQL. The page's Nights field, the quote and
+  `parseRequest()` all used the constant 14. A tenant set to 3 was offered
+  14 nights and refused only on submit, and one set to 30 could never pick
+  more than 14.
+- **Did:** `parseConfig()` reads `max_stay_nights` (default
+  `MAX_STAY_NIGHTS`, 1–60 like the trigger) into `maxStayNights`.
+  `bookingPage()`, `quoteRequest()` and `requestBooking()` pass it on. The
+  page says "Up to N nights" under the Nights field, and the line turns red
+  the moment N is passed.
+- **Observed:** typecheck 11/11; bookings tests 96/96; pipeline 329/329.
+  Live, villa with `max_stay_nights: 3` showed "Up to 3" and its quote
+  answered `A stay is at most 3 nights.` for 4 nights. The config was
+  restored to `{"timezone":"Asia/Manila"}`, and the page read 14 again.
+- **Then, the same for the booking horizon:** `parseConfig()` reads
+  `max_advance_days` (default 365, 1–730 like the trigger) into
+  `maxAdvanceDays`. The page's last date, the quote and `parseRequest()`
+  count it from the tenant's today. The date field says "Up to <date>" and
+  turns red past it. Bookings tests 97/97; pipeline 329/329. Live, villa
+  with `max_advance_days: 30` showed "Up to Fri, 30 Oct 2026" and refused
+  1 December with `Bookings open 30 days ahead, so the latest date is
+  2026-10-30.` Restored, it showed 30 Sept 2027 and quoted 1 December.
+
 ### 2026-09-30 — one header nav, by role
 - **Did:** replaced the hand-written links on nine tenant pages with one
   `TenantNav`. The links come from `navItems(slug, features, role)`, which is

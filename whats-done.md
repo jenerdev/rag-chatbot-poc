@@ -6498,3 +6498,26 @@ before against `pnpm dev`.
 **Trap avoided:** the features come from the same checks the pages 404 on
 (`hasApplication`, `bookingType === 'per_room'`, `hasBookingPage`), so a
 button never leads to "No such workspace".
+
+## The booking page says the tenant's max stay up front · done 2026-09-30
+
+**What:** the tenant's `max_stay_nights` now reaches the booking page,
+the quote and `parseRequest()` through `parseConfig()` (`maxStayNights`,
+default 14). The Nights field says "Up to N nights" before anything is
+typed, and turns red as soon as N is passed.
+
+**Why it matters:** before this, only `request_booking()` knew the
+tenant's number. A customer found out on submit, after filling in the whole
+form, and a tenant who allowed more than 14 nights could never get them.
+
+**Observed:** villa set to 3 for the check showed "Up to 3", and its quote
+refused 4 nights with `A stay is at most 3 nights.` Restored afterwards.
+Bookings tests 96/96, including the new ones for a tenant's own limit and
+for two bad configs refused.
+
+**Then the booking horizon, the same way:** `max_advance_days` (default
+365) now sets the page's latest date, the quote's check and
+`parseRequest()`'s, counted from the tenant's today like
+`request_booking()`. The date field says "Up to <date>". Villa set to 30
+days showed "Up to Fri, 30 Oct 2026" and refused 1 December. Restored, it
+quoted 1 December again. Bookings tests 97/97.
