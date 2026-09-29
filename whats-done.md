@@ -6360,3 +6360,38 @@ passed 11/11 before the build did: Next's dev compiler let an update row
 typed `Record<string, unknown>` through, and `tsc` did not. Typed as the
 table's own `Update`, a typo'd column is now a compile error, which is the
 point of the hand-written types.
+
+## Tenant management, Phase 5: the screens · code done 2026-09-29 (the browser walk is Phase 7)
+
+**What:** `/platform`: a login form until the session says so, then the
+tenant list and one form per tenant. The form creates a tenant from three
+fields, and edits everything else: names, logo and banner, the five theme
+colours with a live preview, the fallback messages per language, the
+bookings application's config as plain fields, the members, and archive.
+`/platform/reset` closes the invite detour of Phase 2. `/t/<slug>/admin/members`
+is the owners' Members screen, and the knowledge base shows a Members tab to
+owners. One members panel serves both the platform and the tenant screen.
+
+**Why it matters:** this is the feature the user asked for, in the browser:
+a super user creates and edits tenants, and owners manage their staff's
+roles, with no command line. The command line keeps the two things a
+request may not do: invite a new account (the service key) and delete a
+tenant for good (guest data and photos).
+
+**Observed:**
+- typecheck clean; `/platform`, `/platform/reset`, `/t/villa/admin/members`
+  and `/t/villa/admin` render 200 on `pnpm dev`;
+- the platform's "Forgot password?" answers the generic sentence, as the
+  staff one does;
+- the Phase 4 walk 12/12 with the new 6b: the platform adds ITSELF as owner
+  by user id (201, three listed) and removes itself (200, two left, the
+  other owner keeping the trigger quiet); staff-cases 13/13; web tests 17/17.
+
+**Worth knowing: generalise, do not copy.** `LoginForm` and `ResetPassword`
+were the staff screens' and took the platform's paths as props (bookings
+Phase 4 had already extracted the login form so a second copy could not
+drift; this is the same rule one step on). `addMember()` grew a second key,
+`userId`, because a browser legitimately knows one id, its own, and
+"Make me an owner" (plan § 8 q5) is that id and nothing else. The theme
+preview is the page's own mechanism, a `.tenant-root` carrying custom
+properties through `style`; there is no `<style>` tag and no new CSS.

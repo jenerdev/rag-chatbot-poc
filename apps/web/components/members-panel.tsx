@@ -1,0 +1,185 @@
+'use client';
+
+// The members of one tenant: who, as what, since when; add an existing
+// account; change a role; remove (plan/tenant-management.md § 4.3).
+//
+// ONE panel, TWO callers: the tenant's Members screen (an owner, on
+// /api/t/<slug>/members) and the platform's tenant form (a super user, on
+// /api/platform/tenants/<id>/members). The routes differ; the panel does
+// not. Everything it shows is a React child, so escaped.
+//
+// What it cannot do: invite a NEW account. That needs the service key, which
+// no request holds (CLAUDE.md rule 2). The route's 404 says the CLI command
+// to run, and this panel shows it as it is.
+
+import { useCallback, useEffect, useState } from 'react';
+import type { Member } from '@rag/pipeline';
+import { describeFailure } from '@/components/admin-login';
+import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
+
+type Notice = { message: string; kind: 'ok' | 'error' } | null;
+
+export function MembersPanel({
+  api,
+  selfUserId,
+  onUnauthorized,
+}: {
+  /** The members endpoint: `/api/t/<slug>/members` or `/api/platform/tenants/<id>/members`. */
+  api: string;
+  /** The platform's own user id, for "Make me an owner" (plan § 8 q5). Absent on the tenant's screen. */
+  selfUserId?: string | null;
+  onUnauthorized: () => void;
+}) {
+  const [members, setMembers] = useState<Member[] | null>(null);
+  const [loadMessage, setLoadMessage] = useState('Loading members…');
+  const [notice, setNotice] = useState<Notice>(null);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<Role>('staff');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    let response: Response | null = null;
+    try {
+      response = await fetch(api);
+      if (response.status === 401) return onUnauthorized();
+      if (!response.ok) throw new Error('failed');
+      setMembers(await response.json());
+    } catch (error) {
+      setMembers(null);
+      setLoadMessage(await describeFailure(error as Error, response));
+    }
+  }, [api, onUnauthorized]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /** One write, then the list the route hands back. Every refusal is shown in the server's words. */
+  const write = useCallback(
+    async (method: 'POST' | 'PATCH' | 'DELETE', body: object, done: string) => {
+      setBusy(true);
+      setNotice(null);
+      let response: Response | null = null;
+      try {
+        response = await fetch(api, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (response.status === 401) return onUnauthorized();
+        if (!response.ok) throw new Error('failed');
+        setMembers(await response.json());
+        setNotice({ message: done, kind: 'ok' });
+        return true;
+      } catch (error) {
+        setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [api, onUnauthorized],
+  );
+
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    if (await write('POST', { email: email.trim(), role }, `Added ${email.trim()} as ${ROLE_LABELS[role].toLowerCase()}.`)) setEmail('');
+  }
+
+  const isMember = selfUserId ? members?.some((m) => m.userId === selfUserId) : true;
+
+  return (
+    <section className="card">
+      <h2>Members{members ? ` (${members.length})` : ''}</h2>
+      <p className="small muted">
+        Owners manage members and everything below; admins manage the knowledge base, rooms, rates and holidays; staff
+        handle bookings and the unanswered questions. A change takes effect on the person&apos;s next request. A tenant
+        always keeps at least one owner.
+      </p>
+      <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+
+      {members === null ? (
+        <div className="small">{loadMessage}</div>
+      ) : members.length === 0 ? (
+        <div className="small muted">Nobody yet. Add the first owner below.</div>
+      ) : (
+        <div>
+          {members.map((m) => (
+            <div key={m.userId} className="doc">
+              <div className="doc-head">
+                <span className="doc-title">
+                  {m.email}
+                  {selfUserId === m.userId && <span className="muted"> (you)</span>}
+                </span>
+                <span className="doc-meta small muted">since {new Date(m.createdAt).toLocaleDateString()}</span>
+                <select
+                  aria-label={`Role of ${m.email}`}
+                  value={m.role}
+                  disabled={busy}
+                  onChange={(event) => void write('PATCH', { userId: m.userId, role: event.target.value }, `${m.email} is now ${event.target.value}.`)}
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  title="Remove this member"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(`Remove ${m.email}? Their next request is refused.`)) void write('DELETE', { userId: m.userId }, `Removed ${m.email}.`);
+                  }}
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={add}>
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="member-email">Add an existing account</label>
+            <input
+              type="email"
+              id="member-email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="member-role">As</label>
+            <select id="member-role" value={role} onChange={(event) => setRole(event.target.value as Role)}>
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="form-footer">
+          <span className="small muted">
+            The account must already exist. A new one is invited from the command line: <code>member:add</code>.
+          </span>
+          <button type="submit" className="primary" disabled={busy || email.trim() === ''}>
+            {busy ? 'Saving…' : 'Add member'}
+          </button>
+        </div>
+      </form>
+
+      {selfUserId && members && !isMember && (
+        <div className="form-footer">
+          <span className="small muted">
+            The platform manages this tenant&apos;s record, not its content. To open its screens, become an owner.
+          </span>
+          <button type="button" disabled={busy} onClick={() => void write('POST', { userId: selfUserId, role: 'owner' }, 'You are an owner here now. Log in on its admin page.')}>
+            Make me an owner
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}

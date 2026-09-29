@@ -38,18 +38,31 @@ export async function listMembers(db: DbClient, tenantId: number): Promise<Membe
  * Add an EXISTING account to a tenant with a role. 404 when the email has no
  * account (with the CLI command that invites one), 409 when already a member.
  */
-export async function addMember(db: DbClient, tenantId: number, slug: string, email: string, role: MemberRole): Promise<Member[]> {
-  const lookup = await db.rpc('user_id_by_email', { p_email: email });
-  if (lookup.error) throw fromPostgrest(lookup.error, 'Could not look the account up');
-  if (!lookup.data) {
-    throw new PlatformNotFoundError(
-      `No account for ${email}. Invite one from the command line: pnpm --filter @rag/db member:add -- ${slug} ${email} ${role}`,
-    );
+export async function addMember(
+  db: DbClient,
+  tenantId: number,
+  slug: string,
+  who: { email?: string; userId?: string },
+  role: MemberRole,
+): Promise<Member[]> {
+  let userId = who.userId ?? null;
+  if (!userId) {
+    // By email: the definer lookup, owner or platform only (R-42).
+    const lookup = await db.rpc('user_id_by_email', { p_email: who.email ?? '' });
+    if (lookup.error) throw fromPostgrest(lookup.error, 'Could not look the account up');
+    if (!lookup.data) {
+      throw new PlatformNotFoundError(
+        `No account for ${who.email}. Invite one from the command line: pnpm --filter @rag/db member:add -- ${slug} ${who.email} ${role}`,
+      );
+    }
+    userId = lookup.data;
   }
-  const { error } = await db.from('memberships').insert({ user_id: lookup.data, tenant_id: tenantId, role });
-  if (error?.code === '23505') throw new PlatformConflictError(`${email} is already a member. Change the role instead.`);
+  // By id: the platform adding ITSELF (plan § 8 q5), the one id a browser
+  // legitimately knows. A wrong id is a 23503 from the FK, so a 404.
+  const { error } = await db.from('memberships').insert({ user_id: userId, tenant_id: tenantId, role });
+  if (error?.code === '23505') throw new PlatformConflictError(`${who.email ?? 'That account'} is already a member. Change the role instead.`);
   if (error) throw fromPostgrest(error, 'Could not add the member');
-  console.log(`[members] tenant ${tenantId}: added ${lookup.data} as ${role}`);
+  console.log(`[members] tenant ${tenantId}: added ${userId} as ${role}`);
   return listMembers(db, tenantId);
 }
 

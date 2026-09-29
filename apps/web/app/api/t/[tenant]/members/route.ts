@@ -26,7 +26,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'members:manage');
   const parsed = addMemberSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
-  return NextResponse.json(await addMember(tenant.db, tenant.id, tenant.slug, parsed.data.email, parsed.data.role), { status: 201 });
+  return NextResponse.json(await addMember(tenant.db, tenant.id, tenant.slug, parsed.data, parsed.data.role), { status: 201 });
 });
 
 export const PATCH = withTenantRoute(async (request, { tenant }) => {

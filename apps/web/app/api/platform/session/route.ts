@@ -29,8 +29,10 @@ export const POST = withRoute(async (request: Request) => {
 /** Is this browser the platform? Re-reads the row, so a removed super user sees the login form on the next load. */
 export const GET = withRoute(async (request: Request) => {
   try {
-    await requirePlatform(request);
-    return NextResponse.json({ platform: true });
+    const { userId } = await requirePlatform(request);
+    // The id, not the email: the platform token cannot read auth.users, and
+    // the id is what the members route takes to add this very account.
+    return NextResponse.json({ platform: true, userId });
   } catch (error) {
     if ((error as { status?: number }).status === 401) return NextResponse.json({ platform: false });
     throw error;

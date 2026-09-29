@@ -33,7 +33,25 @@ export async function describeFailure(error: Error, response: Response | null): 
  * read it, and does not need to. "Forgot password?" swaps the form for a
  * one-field request for a reset email.
  */
-export function LoginForm({ api, slug, onLoggedIn }: { api: string; slug: string; onLoggedIn: () => void }) {
+export function LoginForm({
+  api,
+  slug,
+  onLoggedIn,
+  sessionPath = '/admin/session',
+  resetPath = '/admin/password-reset',
+  title = 'Staff login',
+  intro,
+}: {
+  api: string;
+  slug: string;
+  onLoggedIn: () => void;
+  /** The platform (tenant management Phase 5) logs in at /api/platform/session with the same form. */
+  sessionPath?: string;
+  resetPath?: string;
+  title?: string;
+  /** Replaces the staff sentence under the title. */
+  intro?: React.ReactNode;
+}) {
   const [mode, setMode] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -62,11 +80,11 @@ export function LoginForm({ api, slug, onLoggedIn }: { api: string; slug: string
       setInfo(null);
       try {
         if (mode === 'login') {
-          await post('/admin/session', { email, password });
+          await post(sessionPath, { email, password });
           setPassword('');
           onLoggedIn();
         } else {
-          const response = await post('/admin/password-reset', { email });
+          const response = await post(resetPath, { email });
           setInfo((await response.json()).message);
         }
       } catch (caught) {
@@ -75,7 +93,7 @@ export function LoginForm({ api, slug, onLoggedIn }: { api: string; slug: string
         setBusy(false);
       }
     },
-    [mode, email, password, post, onLoggedIn],
+    [mode, email, password, post, onLoggedIn, sessionPath, resetPath],
   );
 
   const switchTo = (next: 'login' | 'forgot') => {
@@ -87,13 +105,15 @@ export function LoginForm({ api, slug, onLoggedIn }: { api: string; slug: string
 
   return (
     <section className="card">
-      <h2>{mode === 'login' ? 'Staff login' : 'Reset your password'}</h2>
+      <h2>{mode === 'login' ? title : 'Reset your password'}</h2>
       <p className="small muted">
         {mode === 'login' ? (
-          <>
-            Log in with a staff account that is a member of <strong>{slug}</strong>. Members are added with{' '}
-            <code>pnpm --filter @rag/db member:add</code>.
-          </>
+          intro ?? (
+            <>
+              Log in with a staff account that is a member of <strong>{slug}</strong>. Members are added with{' '}
+              <code>pnpm --filter @rag/db member:add</code>.
+            </>
+          )
         ) : (
           <>We will email a link to set a new password. It expires in an hour.</>
         )}

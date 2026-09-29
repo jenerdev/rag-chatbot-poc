@@ -24,7 +24,7 @@ export default async function TenantResetPage({ params }: { params: Promise<{ te
         </Link>
       </BrandHeader>
       <main>
-        <ResetPassword slug={tenant.slug} />
+        <ResetPassword api={`/api/t/${tenant.slug}/admin/password`} loginHref={`/t/${tenant.slug}/admin`} />
       </main>
     </>
   );

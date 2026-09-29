@@ -644,7 +644,21 @@ demotion (409), archive (then `/t/probe-tm` is 404 and so is chat),
 unarchive, and every one of those on a STAFF cookie → 401, on a `staff`
 member's cookie against `/members` → 403.
 
-### Phase 5 — The screens
+### Phase 5 — The screens · **code done 2026-09-29, the browser walk is Phase 7**
+
+Observed: typecheck clean; `/platform`, `/platform/reset`,
+`/t/villa/admin/members` and `/t/villa/admin` render 200 on `pnpm dev`;
+`/api/platform/password-reset` answers the generic sentence; the Phase 4
+walk gained 6b ("Make me an owner": the platform adds itself by user id →
+201, removes itself → 200) and reads **12/12**; staff-cases 13/13; web tests
+17/17. `LoginForm` and `ResetPassword` were generalised (paths, title,
+intro; `api` and `loginHref`) rather than copied, so the platform's login
+and reset are the staff ones at other paths. `addMember()` takes an email
+OR a user id: the browser knows only its own id, which the platform session
+GET now returns. `components/members-panel.tsx` is ONE panel for both the
+tenant's Members screen (`/t/<slug>/admin/members`, owners) and the
+platform form. The invite detour of Phase 2 is closed: `/platform/reset`
+exists, with `/api/platform/password`.
 
 `components/platform-screen.tsx` (login, list, form), `components/tenant-form.tsx`
 (pure: the theme preview is the same five custom properties through the

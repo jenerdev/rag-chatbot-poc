@@ -97,7 +97,12 @@ archive not delete, existing accounts only in the browser, operators stay
   `platform.ts` + `members.ts`, seven route files (`/api/platform/session`,
   `/tenants`, `/tenants/[id]`, `/archive`, `/applications/[key]`,
   `/members`; `/api/t/[tenant]/members`), six zod schemas; walk 11/11;
-  typecheck, tests, staff-cases 13/13, verify 109 unchanged · [ ] Phase 5 — screens ·
+  typecheck, tests, staff-cases 13/13, verify 109 unchanged · [x] **Phase 5 — screens** (2026-09-29, code; the walk is Phase 7):
+  `/platform` (login → list → form with a live theme preview, applications
+  config, members, archive), `/platform/reset` (+ `/api/platform/password`
+  and `/password-reset`), `/t/<slug>/admin/members` (owners; a Members tab
+  on the knowledge base). One members panel for both. Pages 200; walk 12/12;
+  staff-cases 13/13; typecheck clean ·
   [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
@@ -1088,6 +1093,37 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 5 (the screens; walk owed to Phase 7)
+- **Did:** `components/platform-screen.tsx` (session → login form → tenant
+  list → one tenant), `components/tenant-form.tsx` (create: slug and the two
+  names; edit: names, https logo and banner, five theme colours with a live
+  preview through the `style` prop, three fallback messages, the bookings
+  application's config as fields (timezone, type, currency, weekend days,
+  max stay, horizon, page text, guest hint) with Switch on / Save / Switch
+  off, the members panel, Archive / Unarchive), `components/members-panel.tsx`
+  (list with emails, role select, remove, add an existing account, "Make me
+  an owner" for the platform), `components/members-screen.tsx` and
+  `app/t/[tenant]/admin/members/page.tsx` (owners; others see one
+  sentence), `app/platform/page.tsx`, `app/platform/reset/page.tsx`,
+  `/api/platform/password` and `/api/platform/password-reset`. `LoginForm`
+  gained `sessionPath`, `resetPath`, `title`, `intro`; `ResetPassword`
+  takes `api` and `loginHref`. `addMember()` accepts `{ email }` or
+  `{ userId }`; the platform session GET returns `userId`. The knowledge
+  base's nav shows Members to owners.
+- **Observed:** typecheck clean (one fix: a language label map instead of
+  indexing a string); the four pages 200 on `pnpm dev`; the platform reset
+  request answers "If that email has a platform account…"; the Phase 4 walk
+  **12/12** with 6b: the platform adds itself as owner by id (201, 3
+  listed) and removes itself (200, 2 left); staff-cases 13/13; web tests
+  17/17. No CSS was added: the screens use the classes the other screens
+  use, and the theme preview is a `.tenant-root` with the tenant's
+  variables, the same element the real page wraps itself in.
+- **Owed to Phase 7:** the browser walk of all of it, by the user, with the
+  real super account.
+- **Next:** Phase 6, proving the walls: verify's platform-through-pipeline
+  check, both isolation suites, staff-cases, the battery verdict for
+  verdict, the bundle grep, plan.md Phase 3's tenant-filter grep.
 
 ### 2026-09-29 — tenant management Phase 4 (platform and members routes)
 - **Did:** `packages/rag/src/platform.ts` (`listTenants`, `getTenant`,

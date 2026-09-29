@@ -340,6 +340,11 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
           Log out
         </button>
       )}
+      {role && can(role, 'members:manage') && (
+        <Link className="button" href={`/t/${slug}/admin/members`}>
+          Members
+        </Link>
+      )}
       <Link className="button" href={`/t/${slug}/admin/unanswered`}>
         Unanswered
       </Link>

@@ -31,7 +31,7 @@ export const POST = withPlatformRoute<{ id: string }>(async (request, { platform
   if (!tenant) return badRequest('Invalid tenant id');
   const parsed = addMemberSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
-  return NextResponse.json(await addMember(platform.db, tenant.id, tenant.slug, parsed.data.email, parsed.data.role), { status: 201 });
+  return NextResponse.json(await addMember(platform.db, tenant.id, tenant.slug, parsed.data, parsed.data.role), { status: 201 });
 });
 
 export const PATCH = withPlatformRoute<{ id: string }>(async (request, { platform, params }) => {

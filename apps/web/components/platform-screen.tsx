@@ -1,0 +1,240 @@
+'use client';
+
+// /platform (plan/tenant-management.md § 4.3): the super user's screen. A
+// login form until the session GET says `platform: true`; then the tenant
+// list, and one form per tenant (tenant-form.tsx). Every call goes to
+// /api/platform/*, each on the platform token; this component holds no
+// secret and decides nothing the routes do not decide again.
+
+import { useCallback, useEffect, useState } from 'react';
+import type { TenantDetail, TenantSummary } from '@rag/pipeline';
+import { LoginForm, describeFailure } from '@/components/admin-login';
+import { TenantForm } from '@/components/tenant-form';
+
+type Auth = 'checking' | 'out' | 'in';
+const API = '/api/platform';
+
+export function PlatformScreen() {
+  const [auth, setAuth] = useState<Auth>('checking');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [tenants, setTenants] = useState<TenantSummary[] | null>(null);
+  const [listMessage, setListMessage] = useState('Loading tenants…');
+  /** null = the list; 'new' = the create form; a number = that tenant's form. */
+  const [selected, setSelected] = useState<number | 'new' | null>(null);
+  const [detail, setDetail] = useState<TenantDetail | null>(null);
+  const [detailMessage, setDetailMessage] = useState<string | null>(null);
+
+  const askSession = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/session`);
+      const body = await response.json();
+      setAuth(body.platform === true ? 'in' : 'out');
+      setUserId(typeof body.userId === 'string' ? body.userId : null);
+    } catch {
+      setAuth('out');
+    }
+  }, []);
+
+  useEffect(() => {
+    void askSession();
+  }, [askSession]);
+
+  // Any 401 means the session is gone (expired, logged out, or super:remove).
+  const unauthorized = useCallback(() => {
+    setAuth('out');
+    setUserId(null);
+    setTenants(null);
+    setSelected(null);
+    setDetail(null);
+  }, []);
+
+  const loadTenants = useCallback(async () => {
+    let response: Response | null = null;
+    try {
+      response = await fetch(`${API}/tenants`);
+      if (response.status === 401) return unauthorized();
+      if (!response.ok) throw new Error('failed');
+      setTenants(await response.json());
+    } catch (error) {
+      setTenants(null);
+      setListMessage(await describeFailure(error as Error, response));
+    }
+  }, [unauthorized]);
+
+  useEffect(() => {
+    if (auth === 'in') void loadTenants();
+  }, [auth, loadTenants]);
+
+  // One tenant's detail, by id (an archived one still resolves here).
+  useEffect(() => {
+    if (typeof selected !== 'number') {
+      setDetail(null);
+      return;
+    }
+    let cancelled = false;
+    setDetail(null);
+    setDetailMessage(null);
+    void (async () => {
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${API}/tenants/${selected}`);
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        const loaded: TenantDetail = await response.json();
+        if (!cancelled) setDetail(loaded);
+      } catch (error) {
+        if (!cancelled) setDetailMessage(await describeFailure(error as Error, response));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, unauthorized]);
+
+  const logout = useCallback(async () => {
+    await fetch(`${API}/session`, { method: 'DELETE' }).catch(() => undefined);
+    unauthorized();
+  }, [unauthorized]);
+
+  const header = (
+    <header>
+      <h1 className="brand">
+        <span>Platform</span>
+        <span className="brand-subtitle">{selected === null ? 'Tenants' : selected === 'new' ? 'New tenant' : detail?.businessName ?? '…'}</span>
+      </h1>
+      <nav>
+        {auth === 'in' && selected !== null && (
+          <button type="button" className="button" onClick={() => setSelected(null)}>
+            ← All tenants
+          </button>
+        )}
+        {auth === 'in' && (
+          <button type="button" className="link" onClick={logout}>
+            Log out
+          </button>
+        )}
+      </nav>
+    </header>
+  );
+
+  if (auth !== 'in') {
+    return (
+      <>
+        {header}
+        <main>
+          {auth === 'checking' ? (
+            <div className="small muted">Checking your session…</div>
+          ) : (
+            <LoginForm
+              api={API}
+              slug="platform"
+              sessionPath="/session"
+              resetPath="/password-reset"
+              title="Platform login"
+              intro={
+                <>
+                  Log in with a platform account. Platform accounts are created with <code>pnpm --filter @rag/db super:add</code>.
+                </>
+              }
+              onLoggedIn={() => void askSession()}
+            />
+          )}
+        </main>
+      </>
+    );
+  }
+
+  if (selected === 'new') {
+    return (
+      <>
+        {header}
+        <main>
+          <TenantForm
+            api={API}
+            tenant={null}
+            selfUserId={userId}
+            onUnauthorized={unauthorized}
+            onSaved={(saved) => {
+              void loadTenants();
+              setSelected(saved.id);
+            }}
+          />
+        </main>
+      </>
+    );
+  }
+
+  if (typeof selected === 'number') {
+    return (
+      <>
+        {header}
+        <main>
+          {detail ? (
+            <TenantForm
+              api={API}
+              tenant={detail}
+              selfUserId={userId}
+              onUnauthorized={unauthorized}
+              onSaved={(saved) => {
+                setDetail(saved);
+                void loadTenants();
+              }}
+            />
+          ) : (
+            <div className="small">{detailMessage ?? 'Loading…'}</div>
+          )}
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {header}
+      <main>
+        <section className="card">
+          <div className="form-footer">
+            <h2>Tenants{tenants ? ` (${tenants.length})` : ''}</h2>
+            <button type="button" className="primary" onClick={() => setSelected('new')}>
+              New tenant
+            </button>
+          </div>
+          <p className="small muted">
+            Each tenant is a workspace at <code>/t/&lt;slug&gt;</code> with its own documents, assistant and theme. Archived
+            tenants answer 404 everywhere but here.
+          </p>
+          {tenants === null ? (
+            <div className="small">{listMessage}</div>
+          ) : tenants.length === 0 ? (
+            <div className="small muted">No tenants yet.</div>
+          ) : (
+            <div>
+              {tenants.map((t) => (
+                <div key={t.id} className="doc">
+                  <div className="doc-head">
+                    <span className="doc-title">
+                      {t.businessName}
+                      {t.archivedAt && <span className="muted"> · archived</span>}
+                    </span>
+                    <span className="doc-meta small muted">
+                      /t/{t.slug} · {t.assistantName} · {t.applications.length ? t.applications.join(', ') : 'no applications'} ·{' '}
+                      {t.members} member{t.members === 1 ? '' : 's'}
+                    </span>
+                    <button type="button" onClick={() => setSelected(t.id)}>
+                      Edit
+                    </button>
+                    {!t.archivedAt && (
+                      <a className="button" href={`/t/${t.slug}`} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </>
+  );
+}

@@ -304,6 +304,9 @@ export const applicationConfigSchema = z.object({
 const role = z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) });
 const userId = z.string({ required_error: 'A user id is required' }).uuid('That is not a user id');
 
-export const addMemberSchema = z.object({ email, role });
+/** An existing account, by email (the form) or by user id (the platform adding itself). One of the two. */
+export const addMemberSchema = z
+  .object({ email: email.optional(), userId: userId.optional(), role })
+  .refine((v) => (v.email ? 1 : 0) + (v.userId ? 1 : 0) === 1, 'Give an email or a user id, not both');
 export const memberRoleSchema = z.object({ userId, role });
 export const removeMemberSchema = z.object({ userId });

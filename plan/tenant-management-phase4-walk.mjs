@@ -146,6 +146,17 @@ try {
     `${noAccount.status} · ${addOwner.status} · ${addStaff.status} (${addStaff.data?.length}) · again ${again.status} · demote ${demote.status} "${err(demote)}"`,
   );
 
+  // 6b. "Make me an owner" (plan § 8 q5): the platform adds ITSELF by user id
+  //     → 201 and it is listed as owner; then removes itself → 200 (the other
+  //     owner stays, so the last-owner trigger allows it), and the list is 2 again.
+  const selfAdd = await call('POST', `/api/platform/tenants/${tenantId}/members`, { cookie, json: { userId: superUser.id, role: 'owner' } });
+  const selfRemove = await call('DELETE', `/api/platform/tenants/${tenantId}/members`, { cookie, json: { userId: superUser.id } });
+  check(
+    selfAdd.status === 201 && selfAdd.data.some((m) => m.userId === superUser.id && m.role === 'owner') && selfRemove.status === 200 && selfRemove.data.length === 2,
+    '6b. the platform adds itself as owner by user id → 201; removes itself → 200, 2 left',
+    `add ${selfAdd.status} (${selfAdd.data?.length}) · remove ${selfRemove.status} (${selfRemove.data?.length})`,
+  );
+
   // 7. The tenant's own members route: the owner (staff cookie) lists 2 and
   //    promotes the staffer to admin; the staffer (now admin) → 403 there,
   //    and 200 on the documents list; a platform cookie sent by hand → 401.

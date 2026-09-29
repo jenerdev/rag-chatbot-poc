@@ -32,7 +32,7 @@ function readLink(): LinkState {
   return { token };
 }
 
-export function ResetPassword({ slug }: { slug: string }) {
+export function ResetPassword({ api, loginHref }: { api: string; loginHref: string }) {
   const [link, setLink] = useState<LinkState>(null);
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
@@ -55,7 +55,7 @@ export function ResetPassword({ slug }: { slug: string }) {
       setError(null);
       let response: Response | null = null;
       try {
-        response = await fetch(`/api/t/${slug}/admin/password`, {
+        response = await fetch(api, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ accessToken: link.token, password }),
@@ -70,7 +70,7 @@ export function ResetPassword({ slug }: { slug: string }) {
         setBusy(false);
       }
     },
-    [link, password, again, slug],
+    [link, password, again, api],
   );
 
   if (link === null) return <div className="small muted">Reading the link…</div>;
@@ -80,7 +80,7 @@ export function ResetPassword({ slug }: { slug: string }) {
       <section className="card">
         <h2>Set a password</h2>
         <div className="notice error">{link.problem}</div>
-        <Link href={`/t/${slug}/admin`}>Back to the login form</Link>
+        <Link href={loginHref}>Back to the login form</Link>
       </section>
     );
   }
@@ -90,7 +90,7 @@ export function ResetPassword({ slug }: { slug: string }) {
       <section className="card">
         <h2>Set a password</h2>
         <div className="notice ok">{done}</div>
-        <Link className="button" href={`/t/${slug}/admin`}>
+        <Link className="button" href={loginHref}>
           Log in
         </Link>
       </section>
