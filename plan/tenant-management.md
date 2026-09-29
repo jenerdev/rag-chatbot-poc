@@ -86,9 +86,15 @@ that only one wall knows about is a bug.
 ### Rule 3 — No prompt, tool or retrieval change, so the battery must not move
 
 Nothing in this plan touches `buildPrompt()`, `language.ts`, `dates.ts`, a
-tool definition or a retrieval number. `pnpm eval` must read **59/61**
-(`original 9/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 5/5
-· price 3/3`), northwind's prompt snapshot must match
+tool definition or a retrieval number. `pnpm eval` must match Phase 0's
+run **verdict for verdict** (`plan/baseline/eval-pre-tenant-management-2026-09-29.txt`:
+57/61, `original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 ·
+book 4/5 · price 3/3`). Two of its four failures are DATE-driven, not
+code-driven, and are explained in Phase 0 below: `tool-leak` fails on any
+day whose number is a token in northwind's handbook, and
+`book-for-me-harbor` flipped with the fused chunk order for 13 October.
+Neither is this plan's to fix (Rule 3), and both are owed a separate look.
+Northwind's prompt snapshot must match
 `plan/baseline/northwind-prompt-pre-bookings.txt`, and villa's and harbor's
 tool definitions must match `villa-tools-post-villa-prices.txt` and
 `harbor-tools-pre-customer-booking.txt` byte for byte. A flipped verdict
@@ -452,17 +458,38 @@ until it is not.
 Each phase ends with the checks named in it, recorded in `status.md` and
 `whats-done.md` in the same turn, with observed values.
 
-### Phase 0 — Baseline and the record of the rules
+### Phase 0 — Baseline and the record of the rules · **done 2026-09-29**
+
+Observed: verify **92/92**; tests 13 + 14 + 94 + 329; typecheck clean;
+pipeline isolation **20/20** both ways; bookings isolation **29/29** both
+ways; rooms **30/30**; northwind's prompt, villa's and harbor's tool
+definitions byte-identical to their baselines (saved again as
+`*-pre-tenant-management.txt`); every live row passes the Phase 1
+constraints (`tenant-management-shapes-2026-09-29.txt`, 23/23); seven
+members over four tenants (`members-2026-09-29.txt`). Battery **57/61**:
+`antecedent` (D-017) and `lang-followup` (D-043) as always, plus two
+flips repeated per R-18 and traced to the date, both on unchanged code:
+- `tool-leak` 0 of 3: FREE is 13 October, and "13" is a tsvector token in
+  one northwind chunk (`vector:0 keyword:1 -> fused:1`, similarity 0.150),
+  so D-015's keyword rescue kept the model call the case forbids. On 12
+  October (every earlier run) nothing matched. The refusal and the zero
+  tool calls, the half that guards a leak, still held.
+- `book-for-me-harbor` 0 of 4: the same four chunks in a different fused
+  order, and the model offered to "send your request to the Dela Rosa
+  family" instead of naming the Book button. No booking was claimed. On 12
+  October it named the button 3 of 3.
 
 - Branch `feat/tenant-management`. Commit this plan on `master` first.
 - Record: verify **92/92**, eval **59/61** with the per-group line, pipeline
   isolation 20 both ways, bookings isolation 29 both ways, rooms 30, tests
   (count), `pnpm typecheck` clean. Prompt snapshot and both tool baselines
   diffed clean.
-- Run the three live themes, urls and names through the § 2.5 and § 3.3
-  constraints as SELECTs (`plan/tenant-management-phase0-shapes.sql`). Every
-  live row must pass before Phase 1 adds the constraint. Record what each
-  returned.
+- Run every live tenant's theme, urls and names, and every bookings
+  config, through the § 2.5 and § 3.3 rules
+  (`plan/tenant-management-phase0-shapes.mjs`: the same rules in
+  JavaScript, on the service client, because PostgREST runs no ad-hoc SQL).
+  Every live row must pass before Phase 1 adds the constraint. Record what
+  each returned.
 - `member:list` for every tenant, into `plan/baseline/members-2026-09-29.txt`:
   the rows the backfill will turn into `admin`.
 

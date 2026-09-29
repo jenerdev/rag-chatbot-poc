@@ -6133,3 +6133,42 @@ purpose (questionnaire rule 2: prices live on the Rooms and Holidays
 screens), so the script's numbers exist to make the booking page and the
 tool work until the owner sets the real ones. Nothing has to change in the
 documents when they do.
+
+## Tenant management, Phase 0: the baseline · done 2026-09-29
+
+**What:** on branch `feat/tenant-management`, every suite on the code the
+plan was written against, the three prompt and tool snapshots diffed
+against their baselines and saved again, a dry run of every constraint
+Phase 1 adds against every live row, and the members of every tenant on
+record. Nothing changed but the plan's own text.
+
+**Why it matters:** Rule 3 says the battery must not move, and § 2.5 says a
+constraint a live row fails is a migration. Both can only be judged against
+something taken before the first edit.
+
+**Observed** (`plan/baseline/*-pre-tenant-management*`,
+`tenant-management-shapes-2026-09-29.txt`, `members-2026-09-29.txt`):
+- verify 92/92; tests 13 + 14 + 94 + 329; typecheck clean; pipeline
+  isolation 20/20 both ways; bookings isolation 29/29 both ways; rooms 30/30;
+- northwind's prompt, villa's and harbor's tool definitions byte-identical;
+- the dry run 23/23: four tenants, themes of 0, 3, 0 and 0 valid keys, no
+  logo or banner anywhere, names within 1–100 and 1–50, no reserved slug,
+  no bookings config with the two new keys (so absent → 14 / 365 holds
+  for all three);
+- seven memberships over four tenants: one operator each, plus one human
+  test account for villa, harbor and alteza. Every row becomes `admin` in
+  Phase 1 (§ 8 q8);
+- battery **57/61**: `original 9/10 · tool 8/9 · lang 9/10 · date 11/11 ·
+  rooms 13/13 · book 4/5 · price 3/3`.
+
+**Trap met: the battery moves with the calendar.** Two verdicts flipped on
+code that had not changed since the 59/61 of 2026-09-28. Both were
+repeated first (R-18) and both trace to FREE being 13 October today:
+`tool-leak` because "13" is a full-text token in one northwind chunk, so
+the keyword rescue kept a model call the case forbids (the refusal and the
+zero tool calls held); `book-for-me-harbor` because the same four chunks
+fused in a different order and the model offered to send the request
+itself instead of naming the Book button (no booking claimed). Neither is
+this plan's to fix, so Rule 3 was reworded to "verdict for verdict against
+Phase 0's file", and both are owed a separate look: a date-independent
+`tool-leak`, and R-23's new shape for harbor.

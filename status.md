@@ -64,7 +64,19 @@ horizon), and a `role` on `memberships` (`owner` / `admin` / `staff`) that
 every admin route names and every write policy asks. Its § 8 is answered:
 every recommendation taken (roles `owner|admin|staff`, super as a table,
 archive not delete, existing accounts only in the browser, operators stay
-`admin`). Start with Phase 0 on a branch `feat/tenant-management`.
+`admin`). On branch `feat/tenant-management`.
+- [x] **Phase 0 — Baseline** (2026-09-29). verify 92/92; tests 13/14/94/329;
+  typecheck clean; pipeline isolation 20/20 both ways; bookings isolation
+  29/29 both ways; rooms 30/30; northwind prompt and both tool baselines
+  byte-identical; every live tenant passes the Phase 1 constraints (23/23);
+  members recorded (7 rows, 4 tenants). Battery **57/61**: the two known
+  failures plus `tool-leak` and `book-for-me-harbor`, both repeated and
+  both DATE-driven (13 October), on unchanged code. See the session log.
+- [ ] **Phase 1 — Schema** (`schema-roles.sql`, ten steps, guarded on
+  `platform_admins`).
+- [ ] Phase 2 — `@rag/db` and the CLI · [ ] Phase 3 — the guards ·
+  [ ] Phase 4 — platform and members routes · [ ] Phase 5 — screens ·
+  [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
 on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
@@ -1054,6 +1066,45 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 0 (baseline), on `feat/tenant-management`
+- **Did:** packages rebuilt; every suite run on `ebe9812` + the two docs
+  commits. verify 92/92; tests 13 + 14 + 94 + 329; typecheck clean;
+  pipeline isolation 20/20 both ways; bookings isolation 29/29 both ways;
+  rooms 30/30. Northwind's prompt snapshot byte-identical to
+  `northwind-prompt-pre-bookings.txt`; villa's tool definitions to
+  `villa-tools-post-villa-prices.txt`; harbor's to
+  `harbor-tools-pre-customer-booking.txt`; all three saved again as
+  `*-pre-tenant-management.txt`.
+- **The constraint dry run** (`plan/tenant-management-phase0-shapes.mjs`,
+  saved to `tenant-management-shapes-2026-09-29.txt`): 23/23. Four tenants
+  (northwind #1, villa #3, harbor #67, alteza #224); themes have 0, 3, 0, 0
+  keys, all valid colours; no logo or banner set anywhere; names 10–27 and
+  3–6 characters; no slug reserved; no bookings config carries the two new
+  keys yet (absent → 14 / 365).
+- **Members** (`members-2026-09-29.txt`): seven rows. Each tenant has its
+  operator; villa, harbor and alteza each have one human test account. All
+  seven become `admin` in Phase 1 (§ 8 q8).
+- **Battery 57/61, not 59.** `antecedent` and `lang-followup` as always.
+  Two more, repeated per R-18 before deciding, and both explained by the
+  DATE (FREE = today + 14 = 13 October 2026), not by code:
+  - `tool-leak` failed 3 of 3: "13" is a tsvector token in one northwind
+    chunk (`vector:0 keyword:1 -> fused:1`, similarity 0.150), so the
+    keyword rescue (D-015) stopped the D-008 short circuit and the model
+    was asked once. It refused with 0 tool calls, so no leak. Every earlier
+    run asked about 12 October, which matches nothing. The case's
+    `answerCalls === 0` half is date-dependent; a fix is owed, outside
+    this plan (Rule 3).
+  - `book-for-me-harbor` failed 4 of 4: the same four chunks, fused in a
+    different order (0.559/0.427/0.441/0.333 vs 0.437/0.557/0.423/0.326),
+    and the model offered to "send your request to the Dela Rosa family"
+    rather than naming the Book button. No booking claimed. 3 of 3 on 12
+    October. R-23's shape: the model reads what the PAGE does and offers to
+    do it. Owed a look, outside this plan.
+- **Rule 3 of the plan now says "verdict for verdict against Phase 0's
+  file"** rather than a fixed 59/61, because the number moves with the
+  calendar and this plan must not move the battery to chase it.
+- **Next:** Phase 1, `schema-roles.sql`.
 
 ### 2026-09-29 — tenant management and roles (planning)
 - **Did:** wrote [`plan/tenant-management.md`](./plan/tenant-management.md)

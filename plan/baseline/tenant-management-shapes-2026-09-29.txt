@@ -1,0 +1,26 @@
+4 tenants
+PASS  northwind (#1): tenants_theme_shape  — 0 key(s)
+PASS  northwind (#1): tenants_urls_https  — logo null · banner null
+PASS  northwind (#1): business_name 1–100  — 14 chars
+PASS  northwind (#1): assistant_name 1–50  — 4 chars
+PASS  northwind (#1): slug not reserved (incl. "platform")
+PASS  villa (#3): tenants_theme_shape  — 3 key(s)
+PASS  villa (#3): tenants_urls_https  — logo null · banner null
+PASS  villa (#3): business_name 1–100  — 27 chars
+PASS  villa (#3): assistant_name 1–50  — 3 chars
+PASS  villa (#3): slug not reserved (incl. "platform")
+PASS  harbor (#67): tenants_theme_shape  — 0 key(s)
+PASS  harbor (#67): tenants_urls_https  — logo null · banner null
+PASS  harbor (#67): business_name 1–100  — 10 chars
+PASS  harbor (#67): assistant_name 1–50  — 6 chars
+PASS  harbor (#67): slug not reserved (incl. "platform")
+PASS  alteza (#224): tenants_theme_shape  — 0 key(s)
+PASS  alteza (#224): tenants_urls_https  — logo null · banner null
+PASS  alteza (#224): business_name 1–100  — 22 chars
+PASS  alteza (#224): assistant_name 1–50  — 5 chars
+PASS  alteza (#224): slug not reserved (incl. "platform")
+PASS  villa: bookings config max_stay_nights / max_advance_days  — absent → 14 / absent → 365
+PASS  harbor: bookings config max_stay_nights / max_advance_days  — absent → 14 / absent → 365
+PASS  alteza: bookings config max_stay_nights / max_advance_days  — absent → 14 / absent → 365
+
+Every live row passes the Phase 1 constraints.
