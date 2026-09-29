@@ -1083,6 +1083,28 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   member becomes `admin`, owners promoted by hand after (q8).
 - **Next:** Phase 0 (baseline) on `feat/tenant-management`.
 
+### 2026-09-29 — alteza, the fourth tenant, loaded by script
+- **Did:** `sample-documents/alteza/01–11` (one per section of
+  `sample-documents/OWNER-QUESTIONNAIRE.md`, with a README that is never
+  ingested) went in through `plan/alteza-load.mjs`, and its six rooms,
+  rates and holiday calendar through `plan/alteza-rooms.mjs`. Both run as
+  alteza's operator member on a staff token, through the same package
+  functions the admin routes call, never as `service_role`; both are
+  idempotent (documents matched by title, rooms upserted by name).
+- **Observed** (`plan/baseline/alteza-*-2026-09-29.txt`): 11 documents,
+  48 chunks (documents #334–#344); six rooms (Casa Uno, Casa Dos, Familia,
+  Kubo A, Kubo B, Loft Suite) with Day Use and Overnight weekday/weekend
+  rates, ₱350 per extra guest except the Loft; ten calendar days set,
+  ₱1,000 peak on 24 and 31 Dec and 1 Jan, Holy Week 2027 marked.
+- **The rates are placeholders.** The documents hold no prices on purpose
+  (questionnaire rule 2), so the script's figures are invented for the owner
+  to replace on the Rooms screen. Nothing in the chat quotes them until then
+  except the tool, which quotes whatever the database holds.
+- **Why it matters for the next plan:** this is the fifth tenant set up by
+  CLI and script (northwind, villa, harbor, the eval probes, alteza), which
+  is what `plan/tenant-management.md` replaces for the tenant record; the
+  documents and rooms scripts stay (its § 8 q6).
+
 ### 2026-09-28 — villa's prices from the tool (D-074, `plan/villa-prices.md`)
 - **Built:** `check_room_availability`'s gate is the rate, not the type
   (the user re-ran `schema-customer-booking.sql`); `checkPricedAvailability`

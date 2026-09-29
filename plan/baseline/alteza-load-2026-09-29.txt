@@ -1,0 +1,12 @@
+ingested   #334  Alteza Hillside Resort — Overview  (3 chunks)
+ingested   #335  Alteza Hillside Resort — Rooms, Cottages and Capacity  (3 chunks)
+ingested   #336  Alteza Hillside Resort — Booking Periods, Inclusions and Pricing Rules  (4 chunks)
+ingested   #337  Alteza Hillside Resort — Booking, Payment and Proof of Payment  (4 chunks)
+ingested   #338  Alteza Hillside Resort — Cancellation, Rescheduling and Changes  (4 chunks)
+ingested   #339  Alteza Hillside Resort — House Rules  (6 chunks)
+ingested   #340  Alteza Hillside Resort — Amenities, Facilities, Food and Cooking  (5 chunks)
+ingested   #341  Alteza Hillside Resort — Directions, Parking and Arrival  (5 chunks)
+ingested   #342  Alteza Hillside Resort — Events and Add-Ons  (4 chunks)
+ingested   #343  Alteza Hillside Resort — Safety, Weather and Emergencies  (4 chunks)
+ingested   #344  Alteza Hillside Resort — Frequently Asked Questions  (6 chunks)
+alteza: 11 documents, 48 chunks

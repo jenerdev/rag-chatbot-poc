@@ -6100,3 +6100,36 @@ in the prompt was reworded to satisfy the counter (trap 10).
 **Limit:** `rt-leak-2` failed once on wording ("there is no specific
 mention of a Garden Room, but the entire property is available", which the
 check read as a claim) and passed 3 of 3 on repeat; unchanged.
+
+## Alteza, the fourth tenant: documents, rooms and calendar by script · done 2026-09-29
+
+**What:** eleven documents under `sample-documents/alteza/`, one per section
+of `sample-documents/OWNER-QUESTIONNAIRE.md` (a checklist for the first
+meeting with a resort owner, and how guests ask the same things), loaded by
+`plan/alteza-load.mjs`; six rooms with Day Use and Overnight rates, an
+extra-guest fee and a holiday calendar, loaded by `plan/alteza-rooms.mjs`.
+Both scripts run as alteza's operator member on a staff token
+(plan/auth-rls.md § 2.7) and are idempotent, so a document edited in the
+folder is re-ingested (new id, D-044) and a room edited by staff is kept.
+
+**Why it matters:** it is the first tenant built from the questionnaire
+rather than from an existing corpus, so the questionnaire is now tested
+against a real set of answers. And it is the last tenant that needs the
+command line for its record: `plan/tenant-management.md` puts the tenant
+form in the browser. The documents and rooms scripts stay in use (its § 8 q6).
+
+**Observed** (`plan/baseline/alteza-load-2026-09-29.txt`,
+`alteza-rooms-2026-09-29.txt`):
+- 11 documents ingested, 48 chunks, ids #334–#344, 3 to 6 chunks each;
+- rooms: Casa Uno 2/3, Casa Dos 2/3, Familia 4/6, Kubo A 2/4, Kubo B 2/4,
+  Loft Suite 2/2; ₱350 per extra guest where included < maximum, none for
+  the Loft; Day Use from ₱2,200/₱2,800 to ₱4,500/₱5,500, Overnight from
+  ₱3,500/₱4,400 to ₱6,500/₱8,000 (weekday/weekend);
+- calendar: 10 days set, +₱1,000 on 24 Dec, 31 Dec and 1 Jan for 2026–2028,
+  Holy Week 2027 (25–28 March) marked with no surcharge.
+
+**The rates are invented placeholders.** The documents hold no figures on
+purpose (questionnaire rule 2: prices live on the Rooms and Holidays
+screens), so the script's numbers exist to make the booking page and the
+tool work until the owner sets the real ones. Nothing has to change in the
+documents when they do.
