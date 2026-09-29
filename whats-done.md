@@ -6395,3 +6395,37 @@ drift; this is the same rule one step on). `addMember()` grew a second key,
 "Make me an owner" (plan § 8 q5) is that id and nothing else. The theme
 preview is the page's own mechanism, a `.tenant-root` carrying custom
 properties through `style`; there is no `<style>` tag and no new CSS.
+
+## Tenant management, Phase 6: proving the walls · done 2026-09-29 (bundle grep owed until `pnpm dev` stops)
+
+**What:** every suite on the finished code, one new isolation check, and
+the tenant-filter grep read line by line.
+
+**Why it matters:** plan Rule 2 says each wall is tested alone, and Rule 5
+says both walls for everything new. Phase 1 built the SQL-level checks into
+verify as the schema landed; this phase adds the one that only the pipeline
+can make (a platform token through the routes' own functions) and re-runs
+the lot.
+
+**Observed:**
+- pipeline isolation 21/21 on tokens, 20/20 with filters alone: the new
+  check, villa's context on a platform token, reads 0 documents, 0 chunks,
+  a null document and a null transcript; it does not run under
+  `--filters-only`, because there a platform token and villa's are the same
+  service client, and the comment says so: that wall is Postgres's alone;
+- bookings isolation 29/29 both ways; rooms 30/30; verify 109/109;
+  staff-cases 13/13; the Phase 4 walk 12/12;
+- battery 56/61: Phase 0's four, plus `leak-2`'s control (below);
+- the grep: every pipeline query on the four content tables carries its
+  tenant; `listTenants()` alone reads across tenants, on purpose.
+
+**Trap met: an identical prompt, a different answer.** `leak-2` failed 4 of
+4, and the half it exists for, northwind refusing villa's Wi-Fi password
+with 0 chunks retrieved, held every time. Its control, villa answering the
+same question, is what changed: the same five chunks with the same five
+scores, the same 1957-token prompt, and `gpt-4o-mini` answering at 11:xx
+and 14:xx (27 and 24 output tokens) and refusing at 16:xx (11 tokens, the
+marker). The password is whole in the chunk. When retrieval, prompt and
+data are byte-for-byte the same and only the reply moves, the cause is the
+model, and the record says so rather than rewording anything (Rule 3,
+R-18).

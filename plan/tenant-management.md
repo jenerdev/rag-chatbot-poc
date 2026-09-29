@@ -668,7 +668,30 @@ exists, with `/api/platform/password`.
 server string is a React child. The form's Save shows Postgres's reason
 verbatim when a trigger refuses.
 
-### Phase 6 — Proving the walls
+### Phase 6 — Proving the walls · **done 2026-09-29, except the bundle grep (needs `pnpm dev` stopped, trap 16)**
+
+Observed: verify 109/109 (the Phase 1 checks ARE this phase's list, built
+there so the schema could be proven as it landed); pipeline isolation
+**21/20** (a new RLS-only check: villa's context on a PLATFORM token reads 0
+documents, 0 chunks, a null document and a null transcript through the same
+functions the routes call; with `--filters-only` the check does not run,
+because a platform token and villa's are the same service client there,
+which is the point: that wall is Postgres's alone); bookings isolation
+29/29 both ways; rooms 30/30; staff-cases 13/13 (the three role cases);
+the Phase 4 walk 12/12 over HTTP. Battery **56/61**: the same four as
+Phase 0, plus `leak-2`, repeated 4 of 4 and traced: northwind's half, the
+leak assertion, HELD (`vector:0 keyword:0 -> fused:0`, the free refusal);
+what flipped is the CONTROL, villa asked the same question, with IDENTICAL
+retrieval (the same five chunks, the same scores) and an IDENTICAL prompt
+(1957 input tokens in all three runs today) and a different reply from
+`gpt-4o-mini`: 27 and 24 tokens of answer at Phase 0 and Phase 1, 11 tokens
+(the refusal) now. The password is whole in villa's chunk #152. Nothing in
+this plan touched retrieval, the prompt or the document; the flip is the
+model's, and it is recorded, not chased (Rule 3). plan.md Phase 3's grep:
+every pipeline query on the four content tables still carries its tenant;
+the new `platform.ts` reads `tenants`, `tenant_applications` and
+`memberships` WITHOUT a tenant in `listTenants()` alone, by design (the
+platform's list), and with one everywhere else.
 
 - **verify.mjs**, new checks, each with its twin:
   - a `staff` token cannot insert a document / a unit / a rate / a holiday;

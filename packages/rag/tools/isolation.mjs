@@ -21,6 +21,8 @@
 // Needs: pnpm --filter @rag/db member:operator -- villa
 //
 // Run:  pnpm --filter @rag/pipeline isolation [-- --filters-only]
+import { randomUUID } from 'node:crypto';
+import { mintPlatformToken, scopedClient } from '@rag/db';
 import { asOperator, supabase as service } from '@rag/db/service';
 import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
@@ -111,4 +113,17 @@ check(
   "villa's tool: its whole property only, priced from its own rates, none of harbor's",
   tV.map((r) => `${r.slot} ${r.price}`).join(', '),
 );
+// --- tenant management (plan/tenant-management.md Phase 6) ---------------------
+// A PLATFORM token (app_super, NO tenant_id) manages every tenant's record and
+// reads none of their content. Through the same functions the routes call,
+// handed villa's context with the platform token as its db: 0 documents, 0
+// chunks of a real document, a null document, a null transcript. RLS ONLY:
+// with --filters-only the db is the service client and the filters carry
+// villa's id, so a platform context is indistinguishable from villa's; this
+// wall is Postgres's alone, which is exactly what the check says.
+if (!filtersOnly) {
+  const platformVilla = { ...villa, db: scopedClient(mintPlatformToken({ userId: randomUUID() })) };
+  const pDocs = await listDocuments(platformVilla), pChunks = await getChunks(platformVilla, vdoc), pDoc = await getDocument(platformVilla, vdoc), pMsgs = await getMessages(platformVilla, aV.conversationId);
+  check(pDocs.length === 0 && pChunks.length === 0 && pDoc === null && pMsgs === null, 'a platform token reads no tenant content through the pipeline', `villa as platform: ${pDocs.length} documents, ${pChunks.length} chunks, document ${pDoc}, transcript ${pMsgs}`);
+}
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');

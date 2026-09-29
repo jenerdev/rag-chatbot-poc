@@ -103,7 +103,12 @@ archive not delete, existing accounts only in the browser, operators stay
   and `/password-reset`), `/t/<slug>/admin/members` (owners; a Members tab
   on the knowledge base). One members panel for both. Pages 200; walk 12/12;
   staff-cases 13/13; typecheck clean ·
-  [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
+  [x] **Phase 6 — the walls** (2026-09-29; the bundle grep waits for `pnpm dev`
+  to stop): pipeline isolation **21**/20 (new: a platform token reads no
+  tenant content through the pipeline, RLS only) · bookings isolation 29+29 ·
+  rooms 30 · verify 109 · staff-cases 13 · walk 12 · battery 56/61 (Phase 0's
+  four + `leak-2`'s CONTROL, a model flip on an identical prompt; the leak
+  half held) · the tenant-filter grep read · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
 on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
@@ -1093,6 +1098,40 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 6 (proving the walls; bundle grep owed)
+- **Did:** `packages/rag/tools/isolation.mjs` gained an RLS-only check:
+  villa's TenantContext with a PLATFORM token as its db (`mintPlatformToken`,
+  a random uuid, no `platform_admins` row needed for this) through
+  `listDocuments`, `getChunks`, `getDocument`, `getMessages` → 0, 0, null,
+  null. Ran every suite on the Phase 5 code; read plan.md Phase 3's grep.
+- **Observed:** pipeline isolation **21/21** on tokens and 20/20 filters-only
+  (the new check is RLS-only and says why); bookings isolation 29/29 both
+  ways; rooms 30/30; verify 109/109; staff-cases 13/13; the Phase 4 walk
+  12/12; battery **56/61** (`plan/baseline/eval-tenant-management-phase6.txt`).
+- **The battery's fifth failure is a model flip, not a leak.** `leak-2` asks
+  northwind for villa's Wi-Fi password: northwind retrieved 0 chunks and
+  refused for free, as always (the assertion the case exists for). Its
+  CONTROL asks villa the same question and expects "wi-fi" in the answer.
+  Villa's retrieval was identical in all three runs today (`vector:10
+  keyword:1 -> fused:5`, 0.361/0.455/0.423/0.353/0.338), the prompt was
+  1957 input tokens in all three, the password is whole in chunk #152, and
+  `gpt-4o-mini` answered at Phase 0 (27 tokens) and Phase 1 (24) and refused
+  now (11 tokens, the marker), 4 of 4 on repeat (R-18). An identical prompt
+  with a different reply is the model's doing; nothing in this plan touched
+  retrieval, the prompt or the document, and Rule 3 forbids chasing it.
+  Recorded, to re-run with Phase 7.
+- **The tenant-filter grep:** every `from('documents'|'chunks'|'messages'|
+  'conversations')` and every `rpc(` in `packages/rag/src` still carries its
+  tenant on the next line. The new `platform.ts` reads `tenants`,
+  `tenant_applications` and `memberships` with no tenant filter in
+  `listTenants()` ONLY, by design, and with `.eq('tenant_id', …)` or
+  `.eq('id', …)` in every other function; `members.ts` filters every query.
+- **Owed:** `pnpm build` and the rule 2 grep of `apps/web/.next/static/`
+  (extended with `app_super`, `platform_admins`, `rag_platform`, and the
+  key VALUES) need `pnpm dev` stopped first (CLAUDE.md trap 16).
+- **Next:** the bundle grep once dev is stopped; then Phase 7, the browser
+  walk, by the user.
 
 ### 2026-09-29 — tenant management Phase 5 (the screens; walk owed to Phase 7)
 - **Did:** `components/platform-screen.tsx` (session → login form → tenant
