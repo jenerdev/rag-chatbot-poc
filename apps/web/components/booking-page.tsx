@@ -16,10 +16,11 @@
 // Everything the server sends is a React child, so it is escaped, including
 // the tenant's own instructions text (CLAUDE.md § Conventions).
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
+import { TenantNav } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 
 export interface BookingPageScreenProps {
@@ -28,6 +29,8 @@ export interface BookingPageScreenProps {
   logoUrl: string | null;
   bannerUrl: string | null;
   page: BookingPage;
+  /** What the tenant has, for the header's links (lib/nav.ts). */
+  nav: NavFeatures;
 }
 
 /** YYYY-MM-DD plus n days, on UTC midnights, so no DST edge shifts the date. */
@@ -85,7 +88,7 @@ function instantLabel(iso: string, timezone: string): string {
 
 type Sent = { receipt: RequestReceipt } | null;
 
-export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page }: BookingPageScreenProps) {
+export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav }: BookingPageScreenProps) {
   const api = `/api/t/${slug}`;
   const perRoom = page.bookingType === 'per_room';
 
@@ -194,9 +197,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Book">
-      <Link className="button" href={`/t/${slug}`}>
-        ← Chat
-      </Link>
+      <TenantNav slug={slug} features={nav} current="book" />
     </BrandHeader>
   );
 

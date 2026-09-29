@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { UnansweredScreen } from '@/components/unanswered-screen';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-4 for one tenant: the questions the documents could not answer. Like the
@@ -13,7 +14,7 @@ export default async function TenantUnansweredPage({ params }: { params: Promise
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
 
-  const branding = await loadBranding(tenant);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
     <UnansweredScreen
@@ -21,6 +22,7 @@ export default async function TenantUnansweredPage({ params }: { params: Promise
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      nav={nav}
     />
   );
 }

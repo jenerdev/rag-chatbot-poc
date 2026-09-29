@@ -42,7 +42,9 @@ import type {
 } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { can, isRole, type Role } from '@/lib/permissions';
+import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
+import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
 
 export interface BookingsScreenProps {
@@ -50,6 +52,8 @@ export interface BookingsScreenProps {
   businessName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  /** What the tenant has, for the header's links (lib/nav.ts). */
+  nav: NavFeatures;
 }
 
 interface Setup {
@@ -192,7 +196,7 @@ function RequestRow({
   );
 }
 
-export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: BookingsScreenProps) {
+export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: BookingsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, from the session check. Hides the tabs a role cannot
@@ -482,27 +486,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Bookings">
-      {auth === 'in' && (
-        <button type="button" className="link" onClick={logout}>
-          Log out
-        </button>
-      )}
-      {perRoom && role && can(role, 'rooms:read') && (
-        <Link className="button" href={`/t/${slug}/admin/accommodations`}>
-          Rooms
-        </Link>
-      )}
-      {role && can(role, 'holidays:read') && (
-        <Link className="button" href={`/t/${slug}/admin/holidays`}>
-          Holidays
-        </Link>
-      )}
-      <Link className="button" href={`/t/${slug}/admin`}>
-        Knowledge base
-      </Link>
-      <Link className="button" href={`/t/${slug}`}>
-        ← Chat
-      </Link>
+      <TenantNav slug={slug} features={nav} current="bookings" session={{ auth, role, onLogout: logout }} />
     </BrandHeader>
   );
 
@@ -519,10 +503,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl }: Booki
               slug={slug}
               onLoggedIn={() => {
                 setAuth('in');
-                void fetch(`${api}/admin/session`)
-                  .then((r) => r.json())
-                  .then((body) => setRole(isRole(body.role) ? body.role : null))
-                  .catch(() => setRole(null));
+                void fetchRole(api).then(setRole);
               }}
             />
           )}

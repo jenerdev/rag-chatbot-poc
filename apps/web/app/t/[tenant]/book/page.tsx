@@ -3,6 +3,7 @@ import { bookingPage, BookingsNotEnabledError } from '@rag/bookings';
 import { BookingPageScreen } from '@/components/booking-page';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-6 · the customer booking page (plan/customer-booking.md § 2.8). PUBLIC,
@@ -28,7 +29,7 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
     if (error instanceof BookingsNotEnabledError) notFound();
     throw error;
   }
-  const branding = await loadBranding(tenant);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
     <BookingPageScreen
@@ -36,6 +37,7 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      nav={nav}
       page={page}
     />
   );

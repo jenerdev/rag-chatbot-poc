@@ -11,17 +11,21 @@
 // the answer is in the knowledge base. It adds a resolution row; the visitor's
 // transcript is never touched, and Reopen undoes it.
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
+import { isRole, type Role } from '@/lib/permissions';
 
 export interface UnansweredScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  /** What the tenant has, for the header's links (lib/nav.ts). */
+  nav: NavFeatures;
 }
 
 type Auth = 'checking' | 'out' | 'in';
@@ -37,9 +41,11 @@ function askedLabel(askedAt: string): string {
   });
 }
 
-export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: UnansweredScreenProps) {
+export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }: UnansweredScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
+  // What this member is, for the header's links only; the routes decide for themselves.
+  const [role, setRole] = useState<Role | null>(null);
   const [questions, setQuestions] = useState<UnansweredQuestion[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading…');
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
@@ -57,6 +63,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
         const response = await fetch(`${api}/admin/session`);
         const body = await response.json();
         setAuth(body.admin === true ? 'in' : 'out');
+        setRole(isRole(body.role) ? body.role : null);
       } catch {
         setAuth('out');
       }
@@ -108,17 +115,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Unanswered questions">
-      {auth === 'in' && (
-        <button type="button" className="link" onClick={logout}>
-          Log out
-        </button>
-      )}
-      <Link className="button" href={`/t/${slug}/admin`}>
-        Knowledge base
-      </Link>
-      <Link className="button" href={`/t/${slug}`}>
-        ← Chat
-      </Link>
+      <TenantNav slug={slug} features={nav} current="unanswered" session={{ auth, role, onLogout: logout }} />
     </BrandHeader>
   );
 
@@ -130,7 +127,10 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl }: Una
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
-            <LoginForm api={api} slug={slug} onLoggedIn={() => setAuth('in')} />
+            <LoginForm api={api} slug={slug} onLoggedIn={() => {
+                setAuth('in');
+                void fetchRole(api).then(setRole);
+              }} />
           )}
         </main>
       </>

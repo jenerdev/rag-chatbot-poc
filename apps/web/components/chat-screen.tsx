@@ -23,6 +23,8 @@ import type { Source, ToolCallRecord } from '@rag/pipeline';
 import { SourcesPanel } from '@/components/sources-panel';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { BrandHeader } from '@/components/brand-header';
+import { TenantNav } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
 export interface ChatScreenProps {
@@ -34,11 +36,12 @@ export interface ChatScreenProps {
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
   /**
-   * The customer booking page, or null when this tenant has none
-   * (plan/customer-booking.md § 8 q5). A button, not a link in the model's
-   * reply: the chat renders no links, and the model never books (D-037).
+   * What the tenant has, for the header's links (lib/nav.ts). `book` is the
+   * customer booking page (plan/customer-booking.md § 8 q5): a button, not a
+   * link in the model's reply: the chat renders no links, and the model never
+   * books (D-037).
    */
-  bookingUrl: string | null;
+  nav: NavFeatures;
 }
 
 type Turn =
@@ -69,7 +72,7 @@ export function ChatScreen({
   logoUrl,
   bannerUrl,
   documentCount,
-  bookingUrl,
+  nav,
 }: ChatScreenProps) {
   const api = `/api/t/${slug}`;
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -274,14 +277,7 @@ export function ChatScreen({
         <button className="link" type="button" onClick={newChat}>
           New chat
         </button>
-        {bookingUrl && (
-          <Link className="button primary" href={bookingUrl}>
-            Book
-          </Link>
-        )}
-        <Link className="button" href={`/t/${slug}/admin`}>
-          Knowledge base
-        </Link>
+        <TenantNav slug={slug} features={nav} current="chat" />
       </BrandHeader>
 
       <div id="messages" ref={messagesRef} onScroll={onScroll}>

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { BookingsScreen } from '@/components/bookings-screen';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-3 for one tenant. Like the knowledge-base page, the page itself holds no
@@ -18,7 +19,7 @@ export default async function TenantBookingsPage({ params }: { params: Promise<{
   if (!tenant) notFound();
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
 
-  const branding = await loadBranding(tenant);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
     <BookingsScreen
@@ -26,6 +27,7 @@ export default async function TenantBookingsPage({ params }: { params: Promise<{
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      nav={nav}
     />
   );
 }

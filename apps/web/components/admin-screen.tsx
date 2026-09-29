@@ -10,7 +10,6 @@
 // If not, it shows a login form. A 401 at any later point, such as an expired
 // session, drops back to that form instead of showing an error per row.
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 // The chunker the SERVER uses, imported straight into the browser.
 //
@@ -31,6 +30,8 @@ import type { ChunkSummary, DocumentDetail, DocumentSummary } from '@rag/pipelin
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
 import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
@@ -39,8 +40,8 @@ export interface AdminScreenProps {
   businessName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
-  /** Show the link to the bookings screen. Decided on the server, from tenant_applications. */
-  bookingsEnabled: boolean;
+  /** What the tenant has, for the header's links (lib/nav.ts). */
+  nav: NavFeatures;
 }
 
 type Auth = 'checking' | 'out' | 'in';
@@ -177,7 +178,7 @@ function DocumentRow({
 }
 
 
-export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEnabled }: AdminScreenProps) {
+export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: AdminScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is (tenant management Phase 3). Staff reads the knowledge
@@ -335,27 +336,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
       bannerUrl={bannerUrl}
       subtitle="Knowledge base"
     >
-      {auth === 'in' && (
-        <button type="button" className="link" onClick={logout}>
-          Log out
-        </button>
-      )}
-      {role && can(role, 'members:manage') && (
-        <Link className="button" href={`/t/${slug}/admin/members`}>
-          Members
-        </Link>
-      )}
-      <Link className="button" href={`/t/${slug}/admin/unanswered`}>
-        Unanswered
-      </Link>
-      {bookingsEnabled && (
-        <Link className="button" href={`/t/${slug}/admin/bookings`}>
-          Bookings
-        </Link>
-      )}
-      <Link className="button" href={`/t/${slug}`}>
-        ← Chat
-      </Link>
+      <TenantNav slug={slug} features={nav} current="documents" session={{ auth, role, onLogout: logout }} />
     </BrandHeader>
   );
 
@@ -373,10 +354,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, bookingsEn
               onLoggedIn={() => {
                 setAuth('in');
                 // The login route says only "admin: true"; the role is the session GET's.
-                void fetch(`${api}/admin/session`)
-                  .then((r) => r.json())
-                  .then((body) => setRole(isRole(body.role) ? body.role : null))
-                  .catch(() => setRole(null));
+                void fetchRole(api).then(setRole);
               }}
             />
           )}

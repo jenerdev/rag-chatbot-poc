@@ -130,7 +130,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -138,6 +138,8 @@ apps/web/              Next.js 15, App Router
   lib/admin-auth.ts      the staff session cookie; requireAdmin(request, tenant, permission) re-checks the membership and the ROLE → a STAFF context, or 401 / 403
   lib/platform-auth.ts   the platform session cookie (rag_platform, /api/platform); requirePlatform() → { db, userId }; withPlatformRoute()
   lib/permissions.ts     the ONE table of what each role may do — pure, imported by routes (the guard) and screens (the courtesy)
+  lib/nav-items.ts       navItems(): the header's links for a tenant's features and a role — pure, tested
+  lib/nav.ts             loadNavFeatures(): which of those pages the tenant has, the same checks the pages 404 on
   lib/theme.ts           the five theme keys, the colour regex, themeVars() and parseTheme() — pure, shared by the page and the platform form
   lib/applications.ts    requireApplication(): 404 unless the tenant has it switched on
   lib/branding.ts        the five-key theme allowlist, https-only image URLs

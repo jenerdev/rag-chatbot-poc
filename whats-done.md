@@ -6472,3 +6472,29 @@ status line.
 now says that roles exist, that the platform is a second token shape that
 reads no content, that a route names its permission or does not compile,
 and which three traps this plan met.
+
+## One header nav, by role · done 2026-09-30
+
+**What:** every tenant page (chat, book, knowledge base, unanswered,
+bookings, rooms, holidays, members, reset) draws its header links from one
+component, `components/tenant-nav.tsx`. The links come from one pure
+function, `navItems()` in `lib/nav-items.ts`: Chat and Book for everyone,
+then each staff page this role may open by `lib/permissions.ts` and this
+tenant has by `lib/nav.ts`, then Log out.
+
+**Why it matters:** before this, each screen hand-picked its own links.
+Holidays had no link to the knowledge base, Unanswered had none to
+Bookings, and only the knowledge base linked to Members. Now every page
+offers the same set for the same person, and a new page is added to the
+list in ONE place. The header is still a courtesy. The pages still 404 on a
+missing feature and the routes still answer 403 on a missing permission.
+
+**Observed:** web tests 23/23. The six new ones pin the header for a
+visitor, staff, admin and owner on harbor-, villa- and northwind-shaped
+tenants: staff see `Knowledge base, Unanswered, Bookings`; admin adds
+`Rooms, Holidays`; owner adds `Members`. All 27 tenant pages answered as
+before against `pnpm dev`.
+
+**Trap avoided:** the features come from the same checks the pages 404 on
+(`hasApplication`, `bookingType === 'per_room'`, `hasBookingPage`), so a
+button never leads to "No such workspace".

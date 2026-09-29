@@ -4,11 +4,12 @@
 // OWNERS. The page holds nothing; the browser proves its session first, and
 // the route behind every action asks `members:manage` again.
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { LoginForm } from '@/components/admin-login';
 import { BrandHeader } from '@/components/brand-header';
 import { MembersPanel } from '@/components/members-panel';
+import { TenantNav } from '@/components/tenant-nav';
+import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 
 type Auth = 'checking' | 'out' | 'in';
@@ -18,11 +19,13 @@ export function MembersScreen({
   businessName,
   logoUrl,
   bannerUrl,
+  nav,
 }: {
   slug: string;
   businessName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  nav: NavFeatures;
 }) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
@@ -55,17 +58,7 @@ export function MembersScreen({
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Members">
-      {auth === 'in' && (
-        <button type="button" className="link" onClick={logout}>
-          Log out
-        </button>
-      )}
-      <Link className="button" href={`/t/${slug}/admin`}>
-        Knowledge base
-      </Link>
-      <Link className="button" href={`/t/${slug}`}>
-        ← Chat
-      </Link>
+      <TenantNav slug={slug} features={nav} current="members" session={{ auth, role, onLogout: logout }} />
     </BrandHeader>
   );
 

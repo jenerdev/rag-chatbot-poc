@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-30 (tenant management complete and merged into `master` at `46dfb24`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-30 (one role-aware header nav on every tenant page; before that, tenant management complete and merged into `master` at `46dfb24`, D-075–D-079; planned 2026-09-29; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -55,6 +55,13 @@
 ---
 
 ## ▶ Next up (do this next)
+
+**Header nav (done 2026-09-30, browser walk owed):** every tenant page's
+header is now `components/tenant-nav.tsx`: Chat, Book, then every staff page
+the ROLE may open and the TENANT has (`lib/nav-items.ts`, from
+`lib/permissions.ts`), then Log out. Owed: a walk as owner, admin, staff and
+logged out, on villa, harbor and northwind, to see that each header matches
+`lib/nav-items.test.ts`.
 
 **Tenant management and roles (planned and decided 2026-09-29, not started):**
 [`plan/tenant-management.md`](./plan/tenant-management.md). A `/platform`
@@ -1104,6 +1111,23 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-30 — one header nav, by role
+- **Did:** replaced the hand-written links on nine tenant pages with one
+  `TenantNav`. The links come from `navItems(slug, features, role)`, which is
+  pure: the tenant's features are worked out on the server (`lib/nav.ts`, the
+  same checks the pages 404 on) and the role comes from `/admin/session`.
+  Staff screens pass their own session in. Chat, book and reset ask for
+  themselves. The current page is marked `aria-current`.
+- **Observed:** typecheck 11/11; web tests 23/23 (6 new); all 27 tenant
+  pages answered as before against `pnpm dev` (the 404s are the ones the
+  pages already return: villa has no Rooms, northwind has no bookings).
+  Logged out, villa's chat header is `Chat · Book`, northwind's is `Chat`.
+  Staff login and Log out appear once the session check comes back.
+- **Deviation:** the chat header's "Knowledge base" link now reads
+  "Staff login" when nobody is logged in. It still goes to `/admin`.
+- **Not run:** `pnpm eval`, isolation and verify. No prompt, query or policy
+  changed.
 
 ### 2026-09-30 — tenant management merged
 - **Did:** `git merge --ff-only feat/tenant-management` on `master`: master is

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AdminScreen } from '@/components/admin-screen';
-import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-2 for one tenant. The page itself is public: it holds no data until the
@@ -14,7 +14,7 @@ export default async function TenantAdminPage({ params }: { params: Promise<{ te
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
 
-  const [branding, bookingsEnabled] = await Promise.all([loadBranding(tenant), hasApplication(tenant, 'bookings')]);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
     <AdminScreen
@@ -22,7 +22,7 @@ export default async function TenantAdminPage({ params }: { params: Promise<{ te
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
-      bookingsEnabled={bookingsEnabled}
+      nav={nav}
     />
   );
 }

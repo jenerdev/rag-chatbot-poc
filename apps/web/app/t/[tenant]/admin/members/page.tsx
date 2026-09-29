@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { MembersScreen } from '@/components/members-screen';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-8 for one tenant: its members, for its owners (tenant management Phase 5).
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export default async function TenantMembersPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  const branding = await loadBranding(tenant);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
-  return <MembersScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} />;
+  return <MembersScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} nav={nav} />;
 }

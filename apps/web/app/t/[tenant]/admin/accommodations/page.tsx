@@ -3,6 +3,7 @@ import { bookingsConfig, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_IMAGES_PER_UNIT } 
 import { AccommodationsScreen } from '@/components/accommodations-screen';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
+import { loadNavFeatures } from '@/lib/nav';
 import { getTenant } from '@/lib/tenant';
 
 // S-5 · Rooms, for a per_room tenant (plan/booking-types.md Phase 4). Like the
@@ -25,7 +26,7 @@ export default async function TenantAccommodationsPage({ params }: { params: Pro
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
   if ((await bookingsConfig(tenant))?.bookingType !== 'per_room') notFound();
 
-  const branding = await loadBranding(tenant);
+  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
     <AccommodationsScreen
@@ -33,6 +34,7 @@ export default async function TenantAccommodationsPage({ params }: { params: Pro
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      nav={nav}
       maxImageBytes={MAX_IMAGE_BYTES}
       maxImageEdge={MAX_IMAGE_EDGE}
       maxImagesPerUnit={MAX_IMAGES_PER_UNIT}

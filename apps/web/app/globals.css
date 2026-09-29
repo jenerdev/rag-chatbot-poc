@@ -42,6 +42,12 @@ header {
 
 header h1 { font-size: 16px; margin: 0; font-weight: 600; }
 header nav { display: flex; gap: 8px; align-items: center; }
+/* The page you are on, among the header's links (components/tenant-nav.tsx). */
+header nav a.button[aria-current="page"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+@media (max-width: 720px) {
+  header { flex-wrap: wrap; }
+  header nav { flex-wrap: wrap; }
+}
 
 a.button, button, span.button {
   font: inherit;
