@@ -103,8 +103,8 @@ archive not delete, existing accounts only in the browser, operators stay
   and `/password-reset`), `/t/<slug>/admin/members` (owners; a Members tab
   on the knowledge base). One members panel for both. Pages 200; walk 12/12;
   staff-cases 13/13; typecheck clean ·
-  [x] **Phase 6 — the walls** (2026-09-29; the bundle grep waits for `pnpm dev`
-  to stop): pipeline isolation **21**/20 (new: a platform token reads no
+  [x] **Phase 6 — the walls** (2026-09-29; bundle clean: 0 secret names, 0
+  secret values in 68 static files, the twin present in 4): pipeline isolation **21**/20 (new: a platform token reads no
   tenant content through the pipeline, RLS only) · bookings isolation 29+29 ·
   rooms 30 · verify 109 · staff-cases 13 · walk 12 · battery 56/61 (Phase 0's
   four + `leak-2`'s CONTROL, a model flip on an identical prompt; the leak
@@ -1127,11 +1127,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   `tenant_applications` and `memberships` with no tenant filter in
   `listTenants()` ONLY, by design, and with `.eq('tenant_id', …)` or
   `.eq('id', …)` in every other function; `members.ts` filters every query.
-- **Owed:** `pnpm build` and the rule 2 grep of `apps/web/.next/static/`
-  (extended with `app_super`, `platform_admins`, `rag_platform`, and the
-  key VALUES) need `pnpm dev` stopped first (CLAUDE.md trap 16).
-- **Next:** the bundle grep once dev is stopped; then Phase 7, the browser
-  walk, by the user.
+- **The bundle (dev stopped by the user):** `next build` clean; 68 static
+  files hold none of the nine secret NAMES and none of the five secret
+  VALUES (read from .env, never printed); `members:manage` in 4 files is the
+  positive twin.
+- **Next:** Phase 7, the browser walk, by the user, on a restarted `pnpm dev`.
 
 ### 2026-09-29 — tenant management Phase 5 (the screens; walk owed to Phase 7)
 - **Did:** `components/platform-screen.tsx` (session → login form → tenant

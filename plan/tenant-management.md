@@ -668,7 +668,15 @@ exists, with `/api/platform/password`.
 server string is a React child. The form's Save shows Postgres's reason
 verbatim when a trigger refuses.
 
-### Phase 6 — Proving the walls · **done 2026-09-29, except the bundle grep (needs `pnpm dev` stopped, trap 16)**
+### Phase 6 — Proving the walls · **done 2026-09-29**
+
+Bundle (with `pnpm dev` stopped, trap 16): `next build` clean, the twelve
+new routes and three pages listed; 68 files under `apps/web/.next/static/`
+hold NONE of `service_role`, `SUPABASE_SECRET`, `TENANT_SIGNING_JWK`,
+`guest_phone`, `app_super`, `platform_admins`, `rag_platform`,
+`ADMIN_COOKIE_SECRET`, and none of the five secret VALUES (the service and
+secret keys, the cookie secret, the OpenAI key, the signing key's `d`); the
+positive twin, the client-side string `members:manage`, is in 4.
 
 Observed: verify 109/109 (the Phase 1 checks ARE this phase's list, built
 there so the schema could be proven as it landed); pipeline isolation

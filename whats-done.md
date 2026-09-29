@@ -6396,7 +6396,7 @@ drift; this is the same rule one step on). `addMember()` grew a second key,
 preview is the page's own mechanism, a `.tenant-root` carrying custom
 properties through `style`; there is no `<style>` tag and no new CSS.
 
-## Tenant management, Phase 6: proving the walls · done 2026-09-29 (bundle grep owed until `pnpm dev` stops)
+## Tenant management, Phase 6: proving the walls · done 2026-09-29
 
 **What:** every suite on the finished code, one new isolation check, and
 the tenant-filter grep read line by line.
@@ -6429,3 +6429,12 @@ marker). The password is whole in the chunk. When retrieval, prompt and
 data are byte-for-byte the same and only the reply moves, the cause is the
 model, and the record says so rather than rewording anything (Rule 3,
 R-18).
+
+**The bundle**, once the user stopped `pnpm dev`: `next build` clean, with the
+twelve new routes and three new pages in its table; 68 files under
+`apps/web/.next/static/` contain none of nine secret names (the rule 2 list
+plus `app_super`, `platform_admins`, `rag_platform`, `ADMIN_COOKIE_SECRET`)
+and none of five secret values read from `.env` (the service and secret
+keys, the cookie secret, the OpenAI key, the signing key's private `d`);
+the positive twin, `members:manage` from the client-side permission table,
+is in 4 of them, so the grep looked at the right files.
