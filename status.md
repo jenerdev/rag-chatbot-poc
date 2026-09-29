@@ -9,7 +9,7 @@
 > so the next session (you or a fresh Claude) starts immediately without
 > re-reading everything.
 >
-> Last updated: 2026-09-26 (Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
+> Last updated: 2026-09-29 (tenant management and roles planned, `plan/tenant-management.md`; before that 2026-09-26: Taglish replies, D-043; auth-rls complete and merged into `master` at `f3ea70b`; three email checks owed)
 
 ---
 
@@ -55,6 +55,16 @@
 ---
 
 ## ▶ Next up (do this next)
+
+**Tenant management and roles (planned and decided 2026-09-29, not started):**
+[`plan/tenant-management.md`](./plan/tenant-management.md). A `/platform`
+area where a super user creates, edits and archives tenants (names, theme,
+fallbacks, applications and their config, per-tenant max stay and booking
+horizon), and a `role` on `memberships` (`owner` / `admin` / `staff`) that
+every admin route names and every write policy asks. Its § 8 is answered:
+every recommendation taken (roles `owner|admin|staff`, super as a table,
+archive not delete, existing accounts only in the browser, operators stay
+`admin`). Start with Phase 0 on a branch `feat/tenant-management`.
 
 **Booking types (whole-resort / per-room)**, [`plan/booking-types.md`](./plan/booking-types.md),
 on branch `feat/booking-types` (plans committed on `master` at `e8fc28b`).
@@ -1044,6 +1054,34 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management and roles (planning)
+- **Did:** wrote [`plan/tenant-management.md`](./plan/tenant-management.md)
+  against `ebe9812`, after reading `schema-auth.sql`, `tenant-client.ts`,
+  `staff-auth.ts`, `admin-auth.ts`, `tenant.mjs`, `member.mjs`, the
+  `tenant_applications` triggers and `request_booking()`.
+- **The shape:** a `platform_admins` table and a second, tenant-less token
+  shape for the super user (same signer, still no role parameter);
+  `memberships.role` with `app_role()` underneath the unchanged
+  `app_is_admin()` so 30 policies keep their text; `app_is_staff()` for the
+  six bookings and unanswered policies; `requireAdmin(request, tenant,
+  permission)` with a REQUIRED permission (31 call sites become compile
+  errors until named); archive instead of delete (`tenant_public()` filters
+  `archived_at`, so an archived tenant is a 404 everywhere at once).
+- **Found while reading:** max stay (14) and the horizon (365) are constants
+  in `request_booking()` AND `constants.ts`, pinned equal by a test; the plan
+  moves them into the bookings config with the same absent-means-default
+  pattern as `booking_type` (D-050). `memberships` writes are revoked from
+  `authenticated`, so owner writes need the grant back AND a policy.
+- **Decided (the user: "decide based on your recommendations"):** all eight
+  § 8 questions, every recommendation taken. Roles are `owner|admin|staff`
+  and super is a `platform_admins` row (q1); owners do not edit branding
+  (q2); the browser adds existing accounts only (q3); `user_id_by_email()`
+  may say "not found", R-42 (q4); a super user reaches a tenant's screens
+  only as its owner (q5); slots stay a script (q6); switching an
+  application off is refused while a booking is live (q7); every existing
+  member becomes `admin`, owners promoted by hand after (q8).
+- **Next:** Phase 0 (baseline) on `feat/tenant-management`.
 
 ### 2026-09-28 — villa's prices from the tool (D-074, `plan/villa-prices.md`)
 - **Built:** `check_room_availability`'s gate is the rate, not the type
