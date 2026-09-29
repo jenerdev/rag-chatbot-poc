@@ -28,7 +28,7 @@ async function makeUser(name, memberOf) {
   const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) throw new Error(`create ${name}: ${error.message}`);
   for (const slug of memberOf) {
-    const { error: memberError } = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: idOf[slug] });
+    const { error: memberError } = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: idOf[slug], role: 'admin' });
     if (memberError) throw new Error(`membership ${name}/${slug}: ${memberError.message}`);
   }
   users[name] = { id: data.user.id, email, password };

@@ -45,6 +45,14 @@ $$;
 --    while the tenant has a live booking that has not ended would leave a
 --    whole-property booking that no room booking overlaps, or the reverse.
 --    The operator CLI (Phase 5) refuses first; this is the second wall.
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this (security definer, two more config keys).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 create or replace function tenant_applications_validate() returns trigger
 language plpgsql
 as $$
@@ -102,6 +110,9 @@ begin
   return new;
 end;
 $$;
+    $ddl$;
+  end if;
+end $guard$;
 -- The trigger itself (tenant_applications_validate, before insert or update)
 -- already exists from schema-bookings.sql and now runs this body.
 

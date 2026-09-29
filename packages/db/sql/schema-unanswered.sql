@@ -44,15 +44,36 @@ create index if not exists unanswered_resolutions_tenant_idx on unanswered_resol
 --    removed, never changed.
 alter table unanswered_resolutions enable row level security;
 
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- these three (any member, via app_is_staff()).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 drop policy if exists unanswered_resolutions_read   on unanswered_resolutions;
+    $ddl$;
+    execute $ddl$
 drop policy if exists unanswered_resolutions_insert on unanswered_resolutions;
+    $ddl$;
+    execute $ddl$
 drop policy if exists unanswered_resolutions_delete on unanswered_resolutions;
+    $ddl$;
+    execute $ddl$
 create policy unanswered_resolutions_read on unanswered_resolutions for select to authenticated
   using (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+    execute $ddl$
 create policy unanswered_resolutions_insert on unanswered_resolutions for insert to authenticated
   with check (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+    execute $ddl$
 create policy unanswered_resolutions_delete on unanswered_resolutions for delete to authenticated
   using (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+  end if;
+end $guard$;
 
 -- Belt and braces, as for memberships: Supabase grants every privilege on a
 -- new table by default. anon never needs this table; update is never used.

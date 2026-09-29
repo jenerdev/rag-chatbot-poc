@@ -16,8 +16,11 @@
 //
 // ⚠️ TENANT_SIGNING_JWK is a master key too (§ 2.2, R-19). Whoever holds it
 // can mint any claim, `role: service_role` included. So it is read here and
-// nowhere else, and mintTenantToken() mints exactly one shape: role
-// `authenticated`, a tenant, five minutes.
+// nowhere else, and this file mints exactly TWO shapes, both role
+// `authenticated`, both five minutes: a tenant token (mintTenantToken: a
+// tenant, optionally a staff user) and, since tenant management Phase 1, a
+// platform token (mintPlatformToken: a user and `app_super`, NO tenant).
+// Neither has a role parameter.
 import 'server-only';
 
 import { createPrivateKey, sign, type KeyObject } from 'node:crypto';
@@ -73,17 +76,37 @@ export function mintTenantToken(input: { tenantId: number; userId?: string; admi
   if (userId !== undefined && !UUID.test(userId)) throw new Error('mintTenantToken: userId must be a uuid');
   if (admin && userId === undefined) throw new Error('mintTenantToken: an admin token needs a userId');
 
-  const { key, kid } = loadSigningKey();
-  const now = Math.floor(Date.now() / 1000);
-  const claims = {
-    role: 'authenticated',
+  return signClaims({
     tenant_id: tenantId,
     ...(userId !== undefined ? { sub: userId } : {}),
     ...(admin ? { app_admin: true } : {}),
-    iat: now,
-    exp: now + TENANT_TOKEN_SECONDS,
-  };
-  const input64 = `${base64url({ alg: 'ES256', typ: 'JWT', kid })}.${base64url(claims)}`;
+  });
+}
+
+/**
+ * Mint the token the PLATFORM (a super user) reaches Postgres with
+ * (plan/tenant-management.md Rule 1).
+ *
+ * `{ sub, app_super: true }` and NO `tenant_id`. With no tenant claim,
+ * app_tenant_id() is null and every tenant policy is false, so this token
+ * reads no document, chunk or booking of anyone; only the `*_super_*`
+ * policies (schema-roles.sql) open a table to it, and each of those also
+ * demands a `platform_admins` row for this user (app_is_super()).
+ *
+ * Still `authenticated`, still five minutes, still no role parameter.
+ */
+export function mintPlatformToken(input: { userId: string }): string {
+  const { userId } = input;
+  if (!UUID.test(userId)) throw new Error('mintPlatformToken: userId must be a uuid');
+  return signClaims({ sub: userId, app_super: true });
+}
+
+/** The one signer. Adds the fixed claims (role, iat, exp) and signs; the two shapes above are its only callers. */
+function signClaims(claims: Record<string, unknown>): string {
+  const { key, kid } = loadSigningKey();
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { role: 'authenticated', ...claims, iat: now, exp: now + TENANT_TOKEN_SECONDS };
+  const input64 = `${base64url({ alg: 'ES256', typ: 'JWT', kid })}.${base64url(payload)}`;
   // A JWT's ES256 signature is raw r||s (IEEE P1363). node:crypto defaults to
   // DER, which every verifier rejects, with an error that does not say why.
   const signature = sign('sha256', Buffer.from(input64), { key, dsaEncoding: 'ieee-p1363' });

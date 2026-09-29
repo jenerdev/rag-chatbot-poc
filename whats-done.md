@@ -6172,3 +6172,63 @@ itself instead of naming the Book button (no booking claimed). Neither is
 this plan's to fix, so Rule 3 was reworded to "verdict for verdict against
 Phase 0's file", and both are owed a separate look: a date-independent
 `tool-leak`, and R-23's new shape for harbor.
+
+## Tenant management, Phase 1: the schema · done 2026-09-29
+
+**What:** `packages/db/sql/schema-roles.sql`: `memberships.role`
+(`owner | admin | staff`, every existing row backfilled to `admin`),
+`platform_admins`, `app_role()`, `app_is_admin()` redefined as owner or
+admin under the thirty policies that name it, `app_is_staff()` for the six
+bookings and unanswered policies, `app_is_super()`, `tenants.archived_at`
+and the first policy `tenants` has had (super only), `tenant_public()`
+hiding archived tenants, the theme, https, name-length and reserved-slug
+constraints, super and owner policies on `tenant_applications` and
+`memberships`, a no-delete-while-live trigger, a last-owner trigger,
+`request_booking()` reading `max_stay_nights` and `max_advance_days` from
+the config, and two definer lookups into `auth.users`. Five earlier files
+gained trap-20 guards. `@rag/db` gained `mintPlatformToken()`.
+
+**Why it matters:** the database now knows three business roles and one
+platform, and refuses on its own what the routes will refuse in Phase 3, so
+each wall can be tested alone (plan Rule 2). And a tenant can be created,
+edited and archived by a token that reads no tenant's content.
+
+**Observed** (`plan/baseline/verify-tenant-management-phase1.txt`,
+`eval-tenant-management-phase1.txt`):
+- verify **109/109**, 17 new: a staff token cannot insert a document and an
+  admin can; a staff token inserts and reads a booking; a chat token and a
+  staff token read 0 `tenants` rows while a platform token with its row
+  reads all 5 and 0 documents, chunks and bookings; the same token without
+  the row reads 0 tenants; the platform renames and archives a tenant and
+  `tenant_public()` returns 0 rows until it is unarchived; five bad shapes
+  refused with 23514 and a valid theme accepted; four bad config values
+  refused and 7 / 90 accepted; `member_emails()` lists 3 members to a staff
+  token and refuses a chat token and another tenant's id;
+  `user_id_by_email()` resolves a trimmed, mixed-case address for an
+  owner, null for an unknown one, 42501 for staff; a member reads its
+  tenant's 3 rows and a chat token 0; an owner promotes staff (1 row) while
+  staff and a cross-tenant update touch 0; the last owner cannot leave or
+  step down (23514) until a second owner exists; 3 nights accepted and 4
+  refused naming 3, 250 days out refused naming 200; switching bookings off
+  refused while live, allowed once cancelled;
+- pipeline isolation 20/20 both ways; bookings isolation 29/29 both ways;
+  rooms 30/30; tests 13 + 14 + 94 + 329; typecheck clean;
+- northwind's prompt and both tool baselines byte-identical; battery
+  **57/61**, verdict for verdict the same four as Phase 0 (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`);
+- seven memberships, all `admin`; `platform_admins` empty.
+
+**Trap met: a write under RLS reaches only what the token can read.** The
+owner policies were right and still did nothing: an UPDATE's target rows
+are filtered by the SELECT policies first, and an owner could see only its
+own row. verify's positive twin (1 row promoted) is what showed it; the
+negative checks alone would have passed. The fix, a tenant-wide read
+policy, then met the recursion rule: a policy that calls a function that
+reads the same table under that policy is "infinite recursion detected",
+so `app_role()` became SECURITY DEFINER. It reads the caller's own row and
+nothing else, which `memberships_read_own` already showed it.
+
+**Trap met: a column that loses its default breaks every writer at once.**
+Nine tool inserts into `memberships` failed with 23502, unreported, and
+the symptom was every staff write refused everywhere: no member, no
+`app_is_admin()`. Every insert now names its role, and `member.mjs` writes
+`admin` until Phase 2 gives it a role argument.

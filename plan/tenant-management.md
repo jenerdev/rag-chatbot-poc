@@ -493,7 +493,37 @@ flips repeated per R-18 and traced to the date, both on unchanged code:
 - `member:list` for every tenant, into `plan/baseline/members-2026-09-29.txt`:
   the rows the backfill will turn into `admin`.
 
-### Phase 1 — Schema (`packages/db/sql/schema-roles.sql`)
+### Phase 1 — Schema (`packages/db/sql/schema-roles.sql`) · **done 2026-09-29**
+
+Observed: verify **109/109** (17 new: check 27 split in three, 86b, and
+95–108); both isolation suites 20/20 and 29/29 both ways; rooms 30/30;
+tests 13 + 14 + 94 + 329; typecheck clean; northwind's prompt and both
+tool baselines byte-identical; battery **57/61**, verdict for verdict the same four as Phase 0 (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`). All seven memberships
+read `admin`. The file ran twice (the second run carried two deliberate
+changes, below); verify passed after each.
+
+Three things the first run taught, all in the file's comments:
+- **Every membership insert must name a role** now that the column has no
+  default: nine inserts across verify, both isolation suites, staff-cases,
+  member.mjs and two walk scripts. The symptom was every staff write
+  refused by RLS, because the probe users were never members.
+- **An UPDATE or DELETE under RLS reaches only rows the token can SELECT.**
+  An owner could select its own row only, so a role change matched 0 rows
+  and raised nothing. `memberships_read_tenant` (any member reads its
+  tenant's rows) fixes it, and that makes `app_role()` SECURITY DEFINER,
+  or the policy that calls it recurses into itself. It still reads one
+  row, the caller's own.
+- **Switching bookings off is refused while a booking is live**, so
+  verify's check 27, which did exactly that, now asserts the refusal, its
+  twin, then the original check, and restores the statuses after.
+
+`mintPlatformToken()` was built here rather than in Phase 2, because the
+platform-token checks needed it. Phase 2 keeps `platformClient()`,
+`staffClient()`'s role and the CLI. Definer functions are now ten:
+`tenant_public`, `check_availability`, `check_room_availability`,
+`request_booking`, `app_role`, `tenant_applications_validate`,
+`tenant_applications_no_delete_live`, `memberships_keep_an_owner`,
+`member_emails`, `user_id_by_email` (Phase 8 amends D-042).
 
 Idempotent, in this order, and guarded on `to_regclass('public.platform_admins')`
 wherever it replaces a definition from an earlier file (trap 20):

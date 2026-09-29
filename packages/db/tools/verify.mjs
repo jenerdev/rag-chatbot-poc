@@ -22,7 +22,7 @@
 // Run:  pnpm --filter @rag/db verify
 
 import { randomBytes } from 'node:crypto';
-import { anonClient, mintTenantToken, parseStoredVector, scopedClient, VECTOR_DIMENSIONS } from '../dist/index.js';
+import { anonClient, mintPlatformToken, mintTenantToken, parseStoredVector, scopedClient, VECTOR_DIMENSIONS } from '../dist/index.js';
 import { supabase } from '../dist/service.js';
 
 let failures = 0;
@@ -346,8 +346,27 @@ async function bookingChecks(probeId) {
   }
 
   // 27. Without the application, a tenant cannot hold bookings at all.
+  //     Since tenant management Phase 1, switching the application OFF is
+  //     itself refused while a booking has not ended
+  //     (tenant_applications_no_delete_live, plan § 8 q7), so that refusal is
+  //     checked first, its twin (off once every booking is cancelled) second,
+  //     and only then the original check.
   {
-    await supabase.from('tenant_applications').delete().eq('tenant_id', probeId).eq('application_key', 'bookings');
+    const off = () => supabase.from('tenant_applications').delete().eq('tenant_id', probeId).eq('application_key', 'bookings').select('tenant_id');
+    const refused = await off();
+    check(
+      refused.error?.code === '23514' && /live booking/.test(refused.error.message),
+      'roles: bookings cannot be switched off while a booking is live',
+      refused.error ? `${refused.error.code} ${refused.error.message}` : `DELETED ${refused.data?.length} row(s)`,
+    );
+    const { data: before } = await supabase.from('bookings').select('id, status').eq('tenant_id', probeId);
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('tenant_id', probeId);
+    const allowed = await off();
+    check(
+      !allowed.error && allowed.data.length === 1,
+      'roles: switched off once every booking is cancelled',
+      allowed.error ? `${allowed.error.code} ${allowed.error.message}` : `${allowed.data.length} row deleted`,
+    );
     const error = await insertExpectingFailure({
       tenant_id: probeId,
       unit_id: unit.id,
@@ -360,6 +379,10 @@ async function bookingChecks(probeId) {
       'no bookings application, no bookings',
       error ? `${error.code} ${error.message}` : 'INSERT SUCCEEDED — the trigger does not check the application',
     );
+    // The statuses back as they were: authChecks (37–39) expects a taken slot.
+    for (const row of before ?? []) {
+      if (row.status !== 'cancelled') await supabase.from('bookings').update({ status: row.status }).eq('id', row.id);
+    }
   }
 }
 
@@ -381,6 +404,7 @@ async function bookingChecks(probeId) {
 const asToken = (token) => (token ? scopedClient(token) : anonClient());
 const chatToken = (tenantId) => mintTenantToken({ tenantId }); // no sub (§ 2.4)
 const staffToken = (tenantId, userId) => mintTenantToken({ tenantId, userId, admin: true });
+const platformToken = (userId) => mintPlatformToken({ userId }); // no tenant_id (tenant management Rule 1)
 
 async function authChecks(probeId, anyChunk) {
   const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
@@ -552,7 +576,7 @@ async function authChecks(probeId, anyChunk) {
     }
 
     // 44. With a membership, it can insert, and delete what it inserted.
-    await supabase.from('memberships').insert({ user_id: userId, tenant_id: probeId });
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: probeId, role: 'admin' });
     {
       const staff = asToken(staffToken(probeId, userId));
       const inserted = await staff.from('documents').insert(document(probeId)).select('id').single();
@@ -977,7 +1001,7 @@ async function bookingTypeChecks(probeId) {
       return;
     }
     userId = created.user.id;
-    await supabase.from('memberships').insert({ user_id: userId, tenant_id: roomsId });
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: roomsId, role: 'admin' });
     const staff = asToken(staffToken(roomsId, userId));
     const chat = asToken(chatToken(roomsId));
 
@@ -1192,7 +1216,7 @@ async function customerBookingChecks() {
       return;
     }
     userId = created.user.id;
-    await supabase.from('memberships').insert({ user_id: userId, tenant_id: bookId });
+    await supabase.from('memberships').insert({ user_id: userId, tenant_id: bookId, role: 'admin' });
     const staff = asToken(staffToken(bookId, userId));
     const chat = asToken(chatToken(bookId));
     const request = (client, overrides = {}) =>
@@ -1293,6 +1317,30 @@ async function customerBookingChecks() {
         `14 ${fourteen.error?.code ?? `${fourteen.data.length} rows`} · 15 ${fifteen.error?.code ?? 'ACCEPTED'} · Day Tour ${dayTour.error?.code ?? 'ACCEPTED'}`,
       );
       await supabase.from('bookings').delete().eq('tenant_id', bookId).eq('guest_email', 'long@example.com');
+    }
+
+    // 86b. (tenant management Phase 1, plan § 2.4) The limits are the TENANT's:
+    //      with max_stay_nights 3 and max_advance_days 200 in the config, 3
+    //      nights are accepted, 4 are refused with a message naming 3, and a
+    //      date 250 days out is refused naming 200. The keys removed, 86's 14
+    //      and 365 hold again. request_booking() and the trigger read the same
+    //      row, so there is no second copy of the number to drift.
+    {
+      const where = (q) => q.eq('tenant_id', bookId).eq('application_key', 'bookings');
+      const { data: app } = await where(supabase.from('tenant_applications').select('config')).single();
+      await where(supabase.from('tenant_applications').update({ config: { ...app.config, max_stay_nights: 3, max_advance_days: 200 } }));
+      const three = await request(chat, { p_check_in: addDays(thursday, 150), p_nights: 3, p_phone: '09170000009', p_email: 'limits@example.com' });
+      const four = await request(chat, { p_check_in: addDays(thursday, 160), p_nights: 4, p_phone: '09170000009', p_email: 'limits@example.com' });
+      const far = await request(chat, { p_check_in: addDays(thursday, 250), p_nights: 1, p_phone: '09170000009', p_email: 'limits@example.com' });
+      await where(supabase.from('tenant_applications').update({ config: app.config }));
+      check(
+        !three.error && three.data.length === 3
+          && four.error?.code === '22023' && /1 to 3 nights/.test(four.error.message)
+          && far.error?.code === '22023' && /200 days/.test(far.error.message),
+        'request_booking: max_stay_nights and max_advance_days come from the tenant config',
+        `3 ${three.error?.code ?? `${three.data.length} rows`} · 4 ${four.error ? `${four.error.code} "${four.error.message}"` : 'ACCEPTED'} · +250d ${far.error ? `${far.error.code} "${far.error.message}"` : 'ACCEPTED'}`,
+      );
+      await supabase.from('bookings').delete().eq('tenant_id', bookId).eq('guest_email', 'limits@example.com');
     }
 
     // 87. Contact details are checked for FORMAT: a landline-shaped phone, a
@@ -1458,6 +1506,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await authChecks(probe.id, chunk);
       await bookingTypeChecks(probe.id);
       await customerBookingChecks();
+      await rolesChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);
@@ -1465,6 +1514,257 @@ if (chunk && typeof chunk.tenant_id === 'number') {
   }
 } else if (chunk) {
   check(false, 'chunk has a tenant_id', 'run packages/db/sql/schema-tenancy.sql first');
+}
+
+// ---------------------------------------------------------------------------
+// Tenant management Phase 1 (plan/tenant-management.md): roles on memberships,
+// the platform table and token, and the tenants constraints. Every RLS check
+// has its positive twin (CLAUDE.md trap 12). A throwaway `roles-probe`
+// tenant and four probe users, all deleted at the end.
+async function rolesChecks() {
+  // 95. Is schema-roles.sql applied at all?
+  const roleCol = await supabase.from('memberships').select('role', { count: 'exact', head: true });
+  const platform = await supabase.from('platform_admins').select('user_id', { count: 'exact', head: true });
+  check(
+    !roleCol.error && !platform.error,
+    'roles: schema-roles.sql is applied (memberships.role, platform_admins)',
+    roleCol.error?.message ?? platform.error?.message ?? `${roleCol.count} memberships · ${platform.count} platform admins`,
+  );
+  if (roleCol.error || platform.error) return;
+
+  const { data: probe, error: probeError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'roles-probe', business_name: 'roles probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (probeError) {
+    check(false, 'roles: create the roles-probe tenant', probeError.message);
+    return;
+  }
+  const stamp = Date.now();
+  const ids = {};
+  try {
+    for (const name of ['owner', 'admin', 'staff', 'super']) {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: `roles-probe-${name}-${stamp}@example.com`,
+        password: randomBytes(24).toString('base64url'),
+        email_confirm: true,
+      });
+      if (error) throw new Error(`create ${name}: ${error.message}`);
+      ids[name] = data.user.id;
+    }
+    const { error: memberError } = await supabase.from('memberships').insert([
+      { user_id: ids.owner, tenant_id: probe.id, role: 'owner' },
+      { user_id: ids.admin, tenant_id: probe.id, role: 'admin' },
+      { user_id: ids.staff, tenant_id: probe.id, role: 'staff' },
+    ]);
+    if (memberError) throw new Error(`memberships: ${memberError.message}`);
+    const as = { owner: asToken(staffToken(probe.id, ids.owner)), admin: asToken(staffToken(probe.id, ids.admin)), staff: asToken(staffToken(probe.id, ids.staff)) };
+    const chat = asToken(chatToken(probe.id));
+
+    // 96. app_role() is the ROW's role for a staff token, and null for a chat token.
+    {
+      const roles = {};
+      for (const [name, client] of Object.entries({ ...as, chat })) roles[name] = (await client.rpc('app_role')).data ?? null;
+      check(
+        roles.owner === 'owner' && roles.admin === 'admin' && roles.staff === 'staff' && roles.chat === null,
+        'roles: app_role() reads the row (owner, admin, staff), null for a chat token',
+        JSON.stringify(roles),
+      );
+    }
+
+    // 97. Wall 2 alone: a staff token cannot insert a document; an admin token
+    //     can (the twin), and the row is deleted again.
+    {
+      const document = { tenant_id: probe.id, title: 'roles probe', content: 'roles probe' };
+      const denied = await as.staff.from('documents').insert(document).select('id');
+      if (!denied.error) await supabase.from('documents').delete().in('id', denied.data.map((r) => r.id));
+      const allowed = await as.admin.from('documents').insert(document).select('id').single();
+      if (!allowed.error) await supabase.from('documents').delete().eq('id', allowed.data.id);
+      check(
+        denied.error?.code === '42501' && !allowed.error,
+        'roles: staff cannot insert a document, admin can',
+        `staff ${denied.error ? denied.error.code : 'INSERTED'} · admin ${allowed.error ? allowed.error.message : `#${allowed.data.id}`}`,
+      );
+    }
+
+    // 98. The widened policies: a staff token CAN insert and read a booking.
+    {
+      await supabase.from('tenant_applications').insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+      const { data: unit } = await supabase.from('units').insert({ tenant_id: probe.id, name: 'Roles unit' }).select('id').single();
+      const { data: slot } = await supabase.from('slots').insert({ tenant_id: probe.id, name: 'Day Tour', start_time: '08:00', duration: '9 hours' }).select('id').single();
+      const inserted = await as.staff
+        .from('bookings')
+        .insert({ tenant_id: probe.id, unit_id: unit.id, slot_id: slot.id, booked_date: '2027-06-01', guest_name: 'roles probe' })
+        .select('id')
+        .single();
+      const seen = await as.staff.from('bookings').select('id').eq('tenant_id', probe.id);
+      check(
+        !inserted.error && !seen.error && seen.data.length === 1,
+        'roles: staff can insert and read a booking',
+        inserted.error ? `${inserted.error.code} ${inserted.error.message}` : `#${inserted.data.id} · reads ${seen.data?.length}`,
+      );
+      await supabase.from('bookings').delete().eq('tenant_id', probe.id);
+    }
+
+    // 99. tenants: a chat token and a staff token read 0 rows; a platform token
+    //     WITH its platform_admins row reads every tenant (the count matches
+    //     service_role's), archived included, and reads 0 rows of any tenant table.
+    // 100. The claim without the row: the same token, once the row is gone,
+    //     reads 0 tenants. Without this twin, 99 would prove only that the
+    //     claim is honoured, not that the row is required (plan Rule 1).
+    {
+      const chatRows = await chat.from('tenants').select('id');
+      const staffRows = await as.owner.from('tenants').select('id');
+      await supabase.from('platform_admins').insert({ user_id: ids.super });
+      const superClient = asToken(platformToken(ids.super));
+      const all = await superClient.from('tenants').select('id');
+      const { count } = await supabase.from('tenants').select('id', { count: 'exact', head: true });
+      const documents = await superClient.from('documents').select('id');
+      const chunks = await superClient.from('chunks').select('id');
+      const bookings = await superClient.from('bookings').select('id');
+      check(
+        !chatRows.error && chatRows.data.length === 0 && !staffRows.error && staffRows.data.length === 0
+          && !all.error && all.data.length === count && count >= 5
+          && documents.data?.length === 0 && chunks.data?.length === 0 && bookings.data?.length === 0,
+        'roles: tenants read by the platform only, and the platform reads no tenant table',
+        `chat ${chatRows.data?.length} · staff ${staffRows.data?.length} · platform ${all.error ? all.error.message : all.data.length} of ${count} · documents ${documents.data?.length} chunks ${chunks.data?.length} bookings ${bookings.data?.length}`,
+      );
+      await supabase.from('platform_admins').delete().eq('user_id', ids.super);
+      const none = await asToken(platformToken(ids.super)).from('tenants').select('id');
+      check(!none.error && none.data.length === 0, 'roles: app_super without a platform_admins row reads 0 tenants', none.error ? none.error.message : `${none.data.length} rows`);
+      await supabase.from('platform_admins').insert({ user_id: ids.super });
+    }
+
+    // 101. The platform writes a tenant: update, archive (tenant_public stops
+    //      returning it, so the app answers 404 everywhere), unarchive.
+    {
+      const superClient = asToken(platformToken(ids.super));
+      const renamed = await superClient.from('tenants').update({ assistant_name: 'Probe 2' }).eq('id', probe.id).select('assistant_name').single();
+      const archived = await superClient.from('tenants').update({ archived_at: new Date().toISOString() }).eq('id', probe.id).select('id');
+      const gone = await asToken(null).rpc('tenant_public', { p_slug: 'roles-probe' });
+      const back = await superClient.from('tenants').update({ archived_at: null }).eq('id', probe.id).select('id');
+      const found = await asToken(null).rpc('tenant_public', { p_slug: 'roles-probe' });
+      check(
+        renamed.data?.assistant_name === 'Probe 2' && archived.data?.length === 1 && gone.data?.length === 0 && back.data?.length === 1 && found.data?.length === 1,
+        'roles: the platform edits and archives a tenant; tenant_public hides an archived one',
+        `renamed ${renamed.error ? renamed.error.message : renamed.data.assistant_name} · archived ${archived.data?.length} · public while archived ${gone.data?.length} · after ${found.data?.length}`,
+      );
+    }
+
+    // 102. The write-side shapes on tenants, refused by Postgres (23514).
+    {
+      const bad = [];
+      for (const [label, patch] of [
+        ['theme url()', { theme: { accent: 'url(javascript:alert(1))' } }],
+        ['theme unknown key', { theme: { accent: '#0f766e', font: 'Comic Sans' } }],
+        ['http logo', { logo_url: 'http://example.com/logo.png' }],
+        ['empty business name', { business_name: '' }],
+        ['reserved slug', { slug: 'platform' }],
+      ]) {
+        const { error } = await supabase.from('tenants').update(patch).eq('id', probe.id);
+        if (error?.code !== '23514') bad.push(`${label}: ${error ? error.code : 'ACCEPTED'}`);
+      }
+      const good = await supabase.from('tenants').update({ theme: { accent: '#0f766e', bg: '#fff' }, logo_url: 'https://example.com/logo.png' }).eq('id', probe.id).select('id');
+      check(bad.length === 0 && !good.error, 'roles: theme, url, name and slug shapes refused; a valid theme accepted', bad.length ? bad.join(' · ') : `5 refused · valid ${good.error ? good.error.message : 'accepted'}`);
+    }
+
+    // 103. The two new config keys: whole numbers within bounds, or 23514.
+    {
+      const app = (config) => supabase.from('tenant_applications').update({ config }).eq('tenant_id', probe.id).eq('application_key', 'bookings');
+      const bad = [];
+      for (const [label, config] of [
+        ['0 nights', { timezone: 'Asia/Manila', max_stay_nights: 0 }],
+        ['3.5 nights', { timezone: 'Asia/Manila', max_stay_nights: 3.5 }],
+        ['"7" as a string', { timezone: 'Asia/Manila', max_stay_nights: '7' }],
+        ['800 days', { timezone: 'Asia/Manila', max_advance_days: 800 }],
+      ]) {
+        const { error } = await app(config);
+        if (error?.code !== '23514') bad.push(`${label}: ${error ? error.code : 'ACCEPTED'}`);
+      }
+      const good = await app({ timezone: 'Asia/Manila', max_stay_nights: 7, max_advance_days: 90 }).select('config');
+      check(bad.length === 0 && !good.error, 'roles: max_stay_nights and max_advance_days validated by the trigger', bad.length ? bad.join(' · ') : `4 refused · 7 / 90 accepted`);
+    }
+
+    // 104. member_emails(): a member sees the tenant's members with emails; a
+    //      chat token is refused, and so is another tenant's id.
+    // 105. user_id_by_email(): an owner resolves an address; a staff token is refused.
+    {
+      const list = await as.staff.rpc('member_emails', { p_tenant_id: probe.id });
+      const chatList = await chat.rpc('member_emails', { p_tenant_id: probe.id });
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const otherList = await as.owner.rpc('member_emails', { p_tenant_id: villaRow.id });
+      const emails = (list.data ?? []).map((r) => r.email).sort();
+      check(
+        !list.error && list.data.length === 3 && emails.every((e) => e.startsWith('roles-probe-')) && chatList.error?.code === '42501' && otherList.error?.code === '42501',
+        'roles: member_emails() lists the tenant to its members, refuses a chat token and another tenant',
+        list.error ? list.error.message : `${list.data.length} members with emails · chat ${chatList.error?.code ?? 'ROWS'} · villa ${otherList.error?.code ?? 'ROWS'}`,
+      );
+      const found = await as.owner.rpc('user_id_by_email', { p_email: `  Roles-Probe-staff-${stamp}@example.com ` });
+      const missing = await as.owner.rpc('user_id_by_email', { p_email: 'nobody-${stamp}@example.com' });
+      const denied = await as.staff.rpc('user_id_by_email', { p_email: `roles-probe-owner-${stamp}@example.com` });
+      check(
+        found.data === ids.staff && missing.data === null && denied.error?.code === '42501',
+        'roles: user_id_by_email() for an owner (trimmed, any case), null when unknown, refused for staff',
+        `found ${found.data === ids.staff} · missing ${missing.data} · staff ${denied.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+
+    // 106. Members read their tenant's rows (memberships_read_tenant): staff
+    //      sees 3, a chat token 0; and an UPDATE reaches only rows its token
+    //      can SELECT, which is what the next check relies on.
+    {
+      const staffSees = await as.staff.from('memberships').select('user_id').eq('tenant_id', probe.id);
+      const chatSees = await chat.from('memberships').select('user_id');
+      check(
+        !staffSees.error && staffSees.data.length === 3 && !chatSees.error && chatSees.data.length === 0,
+        "roles: a member reads its tenant's memberships, a chat token none",
+        `staff ${staffSees.error ? staffSees.error.message : staffSees.data.length} · chat ${chatSees.error ? chatSees.error.message : chatSees.data.length}`,
+      );
+    }
+
+    // 107. Owners manage their tenant's rows: an owner promotes staff to admin
+    //      (1 row); a staff token changes nothing (0 rows); an owner's update
+    //      aimed at villa's rows touches nothing (0 rows, and villa unchanged).
+    {
+      const promoted = await as.owner.from('memberships').update({ role: 'admin' }).eq('tenant_id', probe.id).eq('user_id', ids.staff).select('role');
+      const byStaff = await as.staff.from('memberships').update({ role: 'staff' }).eq('tenant_id', probe.id).eq('user_id', ids.owner).select('role');
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const acrossTenants = await as.owner.from('memberships').update({ role: 'staff' }).eq('tenant_id', villaRow.id).select('role');
+      const { data: villaRoles } = await supabase.from('memberships').select('role').eq('tenant_id', villaRow.id);
+      check(
+        promoted.data?.length === 1 && promoted.data[0].role === 'admin' && byStaff.data?.length === 0 && acrossTenants.data?.length === 0 && villaRoles.every((r) => r.role !== 'staff'),
+        'roles: an owner changes a role in its tenant only; staff changes nothing',
+        `owner→ ${promoted.error ? promoted.error.message : promoted.data.length} row · staff→ ${byStaff.data?.length ?? byStaff.error?.code} · across tenants ${acrossTenants.data?.length ?? acrossTenants.error?.code} · villa still ${villaRoles.map((r) => r.role).join(',')}`,
+      );
+    }
+
+    // 108. The last owner stays: the owner cannot delete or demote itself while
+    //      it is the only owner (23514); after making a second owner, it can.
+    {
+      const selfDelete = await as.owner.from('memberships').delete().eq('tenant_id', probe.id).eq('user_id', ids.owner).select('user_id');
+      const selfDemote = await as.owner.from('memberships').update({ role: 'staff' }).eq('tenant_id', probe.id).eq('user_id', ids.owner).select('role');
+      const second = await as.owner.from('memberships').update({ role: 'owner' }).eq('tenant_id', probe.id).eq('user_id', ids.admin).select('role');
+      const now = await as.owner.from('memberships').delete().eq('tenant_id', probe.id).eq('user_id', ids.owner).select('user_id');
+      check(
+        selfDelete.error?.code === '23514' && selfDemote.error?.code === '23514' && second.data?.length === 1 && now.data?.length === 1,
+        'roles: the last owner cannot leave or step down; with a second owner it can',
+        `delete ${selfDelete.error?.code ?? 'DELETED'} · demote ${selfDemote.error?.code ?? 'DEMOTED'} · second owner ${second.data?.length ?? second.error?.code} · then delete ${now.data?.length ?? now.error?.code}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'roles: probe setup', error.message);
+  } finally {
+    // The tenant first (its memberships and application cascade; the
+    // last-owner and no-delete-live triggers let a cascade through), then the
+    // users (platform_admins cascades).
+    const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
+    if (error) console.log(`WARN  could not delete the roles-probe tenant: ${error.message}`);
+    for (const userId of Object.values(ids)) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(userId);
+      if (userError) console.log(`WARN  could not delete a roles-probe user: ${userError.message}`);
+    }
+  }
 }
 
 console.log();

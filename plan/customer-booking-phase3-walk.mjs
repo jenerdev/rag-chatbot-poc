@@ -98,7 +98,7 @@ async function makeTenant(slug) {
   const { data: user, error: userError } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (userError) throw new Error(`user for ${slug}: ${userError.message}`);
   made.users.push(user.user.id);
-  await supabase.from('memberships').insert({ user_id: user.user.id, tenant_id: data.id });
+  await supabase.from('memberships').insert({ user_id: user.user.id, tenant_id: data.id, role: 'admin' });
   const login = await fetch(`${BASE}/api/t/${slug}/admin/session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

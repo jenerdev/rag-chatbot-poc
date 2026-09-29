@@ -46,6 +46,14 @@ as $$ select nullif(auth.jwt() ->> 'tenant_id', '')::bigint $$;
 -- does not need it: the memberships policy (step 3) already lets a user see
 -- their own rows, which is all this reads. A chat token has no `sub`, so
 -- auth.uid() is null and the answer is false, not an error (§ 2.4).
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this (owner or admin, via app_role()).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 create or replace function app_is_admin() returns boolean
 language sql stable
 set search_path = ''
@@ -56,6 +64,9 @@ as $$
        where m.user_id = auth.uid() and m.tenant_id = public.app_tenant_id()
      )
 $$;
+    $ddl$;
+  end if;
+end $guard$;
 
 -- 3. The policies (plan § 1.3).
 --
@@ -129,16 +140,37 @@ create policy slots_read on slots for select to authenticated
 -- (step 4), which answers open/taken and nothing else (§ 2.5). Cancelling is
 -- an update, so update needs both USING (which rows) and WITH CHECK (what
 -- they may become).
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- these three (any member, via app_is_staff()).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 drop policy if exists bookings_read   on bookings;
+    $ddl$;
+    execute $ddl$
 drop policy if exists bookings_insert on bookings;
+    $ddl$;
+    execute $ddl$
 drop policy if exists bookings_update on bookings;
+    $ddl$;
+    execute $ddl$
 create policy bookings_read on bookings for select to authenticated
   using (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+    execute $ddl$
 create policy bookings_insert on bookings for insert to authenticated
   with check (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+    execute $ddl$
 create policy bookings_update on bookings for update to authenticated
   using      (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()))
   with check (tenant_id = (select public.app_tenant_id()) and (select public.app_is_admin()));
+    $ddl$;
+  end if;
+end $guard$;
 
 -- memberships: a user sees their own rows, which is what app_is_admin()
 -- reads. Rows are added and removed by the CLI with service_role (Phase 5).
@@ -147,7 +179,18 @@ create policy bookings_update on bookings for update to authenticated
 drop policy if exists memberships_read_own on memberships;
 create policy memberships_read_own on memberships for select to authenticated
   using (user_id = (select auth.uid()));
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this revoke with a grant plus owner and platform policies.
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 revoke insert, update, delete on memberships from anon, authenticated;
+    $ddl$;
+  end if;
+end $guard$;
 
 -- 4. check_availability, rewritten (§ 2.5, D-042).
 --
@@ -273,7 +316,17 @@ alter table tenants add constraint tenants_fallback_messages_shape check (
 
 -- The return type changed (fallback_messages), and `create or replace` cannot
 -- change a return type, so drop first. Step 6 below grants EXECUTE again.
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this (the same columns, minus archived tenants).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 drop function if exists tenant_public(text);
+    $ddl$;
+    execute $ddl$
 create function tenant_public(p_slug text)
 returns table (
   id                bigint,
@@ -293,6 +346,9 @@ as $$
   from public.tenants t
   where t.slug = p_slug
 $$;
+    $ddl$;
+  end if;
+end $guard$;
 
 -- 6. EXECUTE grants.
 --

@@ -72,8 +72,11 @@ archive not delete, existing accounts only in the browser, operators stay
   members recorded (7 rows, 4 tenants). Battery **57/61**: the two known
   failures plus `tool-leak` and `book-for-me-harbor`, both repeated and
   both DATE-driven (13 October), on unchanged code. See the session log.
-- [ ] **Phase 1 — Schema** (`schema-roles.sql`, ten steps, guarded on
-  `platform_admins`).
+- [x] **Phase 1 — Schema** (2026-09-29). `schema-roles.sql` applied twice
+  (the second run with two fixes verify found). verify **109/109** (+17);
+  isolation 20/20 + 29/29 both ways; rooms 30/30; tests unchanged;
+  snapshots and tool baselines byte-identical; battery **57/61**, verdict for verdict the same four as Phase 0 (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`). All seven
+  memberships are `admin`. `mintPlatformToken()` built here.
 - [ ] Phase 2 — `@rag/db` and the CLI · [ ] Phase 3 — the guards ·
   [ ] Phase 4 — platform and members routes · [ ] Phase 5 — screens ·
   [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
@@ -1066,6 +1069,40 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 1 (schema), on `feat/tenant-management`
+- **Did:** `packages/db/sql/schema-roles.sql` (ten steps), run by the user
+  twice, and trap-20 guards in five earlier files (`app_is_admin`,
+  `tenant_public`, the bookings and unanswered policies, both
+  `tenant_applications_validate` bodies, `request_booking`, the
+  memberships revoke). `mintPlatformToken()` in `@rag/db`, one signer
+  (`signClaims`) under both shapes. verify +17 checks (roles, platform
+  token with and without its row, archive, shapes, config keys, the two
+  lookups, owner writes, the last owner, per-tenant limits, switching off).
+- **Observed:** verify **109/109**; pipeline isolation 20/20 both ways;
+  bookings isolation 29/29 both ways; rooms 30/30; tests 13 + 14 + 94 +
+  329; typecheck clean; northwind prompt and villa's and harbor's tool
+  definitions byte-identical to Phase 0; battery **57/61**, verdict for verdict the same four as Phase 0 (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`). All seven
+  memberships read `admin`; `platform_admins` is empty until Phase 2's
+  `super:add`; a tenant with an application and a membership was deleted
+  through both new triggers (the cascade guards hold).
+- **Found by the first run, fixed in the second:**
+  - nine tool inserts into `memberships` named no role and failed
+    silently, so every staff write was refused: the whole verify auth
+    section and the bookings isolation suite went red at once, and a
+    crashed run left a `bookings-probe` tenant to delete by hand;
+  - an owner's role UPDATE matched 0 rows: RLS lets a write reach only rows
+    the token can SELECT, and an owner saw its own row only. Added
+    `memberships_read_tenant`, which forced `app_role()` to SECURITY
+    DEFINER (a read policy calling a function that reads the same table
+    under that policy recurses);
+  - verify's check 27 switched bookings off while the probe held live
+    bookings, which the new trigger now refuses. The check grew its twin.
+- **Not done:** the `pg_policies`/`pg_proc` before-and-after diff of the
+  second run needs SQL access; verify passing after each run stands in.
+- **Next:** Phase 2, `platformClient()`, `staffClient()` → `{ db, role }`,
+  the CLI (`super:*`, `member:add [role]`, `member:role`, `tenant:archive`,
+  `tenant:remove`), `database.types.ts`.
 
 ### 2026-09-29 — tenant management Phase 0 (baseline), on `feat/tenant-management`
 - **Did:** packages rebuilt; every suite run on `ebe9812` + the two docs

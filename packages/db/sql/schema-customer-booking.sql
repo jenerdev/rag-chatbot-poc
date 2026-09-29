@@ -454,6 +454,14 @@ $$;
 --       42501 insufficient_privilege  → another tenant's id
 --       23503 / 23514 from the trigger → a unit that is not this tenant's,
 --         inactive, over capacity, or unpriced: the same answer as "not there"
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this (the two limits read from the tenant's config).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 create or replace function request_booking (
   p_tenant_id bigint,
   p_slot_id   bigint,
@@ -653,6 +661,9 @@ begin
     order by b.booked_date, un.sort_order, un.name;
 end;
 $$;
+    $ddl$;
+  end if;
+end $guard$;
 
 -- 12. The booking page's settings, in the bookings application's config
 --     (plan § 3 step 9). A SEPARATE trigger, so tenant_applications_validate

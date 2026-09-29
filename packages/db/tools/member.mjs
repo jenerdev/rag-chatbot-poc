@@ -51,7 +51,9 @@ if (!tenant) fail(`no tenant "${slug}"`);
 async function addMembership(userId, label) {
   const { error } = await supabase
     .from('memberships')
-    .upsert({ user_id: userId, tenant_id: tenant.id }, { onConflict: 'user_id,tenant_id', ignoreDuplicates: true });
+    // role: admin, what every membership meant before roles (D-041); Phase 2 adds
+    // member:add's role argument and member:role.
+    .upsert({ user_id: userId, tenant_id: tenant.id, role: 'admin' }, { onConflict: 'user_id,tenant_id', ignoreDuplicates: true });
   if (error) fail(`could not add the membership: ${error.message}`);
   console.log(`${label} is a member of "${slug}" (tenant ${tenant.id}).`);
 }

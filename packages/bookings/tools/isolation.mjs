@@ -111,7 +111,7 @@ if (probeError) throw new Error(`Could not create the probe tenant: ${probeError
 let probeDb = supabase;
 if (!filtersOnly) {
   const operatorId = await userIdByEmail(operatorEmail('villa'));
-  await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: probeRow.id });
+  await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: probeRow.id, role: 'admin' });
   probeDb = await staffClient(probeRow.id, operatorId);
   if (!probeDb) throw new Error('Could not make the probe operator a member');
 }
@@ -144,7 +144,7 @@ async function roomProbe(slug) {
   let db = supabase;
   if (!filtersOnly) {
     const operatorId = await userIdByEmail(operatorEmail('villa'));
-    await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: data.id });
+    await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: data.id, role: 'admin' });
     db = await staffClient(data.id, operatorId);
     if (!db) throw new Error(`Could not make the operator a member of ${slug}`);
   }

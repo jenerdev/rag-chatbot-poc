@@ -44,6 +44,14 @@ create table if not exists tenant_applications (
 -- (plan/bookings.md § 2.3). `now() at time zone <name>` raises 22023 for a
 -- name Postgres does not know, so an invalid timezone fails on write rather
 -- than on the first booking.
+-- GUARDED (tenant management Phase 1, 2026-09-29): schema-roles.sql replaces
+-- this (as schema-booking-types.sql did before it).
+-- Once that file has run (platform_admins exists), re-running THIS file must
+-- not put the older definition back, so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.platform_admins') is null then
+    execute $ddl$
 create or replace function tenant_applications_validate() returns trigger
 language plpgsql
 as $$
@@ -58,6 +66,9 @@ begin
   return new;
 end;
 $$;
+    $ddl$;
+  end if;
+end $guard$;
 
 drop trigger if exists tenant_applications_validate on tenant_applications;
 create trigger tenant_applications_validate
