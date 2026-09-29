@@ -27,6 +27,13 @@
     "tenant:add": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs add",
     "tenant:fallback": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs fallback",
     "tenant:booking-type": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs booking-type",
+    "tenant:archive": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs archive",
+    "tenant:remove": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs remove",
+    "member:role": "node --conditions=react-server --env-file=../../.env tools/member.mjs role",
+    "super:add": "node --conditions=react-server --env-file=../../.env tools/super.mjs add",
+    "super:remove": "node --conditions=react-server --env-file=../../.env tools/super.mjs remove",
+    "super:list": "node --conditions=react-server --env-file=../../.env tools/super.mjs list",
+    "test": "vitest run",
     "member:add": "node --conditions=react-server --env-file=../../.env tools/member.mjs add",
     "member:remove": "node --conditions=react-server --env-file=../../.env tools/member.mjs remove",
     "member:list": "node --conditions=react-server --env-file=../../.env tools/member.mjs list",
@@ -39,6 +46,7 @@
   "devDependencies": {
     "@rag/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }

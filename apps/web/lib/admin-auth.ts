@@ -116,9 +116,10 @@ class AdminAuthError extends Error {
 export async function requireAdmin(request: Request, tenant: TenantContext): Promise<TenantContext> {
   const userId = readSession(request, tenant);
   if (!userId) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
-  const db = await staffClient(tenant.id, userId);
-  if (!db) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
-  return { ...tenant, db };
+  const staff = await staffClient(tenant.id, userId);
+  if (!staff) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
+  // staff.role is read here and used in Phase 3 (requireAdmin's permission argument).
+  return { ...tenant, db: staff.db };
 }
 
 /**

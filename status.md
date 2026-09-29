@@ -77,7 +77,14 @@ archive not delete, existing accounts only in the browser, operators stay
   isolation 20/20 + 29/29 both ways; rooms 30/30; tests unchanged;
   snapshots and tool baselines byte-identical; battery **57/61**, verdict for verdict the same four as Phase 0 (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`). All seven
   memberships are `admin`. `mintPlatformToken()` built here.
-- [ ] Phase 2 — `@rag/db` and the CLI · [ ] Phase 3 — the guards ·
+- [x] **Phase 2 — `@rag/db` and the CLI** (2026-09-29). `platformClient()`,
+  `staffClient()` → `{ db, role }`, `MemberRole` and the new tables and
+  functions in the types, `super:add|remove|list`, `member:add [role]`,
+  `member:role`, `tenant:archive [--undo]`, `tenant:remove --yes`; 5 token
+  tests. Every suite unchanged (109 · 20+20 · 29+29 · 30). CLI walked on a
+  throwaway tenant. `platform_admins` still empty: run `super:add` for
+  your own email before Phase 4's walk.
+- [ ] Phase 3 — the guards ·
   [ ] Phase 4 — platform and members routes · [ ] Phase 5 — screens ·
   [ ] Phase 6 — the walls · [ ] Phase 7 — the walk · [ ] Phase 8 — the record.
 
@@ -1069,6 +1076,36 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-09-29 — tenant management Phase 2 (`@rag/db` and the CLI)
+- **Did:** `staffClient()` returns `{ db, role }` (the role read from the
+  same row the policies read); `platformClient(userId)` (platform token,
+  `platform_admins_read_own`); `MemberRole`, `platform_admins`,
+  `tenants.archived_at`, `app_role`, `app_is_staff`, `app_is_super`,
+  `member_emails`, `user_id_by_email` in `database.types.ts` (hand-written,
+  so edited, not regenerated); callers updated (`admin-auth.ts` keeps its
+  shape until Phase 3, `asOperator()`, both bookings tools). CLI:
+  `tools/super.mjs` (add invites via `/platform/reset`, remove, list),
+  `member:add -- <slug> <email> [owner|admin|staff]` (default admin; a
+  second add keeps the role), `member:role`, `member:list` with the role,
+  `tenant:archive [--undo]`, `tenant:remove --yes` (13 counts first, then
+  the cascade, then `storage-orphans -- --remove`). `@rag/db` gained
+  vitest (`resolve.conditions: ['react-server']` for `server-only`) and
+  `tenant-client.test.ts`: 5 tests pin both token shapes' claim lists.
+- **Observed:** build and typecheck clean; tests 13 + 14 + 94 + 5 + 329;
+  verify 109/109; pipeline isolation 20/20 both ways; bookings isolation
+  29/29 both ways; rooms 30/30. CLI walk on `cli-probe` (tenant 310): every
+  refusal came from where it should (Postgres for the last owner, the CLI
+  for a bogus role, "no tenant" after the delete), `loadTenant()` returned
+  null while archived, and the sweeper found 2 objects with their 2 rows and
+  no orphans after the delete.
+- **Decision for the user:** `platform_admins` is empty. `super:add` for an
+  email that already has an account sends no email; a new address needs the
+  invite (R-21's cap). Phase 4's walk needs one real super user.
+- **Next:** Phase 3, the guards: `lib/permissions.ts`, `lib/theme.ts`,
+  `requireAdmin(request, tenant, permission)` at all 31 call sites, 403 in
+  the error map, `lib/platform-auth.ts`, `withPlatformRoute()`, the session
+  GET returning the role.
 
 ### 2026-09-29 — tenant management Phase 1 (schema), on `feat/tenant-management`
 - **Did:** `packages/db/sql/schema-roles.sql` (ten steps), run by the user

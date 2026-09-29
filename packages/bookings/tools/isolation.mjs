@@ -112,7 +112,7 @@ let probeDb = supabase;
 if (!filtersOnly) {
   const operatorId = await userIdByEmail(operatorEmail('villa'));
   await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: probeRow.id, role: 'admin' });
-  probeDb = await staffClient(probeRow.id, operatorId);
+  probeDb = (await staffClient(probeRow.id, operatorId))?.db ?? null;
   if (!probeDb) throw new Error('Could not make the probe operator a member');
 }
 const probe = { id: probeRow.id, slug: probeRow.slug, db: probeDb };
@@ -145,7 +145,7 @@ async function roomProbe(slug) {
   if (!filtersOnly) {
     const operatorId = await userIdByEmail(operatorEmail('villa'));
     await supabase.from('memberships').insert({ user_id: operatorId, tenant_id: data.id, role: 'admin' });
-    db = await staffClient(data.id, operatorId);
+    db = (await staffClient(data.id, operatorId))?.db ?? null;
     if (!db) throw new Error(`Could not make the operator a member of ${slug}`);
   }
   return { id: data.id, slug: data.slug, db };

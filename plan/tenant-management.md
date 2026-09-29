@@ -559,10 +559,25 @@ suites unchanged; a second run of the file changes nothing (compare
 `pg_policies` and `pg_proc` before and after, as booking-types Phase 1 did).
 `member:list` shows every existing row as `admin`.
 
-### Phase 2 — `@rag/db` and the CLI
+### Phase 2 — `@rag/db` and the CLI · **done 2026-09-29**
 
-`mintPlatformToken`, `platformClient`, `staffClient` → `{ db, role }`,
-`database.types.ts` regenerated, and the CLI commands of § 4.1. `super:add`
+Observed: build, typecheck clean; `@rag/db` gained vitest and 5 token
+tests (the two shapes' claims, key by key); verify 109/109; pipeline
+isolation 20/20 both ways; bookings isolation 29/29 both ways; rooms
+30/30. The CLI walked on a throwaway `cli-probe` tenant: `member:add …
+staff`, a second add keeps the role, `member:role … owner`, demoting the
+only owner refused by Postgres ("Tenant 310 would be left with no owner"),
+a bogus role refused by the CLI, `tenant:archive` (loadTenant → null),
+`--undo`, `tenant:remove` without `--yes` prints the 13 counts and
+deletes nothing, with `--yes` cascades and the sweeper reports no orphans;
+`super:add` on an existing account (no email), `super:list`,
+`super:remove`. `platform_admins` is EMPTY: the first real super user is
+the user's own account, one `super:add` away (`database.types.ts` is
+hand-written here, so "regenerated" meant edited).
+
+`platformClient`, `staffClient` → `{ db, role }`,
+`database.types.ts` edited (`MemberRole`, `platform_admins`,
+`archived_at`, five functions), and the CLI commands of § 4.1. `super:add`
 for the user's own email, then `super:list` shows it. `asOperator()` still
 works (the operator is `admin`; eval and both isolation suites still seed).
 

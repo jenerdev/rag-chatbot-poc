@@ -125,7 +125,7 @@ try {
   if (userError) throw new Error(`Could not create the probe user: ${userError.message}`);
   userId = created.user.id;
   await supabase.from('memberships').insert({ user_id: userId, tenant_id: probeRow.id, role: 'admin' });
-  const probe = { id: probeRow.id, slug: probeRow.slug, db: await staffClient(probeRow.id, userId) };
+  const probe = { id: probeRow.id, slug: probeRow.slug, db: (await staffClient(probeRow.id, userId))?.db ?? null };
   if (!probe.db) throw new Error('Could not mint the probe staff token');
 
   // 1. Rooms, through the package, on the staff token.

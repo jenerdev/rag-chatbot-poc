@@ -13,7 +13,14 @@
 import 'server-only';
 
 import type { AuthError } from '@supabase/supabase-js';
-import { anonClient, mintTenantToken, scopedClient, type DbClient } from './tenant-client.js';
+import type { MemberRole } from './database.types.js';
+import { anonClient, mintPlatformToken, mintTenantToken, scopedClient, type DbClient } from './tenant-client.js';
+
+/** What staffClient() hands back: the database AS this member, and what the member is. */
+export interface StaffSession {
+  db: DbClient;
+  role: MemberRole;
+}
 
 /** An error whose status the web app's single error map passes through (429). */
 export class StaffAuthError extends Error {
@@ -68,23 +75,42 @@ export async function signInStaff(email: string, password: string): Promise<stri
 }
 
 /**
- * A client AS this user, for this tenant: a staff token with `app_admin`,
- * but only if the membership row exists. Otherwise null.
+ * A client AS this user, for this tenant, and the user's ROLE there: a staff
+ * token with `app_admin`, but only if the membership row exists. Otherwise
+ * null.
  *
  * The membership is read THROUGH that token. The `memberships_read_own`
  * policy lets a user see their own rows, so this needs no service key. The
- * same row is what app_is_admin() demands on every write, so a user removed
- * between this check and a write is still refused by Postgres.
+ * same row is what app_role() reads inside every policy, so a user removed
+ * or demoted between this check and a write is still refused by Postgres
+ * (plan/tenant-management.md Rule 4: the role is a row, never a claim).
  */
-export async function staffClient(tenantId: number, userId: string): Promise<DbClient | null> {
+export async function staffClient(tenantId: number, userId: string): Promise<StaffSession | null> {
   const db = scopedClient(mintTenantToken({ tenantId, userId, admin: true }));
   const { data, error } = await db
     .from('memberships')
-    .select('tenant_id')
+    .select('role')
     .eq('user_id', userId)
     .eq('tenant_id', tenantId)
     .maybeSingle();
   if (error) throw new Error(`Could not check the membership: ${error.message}`);
+  return data ? { db, role: data.role } : null;
+}
+
+/**
+ * A client AS the PLATFORM, for this user: a platform token (`app_super`,
+ * no tenant), but only if the `platform_admins` row exists. Otherwise null.
+ *
+ * The same shape as staffClient(): the row is read through the token itself
+ * (`platform_admins_read_own`), and app_is_super() demands the same row on
+ * every read and write, so removing a super user takes effect on their next
+ * request. With no tenant claim this client reads no tenant's documents,
+ * chunks or bookings; only the `*_super_*` policies open a table to it.
+ */
+export async function platformClient(userId: string): Promise<DbClient | null> {
+  const db = scopedClient(mintPlatformToken({ userId }));
+  const { data, error } = await db.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(`Could not check the platform membership: ${error.message}`);
   return data ? db : null;
 }
 

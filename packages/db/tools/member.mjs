@@ -1,13 +1,19 @@
 // member.mjs — who may administer a tenant (auth-rls Phase 5, D-040, D-041).
 //
-//   pnpm --filter @rag/db member:add      -- <slug> <email>
+//   pnpm --filter @rag/db member:add      -- <slug> <email> [owner|admin|staff]   (default admin)
+//   pnpm --filter @rag/db member:role     -- <slug> <email> <owner|admin|staff>
 //   pnpm --filter @rag/db member:remove   -- <slug> <email>
 //   pnpm --filter @rag/db member:list     -- <slug>
 //   pnpm --filter @rag/db member:operator -- <slug>
 //
-// One role: a membership row IS admin. There is no invite UI (out of scope);
-// this CLI is it, and it runs with service_role because adding the first
-// member of a tenant is, by definition, something no member can do yet.
+// Three roles since tenant management Phase 1 (plan/tenant-management.md
+// § 3.1): owner (everything, plus members), admin (documents, rooms, rates,
+// holidays, bookings), staff (bookings and unanswered; documents read-only).
+// The database decides what each may do (app_role() in every policy) and
+// keeps one owner per tenant (memberships_keep_an_owner); this CLI asks and
+// reports Postgres's answer as it is. Owners manage members from the Members
+// screen; this runs with service_role because adding the FIRST member of a
+// tenant is, by definition, something no member can do yet.
 //
 // member:add for an email with no account sends Supabase's invite email. Its
 // link lands on /t/<slug>/admin/reset, where the new member sets a password.
@@ -26,7 +32,8 @@
 import { randomBytes } from 'node:crypto';
 import { operatorEmail, supabase, userIdByEmail } from '../dist/service.js';
 
-const [command, slug, email] = process.argv.slice(2).filter((a) => a !== '--');
+const [command, slug, email, roleArg] = process.argv.slice(2).filter((a) => a !== '--');
+const ROLES = ['owner', 'admin', 'staff'];
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000';
 
 // Throws rather than process.exit(1). On Windows, exiting while supabase-js
@@ -42,24 +49,27 @@ process.on('uncaughtException', (error) => {
   process.exitCode = 1;
 });
 
-if (!slug) fail('usage: member:<add|remove|list|operator> -- <slug> [email]');
+if (!slug) fail('usage: member:<add|role|remove|list|operator> -- <slug> [email] [role]');
 
 const { data: tenant, error: tenantError } = await supabase.from('tenants').select('id, slug').eq('slug', slug).maybeSingle();
 if (tenantError) fail(tenantError.message);
 if (!tenant) fail(`no tenant "${slug}"`);
 
-async function addMembership(userId, label) {
-  const { error } = await supabase
+async function addMembership(userId, label, role) {
+  // ignoreDuplicates: an existing member keeps its role. member:role changes one.
+  const { data, error } = await supabase
     .from('memberships')
-    // role: admin, what every membership meant before roles (D-041); Phase 2 adds
-    // member:add's role argument and member:role.
-    .upsert({ user_id: userId, tenant_id: tenant.id, role: 'admin' }, { onConflict: 'user_id,tenant_id', ignoreDuplicates: true });
+    .upsert({ user_id: userId, tenant_id: tenant.id, role }, { onConflict: 'user_id,tenant_id', ignoreDuplicates: true })
+    .select('role');
   if (error) fail(`could not add the membership: ${error.message}`);
-  console.log(`${label} is a member of "${slug}" (tenant ${tenant.id}).`);
+  if (data.length === 0) console.log(`${label} was already a member of "${slug}"; the role is unchanged. Use member:role to change it.`);
+  else console.log(`${label} is a member of "${slug}" (tenant ${tenant.id}) as ${role}.`);
 }
 
 if (command === 'add') {
-  if (!email) fail('usage: member:add -- <slug> <email>');
+  if (!email) fail('usage: member:add -- <slug> <email> [owner|admin|staff]');
+  const role = roleArg ?? 'admin';
+  if (!ROLES.includes(role)) fail(`the role is one of ${ROLES.join(', ')}, not "${roleArg}"`);
   let userId = await userIdByEmail(email);
   if (userId) {
     console.log(`${email} already has an account.`);
@@ -71,7 +81,20 @@ if (command === 'add') {
     userId = data.user.id;
     console.log(`Invited ${email}. Their link sets a password at ${APP_URL}/t/${slug}/admin/reset.`);
   }
-  await addMembership(userId, email);
+  await addMembership(userId, email, role);
+} else if (command === 'role') {
+  if (!email || !ROLES.includes(roleArg)) fail(`usage: member:role -- <slug> <email> <${ROLES.join('|')}>`);
+  const userId = await userIdByEmail(email);
+  if (!userId) fail(`no account for ${email}`);
+  // The last-owner trigger may refuse this (23514); its message is printed as is.
+  const { data, error } = await supabase
+    .from('memberships')
+    .update({ role: roleArg })
+    .eq('tenant_id', tenant.id)
+    .eq('user_id', userId)
+    .select('role');
+  if (error) fail(`refused: ${error.message}`);
+  console.log(data.length ? `${email} is now ${roleArg} of "${slug}". Their next request runs as that.` : `${email} is not a member of "${slug}". Add them with member:add.`);
 } else if (command === 'remove') {
   if (!email) fail('usage: member:remove -- <slug> <email>');
   const userId = await userIdByEmail(email);
@@ -82,7 +105,7 @@ if (command === 'add') {
     .eq('tenant_id', tenant.id)
     .eq('user_id', userId)
     .select('user_id');
-  if (error) fail(error.message);
+  if (error) fail(`refused: ${error.message}`);
   console.log(
     data.length
       ? `${email} is no longer a member of "${slug}". Their next request is refused.`
@@ -91,14 +114,14 @@ if (command === 'add') {
 } else if (command === 'list') {
   const { data, error } = await supabase
     .from('memberships')
-    .select('user_id, created_at')
+    .select('user_id, role, created_at')
     .eq('tenant_id', tenant.id)
     .order('created_at');
   if (error) fail(error.message);
   if (data.length === 0) console.log(`"${slug}" has no members. Add one with member:add.`);
   for (const row of data) {
     const { data: user } = await supabase.auth.admin.getUserById(row.user_id);
-    console.log(`${row.created_at.slice(0, 10)}  ${user?.user?.email ?? `(no account: ${row.user_id})`}`);
+    console.log(`${row.created_at.slice(0, 10)}  ${row.role.padEnd(5)}  ${user?.user?.email ?? `(no account: ${row.user_id})`}`);
   }
 } else if (command === 'operator') {
   const address = operatorEmail(slug);
@@ -115,7 +138,9 @@ if (command === 'add') {
     userId = data.user.id;
     console.log(`Created the operator account ${address}.`);
   }
-  await addMembership(userId, address);
+  // admin: the operator ingests documents and seeds bookings, which is admin
+  // work, and never manages members (plan/tenant-management.md § 8 q8).
+  await addMembership(userId, address, 'admin');
 } else {
-  fail('the command is add, remove, list or operator');
+  fail('the command is add, role, remove, list or operator');
 }

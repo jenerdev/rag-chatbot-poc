@@ -6232,3 +6232,45 @@ Nine tool inserts into `memberships` failed with 23502, unreported, and
 the symptom was every staff write refused everywhere: no member, no
 `app_is_admin()`. Every insert now names its role, and `member.mjs` writes
 `admin` until Phase 2 gives it a role argument.
+
+## Tenant management, Phase 2: `@rag/db` and the CLI · done 2026-09-29
+
+**What:** the package half of roles and the platform. `staffClient()` now
+returns `{ db, role }`, the role from the very row `app_role()` reads in
+every policy, so the code and the database can never disagree about it
+(plan Rule 4). `platformClient(userId)` mints the tenant-less token and
+reads the caller's own `platform_admins` row through it, the way
+`staffClient()` reads the membership. The hand-written types gained
+`MemberRole`, `platform_admins`, `archived_at` and the five new
+functions. The CLI gained `super:add|remove|list`, a role on `member:add`,
+`member:role`, `tenant:archive` and `tenant:remove`, and `@rag/db` gained
+its first unit tests, five of them, pinning the two token shapes claim by
+claim.
+
+**Why it matters:** Phase 3's `requireAdmin(request, tenant, permission)`
+needs the role in hand, and the platform routes need a client that is the
+platform and nothing else. And until the browser form exists, the CLI is
+how the first super user and the first owners come to be.
+
+**Observed:**
+- build and typecheck clean; tests 13 + 14 + 94 + 5 + 329; verify 109/109;
+  pipeline isolation 20/20 both ways; bookings isolation 29/29 both ways;
+  rooms 30/30: nothing moved;
+- the CLI walk on a throwaway tenant (`cli-probe`, id 310): add as staff;
+  add again as owner keeps staff and says so; `member:role … owner`;
+  `member:role … staff` refused by Postgres, "Tenant 310 would be left
+  with no owner"; a bogus role refused by the CLI before any query;
+  `tenant:archive` and `loadTenant()` returned null; `--undo`;
+  `tenant:remove` without `--yes` printed 13 counts and deleted nothing;
+  with `--yes` it cascaded and the sweeper reported 2 objects, 2 rows, no
+  orphans; a second `--yes` said "no tenant"; `super:add` on an existing
+  account sent no email, `super:list` showed it, `super:remove` took it
+  back, and the platform is empty again.
+
+**Worth knowing: vitest needs the same condition as Node.** `server-only`
+resolves to a throwing module unless the `react-server` condition is set,
+which is why every db script carries `--conditions=react-server` (rule 4).
+`packages/db/vitest.config.ts` sets `resolve.conditions` to the same, so a
+test can import `tenant-client.ts` directly; the test signs with a
+throwaway P-256 key, because the claims are what is under test and the
+signature is verify's, live.

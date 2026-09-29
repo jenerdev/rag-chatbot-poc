@@ -52,6 +52,9 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type StoredVector = string;
 export type VectorInput = number[] | string;
 
+/** `memberships.role` (sql/schema-roles.sql § 1): what a member may do, decided per request from the row. */
+export type MemberRole = 'owner' | 'admin' | 'staff';
+
 export interface Database {
   public: {
     Tables: {
@@ -67,6 +70,8 @@ export interface Database {
           theme: Json;
           /** what the chat shows when the documents cannot answer, per reply language (D-047, D-048); a missing key or null = the built-in default */
           fallback_messages: Json | null;
+          /** set by the platform (tenant management Phase 1): tenant_public() no longer returns the row, so the whole app answers 404 for it */
+          archived_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -78,6 +83,7 @@ export interface Database {
           banner_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
+          archived_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -89,6 +95,7 @@ export interface Database {
           banner_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
+          archived_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -585,16 +592,41 @@ export interface Database {
         Row: {
           user_id: string;
           tenant_id: number;
+          /** sql/schema-roles.sql § 1 — what this member may do (plan/tenant-management.md § 3.2); read on every request, never a claim */
+          role: MemberRole;
           created_at: string;
         };
         Insert: {
           user_id: string;
           tenant_id: number;
+          /** REQUIRED: the column has no default (every pre-roles row was backfilled to admin) */
+          role: MemberRole;
           created_at?: string;
         };
         Update: {
           user_id?: string;
           tenant_id?: number;
+          role?: MemberRole;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      /**
+       * sql/schema-roles.sql § 1 — who runs the platform (the super user). No
+       * tenant_id: a super user is not a member of anything. Rows are written
+       * by the CLI (super:add) on service_role; a token reads only its own row.
+       */
+      platform_admins: {
+        Row: {
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -607,10 +639,40 @@ export interface Database {
         Args: Record<never, never>;
         Returns: number | null;
       };
-      /** sql/schema-auth.sql § 2 — app_admin claim AND a membership for the token's tenant. */
+      /** sql/schema-roles.sql § 2 — the membership row's role for a staff token's user and tenant; null for a chat or platform token, or a non-member. */
+      app_role: {
+        Args: Record<never, never>;
+        Returns: MemberRole | null;
+      };
+      /** sql/schema-auth.sql § 2, redefined in schema-roles.sql § 2 — owner or admin of the token's tenant. */
       app_is_admin: {
         Args: Record<never, never>;
         Returns: boolean;
+      };
+      /** sql/schema-roles.sql § 2 — any member of the token's tenant (owner, admin or staff). */
+      app_is_staff: {
+        Args: Record<never, never>;
+        Returns: boolean;
+      };
+      /** sql/schema-roles.sql § 2 — app_super claim AND a platform_admins row. */
+      app_is_super: {
+        Args: Record<never, never>;
+        Returns: boolean;
+      };
+      /** sql/schema-roles.sql § 9 — one tenant's members with their email and role; a member of that tenant or the platform, else 42501. */
+      member_emails: {
+        Args: { p_tenant_id: number };
+        Returns: {
+          user_id: string;
+          email: string;
+          role: MemberRole;
+          created_at: string;
+        }[];
+      };
+      /** sql/schema-roles.sql § 9 — an account's id by email (trimmed, any case), or null; an owner or the platform, else 42501 (R-42). */
+      user_id_by_email: {
+        Args: { p_email: string };
+        Returns: string | null;
       };
       /**
        * sql/schema-auth.sql § 5 — the ONLY way a token reads a tenants row. The

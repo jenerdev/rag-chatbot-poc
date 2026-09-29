@@ -7,6 +7,15 @@
 //   pnpm --filter @rag/db tenant:fallback -- <slug>                       show what is set
 //   pnpm --filter @rag/db tenant:booking-type -- <slug>                    show how it books (D-055)
 //   pnpm --filter @rag/db tenant:booking-type -- <slug> <whole_resort|per_room>   switch it
+//   pnpm --filter @rag/db tenant:archive -- <slug> [--undo]                 a 404 everywhere, reversible (plan/tenant-management.md § 2.3)
+//   pnpm --filter @rag/db tenant:remove  -- <slug> --yes                    HARD delete: cascades, then sweeps Storage
+//
+// Since tenant management Phase 1 the platform form (/platform) does what
+// tenant:add, tenant:fallback and tenant:archive do; these stay for scripts
+// and for the first tenant. tenant:remove is CLI-ONLY on purpose: it deletes
+// guest names, phones and emails (bookings) and every document, and the
+// photos' Storage objects do not cascade (R-30), so it prints the counts,
+// insists on --yes, and runs storage-orphans -- --remove afterwards.
 //
 // A new tenant has no members, so nobody can administer it yet. Add the first
 // one with `pnpm --filter @rag/db member:add -- <slug> <email>`. Until auth-rls
@@ -16,6 +25,7 @@
 // Carries --conditions=react-server like every script that touches @rag/db
 // (CLAUDE.md rule 4). The flag is in package.json.
 
+import { execSync } from 'node:child_process';
 import { supabase } from '../dist/service.js';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -126,8 +136,55 @@ if (command === 'fallback') {
       }
     }
   }
+} else if (command === 'archive') {
+  // Reversible, and the whole effect is one line in tenant_public(): with
+  // archived_at set, no page, route or chat resolves the slug any more.
+  const undo = args.includes('--undo');
+  const { data, error } = await supabase
+    .from('tenants')
+    .update({ archived_at: undo ? null : new Date().toISOString() })
+    .eq('slug', slug ?? '')
+    .select('slug, archived_at');
+  if (!slug) fail('usage: tenant:archive -- <slug> [--undo]');
+  else if (error) fail(`could not update "${slug}": ${error.message}`);
+  else if (data.length === 0) fail(`no tenant "${slug}"`);
+  else if (undo) console.log(`"${slug}" is live again: /t/${slug} resolves.`);
+  else console.log(`"${slug}" is archived since ${data[0].archived_at}: /t/${slug}, its chat and its admin answer 404. Undo with --undo.`);
+} else if (command === 'remove') {
+  // The counts first, so the person sees what --yes will take with it.
+  const TABLES = [
+    'documents', 'chunks', 'conversations', 'messages', 'memberships', 'tenant_applications',
+    'units', 'slots', 'unit_rates', 'unit_images', 'rate_calendar', 'bookings', 'unanswered_resolutions',
+  ];
+  const { data: tenant, error: tenantError } = await supabase.from('tenants').select('id, slug, archived_at').eq('slug', slug ?? '').maybeSingle();
+  if (!slug) {
+    fail('usage: tenant:remove -- <slug> --yes');
+  } else if (tenantError || !tenant) {
+    fail(tenantError ? `could not read "${slug}": ${tenantError.message}` : `no tenant "${slug}"`);
+  } else {
+    const counts = [];
+    for (const table of TABLES) {
+      const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq('tenant_id', tenant.id);
+      counts.push(`${table} ${error ? '?' : count}`);
+    }
+    console.log(`"${slug}" (tenant ${tenant.id}${tenant.archived_at ? ', archived' : ', LIVE'}) holds: ${counts.join(' · ')}`);
+    if (!args.includes('--yes')) {
+      console.log('Nothing deleted. This cannot be undone: re-run with --yes to cascade all of it, then sweep the photo objects.');
+      console.log(`Prefer tenant:archive -- ${slug} unless the data really must go.`);
+    } else {
+      const { data, error } = await supabase.from('tenants').delete().eq('id', tenant.id).select('id');
+      if (error) fail(`refused: ${error.message}`);
+      else if (data.length !== 1) fail(`expected to delete 1 tenant, deleted ${data.length}`);
+      else {
+        console.log(`Deleted tenant "${slug}" and everything above by cascade. Sweeping the photo bucket (R-30)…`);
+        // The objects do not cascade. The sweeper counts what Storage says it
+        // removed against what was asked (CLAUDE.md trap 17) and exits 1 on a gap.
+        execSync('pnpm --silent --filter @rag/bookings storage-orphans -- --remove', { cwd: new URL('../../..', import.meta.url), stdio: 'inherit' });
+      }
+    }
+  }
 } else if (command !== 'add') {
-  fail('the command is "add", "fallback" or "booking-type" (tenant:key was removed in auth-rls Phase 6; use member:add)');
+  fail('the command is "add", "fallback", "booking-type", "archive" or "remove" (tenant:key was removed in auth-rls Phase 6; use member:add)');
 } else if (!slug || !businessName || !assistantName) {
   fail('usage: tenant:add -- <slug> "<business name>" "<assistant name>"');
 } else {

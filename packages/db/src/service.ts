@@ -89,9 +89,9 @@ export async function userIdByEmail(email: string): Promise<string | null> {
  */
 export async function asOperator<T extends { id: number; slug: string }>(tenant: T): Promise<T & { db: DbClient }> {
   const userId = await userIdByEmail(operatorEmail(tenant.slug));
-  const db = userId ? await staffClient(tenant.id, userId) : null;
-  if (!db) {
+  const staff = userId ? await staffClient(tenant.id, userId) : null;
+  if (!staff) {
     throw new Error(`No operator member for "${tenant.slug}". Run: pnpm --filter @rag/db member:operator -- ${tenant.slug}`);
   }
-  return { ...tenant, db };
+  return { ...tenant, db: staff.db };
 }
