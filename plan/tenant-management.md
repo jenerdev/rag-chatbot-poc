@@ -575,6 +575,14 @@ deletes nothing, with `--yes` cascades and the sweeper reports no orphans;
 the user's own account, one `super:add` away (`database.types.ts` is
 hand-written here, so "regenerated" meant edited).
 
+**Done by the user, 2026-09-29:** `super:add` for their own, new address.
+The invite link lands on `/platform/reset`, which Phase 5 builds, so it was
+a 404. The token in the fragment is the proof, not the page: with the path
+changed to `/t/villa/admin/reset` and the fragment kept, the tenant reset
+page accepted the `type=invite` link and set the password, checking no
+membership (the password route never did). `super:list` shows one row.
+Until Phase 5, that detour is how a NEW super address sets its password.
+
 `platformClient`, `staffClient` → `{ db, role }`,
 `database.types.ts` edited (`MemberRole`, `platform_admins`,
 `archived_at`, five functions), and the CLI commands of § 4.1. `super:add`

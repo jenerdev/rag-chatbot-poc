@@ -1099,9 +1099,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   for a bogus role, "no tenant" after the delete), `loadTenant()` returned
   null while archived, and the sweeper found 2 objects with their 2 rows and
   no orphans after the delete.
-- **Decision for the user:** `platform_admins` is empty. `super:add` for an
-  email that already has an account sends no email; a new address needs the
-  invite (R-21's cap). Phase 4's walk needs one real super user.
+- **The first super user exists (the user, 2026-09-29):** `super:add` for a
+  new address sent the invite; its link, `/platform/reset#access_token=…`,
+  was a 404 (Phase 5 builds that page). The detour: change the path to
+  `/t/villa/admin/reset` and keep the fragment; that page accepts
+  `type=invite` and the password route checks no membership. Password set,
+  `super:list` shows one row. Phase 5 makes the detour unnecessary.
 - **Next:** Phase 3, the guards: `lib/permissions.ts`, `lib/theme.ts`,
   `requireAdmin(request, tenant, permission)` at all 31 call sites, 403 in
   the error map, `lib/platform-auth.ts`, `withPlatformRoute()`, the session
