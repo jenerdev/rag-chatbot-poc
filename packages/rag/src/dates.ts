@@ -456,6 +456,57 @@ export function asksUndatedPrice(message: string, today: string): boolean {
  * code, like the greetings (D-049): nothing is retrieved, so nothing could be
  * grounded, and every figure it could name would be one the tool owns.
  */
+// --- which rooms are there? (D-084) ---------------------------------------------
+
+/**
+ * Rooms in the PLURAL, or "which/what room": a question about the rooms
+ * there are. "Does the Garden Room have a balcony?" names one room and is a
+ * documents question, so a bare singular "room" is left out. So is "May
+ * kwarto ba kayo?": a yes/no availability question, which refused 3 of 3
+ * with these lines and asks for a date without them.
+ */
+const ROOM_LIST =
+  /\b(?:rooms|accommodations|mga\s+ku?warto|(?:anong|ano\s+ang|what|which)\s+(?:mga\s+)?(?:room|ku?warto))\b/;
+
+/**
+ * "What rooms do you have?", "What are the available rooms?": the rooms
+ * there are, with no date and no price asked. Harbor's tools block tells the
+ * model to ask for a date whenever availability is asked without one, and it
+ * did, 5 questions in 5 (2026-09-30). A price word leaves it to D-081; a
+ * date makes it an availability turn (planDates).
+ *
+ * A YES/NO availability question is not one: "Do you have any rooms
+ * available?" asks whether something is free, and that needs a date. The
+ * user decided so (2026-09-30), and rt-ask pins it: the reply asks for one.
+ */
+const YES_NO = /^\s*(?:do|does|are|is|any|got|may|meron|mayroon)\b/;
+
+export function asksRoomList(message: string, today: string): boolean {
+  const text = message.toLowerCase();
+  if (YES_NO.test(text) && asksAvailability(text)) return false;
+  return ROOM_LIST.test(text) && !PRICE.test(text) && resolveDates(message, today).length === 0;
+}
+
+/**
+ * The lines for that turn, placed after the tools block like a date's
+ * (buildPrompt's per-turn slot), so every other prompt is unchanged. The
+ * rooms come from the tool description (the database's active rooms), the
+ * details from the documents, and no price from either: the documents hold
+ * an out-of-date brochure rate, and a price depends on a date the user has
+ * not given.
+ */
+export const ROOM_LIST_LINES = [
+  'The user is asking which rooms there are, and gives no date. Do not ask',
+  'for a date and do not call check_availability. List every room named in',
+  "check_availability's description, one per line, with how many guests it",
+  'holds and what the documents say about it. Write no price and no rate.',
+  "The rooms in the description are enough to answer, so never reply that",
+  "you don't know.",
+  'If they ask something else about the rooms too, answer it as well. End',
+  'with one sentence saying that for which rooms are free and their rates,',
+  'they can tell you a date.',
+];
+
 export const PRICE_NEEDS_DATE: Record<LanguagePreference, string> = {
   english:
     'Our rates vary depending on whether your visit falls on a weekday, weekend, or holiday. ' +

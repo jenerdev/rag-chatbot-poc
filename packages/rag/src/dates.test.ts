@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -332,6 +332,41 @@ describe('asksUndatedPrice (D-081)', () => {
   it('no price word, no price question', () => {
     for (const m of ['What time is check-in?', 'Is it available?', 'Pwede po bang magdala ng aso?']) {
       expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
+    }
+  });
+});
+
+describe('asksRoomList (D-084)', () => {
+  it('the rooms there are, English and Tagalog, with no date and no price', () => {
+    for (const m of [
+      'what rooms do you have?',
+      'what are the available rooms?',
+      'what are rooms available?',
+      'tell me about your rooms',
+      'Anong mga kwarto ang meron kayo?',
+      'which room is best for a family?',
+    ]) {
+      expect(asksRoomList(m, WEDNESDAY), m).toBe(true);
+    }
+  });
+
+  it('a yes/no availability question asks for a date instead (rt-ask)', () => {
+    for (const m of ['Do you have any rooms available?', 'Are there rooms free?', 'Any rooms available?', 'Meron po bang bakanteng kwarto?']) {
+      expect(asksRoomList(m, WEDNESDAY), m).toBe(false);
+    }
+    // A yes/no question that is NOT about availability still lists them.
+    expect(asksRoomList('Do you have family rooms?', WEDNESDAY)).toBe(true);
+  });
+
+  it('one room by name is a documents question', () => {
+    for (const m of ['May kwarto ba kayo?', 'Does the Garden Room have a balcony?', 'Is the Family Room on the ground floor?', 'What time is check-in?']) {
+      expect(asksRoomList(m, WEDNESDAY), m).toBe(false);
+    }
+  });
+
+  it('a price goes to D-081, a date to planDates', () => {
+    for (const m of ['room rates please', 'how much are your rooms?', 'what rooms are available on Saturday?', 'Anong kwarto ang bakante bukas?']) {
+      expect(asksRoomList(m, WEDNESDAY), m).toBe(false);
     }
   });
 });

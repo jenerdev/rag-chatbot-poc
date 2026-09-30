@@ -3,7 +3,7 @@
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
-import { asksUndatedPrice, planDates, PRICE_NEEDS_DATE } from './dates.js';
+import { asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
@@ -303,16 +303,25 @@ async function smallTalk(
  * nothing to pass a date to, and the northwind prompt stays byte-identical.
  */
 function withDates(
-  prompt: PromptTools | null,
+  tools: TenantTools,
   message: string,
   history: HistoryMessage[],
 ): { prompt: PromptTools | null; precheck: ToolCall[] } {
+  const { prompt } = tools;
   if (!prompt) return { prompt: null, precheck: [] };
   // The user's earlier questions, so a bare "What about the day after
   // tomorrow?" after an availability question counts as one.
   const earlier = history.filter((h) => h.role === 'user').map((h) => h.content);
   const plan = planDates(message, prompt.today, earlier);
-  if (plan.lines.length === 0) return { prompt, precheck: [] };
+  if (plan.lines.length === 0) {
+    // D-084: "What rooms do you have?" lists the rooms, with no price and no
+    // question back. In the same per-turn slot as a date's lines.
+    if (tools.rooms && asksRoomList(message, prompt.today)) {
+      console.log('[query] rooms asked with no date: the room list, no prices (D-084)');
+      return { prompt: { ...prompt, dates: ROOM_LIST_LINES }, precheck: [] };
+    }
+    return { prompt, precheck: [] };
+  }
 
   const precheck: ToolCall[] = plan.calls.map((args, i) => ({
     id: `call_resolved_date_${i}`,
@@ -411,7 +420,7 @@ export async function answerQuestion({
   // "Thanks! Is it free tomorrow?": the thanks is answered in front of the
   // answer. Shown, never saved (see thanksPrefix).
   const prefix = thanksPrefix(message, replyIn) ?? '';
-  const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
+  const { prompt: promptTools, precheck } = withDates(tools, message, history);
   // The marker is what is saved; this is what is shown (D-047).
   const friendly = refusalText(tenant, replyIn);
 
@@ -502,7 +511,7 @@ export async function answerQuestionStream({
     toolsFor(tenant),
   ]);
   const prefix = thanksPrefix(message, replyIn) ?? '';
-  const { prompt: promptTools, precheck } = withDates(tools.prompt, message, history);
+  const { prompt: promptTools, precheck } = withDates(tools, message, history);
   // The marker is what is saved; the friendly text is what is streamed (D-047).
   const friendly = refusalText(tenant, replyIn);
 

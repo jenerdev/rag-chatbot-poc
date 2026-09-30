@@ -67,9 +67,14 @@ export interface TenantTools {
    * that would end in the refusal gets PRICE_NEEDS_DATE instead (D-081).
    */
   priced: boolean;
+  /**
+   * The tenant books by room (per_room). Read by answer.ts only: a turn that
+   * asks which rooms there are, with no date, gets ROOM_LIST_LINES (D-084).
+   */
+  rooms: boolean;
 }
 
-const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false };
+const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false, rooms: false };
 
 /** "Thursday" for a YYYY-MM-DD. Formatted as UTC, because it is a calendar date, not an instant. */
 function weekdayOf(date: string): string {
@@ -150,6 +155,7 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
   return {
     definitions: [checkAvailabilityTool],
     priced,
+    rooms: false,
     prompt: {
       // Each sentence below answers a failure the battery MEASURED, not one
       // imagined. Change one, and re-run `pnpm eval` (CLAUDE.md rule 1).
@@ -297,6 +303,7 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
   return {
     definitions: [tool],
     priced,
+    rooms: true,
     prompt: {
       // Written for rooms, in the shape the villa lines were MEASURED to work
       // in: say what TO write, with an example, rather than what not to
