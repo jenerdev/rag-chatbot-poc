@@ -30,6 +30,7 @@ export default async function TenantChatPage({ params }: { params: Promise<{ ten
       bannerUrl={branding.bannerUrl}
       documentCount={documentCount}
       nav={nav}
+      suggestedQuestions={tenant.suggestedQuestions}
     />
   );
 }

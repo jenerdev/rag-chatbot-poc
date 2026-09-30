@@ -4,8 +4,8 @@
 // for the super user. Create mode takes the three fields a tenant is born
 // with (slug, business name, assistant name) and hands the new tenant back;
 // edit mode has the rest: names, logo and banner, the five theme colours with
-// a live preview, the three fallback messages, the applications and their
-// config, archive, and the members panel.
+// a live preview, the three fallback messages, the suggested questions
+// (D-089), the applications and their config, archive, and the members panel.
 //
 // Every rule lives elsewhere and is repeated here only to say it FIRST, in
 // the form's words: the slug regex and the colour regex (lib/schemas.ts,
@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react';
 import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { MembersPanel } from '@/components/members-panel';
+import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
 
 type Notice = { message: string; kind: 'ok' | 'error' } | null;
@@ -87,6 +88,12 @@ function fallbacksOf(value: unknown): Record<Languages, string> {
   return out;
 }
 
+/** Always MAX_SUGGESTED_QUESTIONS fields; the empty ones are dropped on save. */
+function suggestionsOf(value: unknown): string[] {
+  const saved = Array.isArray(value) ? value.filter((q): q is string => typeof q === 'string') : [];
+  return Array.from({ length: MAX_SUGGESTED_QUESTIONS }, (_, i) => saved[i] ?? '');
+}
+
 export function TenantForm({
   api,
   tenant,
@@ -111,6 +118,7 @@ export function TenantForm({
   const [bannerUrl, setBannerUrl] = useState(tenant?.bannerUrl ?? '');
   const [theme, setTheme] = useState<Theme>(themeOf(tenant?.theme));
   const [fallbacks, setFallbacks] = useState(fallbacksOf(tenant?.fallbackMessages));
+  const [suggestions, setSuggestions] = useState<string[]>(suggestionsOf(tenant?.suggestedQuestions));
   const [bookings, setBookings] = useState<BookingsFields>(bookingsFieldsOf(tenant?.applicationConfigs.bookings));
 
   const bookingsOn = tenant?.applications.includes('bookings') ?? false;
@@ -196,6 +204,7 @@ export function TenantForm({
             for (const k of THEME_KEY_LIST) if (theme[k]) themeOut[k] = theme[k];
             const fb: Partial<Record<Languages, string>> = {};
             for (const l of LANGUAGES) if (fallbacks[l].trim()) fb[l] = fallbacks[l].trim();
+            const questions = suggestions.map((q) => q.trim()).filter(Boolean);
             void send(
               'PATCH',
               `/tenants/${id}`,
@@ -206,6 +215,7 @@ export function TenantForm({
                 bannerUrl: bannerUrl.trim() || null,
                 theme: themeOut,
                 fallbackMessages: Object.keys(fb).length ? fb : null,
+                suggestedQuestions: questions.length ? questions : null,
               },
               'Saved.',
             );
@@ -270,6 +280,24 @@ export function TenantForm({
             <div className="field" key={l}>
               <label htmlFor={`fallback-${l}`}>{LANGUAGE_LABELS[l]}</label>
               <textarea id={`fallback-${l}`} rows={2} maxLength={500} value={fallbacks[l]} onChange={(e) => setFallbacks({ ...fallbacks, [l]: e.target.value })} />
+            </div>
+          ))}
+
+          <h3>Suggested questions</h3>
+          <p className="small muted">
+            Shown as buttons on a new, empty chat; a click asks the question at once. Up to {MAX_SUGGESTED_QUESTIONS}, each at
+            most {MAX_SUGGESTED_QUESTION_LENGTH} characters, in this order. Empty = none (D-089).
+          </p>
+          {suggestions.map((q, i) => (
+            <div className="field" key={i}>
+              <label htmlFor={`suggestion-${i}`}>Question {i + 1}</label>
+              <input
+                id={`suggestion-${i}`}
+                value={q}
+                maxLength={MAX_SUGGESTED_QUESTION_LENGTH}
+                placeholder={i === 0 ? 'What rooms do you have?' : ''}
+                onChange={(e) => setSuggestions(suggestions.map((s, j) => (j === i ? e.target.value : s)))}
+              />
             </div>
           ))}
 

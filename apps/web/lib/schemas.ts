@@ -275,6 +275,21 @@ const fallbackMessagesSchema = z
   .strict()
   .nullable();
 
+/** D-089: the same shape tenants_suggested_questions_shape enforces, said first in the form's words. */
+export const MAX_SUGGESTED_QUESTIONS = 6;
+export const MAX_SUGGESTED_QUESTION_LENGTH = 120;
+const suggestedQuestionsSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1, 'A suggested question cannot be empty')
+      .max(MAX_SUGGESTED_QUESTION_LENGTH, `A suggested question is at most ${MAX_SUGGESTED_QUESTION_LENGTH} characters`),
+  )
+  .min(1, 'Send null for no suggested questions')
+  .max(MAX_SUGGESTED_QUESTIONS, `At most ${MAX_SUGGESTED_QUESTIONS} suggested questions`)
+  .nullable();
+
 export const createTenantSchema = z.object({
   slug: z
     .string({ required_error: 'A slug is required', invalid_type_error: 'A slug is required' })
@@ -292,6 +307,7 @@ export const updateTenantSchema = z
     bannerUrl: httpsUrl.optional(),
     theme: themeSchema.optional(),
     fallbackMessages: fallbackMessagesSchema.optional(),
+    suggestedQuestions: suggestedQuestionsSchema.optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');

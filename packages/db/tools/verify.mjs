@@ -549,7 +549,7 @@ async function authChecks(probeId, anyChunk) {
     const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
     const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
     check(
-      !pub.error && keys === 'assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,theme',
+      !pub.error && keys === 'assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,suggested_questions,theme',
       "auth: tenant_public('villa') has only public columns",
       pub.error ? pub.error.message : `keys: ${keys}`,
     );
@@ -1667,6 +1667,33 @@ async function rolesChecks() {
       }
       const good = await supabase.from('tenants').update({ theme: { accent: '#0f766e', bg: '#fff' }, logo_url: 'https://example.com/logo.png' }).eq('id', probe.id).select('id');
       check(bad.length === 0 && !good.error, 'roles: theme, url, name and slug shapes refused; a valid theme accepted', bad.length ? bad.join(' · ') : `5 refused · valid ${good.error ? good.error.message : 'accepted'}`);
+    }
+
+    // 102b. Suggested questions (D-089): the platform writes them, anon reads
+    //       them back in order through tenant_public(); every bad shape is
+    //       refused by tenants_suggested_questions_shape (23514); null clears.
+    {
+      const superClient = asToken(platformToken(ids.super));
+      const bad = [];
+      for (const [label, value] of [
+        ['seven questions', ['1', '2', '3', '4', '5', '6', '7']],
+        ['an empty array', []],
+        ['a number', ['Rooms?', 5]],
+        ['an empty string', ['']],
+        ['121 characters', ['x'.repeat(121)]],
+        ['an object', { q: 'Rooms?' }],
+      ]) {
+        const { error } = await superClient.from('tenants').update({ suggested_questions: value }).eq('id', probe.id);
+        if (error?.code !== '23514') bad.push(`${label}: ${error ? error.code : 'ACCEPTED'}`);
+      }
+      const set = await superClient.from('tenants').update({ suggested_questions: ['What rooms do you have?', 'Do you allow pets?'] }).eq('id', probe.id).select('id');
+      const seen = (await asToken(null).rpc('tenant_public', { p_slug: 'roles-probe' })).data?.[0]?.suggested_questions;
+      const cleared = await superClient.from('tenants').update({ suggested_questions: null }).eq('id', probe.id).select('suggested_questions').single();
+      check(
+        bad.length === 0 && set.data?.length === 1 && JSON.stringify(seen) === '["What rooms do you have?","Do you allow pets?"]' && cleared.data?.suggested_questions === null,
+        'roles: suggested questions set by the platform, read by anon in order, bad shapes refused, null clears',
+        bad.length ? bad.join(' · ') : `6 refused · public ${JSON.stringify(seen)} · cleared ${cleared.error ? cleared.error.message : cleared.data.suggested_questions}`,
+      );
     }
 
     // 103. The two new config keys: whole numbers within bounds, or 23514.

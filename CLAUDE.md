@@ -99,6 +99,11 @@
 > amount quoted is the DAY price, a holiday's surcharge in
 > (`check_room_availability().day_price`, `sql/schema-day-price.sql`, D-083):
 > unit_quote()'s own price with no guest count, never the base rate alone.
+>
+> **A new chat can offer suggested questions** since 2026-09-30 (D-089): up to
+> six per tenant, set by a super user on the platform tenant form, stored in
+> `tenants.suggested_questions` (shape checked in SQL) and read through
+> `tenant_public()`. A click sends the question as if typed.
 
 ## What this is
 
@@ -171,11 +176,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (13 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (14 files), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     109 checks (77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups), no API key
+    tools/verify.mjs     110 checks (77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -219,7 +224,7 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 109 checks, no API key needed
+pnpm --filter @rag/db verify    # 110 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6

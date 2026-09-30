@@ -80,7 +80,7 @@ export function fromPostgrest(error: { code?: string; message: string }, what: s
 }
 
 /** The tenants columns a platform read selects. EXPLICIT, never `*` (CLAUDE.md § Conventions). */
-const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, theme, fallback_messages, archived_at, created_at';
+const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, theme, fallback_messages, suggested_questions, archived_at, created_at';
 
 /** One row of the platform's tenant list. */
 export interface TenantSummary {
@@ -92,6 +92,8 @@ export interface TenantSummary {
   bannerUrl: string | null;
   theme: Json;
   fallbackMessages: Json | null;
+  /** D-089: the questions a new chat offers as buttons, or null. */
+  suggestedQuestions: Json | null;
   /** ISO timestamp, or null while live. An archived tenant is a 404 everywhere but here. */
   archivedAt: string | null;
   createdAt: string;
@@ -115,6 +117,7 @@ type TenantRow = {
   banner_url: string | null;
   theme: Json;
   fallback_messages: Json | null;
+  suggested_questions: Json | null;
   archived_at: string | null;
   created_at: string;
 };
@@ -131,6 +134,7 @@ function summary(row: TenantRow, applications: ApplicationKey[], members: number
     bannerUrl: row.banner_url,
     theme: row.theme,
     fallbackMessages: row.fallback_messages,
+    suggestedQuestions: row.suggested_questions,
     archivedAt: row.archived_at,
     createdAt: row.created_at,
     applications,
@@ -208,6 +212,7 @@ export interface TenantPatch {
   bannerUrl?: string | null;
   theme?: Json;
   fallbackMessages?: Json | null;
+  suggestedQuestions?: Json | null;
 }
 
 export async function updateTenant(platform: PlatformContext, tenantId: number, patch: TenantPatch): Promise<TenantDetail> {
@@ -219,6 +224,7 @@ export async function updateTenant(platform: PlatformContext, tenantId: number, 
   if (patch.bannerUrl !== undefined) row.banner_url = patch.bannerUrl;
   if (patch.theme !== undefined) row.theme = patch.theme;
   if (patch.fallbackMessages !== undefined) row.fallback_messages = patch.fallbackMessages;
+  if (patch.suggestedQuestions !== undefined) row.suggested_questions = patch.suggestedQuestions;
   if (Object.keys(row).length === 0) throw new PlatformInputError('Nothing to change.');
 
   const { data, error } = await platform.db.from('tenants').update(row).eq('id', tenantId).select('id');

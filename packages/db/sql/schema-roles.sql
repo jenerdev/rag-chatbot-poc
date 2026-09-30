@@ -189,6 +189,17 @@ revoke all on tenants from anon;
 
 -- 5. tenant_public(): one line, and an archived tenant is gone everywhere.
 --    Same return type, so create or replace; the grants are re-applied below.
+-- GUARDED (D-089, 2026-09-30): schema-suggested-questions.sql replaces this
+-- with a suggested_questions column. Once that has run, this `create or
+-- replace` would fail on the changed return type, so it is skipped.
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'tenant_public'
+       and 'suggested_questions' = any(p.proargnames)
+  ) then
+    execute $ddl$
 create or replace function tenant_public(p_slug text)
 returns table (
   id                bigint,
@@ -207,7 +218,11 @@ as $$
   select t.id, t.slug, t.business_name, t.assistant_name, t.logo_url, t.banner_url, t.theme, t.fallback_messages
   from public.tenants t
   where t.slug = p_slug and t.archived_at is null
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. tenant_applications: the platform switches applications on and off and
 --    edits their config; the triggers keep deciding what is allowed.

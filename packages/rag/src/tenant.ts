@@ -41,8 +41,19 @@ export async function loadTenant(slug: string): Promise<TenantContext | null> {
     businessName: row.business_name,
     assistantName: row.assistant_name,
     fallbackMessages: fallbackMessagesOf(row.fallback_messages),
+    suggestedQuestions: suggestedQuestionsOf(row.suggested_questions),
     db: scopedClient(mintTenantToken({ tenantId: row.id })),
   };
+}
+
+/**
+ * The suggested questions from their jsonb column (D-089): the strings, in
+ * order. Postgres enforces the shape (tenants_suggested_questions_shape);
+ * as with the fallback messages, a bad row can only lose its questions here.
+ */
+function suggestedQuestionsOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((q): q is string => typeof q === 'string' && q.trim() !== '').slice(0, 6);
 }
 
 /**

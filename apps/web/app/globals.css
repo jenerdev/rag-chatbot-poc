@@ -103,6 +103,23 @@ main { max-width: 820px; margin: 0 auto; padding: 20px; }
   padding: 60px 20px;
 }
 .empty-state strong { color: var(--ink); display: block; margin-bottom: 6px; }
+/* D-089: the suggested questions, as wrapping chips under the empty state. */
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.suggestions button {
+  border-radius: 999px;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: transparent;
+  text-align: left;
+  white-space: normal;
+}
+.suggestions button:hover:not(:disabled) { background: var(--accent); color: #fff; }
 
 .turn { margin-bottom: 18px; }
 .bubble {

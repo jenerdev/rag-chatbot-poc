@@ -31,6 +31,11 @@ export interface TenantContext {
    */
   fallbackMessages: FallbackMessages;
   /**
+   * Up to six questions shown as buttons on a new, empty chat; a click sends
+   * one (D-089). [] = none. Set on the platform tenant form.
+   */
+  suggestedQuestions: string[];
+  /**
    * The database, AS this tenant: a client holding a token minted for it
    * (auth-rls Phase 3, D-039). Postgres's RLS policies compare every row
    * against that token, so this is the second wall behind every

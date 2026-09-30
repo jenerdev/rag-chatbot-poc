@@ -42,6 +42,12 @@ export interface ChatScreenProps {
    * books (D-037).
    */
   nav: NavFeatures;
+  /**
+   * The tenant's suggested questions (D-089), set on the platform form and
+   * read through tenant_public(). Buttons on a new, empty chat; a click sends
+   * the question as if typed. [] = none, the empty state as it was.
+   */
+  suggestedQuestions: string[];
 }
 
 type Turn =
@@ -73,6 +79,7 @@ export function ChatScreen({
   bannerUrl,
   documentCount,
   nav,
+  suggestedQuestions,
 }: ChatScreenProps) {
   const api = `/api/t/${slug}`;
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -292,6 +299,15 @@ export function ChatScreen({
                   ? 'Your knowledge base is empty — add a document first.'
                   : 'The answer will show the chunks it came from.'}
               </span>
+              {!emptyKb && suggestedQuestions.length > 0 && (
+                <div className="suggestions" aria-label="Suggested questions">
+                  {suggestedQuestions.map((question) => (
+                    <button key={question} type="button" disabled={busy} onClick={() => void send(question)}>
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              )}
               {emptyKb && (
                 <>
                   <br />

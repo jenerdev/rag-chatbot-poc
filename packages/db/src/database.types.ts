@@ -70,6 +70,8 @@ export interface Database {
           theme: Json;
           /** what the chat shows when the documents cannot answer, per reply language (D-047, D-048); a missing key or null = the built-in default */
           fallback_messages: Json | null;
+          /** up to six questions a visitor can click on a new chat (D-089); null = none. Shape checked in SQL */
+          suggested_questions: Json | null;
           /** set by the platform (tenant management Phase 1): tenant_public() no longer returns the row, so the whole app answers 404 for it */
           archived_at: string | null;
           created_at: string;
@@ -83,6 +85,7 @@ export interface Database {
           banner_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
+          suggested_questions?: Json | null;
           archived_at?: string | null;
           created_at?: string;
         };
@@ -95,6 +98,7 @@ export interface Database {
           banner_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
+          suggested_questions?: Json | null;
           archived_at?: string | null;
           created_at?: string;
         };
@@ -689,6 +693,8 @@ export interface Database {
           banner_url: string | null;
           theme: Json;
           fallback_messages: Json | null;
+          /** sql/schema-suggested-questions.sql (D-089) */
+          suggested_questions: Json | null;
         }[];
       };
       /** plan/auth-phase0-spike.sql — TEMPORARY: returns auth.jwt(). Dropped after auth-rls Phase 2. */
