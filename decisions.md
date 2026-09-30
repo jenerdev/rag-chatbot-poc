@@ -2535,3 +2535,39 @@ broke it (1 FAILED, both ways). D-082's record said isolation passed; it
 was measured while the label was still a separate field. The check now
 compares the amount alone, and both ways pass. Rule, as CLAUDE.md
 already says it: re-run every suite after the LAST edit, not the first.
+
+## D-084 · "What rooms do you have?" lists the rooms, with no price and no question back · **Added 2026-09-30**
+
+**Decision:** for a tenant that books by room (`TenantTools.rooms`), a turn
+that asks which rooms there are gets `ROOM_LIST_LINES` (`dates.ts`) in the
+per-turn slot after the tools block, where a date's lines go (D-046): list
+every room from the tool description with its guests and what the
+documents say, no price, no date asked, and end by saying a date gives
+availability and rates. `asksRoomList()`: rooms in the plural, "mga
+kwarto", "what/which/anong room"; no date; no price word (that is D-081's).
+NOT a yes/no availability question ("Do you have any rooms available?",
+"May kwarto ba kayo?"): those still ask for a date, by the user's choice,
+and `rt-ask` pins it. A single named room is a documents question. Every
+other prompt is unchanged (northwind's snapshot matches; no tool text
+changed).
+
+**Why:** the user's note: "what are the available rooms, should answer and
+show all rooms details without pricing … ask only for date if user wants
+price details". Harbor asked "Which date?" to 5 room questions in 5,
+because its tools block says to whenever availability is asked with no
+date. In the model, not in code, because the details are in the
+documents (`units.description` is empty for harbor), and with the rule
+"no price" because those documents hold an old ₱3,000 brochure rate and a
+₱40,000 exclusive-use price.
+
+**Measured:** "what rooms do you have?", "what are the available rooms?",
+"what are rooms available?", "Anong mga kwarto ang meron kayo?": the list,
+no "₱", no tool call, every time tried (Taglish for the last). "May kwarto
+ba kayo?" refused 3 of 3 WITH the lines, even after "never reply that you
+don't know" was added; without them it asks for a date, so it is left
+out. Tests 338/338. Battery **57/61** (`original 8/10 · tool 8/9 · lang
+10/10 · date 11/11 · rooms 13/13 · book 4/5 · price 3/3`): the rule fired
+on no battery turn; `antecedent`, `leak-2`, `tool-leak` (northwind, no
+tools) and `book-for-me-harbor` (dated) cannot reach it. A first run,
+before the yes/no exclusion, fired it on `rt-ask`, which still passed
+that time: the case the user then decided.

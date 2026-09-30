@@ -6604,3 +6604,22 @@ failures only.
 re-running the older schema file would have failed half-way. Its step is
 guarded on the new column. And the isolation check D-082 had quietly
 broken was found here and fixed, with D-082's record corrected.
+
+## "What rooms do you have?" lists the rooms · done 2026-09-30 (D-084)
+
+**What:** at harbor, "what rooms do you have?" or "Anong mga kwarto ang
+meron kayo?" lists every room with its guests and description, no price,
+and says a date gives availability and rates. "Do you have any rooms
+available?" still asks for a date.
+
+**Why it matters:** a guest browsing got "Which date?" before seeing what
+the inn offers, 5 times in 5.
+
+**Observed:** four phrasings listed, no "₱" in any; "May kwarto ba kayo?"
+would not list even with a stronger line (0 of 3), so it asks for a date
+as before. Battery 57/61, no failure on this path.
+
+**Trap avoided:** the first version also took "Do you have any rooms
+available?", the question `rt-ask` pins to ask for a date. Found in the
+battery's log, not by the verdict (it passed that run), and put to the
+user rather than rewritten either way.
