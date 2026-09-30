@@ -92,6 +92,19 @@ export interface SlotSummary {
   duration: string;
   /** a stay of several nights is several rows of this slot (customer booking § 2.2) */
   nightly: boolean;
+  /** false = retired (D-090): takes no new booking; its past bookings keep it */
+  active: boolean;
+}
+
+/** A slot as the Slots screen shows it (D-090): what decides which actions it offers. */
+export interface SlotAdmin extends SlotSummary {
+  /** the duration in minutes, for the form */
+  minutes: number;
+  /** pending or confirmed bookings not yet ended: while > 0 the times are fixed */
+  upcoming: number;
+  /** any booking ever, cancelled included: then it is retired, not deleted */
+  booked: boolean;
+  timezone: string;
 }
 
 /** What createBooking accepts. Loose types on purpose: this package validates them itself. */

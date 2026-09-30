@@ -469,6 +469,8 @@ export interface Database {
           duration: string;
           /** schema-customer-booking.sql § 3 — a stay of N nights is N rows of a nightly slot */
           nightly: boolean;
+          /** schema-slots.sql (D-090): false = retired, takes no new booking */
+          active: boolean;
           created_at: string;
         };
         Insert: {
@@ -478,6 +480,7 @@ export interface Database {
           start_time: string;
           duration: string;
           nightly?: boolean;
+          active?: boolean;
           created_at?: string;
         };
         Update: {
@@ -487,6 +490,7 @@ export interface Database {
           start_time?: string;
           duration?: string;
           nightly?: boolean;
+          active?: boolean;
           created_at?: string;
         };
         Relationships: [];

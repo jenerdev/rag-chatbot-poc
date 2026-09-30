@@ -12,7 +12,7 @@
 //
 // The DATABASE's view of this table is two functions, and they must agree:
 //   app_is_admin()  = owner | admin  → every *:write except bookings and unanswered,
-//                                       and the rooms and holidays reads
+//                                       and the rooms, holidays and slots reads
 //   app_is_staff()  = any member     → bookings, unanswered, session, every other read
 // permissions.test.ts pins the two views to each other, by hand, permission
 // by permission. A permission only one wall knows about is a bug (plan Rule 2).
@@ -34,6 +34,9 @@ export const PERMISSIONS = [
   /** S-7, the holiday calendar */
   'holidays:read',
   'holidays:write',
+  /** the Slots screen (D-090): create, edit, retire and delete booking slots */
+  'slots:read',
+  'slots:write',
   'unanswered:read',
   /** resolve and reopen */
   'unanswered:write',
@@ -43,7 +46,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 const STAFF: readonly Permission[] = ['session', 'documents:read', 'bookings:read', 'bookings:write', 'unanswered:read', 'unanswered:write'];
-const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write'];
+const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write'];
 const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
 
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {

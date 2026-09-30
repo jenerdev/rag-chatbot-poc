@@ -41,6 +41,11 @@ import {
   checkRoomAvailability,
   createAccommodation,
   createBookings,
+  createSlot,
+  deleteSlot,
+  listSlots,
+  listSlotsAdmin,
+  updateSlot,
   listAccommodations,
   listBookings,
   listImages,
@@ -687,6 +692,82 @@ try {
         `closed ${listed.closed} · ${described(confirm)} · still ${still} · declined ${declined} · reopened ${reopened} · booked ${afterReopen.bookings[0]?.date}`,
       );
     }
+  }
+
+  // 34–37. Slots managed by the tenant (D-090), on the probe's ADMIN token.
+  //        Each rule twice: the package's words first, then the same write
+  //        raw, which only Postgres can refuse (the trigger holds alone).
+  {
+    const chat = { id: probe.id, slug: probe.slug, db: scopedClient(mintTenantToken({ tenantId: probe.id })) };
+    // Clear of every other check's dates (30–33 book around day 300).
+    const FAR = firstOf(420, [3]);
+
+    // 34. Create, a duplicate name refused, and the chat token cannot write.
+    const created = await createSlot(probe, { name: 'Probe Day', startTime: '08:00', minutes: 540 });
+    const dup = await thrown(() => createSlot(probe, { name: 'Probe Day', startTime: '09:00', minutes: 60 }));
+    const chatInsert = await chat.db.from('slots').insert({ tenant_id: probe.id, name: 'Chat slot', start_time: '10:00', duration: '1 hour' }).select('id');
+    const chatUpdate = await chat.db.from('slots').update({ name: 'Hijacked' }).eq('id', created.id).select('id');
+    const villaSlot = (await listSlots(villa))[0];
+    const acrossTenants = await updateSlot(probe, villaSlot.id, { name: 'Hijacked' });
+    const listed = (await listSlotsAdmin(probe)).find((s) => s.id === created.id);
+    check(
+      listed?.minutes === 540 && listed.active && !listed.booked && dup instanceof BookingInputError
+        && chatInsert.error !== null && (chatUpdate.data ?? []).length === 0 && acrossTenants === null,
+      'slots: an admin creates one; a duplicate name is a 400; a chat token writes nothing; another tenant\'s slot is "not there"',
+      `${listed?.name} ${listed?.startTime} ${listed?.minutes}min · dup: ${described(dup)} · chat insert: ${chatInsert.error?.code ?? 'ACCEPTED'} · chat update ${chatUpdate.data?.length ?? chatUpdate.error?.code} rows · villa's: ${acrossTenants}`,
+    );
+
+    // 35. An upcoming booking fixes its times: refused in words, and raw on the
+    //     admin token AND on service_role (the trigger alone). The name changes.
+    await setRates(probe, garden.id, [{ slotId: created.id, weekdayPrice: 200000, weekendPrice: 250000 }]);
+    const booked = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: created.id, date: FAR, guestName: 'Slot probe' });
+    const moveWords = await thrown(() => updateSlot(probe, created.id, { startTime: '09:00' }));
+    const rawStaff = await probe.db.from('slots').update({ duration: '10 hours' }).eq('id', created.id);
+    const rawService = await supabase.from('slots').update({ start_time: '07:00' }).eq('id', created.id);
+    const renamed = await updateSlot(probe, created.id, { name: 'Probe Day Tour', startTime: '08:00', minutes: 540 });
+    const afterRename = (await listSlotsAdmin(probe)).find((s) => s.id === created.id);
+    check(
+      booked.bookings.length === 1 && moveWords instanceof BookingInputError && /1 upcoming booking/.test(moveWords.message)
+        && rawStaff.error?.code === '23514' && rawService.error?.code === '23514'
+        && renamed !== null && afterRename?.name === 'Probe Day Tour' && afterRename.startTime === '08:00' && afterRename.upcoming === 1,
+      'slots: an upcoming booking fixes the times (words, and the trigger on staff and service_role); the name still changes',
+      `${described(moveWords)} · raw staff ${rawStaff.error?.code ?? 'ACCEPTED'} · raw service ${rawService.error?.code ?? 'ACCEPTED'} · now "${afterRename?.name}" ${afterRename?.startTime}, ${afterRename?.upcoming} upcoming`,
+    );
+
+    // 36. A booked slot cannot be deleted: retire it. Retired, it is gone from
+    //     every OFFER (listSlots, availability) and takes no new booking,
+    //     refused in words and raw on service_role; its booking keeps its name.
+    const deleteWords = await thrown(() => deleteSlot(probe, created.id));
+    const retired = await updateSlot(probe, created.id, { active: false });
+    const offered = (await listSlots(probe)).map((s) => s.name);
+    const history = (await listSlots(probe, { retired: true })).map((s) => s.name);
+    const availability = [...new Set((await checkRoomAvailability(chat, { from: FAR })).map((r) => r.slot))];
+    const newWords = await thrown(() => createBookings(probe, { unitId: family.id, guestCount: 1, slotId: created.id, date: FAR, guestName: 'After retire' }));
+    const rawInsert = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: family.id, slot_id: created.id, booked_date: FAR, guest_name: 'Raw', status: 'confirmed', guest_count: 1 });
+    const keeps = (await listBookings(probe, { from: FAR, to: FAR })).find((b) => b.id === booked.bookings[0].id)?.slot;
+    check(
+      deleteWords instanceof BookingInputError && /Retire it/.test(deleteWords.message) && retired !== null
+        && !offered.includes('Probe Day Tour') && history.includes('Probe Day Tour') && !availability.includes('Probe Day Tour')
+        && newWords instanceof BookingInputError && /no longer offered/.test(newWords.message)
+        && rawInsert.error?.code === '23514' && keeps === 'Probe Day Tour',
+      'slots: a booked slot is retired, not deleted; retired, it is offered nowhere and takes no booking (words, and the trigger on service_role); its booking keeps it',
+      `delete: ${described(deleteWords)} · offered [${offered}] · history [${history}] · availability [${availability}] · new: ${described(newWords)} · raw ${rawInsert.error?.code ?? 'ACCEPTED'} · booking's slot "${keeps}"`,
+    );
+
+    // 37. Offered again, it books again. A slot never booked is deleted, and
+    //     its rates go with it (counted).
+    await updateSlot(probe, created.id, { active: true });
+    const back = (await listSlots(probe)).map((s) => s.name).includes('Probe Day Tour');
+    const spare = await createSlot(probe, { name: 'Probe Spare', startTime: '18:00', minutes: 120, nightly: true });
+    await setRates(probe, garden.id, [{ slotId: spare.id, weekdayPrice: 100000, weekendPrice: 100000 }]);
+    const removed = await deleteSlot(probe, spare.id);
+    const { count: rateRows } = await supabase.from('unit_rates').select('slot_id', { count: 'exact', head: true }).eq('slot_id', spare.id);
+    const gone = await deleteSlot(probe, spare.id);
+    check(
+      back && removed && rateRows === 0 && gone === false,
+      'slots: a retired slot is offered again; one never booked is deleted with its rates; deleting it twice is "not there"',
+      `offered again ${back} · deleted ${removed} · rate rows left ${rateRows} · again ${gone}`,
+    );
   }
 
   // 14. A whole-resort tenant has no rooms to manage, and cannot book several.

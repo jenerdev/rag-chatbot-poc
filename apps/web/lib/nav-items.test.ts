@@ -20,15 +20,15 @@ describe('navItems', () => {
   });
 
   it('adds rooms and holidays for an admin, but not members', () => {
-    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Rooms', 'Holidays']);
+    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Rooms', 'Holidays', 'Slots']);
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Rooms', 'Holidays', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Rooms', 'Holidays', 'Slots', 'Members']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Holidays', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Knowledge base', 'Unanswered', 'Bookings', 'Holidays', 'Slots', 'Members']);
     expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Knowledge base', 'Unanswered', 'Members']);
   });
 
@@ -41,6 +41,7 @@ describe('navItems', () => {
       '/t/harbor/admin/bookings',
       '/t/harbor/admin/accommodations',
       '/t/harbor/admin/holidays',
+      '/t/harbor/admin/slots',
       '/t/harbor/admin/members',
     ]);
   });

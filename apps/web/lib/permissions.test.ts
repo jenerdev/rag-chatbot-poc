@@ -20,6 +20,8 @@ const POSTGRES: Record<Permission, Role[]> = {
   'rooms:write': ADMIN_ONLY, // units_insert/update, unit_rates_*, unit_images_*, storage.objects
   'holidays:read': ADMIN_ONLY, // rate_calendar_read is any token; the screen is admin-only
   'holidays:write': ADMIN_ONLY, // rate_calendar_insert/update/delete
+  'slots:read': ADMIN_ONLY, // slots_read is any token; the screen is admin-only (it counts bookings)
+  'slots:write': ADMIN_ONLY, // slots_insert/update/delete (schema-slots.sql)
   'unanswered:read': ANY_MEMBER, // unanswered_resolutions_read → app_is_staff()
   'unanswered:write': ANY_MEMBER, // unanswered_resolutions_insert/delete → app_is_staff()
   'members:manage': OWNER_ONLY, // memberships_owner_insert/update/delete

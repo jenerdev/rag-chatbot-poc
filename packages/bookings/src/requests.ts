@@ -22,7 +22,7 @@
 // model: the chatbot has no tool that reaches this file (D-037).
 
 import { MAX_STAY_NIGHTS } from './constants.js';
-import { bookingsConfig, requireConfig, listSlots } from './bookings.js';
+import { bookingsConfig, requireConfig, listSlots, RETIRED } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
 import type {
@@ -166,12 +166,13 @@ export async function quoteRequest(
         'id',
         request.rooms.map((r) => r.unitId),
       ),
-    tenant.db.from('slots').select('id, name, nightly').eq('tenant_id', tenant.id).eq('id', request.slotId).maybeSingle(),
+    tenant.db.from('slots').select('id, name, nightly, active').eq('tenant_id', tenant.id).eq('id', request.slotId).maybeSingle(),
   ]);
   if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
   if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
   // "Not yours" and "not there" are one message (CLAUDE.md conventions).
   if (!slot.data || units.data.length !== request.rooms.length) throw new BookingInputError('No such unit or slot.');
+  if (!slot.data.active) throw new BookingInputError(RETIRED);
   if (request.nights > 1 && !slot.data.nightly) {
     throw new BookingInputError(`${slot.data.name} cannot be booked for several nights.`);
   }
@@ -363,7 +364,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const [unitsRes, slots] = await Promise.all([
     tenant.db.from('units').select('id, name').eq('tenant_id', tenant.id),
-    listSlots(tenant),
+    listSlots(tenant, { retired: true }),
   ]);
   if (unitsRes.error) throw new Error(`Could not load units: ${unitsRes.error.message}`);
   const unitName = new Map(unitsRes.data.map((u) => [u.id, u.name]));
@@ -490,6 +491,7 @@ async function pageSettingsOf(tenant: BookingTenant) {
 function requestError(error: { code?: string; message: string }): Error {
   const closed = closedError(error);
   if (closed) return closed;
+  if (error.code === '23514' && /slot retired/.test(error.message)) return new BookingInputError(RETIRED);
   if (error.code === '22023') return new BookingInputError(error.message);
   if (error.code === '23P01') return new BookingConflictError('That date is no longer available. Please choose another.');
   if (error.code === '54000') return new BookingLimitError(error.message);

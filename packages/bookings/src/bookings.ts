@@ -122,9 +122,14 @@ export async function checkAvailability(
   if (error) throw new Error(`Could not check availability: ${error.message}`);
   // A closed date (D-080) is 'closed' whatever its bookings say. Only the
   // status changes: the label staff typed is not put into a prompt.
-  const closed = await closedDays(tenant, from, to);
+  // A retired slot (D-090) is not offered, so its rows are left out; its
+  // bookings still make the slots they overlap 'taken' (the SQL checks
+  // every booking of the unit, whatever its slot).
+  const [closed, offered] = await Promise.all([closedDays(tenant, from, to), activeSlotNames(tenant)]);
 
-  const rows = data.map((r) => ({ date: r.booked_date, unit: r.unit, slot: r.slot, status: statusOn(r.booked_date, r.status, closed) }));
+  const rows = data
+    .filter((r) => offered.has(r.slot))
+    .map((r) => ({ date: r.booked_date, unit: r.unit, slot: r.slot, status: statusOn(r.booked_date, r.status, closed) }));
   const open = rows.filter((r) => r.status === 'open').length;
   console.log(`[bookings] ${tenant.slug} availability ${from}..${to}: ${open} open of ${rows.length}${closed.size ? `, ${closed.size} day(s) closed` : ''}`);
 
@@ -185,7 +190,7 @@ async function pricedAvailability(
   const unit = blank(query.unit) ? null : requireText(query.unit, 'Room', MAX_UNIT_NAME);
   const guests = blank(query.guests) ? null : positiveInt(query.guests, 'Guests');
 
-  const { data, error } = await tenant.db.rpc('check_room_availability', {
+  const { data: every, error } = await tenant.db.rpc('check_room_availability', {
     p_tenant_id: tenant.id,
     p_from: from,
     p_to: to,
@@ -196,7 +201,9 @@ async function pricedAvailability(
   if (error) throw new Error(`Could not check room availability: ${error.message}`);
   // Which rate each date's price is, from the SAME branch unit_price() took
   // (rate_kind(), D-082), never decided a second time here.
-  const [closed, kinds] = await Promise.all([closedDays(tenant, from, to), rateKinds(tenant, from, to)]);
+  // A retired slot (D-090) is not offered: its rows are left out, as in checkAvailability.
+  const [closed, kinds, offered] = await Promise.all([closedDays(tenant, from, to), rateKinds(tenant, from, to), activeSlotNames(tenant)]);
+  const data = every.filter((r) => offered.has(r.slot));
 
   const open = data.filter((r) => statusOn(r.booked_date, r.status, closed) === 'open').length;
   console.log(
@@ -223,6 +230,18 @@ async function pricedAvailability(
     extraGuestPrice: r.extra_guest_price,
     total: r.total,
   }));
+}
+
+/** Refuse a retired slot in words (D-090). A missing one is the trigger's "No such unit or slot.". */
+async function refuseRetiredSlot(tenant: BookingTenant, slotId: number): Promise<void> {
+  const { data, error } = await tenant.db.from('slots').select('active').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle();
+  if (error) throw new Error(`Could not load the slot: ${error.message}`);
+  if (data && !data.active) throw new BookingInputError(RETIRED);
+}
+
+/** The names of the slots offered (active, D-090). Names are unique per tenant. */
+async function activeSlotNames(tenant: BookingTenant): Promise<Set<string>> {
+  return new Set((await listSlots(tenant)).map((s) => s.name));
 }
 
 /** rate_kinds() returns every date in the range, so a miss is a bug, not a weekday. */
@@ -275,14 +294,15 @@ export async function listUnits(tenant: BookingTenant): Promise<UnitSummary[]> {
 }
 
 /** This tenant's slots, in the order they start in a day. */
-export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
+export async function listSlots(tenant: BookingTenant, options: { retired?: boolean } = {}): Promise<SlotSummary[]> {
   await requireConfig(tenant);
-  const { data, error } = await tenant.db
-    .from('slots')
-    .select('id, name, start_time, duration, nightly')
-    .eq('tenant_id', tenant.id)
-    .order('start_time')
-    .order('name');
+  // Active only, by default: every caller that OFFERS a slot (the booking
+  // page, the chatbot's tool, the staff booking form, the rate grid) must
+  // not offer a retired one (D-090). The history lists pass `retired: true`,
+  // because an old booking keeps its retired slot's name.
+  let query = tenant.db.from('slots').select('id, name, start_time, duration, nightly, active').eq('tenant_id', tenant.id);
+  if (!options.retired) query = query.eq('active', true);
+  const { data, error } = await query.order('start_time').order('name');
   if (error) throw new Error(`Could not load slots: ${error.message}`);
   return data.map((s) => ({
     id: s.id,
@@ -290,6 +310,7 @@ export async function listSlots(tenant: BookingTenant): Promise<SlotSummary[]> {
     startTime: s.start_time.slice(0, 5),
     duration: s.duration,
     nightly: s.nightly,
+    active: s.active,
   }));
 }
 
@@ -333,7 +354,7 @@ export async function listBookings(
 
   // Names are joined here rather than embedded in the select. Both lookups
   // are tenant-scoped, so a unit name can only come from this tenant.
-  const [units, slots] = await Promise.all([listUnits(tenant), listSlots(tenant)]);
+  const [units, slots] = await Promise.all([listUnits(tenant), listSlots(tenant, { retired: true })]);
   const unitName = new Map(units.map((u) => [u.id, u.name]));
   const slotName = new Map(slots.map((s) => [s.id, s.name]));
 
@@ -407,6 +428,10 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
 
   // Said before the insert, in words; the trigger refuses it anyway (D-080).
   await refuseClosedDays(tenant, [date]);
+  // A retired slot (D-090), said first too: with no pre-check, the price
+  // trigger fires before bookings_slot_active (triggers run in name order)
+  // and the refusal read "no price for that slot" instead of "retired".
+  await refuseRetiredSlot(tenant, slotId);
 
   const guestName = requireText(input.guestName, 'Guest name', MAX_GUEST_NAME);
   const guestPhone = optionalText(input.guestPhone, 'Guest phone', MAX_GUEST_PHONE);
@@ -486,11 +511,12 @@ export async function quote(
         'id',
         rooms.map((r) => r.unitId),
       ),
-    tenant.db.from('slots').select('id, name').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle(),
+    tenant.db.from('slots').select('id, name, active').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle(),
   ]);
   if (units.error) throw new Error(`Could not load rooms: ${units.error.message}`);
   if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
   if (!slot.data || units.data.length !== rooms.length) throw new BookingInputError('No such unit or slot.');
+  if (!slot.data.active) throw new BookingInputError(RETIRED);
   const slotName = slot.data.name;
   await refuseClosedDays(tenant, [date]);
 
@@ -530,6 +556,9 @@ export async function quote(
   return { date, slotId, slot: slotName, lines, total: lines.reduce((sum, l) => sum + l.price, 0), currency };
 }
 
+/** A retired slot's refusal (D-090), in the code's words and for the trigger's (bookings_slot_active). */
+export const RETIRED = 'That slot is no longer offered. Choose another.';
+
 /**
  * The one place a failed booking write becomes what the caller sees. Only the
  * codes the schema raises on purpose are translated; anything else propagates
@@ -538,6 +567,7 @@ export async function quote(
 function writeError(error: { code?: string; message: string }, date: string): Error {
   const closed = closedError(error);
   if (closed) return closed;
+  if (error.code === '23514' && /slot retired/.test(error.message)) return new BookingInputError(RETIRED);
   if (error.code === '23P01') return new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
   if (error.code === '23503') return new BookingInputError('No such unit or slot.');
   if (error.code === '23514' && /holds at most/.test(error.message)) {

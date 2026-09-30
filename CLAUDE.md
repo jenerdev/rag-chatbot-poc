@@ -104,6 +104,13 @@
 > six per tenant, set by a super user on the platform tenant form, stored in
 > `tenants.suggested_questions` (shape checked in SQL) and read through
 > `tenant_public()`. A click sends the question as if typed.
+>
+> **Owners and admins manage slots** since 2026-09-30 (D-090), on the Slots
+> screen. A slot's start time and length are fixed while an upcoming booking
+> uses it (`slots_times_fixed`); a slot ever booked is RETIRED (`active =
+> false`), not deleted, and a retired slot takes no new booking from anyone
+> (`bookings_slot_active`). `listSlots()` returns active slots unless asked
+> for history; availability leaves retired slots' rows out.
 
 ## What this is
 
@@ -150,13 +157,14 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/book/page.tsx   S-6 the customer booking page — PUBLIC; 404 unless the tenant has a priced unit
   app/t/[tenant]/admin/holidays/page.tsx  S-7 the holiday calendar — 404 unless the tenant has the application
   app/t/[tenant]/admin/members/page.tsx   S-8 the tenant's members — for OWNERS (members:manage); others see one sentence
+  app/t/[tenant]/admin/slots/page.tsx     S-9 slots — owners and admins (slots:read/write); 404 unless the tenant has the application
   app/platform/page.tsx          the platform: login → tenant list → the tenant form (super users only; not linked from /)
   app/platform/reset/page.tsx    where a super user's invite or reset email lands
   app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members — every one on withPlatformRoute() but the three session/password ones
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -176,7 +184,7 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (14 files), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (15 files), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
@@ -192,7 +200,8 @@ packages/
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
     tools/isolation.mjs    29 cross-tenant checks, no API key
-    tools/rooms.mjs        35 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests and closed dates
+    src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
+    tools/rooms.mjs        39 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates and slots
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -231,7 +240,7 @@ pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 20 of them, code filters alone (RLS bypassed)
 pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
-pnpm --filter @rag/bookings rooms       # 35 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates; no API key
+pnpm --filter @rag/bookings rooms       # 39 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev

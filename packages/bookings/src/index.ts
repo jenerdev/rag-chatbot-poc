@@ -107,6 +107,8 @@ export type {
   RateKind,
   RoomAvailability,
   SlotAvailability,
+  SlotAdmin,
   SlotSummary,
   UnitSummary,
 } from './types.js';
+export { createSlot, deleteSlot, listSlotsAdmin, updateSlot } from './slots.js';

@@ -275,6 +275,29 @@ const fallbackMessagesSchema = z
   .strict()
   .nullable();
 
+/**
+ * D-090: a slot, as the Slots screen sends it. The length is in minutes; the
+ * package turns it into an interval and the database checks it again
+ * (slots_duration_positive, the triggers of schema-slots.sql).
+ */
+const slotFields = {
+  name: z.string().trim().min(1, 'A slot needs a name').max(60, 'A slot name is at most 60 characters'),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time is HH:MM, from 00:00 to 23:59'),
+  minutes: z.number().int('The length is whole minutes').min(1, 'A slot lasts at least a minute').max(48 * 60, 'A slot is at most 48 hours long'),
+  nightly: z.boolean(),
+};
+export const createSlotSchema = z.object({ ...slotFields, nightly: slotFields.nightly.optional() }).strict();
+export const updateSlotSchema = z
+  .object({
+    name: slotFields.name.optional(),
+    startTime: slotFields.startTime.optional(),
+    minutes: slotFields.minutes.optional(),
+    nightly: slotFields.nightly.optional(),
+    active: z.boolean().optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
+
 /** D-089: the same shape tenants_suggested_questions_shape enforces, said first in the form's words. */
 export const MAX_SUGGESTED_QUESTIONS = 6;
 export const MAX_SUGGESTED_QUESTION_LENGTH = 120;

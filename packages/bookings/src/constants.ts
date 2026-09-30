@@ -88,3 +88,7 @@ export const MAX_REQUEST_EMAIL = 254;
 export const MAX_REQUEST_NOTES = 1000;
 // A holiday's label, as rate_calendar_label_length.
 export const MAX_CALENDAR_LABEL = 100;
+
+/** D-090: a slot's name, and its length: 48 hours covers every stay shape a tenant has (22 hours is the longest today). */
+export const MAX_SLOT_NAME = 60;
+export const MAX_SLOT_MINUTES = 48 * 60;
