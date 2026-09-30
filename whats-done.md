@@ -6564,3 +6564,25 @@ refuses. Battery 56/61, none of the five failures on this code path.
 wording untouched (4 of 4), and an up-front code answer would have eaten
 the deposit answer. The rule is "no tool and no figure", which keeps every
 real answer to "how much".
+
+## Every price says which rate it is · done 2026-09-30 (D-082)
+
+**What:** the chatbot now writes "₱16,000.00 (weekday rate)", "₱20,000.00
+(weekend rate)", holiday or peak, for villa and harbor.
+
+**Why it matters:** a guest sees why Saturday costs more than Thursday,
+and the label comes from the same SQL branch as the amount, so it cannot
+name one rate and quote another.
+
+**Observed:** rooms 23b: weekday 1600000, weekend 2000000, peak and
+holiday 2500000, each with its own label. A separate label field was
+ignored 0 of 4; in the price text it was quoted 5 of 5. Battery 58/61;
+`book-for-me-harbor` fails 1 of 4 even without the label today.
+
+**Trap avoided:** re-running `schema-customer-booking.sql` would have put
+the inline unit_price() back, and the label would have been a second
+opinion. That step is now guarded on rate_kind().
+
+**Found, not fixed:** a holiday's surcharge is missing from the price the
+chatbot quotes without a guest count (24 December: ₱20,000.00, really
+₱24,000.00).

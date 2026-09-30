@@ -2456,3 +2456,47 @@ flips trap 24 records.
 
 **Cost, recorded:** an undated price of something the documents lack
 ("how much is parking?" at villa) now gets the rates text, not the refusal.
+
+## D-082 · Every price says which rate it is, from the one branch that chose it · **Added 2026-09-30**
+
+**Decision:** `rate_kind(tenant, date)` (`sql/schema-rate-kind.sql`) is the
+ONE place a date's rate is decided: a `rate_calendar` row's own kind
+(`holiday`, `peak`, `closed`), else `weekend` if the ISO weekday is in the
+bookings config's `weekend_days`, else `weekday`. `unit_price()` now asks
+it (`case rate_kind(...)`), with the same amount for every date, so the
+label and the price are the same branch and cannot disagree.
+`rate_kinds(tenant, from, to)` gives a range; `pricedAvailability()` reads
+it beside `check_room_availability()` and every `RoomAvailability` row
+carries `rateKind` (a missing date throws, never defaults). The chatbot's
+tool writes it INTO the price text: `"₱20,000.00 (weekend rate)"`; a
+closed row has no label. `schema-customer-booking.sql` § 6 is guarded on
+`rate_kind()` (trap 20). No tool TEXT changed.
+
+**Why:** the user asked to tag each price as weekday, weekend or holiday.
+Deciding it again in TypeScript would be a second copy of unit_price()'s
+branch, which is the drift CLAUDE.md forbids for prices.
+
+**Where the label goes, measured:** a separate `rate: "weekend rate"`
+field in each row was mentioned 0 times in 4 replies. In the price text,
+5 of 5 (weekday, weekend, Taglish, harbor's rooms, a plain availability
+question). The battery's `pesos()` keeps only digits, commas and dots, so
+its price comparisons are unaffected.
+
+**Measured:** rooms 35/35 (23b new: Thursday weekday 1600000, Friday
+weekend 2000000, peak and holiday 2500000; check 23's prices unchanged by
+the rewrite); both isolation suites both ways; verify only the known
+roles failure (villa's staff member); tests 333/333, bookings 99/99;
+villa's and harbor's tool definitions byte-identical to their baselines.
+Battery **58/61** (`original 9/10 · tool 8/9 · lang 10/10 · date 11/11 ·
+rooms 13/13 · book 4/5 · price 3/3`): `antecedent` (known), `tool-leak`
+(northwind, no tools, cannot reach this code) and `book-for-me-harbor`.
+That one was repeated (trap 24): with the label 0 of 4, WITHOUT it (the
+old price text, rebuilt) 1 of 4, on today's battery date (14 October).
+It flips with the date; the label is not shown to be the cause, and not
+shown not to be. Record, do not reword.
+
+**Open, found here:** the tool's `price` is the BASE rate. A holiday's
+surcharge reaches the model only in `total`, which is sent only with a
+guest count, so villa's 24 December is quoted ₱20,000.00 (holiday rate)
+where the price is ₱24,000.00. That predates this decision (the user's own
+bug note) and is not fixed by it.
