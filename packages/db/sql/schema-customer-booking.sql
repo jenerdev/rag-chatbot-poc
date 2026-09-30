@@ -356,6 +356,17 @@ $$;
 --     rates still gets zero rows (the lateral unit_quote() yields none), the
 --     same answer as before, so a whole_resort tenant with prices only in
 --     its documents is unchanged.
+--     GUARDED (D-083, 2026-09-30): schema-day-price.sql replaces this with
+--     a `day_price` column. Once that has run, this `create or replace`
+--     would fail on the changed return type, so it is skipped.
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'check_room_availability'
+       and 'day_price' = any(p.proargnames)
+  ) then
+    execute $ddl$
 create or replace function check_room_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -436,7 +447,11 @@ begin
       and (p_guests is null or u.capacity is null or u.capacity >= p_guests)
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 11. request_booking(): THE public write (plan Rule 2, § 2.1). A fourth
 --     security definer function (D-071, amending D-042 and D-054), with the

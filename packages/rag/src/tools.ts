@@ -428,7 +428,12 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
             // price text itself, because the model copies a price as written:
             // a separate `rate` field was mentioned 0 times in 4. No tool TEXT
             // changed (the D-080 lesson), so the baselines stand.
-            price: r.status === 'closed' ? money(r.price, config.currency) : `${money(r.price, config.currency)} (${r.rateKind} rate)`,
+            //
+            // D-083: the DAY price, surcharge in: unit_quote()'s own price
+            // with no guest count. The base rate alone quoted villa's 24
+            // December at ₱20,000.00, where the page and the stored row say
+            // ₱24,000.00. With guests, `total` is this plus the extra charge.
+            price: r.status === 'closed' ? money(r.dayPrice, config.currency) : `${money(r.dayPrice, config.currency)} (${r.rateKind} rate)`,
             ...(guests ? { extra_guest_charge: money(r.extraGuestPrice, config.currency), total: money(r.total, config.currency) } : {}),
           })),
         });

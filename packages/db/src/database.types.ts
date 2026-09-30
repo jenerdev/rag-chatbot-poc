@@ -743,6 +743,8 @@ export interface Database {
           /** for p_guests (0 when it is null): the extra-guest fee, and base + fee */
           extra_guest_price: number;
           total: number;
+          /** sql/schema-day-price.sql (D-083): unit_quote()'s price with no guest count, the surcharge in */
+          day_price: number;
         }[];
       };
       /**

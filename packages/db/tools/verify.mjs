@@ -869,7 +869,7 @@ async function bookingTypeChecks(probeId) {
       const keys = all.data?.[0] ? Object.keys(all.data[0]).sort().join(',') : '';
       check(
         !all.error && got === 'Garden Room 2 taken 999900, Family Room 6 taken 600000'
-          && keys === 'booked_date,capacity,extra_guest_price,extra_person_rate,price,slot,standard_capacity,status,total,unit',
+          && keys === 'booked_date,capacity,day_price,extra_guest_price,extra_person_rate,price,slot,standard_capacity,status,total,unit',
         'check_room_availability: priced active rooms, no guest data',
         all.error ? all.error.message : `${got} · keys ${keys}`,
       );

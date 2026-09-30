@@ -107,9 +107,11 @@ const tV = (await executeTool(villa, call)).record.result?.slots ?? [];
 check(tH.length > 0 && tH.every((r) => r.unit !== 'Whole property' && 'price' in r) && !tH.some((r) => r.slot === 'Overnight'),
   "harbor's tool: its rooms only, priced", [...new Set(tH.map((r) => r.unit))].join(', '));
 const villaPrices = new Set(['₱9,500.00', '₱12,000.00', '₱16,000.00', '₱20,000.00', '₱22,000.00', '₱27,000.00']);
-const harborPrices = new Set(tH.map((r) => r.price));
+// The amount alone: since D-082 the price text names its rate, "₱20,000.00 (weekend rate)".
+const amount = (price) => String(price).replace(/ \(.*\)$/, '');
+const harborPrices = new Set(tH.map((r) => amount(r.price)));
 check(
-  tV.length === 3 && tV.every((r) => r.unit === 'Whole property' && villaPrices.has(r.price) && !harborPrices.has(r.price)),
+  tV.length === 3 && tV.every((r) => r.unit === 'Whole property' && villaPrices.has(amount(r.price)) && !harborPrices.has(amount(r.price))),
   "villa's tool: its whole property only, priced from its own rates, none of harbor's",
   tV.map((r) => `${r.slot} ${r.price}`).join(', '),
 );

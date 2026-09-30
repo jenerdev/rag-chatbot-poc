@@ -219,6 +219,7 @@ async function pricedAvailability(
     status: statusOn(r.booked_date, r.status, closed),
     price: r.price,
     rateKind: kindOn(kinds, r.booked_date),
+    dayPrice: r.day_price,
     extraGuestPrice: r.extra_guest_price,
     total: r.total,
   }));

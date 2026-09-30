@@ -141,8 +141,8 @@ describe('per_room: check_availability checks rooms', () => {
   const config = vi.mocked(bookingsConfig);
   const HARBOR = { ...TENANT, id: 67, slug: 'harbor' } as unknown as TenantContext;
   const ROOMS = [
-    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, rateKind: 'weekday', extraGuestPrice: 0, total: 350000 },
-    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, rateKind: 'weekday', extraGuestPrice: 25000, total: 625000 },
+    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, rateKind: 'weekday', dayPrice: 350000, extraGuestPrice: 0, total: 350000 },
+    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, rateKind: 'weekday', dayPrice: 600000, extraGuestPrice: 25000, total: 625000 },
   ];
 
   beforeEach(() => {
@@ -198,6 +198,15 @@ describe('per_room: check_availability checks rooms', () => {
     expect(prices).toEqual(['₱3,500.00 (holiday rate)', '₱3,500.00 (peak rate)', '₱3,500.00']);
   });
 
+  // D-083: villa's 24 December. The base (weekend) rate is ₱20,000, the
+  // calendar adds ₱4,000; the model is quoted the DAY price, never the base.
+  it("quotes the day price, the holiday surcharge in, not the base rate", async () => {
+    rooms.mockResolvedValueOnce([{ ...ROOMS[0], date: '2026-12-24', rateKind: 'holiday', price: 2000000, dayPrice: 2400000, total: 2400000 }] as never);
+    const { record, content } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-12-24"}' });
+    expect((record.result as { slots: { price: string }[] }).slots[0]!.price).toBe('₱24,000.00 (holiday rate)');
+    expect(content).not.toContain('20,000');
+  });
+
   it('a resolved date ("bukas") reaches the rooms check too', async () => {
     await executeTool(HARBOR, precheck('May kwarto ba kayo bukas?')[0]!);
     expect(rooms).toHaveBeenCalledWith(HARBOR, expect.objectContaining({ from: '2026-09-28' }));
@@ -233,6 +242,7 @@ describe('per_room: check_availability checks rooms', () => {
         status: 'open',
         price: 1600000,
         rateKind: 'weekend',
+        dayPrice: 1600000,
         extraGuestPrice: 50000,
         total: 1650000,
       },

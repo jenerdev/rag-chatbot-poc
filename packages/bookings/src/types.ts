@@ -152,6 +152,12 @@ export interface RoomAvailability {
   price: number;
   /** WHICH of those rates `price` is: rate_kind(), the branch unit_price() took (D-082) */
   rateKind: RateKind;
+  /**
+   * centavos, what the slot costs that date for its included guests, the
+   * calendar's surcharge IN: unit_quote()'s price with no guest count (D-083).
+   * What a person is quoted; `price` alone misses a holiday's surcharge.
+   */
+  dayPrice: number;
   /** for the guests asked about (0 when none were): the fee, and base + fee + that day's surcharge */
   extraGuestPrice: number;
   total: number;
