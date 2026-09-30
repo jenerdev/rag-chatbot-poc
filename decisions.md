@@ -2634,3 +2634,30 @@ snapshot. Battery **55/61** (`original 9/10 · tool 8/9 · lang 9/10 · date
 10/11 · rooms 12/13 · book 4/5 · price 3/3`); neither part fired on any
 battery turn (0 lines, 0 rows). `date-docs` failed once and passed 4 of 4
 on repeat (trap 10); the others are this session's known and dated flips.
+
+## D-087 · A room-list turn is guaranteed in code; a whole property lists its bedrooms · **Added 2026-09-30. Amends D-084**
+
+**Decision:** for a per_room tenant, a room-list turn (D-084's
+`asksRoomList()`) whose reply called no tool and does not name every
+active room is replaced by `roomListReply()` (`dates.ts`): each room and
+its maximum guests, from the database, no price, and one sentence inviting
+a date, in the reply language. A reply that names every room is kept, so
+the model's list with the documents' details still goes out when it
+comes. The stream holds such a turn. `TenantTools.rooms` carries the rooms
+(the tool description's own list). A tenant booked as a whole gets
+`WHOLE_PROPERTY_ROOM_LINES`: the bedrooms its documents describe, no
+price, and that the property is booked together.
+
+**Why:** the user: "What rooms are available?" still answered "Which date
+do you mean?". D-084's line fired (the log said so) and the model ignored
+it, 4 of 4 on harbor and alteza: the tools block's "ask which date" rule
+won for this wording, though not for "what are the available rooms?".
+A line the model follows most of the time is D-046's lesson again; this
+has to happen every time. Villa had no line and refused, 2 of 2.
+
+**Measured:** harbor, alteza and villa 2 of 2 each, no "₱"; the Taglish
+question kept the model's own richer list; "Do you have any rooms
+available?" still asks for a date (`rt-ask`). Tests 344/344; typecheck;
+northwind's snapshot. Battery **55/61**; no room rule fired on any battery
+turn; `lang-tagalog-2` (a pets question) 2 of 4 on repeat, its known flip;
+the rest this session's known and dated failures.

@@ -6657,3 +6657,17 @@ nothing on this path; `date-docs` 4 of 4 on repeat.
 **Trap avoided:** the page, the request check and now the chatbot each
 needed "today + max_advance_days". Written three times, the three could
 drift; it is one function, `lastBookingDate()`.
+
+## "What rooms are available?" on every tenant · done 2026-09-30 (D-087)
+
+**What:** harbor and alteza list their rooms with maximum guests and no
+price, every time; villa lists the bedrooms its documents describe.
+
+**Why it matters:** D-084 worked for some wordings and not this one, the
+one the user tried. An instruction that usually works is not a feature.
+
+**Observed:** 2 of 2 on each tenant; battery 55/61, nothing on this path.
+
+**Trap avoided:** checking the log first showed the rule HAD fired, so the
+fix was not a wider pattern but a guarantee after the model: keep its
+answer when it names the rooms, write the list when it does not.
