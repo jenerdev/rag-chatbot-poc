@@ -6671,3 +6671,19 @@ one the user tried. An instruction that usually works is not a feature.
 **Trap avoided:** checking the log first showed the rule HAD fired, so the
 fix was not a wider pattern but a guarantee after the model: keep its
 answer when it names the rooms, write the list when it does not.
+
+## A named fee is answered from the documents · done 2026-09-30 (D-088)
+
+**What:** "how much is the reservation fee?" at alteza says it is half of
+the total, deducted from it, non-refundable; it used to ask for a date.
+Harbor, whose documents do not say, gives its fallback.
+
+**Why it matters:** D-081 (this session) was overwriting correct answers
+that happen to hold no number.
+
+**Observed:** alteza 2 of 2 and in Taglish, villa unchanged, battery 56/61
+with only known failures.
+
+**Trap avoided:** "no digit in the reply" looked like a safe test for "the
+model did not answer a price". A fee stated as a fraction is an answer
+with no digit. The question, not the reply, now decides.

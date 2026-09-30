@@ -2661,3 +2661,32 @@ available?" still asks for a date (`rt-ask`). Tests 344/344; typecheck;
 northwind's snapshot. Battery **55/61**; no room rule fired on any battery
 turn; `lang-tagalog-2` (a pets question) 2 of 4 on repeat, its known flip;
 the rest this session's known and dated failures.
+
+## D-088 · A named fee is not the nightly rate: D-081 leaves it alone · **Added 2026-09-30. Narrows D-081**
+
+**Decision:** `asksUndatedPrice()` skips a question that names a fee or
+payment (`NAMED_FEE` in `dates.ts`: fee, deposit, down payment, DP, charge,
+surcharge, corkage, bayad, reservation, cancellation, penalty). Its reply
+is left as the model wrote it: from the documents, or the tenant's
+fallback when they do not say. "room rates please", "how much is a room?"
+and "Magkano po?" are still D-081's.
+
+**Why:** the user: alteza answered "how much is reservation fee" by asking
+for a date. Its documents say the fee is "half of the total … deducted
+from the total", a correct answer with no figure, and D-081 replaces a
+figureless reply. At harbor, whose documents do not state a fee, D-081
+turned the honest fallback into "rates vary by date". D-081's "no figure"
+test was the wrong signal for these: a fee can be a fraction, a rule or
+unknown, and none of those is a date question.
+
+**Measured:** alteza "half of the total shown on the booking page, rounded
+up to the nearest hundred pesos … non-refundable but deducted from the
+total" 2 of 2, and in Taglish; villa ₱3,000 / ₱5,000 unchanged; harbor the
+fallback; "room rates please" still D-081's words. Tests 346/346;
+typecheck. Battery **56/61** (`original 8/10 · tool 8/9 · lang 10/10 ·
+date 11/11 · rooms 12/13 · book 4/5 · price 3/3`); D-081 still fired on
+its two `lang-pin-window` setup turns ("Magkano po ang Overnight?"); the
+five failures are this session's known ones.
+
+**Open:** harbor's documents state no reservation fee. That is content,
+for the owner to write on the Knowledge base screen, not code.
