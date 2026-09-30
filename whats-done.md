@@ -6704,3 +6704,19 @@ harbor's page shows its four sample questions, villa's shows none.
 `create or replace` in schema-roles.sql would have failed on a re-run;
 it is guarded on the new column. And the column goes out through
 `tenant_public()` only, the one door a token has to `tenants`.
+
+## Slots managed on their own screen · done 2026-09-30 (D-090)
+
+**What:** owners and admins add, edit, retire and delete booking slots at
+`/t/<slug>/admin/slots`; before this, slots could only be added in SQL.
+
+**Why it matters:** a business can add an "Evening" slot or stop selling
+one without a developer, and nothing it does can strand a booking.
+
+**Observed:** rooms 34–37: each rule refused in words and by Postgres
+alone; the chat token writes nothing; a retired slot is offered nowhere
+and its booking keeps its name. Every other suite as before; battery 56/61.
+
+**Trap avoided:** a retired slot filtered from the slot LIST but not from
+availability would still have been offered by the chatbot. The check that
+asked availability directly caught it.

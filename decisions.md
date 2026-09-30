@@ -2722,3 +2722,54 @@ none, renders none. Not verified: a click in a real browser, and the
 platform form's editor in a browser. The platform HTTP walk could not run:
 its probe tenant `probe-tm` (created 2026-09-29, not by this change) still
 exists, so its create step gets 409 and the rest is skipped.
+
+## D-090 · Owners and admins manage slots: times fixed while booked, retire instead of delete · **Added 2026-09-30**
+
+**Decision:** a Slots screen (`/t/<slug>/admin/slots`, `slots:read` /
+`slots:write`, owners and admins, `app_is_admin()` in Postgres) creates,
+edits, retires and deletes slots. `sql/schema-slots.sql`:
+- `slots.active` (every existing slot true) and the first write policies
+  on `slots` (insert / update / delete, tenant + `app_is_admin()`, like
+  `unit_rates`);
+- `slots_times_fixed`: a BEFORE UPDATE trigger refuses a change of
+  `start_time` or `duration` while a pending or confirmed booking of that
+  slot has not ended (its stored `during` reaches past now);
+- `bookings_slot_active`: a BEFORE INSERT (and slot/date move) trigger on
+  `bookings` refuses a retired slot, for staff and `request_booking()`
+  alike. Neither is security definer; no existing function was replaced,
+  so no older file needed a guard.
+`@rag/bookings`: `slots.ts` (`listSlotsAdmin`, `createSlot`, `updateSlot`,
+`deleteSlot`, every refusal in words); `listSlots()` returns active slots
+unless `{ retired: true }` (the bookings and requests lists, whose rows
+keep a retired slot's name); `checkAvailability()` and
+`pricedAvailability()` leave retired slots' rows out; the staff booking,
+staff quote and booking-page quote refuse a retired slot in words first.
+
+**Why:** the user asked for slot CRUD, and chose both rules: refuse time
+edits while bookings are upcoming (a booking stores its span when made and
+nothing moves it), and retire a slot with history rather than delete it
+(the bookings FK refuses a delete anyway, to keep who came).
+
+**Measured:** rooms 39/39 (34–37 new): an admin creates; a duplicate is a
+400; a chat token's insert is 42501 and its update 0 rows; villa's slot is
+"not there" for the probe; an upcoming booking fixes the times, refused in
+words and raw with 23514 on the admin token AND on service_role; the name
+still changes; a booked slot's delete says "Retire it"; retired, it is out
+of `listSlots`, out of availability, a new booking gets "no longer
+offered" and a raw service insert 23514, and its booking keeps its name;
+offered again; an unused slot is deleted with its rates (0 rows left).
+Verify 109/110 (the known roles failure); both booking and both pipeline
+isolation suites; web 27/27 (the permission pinned to app_is_admin, the nav
+link); pipeline 346/346; bookings 99/99; typecheck; villa's and harbor's
+tool definitions byte-identical to their baselines; `/api/t/harbor/slots`
+401 without a session; the page 200 on harbor, 404 on northwind. Battery
+56/61, the five known failures.
+
+**Caught on the way:** (1) the first version filtered `listSlots()` only,
+and the availability functions still returned a retired slot's rows: the
+chatbot would have offered it. (2) A booking on a retired slot was refused
+as "no price for that slot": BEFORE triggers fire in name order, and
+`bookings_compute_during` runs before `bookings_slot_active`. The staff
+path now says "retired" before it inserts, as it does for closed dates.
+
+**Browser:** the user walked the Slots screen (2026-09-30).
