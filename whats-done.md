@@ -6623,3 +6623,20 @@ as before. Battery 57/61, no failure on this path.
 available?", the question `rt-ask` pins to ask for a date. Found in the
 battery's log, not by the verdict (it passed that run), and put to the
 user rather than rewritten either way.
+
+## The extra-guest fee without a date · done 2026-09-30 (D-085)
+
+**What:** "how much is per extra guest?" now gets the fee straight away:
+villa ₱250.00 above 30 guests, up to 45; harbor per room, and which rooms
+take no extra guests. It used to ask for a date.
+
+**Why it matters:** the fee never depends on the date, so asking for one
+was a wrong answer, and D-081 (this session) had caused it.
+
+**Observed:** 3 of 3 per tenant, English and Taglish. Battery 56/61, no
+failure on this path.
+
+**Trap avoided:** a room whose rate covers its maximum (2 of 2) read as
+"each guest above 2, up to 2", and the model invented "up to 4". Numbers
+that contradict each other get "fixed" by the model; the line now says
+what they mean.

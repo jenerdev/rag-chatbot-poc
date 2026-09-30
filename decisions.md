@@ -2571,3 +2571,34 @@ on no battery turn; `antecedent`, `leak-2`, `tool-leak` (northwind, no
 tools) and `book-for-me-harbor` (dated) cannot reach it. A first run,
 before the yes/no exclusion, fired it on `rt-ask`, which still passed
 that time: the case the user then decided.
+
+## D-085 · The extra-guest fee is answered without a date · **Added 2026-09-30. Narrows D-081**
+
+**Decision:** "how much is per extra guest?" with no date, for a tenant
+whose tool quotes prices, gets `extraGuestLines()` (`tools.ts`) in the
+per-turn slot: each unit's included guests, fee and maximum, from
+`bookingPage()`, the read the public booking page makes on the same chat
+token. Numbers and room names only; the staff-written description stays
+out (Rule 3). A unit full at its included guests says it "takes no extra
+guests". `asksExtraGuest()` (`dates.ts`: "extra/additional/excess/dagdag
+guest|person|pax|tao", "per head/person"), and `asksUndatedPrice()`
+(D-081) now leaves those questions alone. With a date it stays an
+availability turn: every tool row carries the fee already.
+
+**Why:** the user: "how much is Per extra guest" should not require a date.
+It got D-081's "rates vary by date", 4 of 4 (villa and harbor, English and
+Taglish). The fee is per unit (`units.extra_person_rate`) and does not
+change with the date, and since D-074 it is not in villa's documents.
+
+**Measured:** villa "₱250.00 … the rate covers 30 guests" 3 of 3 (Taglish
+too, with the maximum of 45); harbor Family Room and Loft at ₱250.00 above
+2, Garden Room and Sea View Suite "no extra guests" 3 of 3. The first
+wording ("each guest above that … up to 2 guests in all") had the model
+write "up to 4" for a 2-of-2 room: hence the full-room line. "Say how
+many guests the rate covers" was added after villa's reply left out the
+30. Tests 340/340; typecheck; northwind's snapshot matches. Battery
+**56/61** (`original 9/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms
+12/13 · book 4/5 · price 3/3`); the rule fired on no battery turn, and
+every failure is dated or northwind: `antecedent`, `lang-followup`,
+`tool-leak` (known), `rt-leak-2` (3 of 4 before; 0 harbor rows),
+`book-for-me-harbor` (the date flip).
