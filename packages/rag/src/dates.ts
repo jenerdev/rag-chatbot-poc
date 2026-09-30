@@ -451,6 +451,21 @@ export function asksUndatedPrice(message: string, today: string): boolean {
   return PRICE.test(message.toLowerCase()) && !asksExtraGuest(message, today) && resolveDates(message, today).length === 0;
 }
 
+// --- how far ahead can I book? (D-086) ------------------------------------------
+
+/**
+ * "How far in advance can I book?", "What is the latest date I can book?",
+ * "Hanggang kailan pwede mag-book?". Bare "in advance" is left out: "Do I pay
+ * in advance?" is a documents question about the deposit.
+ */
+const HORIZON =
+  /\b(?:how\s+far\s+(?:in\s+advance|ahead)|book(?:ing)?\s+(?:\w+\s+){0,3}?(?:in\s+advance|ahead)|advance\s+booking|how\s+early\s+can|(?:latest|furthest|last)\s+(?:date|day)|how\s+many\s+(?:days|months)\s+(?:ahead|in\s+advance)|hanggang\s+kailan|gaano\s+kaaga)\b/;
+
+/** A question about the booking horizon, with no date in it. */
+export function asksHorizon(message: string, today: string): boolean {
+  return HORIZON.test(message.toLowerCase()) && resolveDates(message, today).length === 0;
+}
+
 // --- the extra-guest fee (D-085) ------------------------------------------------
 
 /** "extra guest", "additional person", "per head", "dagdag na tao". */

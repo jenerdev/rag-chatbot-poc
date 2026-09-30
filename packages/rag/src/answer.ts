@@ -3,14 +3,14 @@
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
-import { asksExtraGuest, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
+import { asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
 import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
-import { executeTool, extraGuestLines, toolsFor } from './tools.js';
+import { executeTool, extraGuestLines, horizonLines, toolsFor } from './tools.js';
 import type { PromptTools, TenantTools } from './tools.js';
 import type {
   Answer,
@@ -315,6 +315,12 @@ async function withDates(
   const earlier = history.filter((h) => h.role === 'user').map((h) => h.content);
   const plan = planDates(message, prompt.today, earlier);
   if (plan.lines.length === 0) {
+    // D-086: "How far ahead can I book?" from the bookings config, the
+    // numbers the booking page enforces.
+    if (tools.horizon && asksHorizon(message, prompt.today)) {
+      console.log('[query] the booking horizon: the latest date from the config (D-086)');
+      return { prompt: { ...prompt, dates: horizonLines(tools.horizon) }, precheck: [] };
+    }
     // D-085: "How much is per extra guest?" needs no date; the fee is the
     // room's, from the database, in this turn's lines.
     if (tools.priced && asksExtraGuest(message, prompt.today)) {

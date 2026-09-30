@@ -229,6 +229,15 @@ export function parseRooms(input: { unitId?: unknown; rooms?: unknown; guestCoun
 }
 
 /** YYYY-MM-DD plus `days`, as UTC midnights, so no DST. */
+/**
+ * The last date a stay may START on: the tenant's today plus its
+ * max_advance_days (D-078). ONE definition, for the booking page, the
+ * request check and the chatbot (D-086), so the three cannot drift.
+ */
+export function lastBookingDate(today: string, maxAdvanceDays: number): string {
+  return addDays(today, maxAdvanceDays);
+}
+
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -320,7 +329,7 @@ export function parseRequest(
   if (!isIsoDate(input.checkIn)) throw new BookingInputError(`"${String(input.checkIn)}" is not a date. Use YYYY-MM-DD.`);
   const checkIn = input.checkIn;
   if (checkIn < today) throw new BookingInputError(`${checkIn} is in the past. Today is ${today}.`);
-  const lastDate = addDays(today, maxAdvanceDays);
+  const lastDate = lastBookingDate(today, maxAdvanceDays);
   if (checkIn > lastDate) {
     throw new BookingInputError(`Bookings open ${maxAdvanceDays} day${maxAdvanceDays === 1 ? '' : 's'} ahead, so the latest date is ${lastDate}.`);
   }

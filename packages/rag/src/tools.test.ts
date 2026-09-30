@@ -17,6 +17,7 @@ vi.mock('@rag/bookings', () => {
     checkPricedAvailability: vi.fn(),
     checkRoomAvailability: vi.fn(),
     hasBookingPage: vi.fn(),
+    lastBookingDate: vi.fn(() => '2027-09-30'),
     listRooms: vi.fn(),
     bookingsConfig: vi.fn(),
     listSlots: vi.fn(),
@@ -29,7 +30,7 @@ vi.mock('./applications.js', () => ({
   enabledApplications: vi.fn(async () => ['bookings']),
 }));
 
-import { BookingInputError, bookingsConfig, checkAvailability, checkPricedAvailability, checkRoomAvailability, hasBookingPage } from '@rag/bookings';
+import { BookingInputError, bookingsConfig, checkAvailability, checkPricedAvailability, checkRoomAvailability, hasBookingPage, lastBookingDate } from '@rag/bookings';
 import { planDates } from './dates.js';
 import { executeTool } from './tools.js';
 import type { TenantContext } from './types.js';
@@ -205,6 +206,22 @@ describe('per_room: check_availability checks rooms', () => {
     const { record, content } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-12-24"}' });
     expect((record.result as { slots: { price: string }[] }).slots[0]!.price).toBe('₱24,000.00 (holiday rate)');
     expect(content).not.toContain('20,000');
+  });
+
+  // D-086: past the horizon, a row is "not yet bookable", with no price,
+  // and the note names the last date; the day before it is priced as usual.
+  it('a date past the booking horizon is not yet bookable, with no price', async () => {
+    vi.mocked(lastBookingDate).mockReturnValueOnce('2027-09-30');
+    rooms.mockResolvedValueOnce([
+      { ...ROOMS[0], date: '2027-09-30' },
+      { ...ROOMS[0], date: '2027-10-01' },
+    ] as never);
+    const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2027-09-30","date_to":"2027-10-01"}' });
+    const result = record.result as { slots: Record<string, unknown>[]; not_yet_bookable?: { dates: string[]; meaning: string } };
+    expect(result.slots[0]).toMatchObject({ date: '2027-09-30', status: 'open', price: '₱3,500.00 (weekday rate)' });
+    expect(result.slots[1]).toEqual({ date: '2027-10-01', unit: 'Garden Room', slot: 'Night', status: 'not yet bookable' });
+    expect(result.not_yet_bookable?.dates).toEqual(['2027-10-01']);
+    expect(result.not_yet_bookable?.meaning).toContain('30 September 2027');
   });
 
   it('a resolved date ("bukas") reaches the rooms check too', async () => {

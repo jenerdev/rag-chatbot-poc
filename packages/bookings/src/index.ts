@@ -83,7 +83,7 @@ export { addImage, listImages, moveImage, removeImage, setImageOrder } from './i
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { closedDays } from './closed.js';
-export { addDays, isIsoDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
+export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
 
 export type {
   Accommodation,

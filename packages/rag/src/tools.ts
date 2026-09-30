@@ -27,6 +27,7 @@ import {
   checkRoomAvailability,
   bookingPage,
   hasBookingPage,
+  lastBookingDate,
   listRooms,
   listSlots,
   localDate,
@@ -73,9 +74,31 @@ export interface TenantTools {
    * asks which rooms there are, with no date, gets ROOM_LIST_LINES (D-084).
    */
   rooms: boolean;
+  /**
+   * How far ahead a stay may start, and how long it may be, for a tenant
+   * with a booking page (D-086); null otherwise. Read by answer.ts only, for
+   * a turn that asks how far in advance one can book.
+   */
+  horizon: Horizon | null;
 }
 
-const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false, rooms: false };
+export interface Horizon {
+  maxAdvanceDays: number;
+  /** YYYY-MM-DD, lastBookingDate(): the latest date a stay can start */
+  lastDate: string;
+  maxNights: number;
+}
+
+const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false, rooms: false, horizon: null };
+
+/** The tenant's horizon, the same numbers the booking page enforces. */
+function horizonOf(config: BookingsConfig): Horizon {
+  return {
+    maxAdvanceDays: config.maxAdvanceDays,
+    lastDate: lastBookingDate(localDate(config.timezone), config.maxAdvanceDays),
+    maxNights: config.maxStayNights,
+  };
+}
 
 /** "Thursday" for a YYYY-MM-DD. Formatted as UTC, because it is a calendar date, not an instant. */
 function weekdayOf(date: string): string {
@@ -157,6 +180,7 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
     definitions: [checkAvailabilityTool],
     priced,
     rooms: false,
+    horizon: priced ? horizonOf(config) : null,
     prompt: {
       // Each sentence below answers a failure the battery MEASURED, not one
       // imagined. Change one, and re-run `pnpm eval` (CLAUDE.md rule 1).
@@ -266,6 +290,48 @@ export async function extraGuestLines(tenant: TenantContext): Promise<string[]> 
   ];
 }
 
+/**
+ * D-086: the lines for a turn that asks how far ahead one can book. From
+ * the bookings config, the numbers the booking page and request_booking()
+ * enforce. No date is needed to answer, so none is asked for.
+ */
+export function horizonLines(horizon: Horizon): string[] {
+  const nights = horizon.maxNights === 1 ? '1 night' : `${horizon.maxNights} nights`;
+  return [
+    'The user is asking how far ahead they can book. From the booking',
+    'settings:',
+    `- Bookings open ${horizon.maxAdvanceDays} days ahead: the latest date a stay can start is ${spokenDate(horizon.lastDate)}.`,
+    `- A stay is at most ${nights}.`,
+    'Answer from these lines, naming that latest date. Do not ask for a date.',
+  ];
+}
+
+/** "30 September 2027", as a person reads it. */
+function spokenDate(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * D-086: a date after the last bookable date cannot be booked yet, however
+ * open it is. The row keeps date, unit, slot, and a status that says so, and
+ * loses its price: nothing may be quoted for a date nobody can book. Like
+ * closedNote(), the explanation is in the RESULT, only when such a date is
+ * in it, so the tool's TEXT and its baselines are unchanged (the D-080
+ * lesson). Before this, "Is 10 December 2027 available?" was "Yes, open",
+ * with prices, on both tenants, and the booking page refused that date.
+ */
+function horizonNote(dates: string[], lastDate: string): { not_yet_bookable?: { dates: string[]; meaning: string } } {
+  if (dates.length === 0) return {};
+  return {
+    not_yet_bookable: {
+      dates,
+      meaning:
+        `Bookings open only up to ${spokenDate(lastDate)}. These dates are too far ahead to book yet. Say so and name that date; ` +
+        'do not call them open or taken, and do not quote a price for them.',
+    },
+  };
+}
+
 /** 350000 centavos → "₱3,500.00". The model reads prices as a person would, never as raw centavos. */
 function money(centavos: number, currency: string): string {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency }).format(centavos / 100);
@@ -336,6 +402,7 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
     definitions: [tool],
     priced,
     rooms: true,
+    horizon: priced ? horizonOf(config) : null,
     prompt: {
       // Written for rooms, in the shape the villa lines were MEASURED to work
       // in: say what TO write, with an example, rather than what not to
@@ -452,9 +519,13 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
         // is no total to give, so none is given: the model is not handed a
         // number it could mistake for the party's price.
         const guests = args.guests !== undefined && args.guests !== null;
+        // D-086: past the horizon, a row says "not yet bookable" and has no price.
+        const lastDate = horizonOf(config).lastDate;
+        const tooFar = [...new Set(rooms.filter((r) => r.date > lastDate).map((r) => r.date))];
         return done({
           ...closedNote(rooms),
-          slots: rooms.map((r) => ({
+          ...horizonNote(tooFar, lastDate),
+          slots: rooms.map((r) => r.date > lastDate ? { date: r.date, unit: r.unit, slot: r.slot, status: 'not yet bookable' } : ({
             date: r.date,
             unit: r.unit,
             capacity: r.capacity,

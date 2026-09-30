@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, asksExtraGuest, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -332,6 +332,20 @@ describe('asksUndatedPrice (D-081)', () => {
   it('no price word, no price question', () => {
     for (const m of ['What time is check-in?', 'Is it available?', 'Pwede po bang magdala ng aso?']) {
       expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
+    }
+  });
+});
+
+describe('asksHorizon (D-086)', () => {
+  it('how far ahead one can book, English and Tagalog', () => {
+    for (const m of ['How far in advance can I book?', 'What is the latest date I can book?', 'Can I book a year ahead?', 'Hanggang kailan pwede mag-book?', 'how many months in advance can we reserve?']) {
+      expect(asksHorizon(m, WEDNESDAY), m).toBe(true);
+    }
+  });
+
+  it('paying in advance is the deposit, not the horizon; a date is an availability turn', () => {
+    for (const m of ['Do I pay in advance?', 'Is the deposit paid in advance?', 'Can I book 10 December 2027?']) {
+      expect(asksHorizon(m, WEDNESDAY), m).toBe(false);
     }
   });
 });

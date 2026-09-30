@@ -35,7 +35,7 @@ import type {
   RequestReceipt,
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
-import { addDays, localDate, pageSettings, parseRequest } from './validate.js';
+import { addDays, lastBookingDate, localDate, pageSettings, parseRequest } from './validate.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -92,7 +92,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
 
   const offered = new Set(priced.flatMap((u) => u.rates.map((r) => r.slotId)));
   const today = localDate(config.timezone);
-  const lastDate = addDays(today, config.maxAdvanceDays);
+  const lastDate = lastBookingDate(today, config.maxAdvanceDays);
   const settings = pageSettings(app.data.config);
   return {
     bookingType: config.bookingType,
