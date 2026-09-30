@@ -133,7 +133,30 @@ main { max-width: 820px; margin: 0 auto; padding: 20px; }
 .turn.user { display: flex; justify-content: flex-end; }
 .turn.user .bubble { background: var(--accent); color: #fff; max-width: 78%; }
 .turn.assistant .bubble { background: var(--panel); border: 1px solid var(--line); max-width: 90%; }
-.turn.assistant .bubble.pending { color: var(--muted); font-style: italic; }
+/* The wait: three dots that pulse in turn (chat-screen.tsx, Thinking). */
+.turn.assistant .bubble.thinking {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 14px 16px;
+}
+.bubble.thinking span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: thinking 1.2s ease-in-out infinite;
+}
+.bubble.thinking span:nth-child(2) { animation-delay: 0.15s; }
+.bubble.thinking span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes thinking {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+/* No motion for those who asked for none: the dots stay, still. */
+@media (prefers-reduced-motion: reduce) {
+  .bubble.thinking span { animation: none; opacity: 0.6; }
+}
 
 /* --- sources panel (D-012: a feature, not a debug aid) ------------------- */
 

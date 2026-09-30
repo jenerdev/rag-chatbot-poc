@@ -71,6 +71,22 @@ type Turn =
 
 let nextId = 0;
 
+/**
+ * The wait, shown as three pulsing dots rather than words. Used twice: before
+ * the sources arrive (`pending`), and after, while the answer bubble is still
+ * empty (a tool answer is held, not streamed, so that gap can be seconds).
+ * The label is for screen readers; the dots are decoration.
+ */
+function Thinking() {
+  return (
+    <div className="bubble thinking" role="status" aria-label="Thinking">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 export function ChatScreen({
   slug,
   businessName,
@@ -337,7 +353,7 @@ export function ChatScreen({
                 return (
                   <div className="turn assistant" key={turn.id}>
                     <div className="speaker">{assistantName}</div>
-                    <div className="bubble pending">Searching the knowledge base…</div>
+                    <Thinking />
                   </div>
                 );
               }
@@ -358,7 +374,7 @@ export function ChatScreen({
               return (
                 <div className="turn assistant" key={turn.id}>
                   <div className="speaker">{assistantName}</div>
-                  <div className="bubble">{turn.text}</div>
+                  {turn.text === '' && !turn.error ? <Thinking /> : <div className="bubble">{turn.text}</div>}
                   <SourcesPanel
                     sources={turn.sources}
                     toolCalls={turn.toolCalls}

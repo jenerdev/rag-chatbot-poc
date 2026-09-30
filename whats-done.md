@@ -6720,3 +6720,15 @@ and its booking keeps its name. Every other suite as before; battery 56/61.
 **Trap avoided:** a retired slot filtered from the slot LIST but not from
 availability would still have been offered by the chatbot. The check that
 asked availability directly caught it.
+
+## A thinking animation while the bot answers · done 2026-09-30
+
+**What:** "Searching the knowledge base…" is replaced by three pulsing
+dots, shown before the sources arrive AND while the answer bubble is still
+empty (a tool answer is held, not streamed, so that gap can be seconds).
+
+**Why it matters:** the text read like a system log; the dots are the
+familiar "someone is typing".
+
+**Observed:** typecheck; screen readers get role="status" "Thinking";
+reduced-motion keeps the dots still. The animation itself is for a browser.
