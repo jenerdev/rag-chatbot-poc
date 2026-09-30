@@ -6586,3 +6586,21 @@ opinion. That step is now guarded on rate_kind().
 **Found, not fixed:** a holiday's surcharge is missing from the price the
 chatbot quotes without a guest count (24 December: ₱20,000.00, really
 ₱24,000.00).
+
+## The holiday surcharge in the chatbot's price · done 2026-09-30 (D-083)
+
+**What:** the chatbot quotes 24 December at ₱24,000.00 (holiday rate),
+not ₱20,000.00: the price for that date with the calendar's surcharge,
+the same amount the booking page quotes.
+
+**Why it matters:** a guest told ₱20,000 in the chat and ₱24,000 on the
+page loses trust in both, and the user had it on their bug list.
+
+**Observed:** the probe's peak day 2500000 base, 2900000 day price, equal
+to the page's quote; the three chat checks above; battery 58/61, known
+failures only.
+
+**Trap avoided:** the new column changed the function's return type, so
+re-running the older schema file would have failed half-way. Its step is
+guarded on the new column. And the isolation check D-082 had quietly
+broken was found here and fixed, with D-082's record corrected.

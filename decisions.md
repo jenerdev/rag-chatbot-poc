@@ -2500,3 +2500,38 @@ surcharge reaches the model only in `total`, which is sent only with a
 guest count, so villa's 24 December is quoted ₱20,000.00 (holiday rate)
 where the price is ₱24,000.00. That predates this decision (the user's own
 bug note) and is not fixed by it.
+
+## D-083 · The chatbot quotes the DAY price, a holiday's surcharge in · **Added 2026-09-30. Closes the open item D-082 recorded**
+
+**Decision:** `check_room_availability()` gains one column, `day_price`:
+`unit_quote()`'s own `price` with no guest count, from a second lateral
+call (`sql/schema-day-price.sql`). The chatbot's tool quotes it, labelled
+as D-082 says: "₱24,000.00 (holiday rate)". `price` keeps its meaning (the
+base rate) for every other reader; with a guest count, `total` is still
+the day price plus the extra charge, both from `unit_quote()`. The return
+type changed, so the function was dropped, re-created (the same body,
+still security definer, still ten definer functions) and re-granted;
+`schema-customer-booking.sql` § 10 is guarded on the new column (trap 20).
+
+**Why:** the tool quoted the base rate. The surcharge reached the model
+only in `total`, sent only with a guest count, so villa's 24 December was
+₱20,000.00 in the chat and ₱24,000.00 on the page and in the stored row.
+A second lateral call rather than `base + surcharge` in SQL or TypeScript:
+unit_quote() stays the only place a price is summed (extra-guests Rule 1).
+
+**Measured:** rooms 35/35 (23b: the probe's peak day, base 2500000, day
+price 2900000, equal to the page's quote less its extra guests); verify
+only the known roles failure (62 pins `day_price`); tests 334/334,
+bookings 99/99. Chat: 24 Dec ₱24,000.00 (holiday rate); 25 Dec for 32
+guests ₱24,500.00 with ₱500.00 for 2 extra guests; 8 Oct ₱16,000.00
+(weekday rate). Battery **58/61** (`original 9/10 · tool 8/9 · lang 9/10
+· date 11/11 · rooms 13/13 · book 5/5 · price 3/3`): `antecedent`,
+`tool-leak` and `lang-followup`, all known. `book-for-me-harbor`, 0 of 5
+under D-082, passed.
+
+**Caught on the way:** the pipeline isolation check "villa's tool … none
+of harbor's" compared price strings with a fixed list, and D-082's label
+broke it (1 FAILED, both ways). D-082's record said isolation passed; it
+was measured while the label was still a separate field. The check now
+compares the amount alone, and both ways pass. Rule, as CLAUDE.md
+already says it: re-run every suite after the LAST edit, not the first.
