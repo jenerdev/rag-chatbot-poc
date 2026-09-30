@@ -2421,3 +2421,38 @@ after.
 
 **Reverse if:** a tenant needs to close one room on a date, not the whole
 property. That is a `unit_id` on the closure, and it changes every check.
+
+## D-081 · A price asked with no date is answered "rates vary by date", in code, not refused · **Added 2026-09-30. Amends D-035's outcome for one question shape**
+
+**Decision:** for a tenant whose tool quotes prices (`TenantTools.priced`:
+a unit has a rate, so villa and harbor), a message with a price word
+("rates", "how much", "magkano", "presyo", …) and no date, whose reply
+called no tool and holds no figure, gets fixed text instead:
+`PRICE_NEEDS_DATE` in `dates.ts`, in the reply language. English, the
+user's words: "Our rates vary depending on whether your visit falls on a
+weekday, weekend, or holiday. Please provide your preferred date so I can
+check and share the correct rate with you." A reply WITH a figure is kept,
+so "Magkano po ang security deposit?" is still ₱2,000 from the documents.
+The streamed path holds such a turn so the swap can happen. No prompt text
+changed: `priced` is read by `answer.ts`, never by `buildPrompt()`.
+
+**Why:** "room rates please" showed nothing useful. Since D-074 the
+documents hold no rates and no date means no tool call. Measured before
+the change: harbor wrote the refusal 2 of 3 with 4 chunks retrieved (the
+visitor was told we have no information about our own prices), and villa
+asked "Which date do you mean?" 4 of 4 in varying words. The user asked
+for one fixed sentence.
+
+**Measured:** villa 2 of 2 and harbor 2 of 2 give the text; Taglish in,
+Taglish text; the deposit kept; "room rates on Saturday" still priced by
+the tool; northwind (no prices) still refuses. Unit tests 332/332;
+northwind's prompt snapshot matches. Battery 56/61
+(`original 8/10 · tool 8/9 · lang 9/10 · date 11/11 · rooms 12/13 ·
+book 5/5 · price 3/3`); the text fired on 2 turns, both setup turns of
+`lang-pin-window`, which passed. The five failures are `antecedent`,
+`lang-followup` (known), and `leak-2`, `tool-leak`, `rt-leak-2`, none of
+which reaches this code (northwind has no tools; no price word), the
+flips trap 24 records.
+
+**Cost, recorded:** an undated price of something the documents lack
+("how much is parking?" at villa) now gets the rates text, not the refusal.

@@ -6543,3 +6543,24 @@ confirm refused, and decline works (rooms 30–33).
 a leak case (0/6). The explanation went into the tool result instead,
 where only a closed date brings it in, and the tool text stayed
 byte-identical to its baselines.
+
+## A price with no date · done 2026-09-30 (D-081)
+
+**What:** "room rates please" at villa or harbor now answers "Our rates
+vary depending on whether your visit falls on a weekday, weekend, or
+holiday. Please provide your preferred date so I can check and share the
+correct rate with you." (Taglish and Tagalog too), instead of the refusal
+or a model-worded question.
+
+**Why it matters:** the rates left the documents (D-074), so with no date
+there was nothing to retrieve and no tool call, and harbor refused 2 of 3:
+the visitor was told we knew nothing about our own prices.
+
+**Observed:** villa 2/2, harbor 2/2, Taglish 1/1; the deposit still
+₱2,000; a dated question still priced by the tool; northwind still
+refuses. Battery 56/61, none of the five failures on this code path.
+
+**Trap avoided:** swapping only the refusal left villa's own "Which date?"
+wording untouched (4 of 4), and an up-front code answer would have eaten
+the deposit answer. The rule is "no tool and no figure", which keeps every
+real answer to "how much".
