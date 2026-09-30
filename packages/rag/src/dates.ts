@@ -46,6 +46,8 @@
 // the 10th and the 11th, checking out on the 12th. Both are decided here,
 // so the tool is called once for the whole span (planDates).
 
+import type { LanguagePreference } from './language.js';
+
 /** One date expression found in a message, and what it resolves to. */
 export interface DateMention {
   /** The words as the user wrote them, lower-cased: `"bukas"`, `"next friday"`. */
@@ -430,6 +432,41 @@ const AVAILABILITY =
 export function asksAvailability(message: string): boolean {
   return AVAILABILITY.test(message.toLowerCase());
 }
+
+// --- a price asked with no date (D-081) -----------------------------------------
+
+/** The price words of AVAILABILITY, alone: "rates", "how much", "magkano". */
+const PRICE = /\b(?:how\s+much|magkano|price|prices|pricing|rate|rates|cost|costs|presyo)\b/;
+
+/**
+ * "room rates please": a price, and no date to price. The rates are not in
+ * the documents (D-074), so retrieval found nothing, the tool was never
+ * called, and D-035 swapped the model's "which date?" for the refusal. The
+ * visitor was told we have no information about our own prices.
+ *
+ * answer.ts uses this only on a reply that is ALREADY the refusal, so a price
+ * the documents do answer ("Magkano po ang security deposit?") is untouched.
+ */
+export function asksUndatedPrice(message: string, today: string): boolean {
+  return PRICE.test(message.toLowerCase()) && resolveDates(message, today).length === 0;
+}
+
+/**
+ * What an undated price question gets instead of the refusal. Fixed text, in
+ * code, like the greetings (D-049): nothing is retrieved, so nothing could be
+ * grounded, and every figure it could name would be one the tool owns.
+ */
+export const PRICE_NEEDS_DATE: Record<LanguagePreference, string> = {
+  english:
+    'Our rates vary depending on whether your visit falls on a weekday, weekend, or holiday. ' +
+    'Please provide your preferred date so I can check and share the correct rate with you.',
+  taglish:
+    'Nag-iiba po ang rates namin depende kung weekday, weekend, o holiday ang visit niyo. ' +
+    'Pakisabi po ang preferred date niyo para ma-check ko at maibigay ang tamang rate.',
+  tagalog:
+    'Nag-iiba po ang aming presyo depende kung karaniwang araw, Sabado at Linggo, o pista opisyal ang inyong pagbisita. ' +
+    'Pakisabi po ang nais ninyong petsa upang masuri ko at maibigay ang tamang presyo.',
+};
 
 /** Words a follow-up wraps around a date: "How about bukas?", "Paano kung sa Friday naman po?" */
 const FILLER = new Set(

@@ -54,7 +54,7 @@ export {
   requestReply,
 } from './language.js';
 export type { LanguageChoice, LanguagePreference } from './language.js';
-export { addDays, asksAvailability, dateInstructions, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+export { addDays, asksAvailability, asksUndatedPrice, PRICE_NEEDS_DATE, dateInstructions, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 export type { DateMention, DatePlan } from './dates.js';
 export { rewriteQuestion, retrieve } from './retrieve.js';
 export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';

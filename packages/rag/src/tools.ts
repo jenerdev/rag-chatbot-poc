@@ -61,9 +61,15 @@ export interface TenantTools {
   definitions: ToolDefinition[];
   /** Null when there are no tools, so buildPrompt adds nothing. */
   prompt: PromptTools | null;
+  /**
+   * The tool quotes prices (a unit has a rate). Read by answer.ts, never by
+   * buildPrompt, so no prompt text depends on it: an undated price question
+   * that would end in the refusal gets PRICE_NEEDS_DATE instead (D-081).
+   */
+  priced: boolean;
 }
 
-const NO_TOOLS: TenantTools = { definitions: [], prompt: null };
+const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false };
 
 /** "Thursday" for a YYYY-MM-DD. Formatted as UTC, because it is a calendar date, not an instant. */
 function weekdayOf(date: string): string {
@@ -143,6 +149,7 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
 
   return {
     definitions: [checkAvailabilityTool],
+    priced,
     prompt: {
       // Each sentence below answers a failure the battery MEASURED, not one
       // imagined. Change one, and re-run `pnpm eval` (CLAUDE.md rule 1).
@@ -243,7 +250,7 @@ function money(centavos: number, currency: string): string {
  */
 async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: SlotSummary[]): Promise<TenantTools> {
   const today = localDate(config.timezone);
-  const rooms = await listRooms(tenant);
+  const [rooms, priced] = await Promise.all([listRooms(tenant), hasBookingPage(tenant)]);
   const slotList = slots.map((s) => `${s.name} (from ${s.startTime}, ${hoursOf(s.duration)})`).join('; ');
   const roomList = rooms.map((r) => (r.capacity === null ? r.name : `${r.name} (up to ${r.capacity} guests)`)).join('; ');
 
@@ -289,6 +296,7 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
 
   return {
     definitions: [tool],
+    priced,
     prompt: {
       // Written for rooms, in the shape the villa lines were MEASURED to work
       // in: say what TO write, with an example, rather than what not to

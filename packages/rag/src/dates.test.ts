@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -313,6 +313,26 @@ describe('which messages get check_availability run up front (planDates)', () =>
 
   it('at most MAX_DATE_CHECKS dates', () => {
     expect(calls('Available ba Monday, Tuesday, Wednesday or Thursday?')).toHaveLength(MAX_DATE_CHECKS);
+  });
+});
+
+describe('asksUndatedPrice (D-081)', () => {
+  it('a price word and no date', () => {
+    for (const m of ['room rates please', 'Magkano po?', 'How much is the Overnight?', 'presyo ng Day Tour', 'what are your prices']) {
+      expect(asksUndatedPrice(m, WEDNESDAY)).toBe(true);
+    }
+  });
+
+  it('a date makes it a priced availability turn instead (planDates)', () => {
+    for (const m of ['room rates on Saturday', 'Magkano po bukas?', 'How much is the Overnight on 10 October?']) {
+      expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
+    }
+  });
+
+  it('no price word, no price question', () => {
+    for (const m of ['What time is check-in?', 'Is it available?', 'Pwede po bang magdala ng aso?']) {
+      expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
+    }
   });
 });
 

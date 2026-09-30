@@ -3,7 +3,7 @@
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
-import { planDates } from './dates.js';
+import { asksUndatedPrice, planDates, PRICE_NEEDS_DATE } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
@@ -11,7 +11,7 @@ import { buildPrompt } from './prompt.js';
 import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import { executeTool, toolsFor } from './tools.js';
-import type { PromptTools } from './tools.js';
+import type { PromptTools, TenantTools } from './tools.js';
 import type {
   Answer,
   HistoryMessage,
@@ -345,6 +345,34 @@ function acceptReply(matches: RetrievedChunk[], records: ToolCallRecord[], text:
 }
 
 /**
+ * D-081: a price asked with no date ("room rates please") is not a question
+ * the documents cannot answer. The answer is "it depends on the date", in
+ * the same words every time. Measured before this: villa's model asked
+ * "Which date do you mean?" 4 of 4, and harbor's REFUSED 2 of 3 with four
+ * chunks retrieved, which told the visitor we knew nothing of our prices.
+ *
+ * True only for a tenant whose tool quotes prices, on a message with a price
+ * word and no date. Even then a reply is replaced only when no tool was
+ * called and it holds NO FIGURE: an answer to "how much" names a number
+ * ("the deposit is ₱2,000"), and that is kept. What is replaced is the
+ * refusal, or a question back asking for the date.
+ */
+function asksPriceWithoutDate(tools: TenantTools, message: string): boolean {
+  return tools.priced && tools.prompt !== null && asksUndatedPrice(message, tools.prompt.today);
+}
+
+function explainPrice(
+  undatedPrice: boolean,
+  records: ToolCallRecord[],
+  reply: string,
+  replyIn: LanguagePreference,
+): string {
+  if (!undatedPrice || records.length > 0 || /\d/.test(reply)) return reply;
+  console.log('[query] a price with no date, answered with no figure: the reply is PRICE_NEEDS_DATE (D-081)');
+  return PRICE_NEEDS_DATE[replyIn];
+}
+
+/**
  * Answer a question from the knowledge base, returning the whole reply.
  *
  * The flow, matching architecture.md § 3.2:
@@ -416,7 +444,7 @@ export async function answerQuestion({
     undefined,
     precheck,
   );
-  const reply = acceptReply(matches, records, text);
+  const reply = explainPrice(asksPriceWithoutDate(tools, message), records, acceptReply(matches, records, text), replyIn);
   await saveMessages(tenant, id, message, reply);
   return {
     conversationId: id,
@@ -508,7 +536,11 @@ export async function answerQuestionStream({
     // and that is known only at the end. Text already on screen cannot be
     // replaced by the refusal. With chunks there is nothing to decide, so it
     // streams as it always has.
-    const hold = matches.length === 0;
+    //
+    // An undated price question is held too, with chunks or without: its
+    // refusal is replaced by D-081's text, and a streamed one could not be.
+    const undatedPrice = asksPriceWithoutDate(tools, message);
+    const hold = matches.length === 0 || undatedPrice;
     const { text, records } = await toolLoop(
       tenant,
       buildPrompt(tenant, matches, history, message, promptTools, language),
@@ -516,7 +548,7 @@ export async function answerQuestionStream({
       onTool,
       precheck,
     );
-    const reply = acceptReply(matches, records, text);
+    const reply = explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn);
     // Held text was never streamed, so it goes out whole, already swapped.
     if (hold) onDelta(displayReply(reply, friendly));
     else filter.finish();
