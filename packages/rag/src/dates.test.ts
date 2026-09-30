@@ -350,6 +350,18 @@ describe('asksHorizon (D-086)', () => {
   });
 });
 
+describe('asksUndatedPrice leaves a named fee alone (D-088)', () => {
+  it('a fee or payment by name is not the nightly rate', () => {
+    for (const m of ['how much is reservation fee', 'Magkano po ang reservation fee?', 'How much is the security deposit?', 'how much is the corkage?', 'how much is the cancellation fee?', 'magkano ang DP?']) {
+      expect(asksUndatedPrice(m, WEDNESDAY), m).toBe(false);
+    }
+  });
+
+  it('the rate itself still is', () => {
+    for (const m of ['room rates please', 'how much is a room?', 'Magkano po?']) expect(asksUndatedPrice(m, WEDNESDAY), m).toBe(true);
+  });
+});
+
 describe('asksExtraGuest (D-085)', () => {
   it('the extra guest fee, with no date, English and Tagalog', () => {
     for (const m of ['how much is Per extra guest', 'What is the fee for additional persons?', 'magkano po ang extra guest?', 'magkano ang dagdag na tao?', 'how much per head?']) {

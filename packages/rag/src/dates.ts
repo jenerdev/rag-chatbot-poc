@@ -448,8 +448,19 @@ const PRICE = /\b(?:how\s+much|magkano|price|prices|pricing|rate|rates|cost|cost
  * the documents do answer ("Magkano po ang security deposit?") is untouched.
  */
 export function asksUndatedPrice(message: string, today: string): boolean {
-  return PRICE.test(message.toLowerCase()) && !asksExtraGuest(message, today) && resolveDates(message, today).length === 0;
+  const text = message.toLowerCase();
+  return PRICE.test(text) && !NAMED_FEE.test(text) && !asksExtraGuest(message, today) && resolveDates(message, today).length === 0;
 }
+
+/**
+ * A fee or payment by name is not the nightly rate (D-088). "How much is the
+ * reservation fee?" at alteza is answered by its documents as "half of the
+ * total", which holds no figure, so D-081 replaced it with "rates vary by
+ * date"; at harbor, whose documents do not say, it turned an honest "I don't
+ * know" into the same wrong answer. The reply to these is left alone.
+ */
+const NAMED_FEE =
+  /\b(?:fees?|deposits?|down\s*payment|dp|charges?|surcharges?|corkage|bayad|reservation|cancell?ation|penalty|penalties)\b/;
 
 // --- how far ahead can I book? (D-086) ------------------------------------------
 
