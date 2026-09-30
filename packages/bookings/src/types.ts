@@ -134,6 +134,9 @@ export interface BookingsConfig {
  * resort publishes anyway (plan/booking-types.md Rule 4). No guest data, and
  * no description: tenant-written free text is not put into a prompt.
  */
+/** A date's rate: the calendar's kind, or the tenant's weekend days, or neither (D-082). */
+export type RateKind = 'weekday' | 'weekend' | 'holiday' | 'peak' | 'closed';
+
 export interface RoomAvailability {
   date: string;
   unit: string;
@@ -147,6 +150,8 @@ export interface RoomAvailability {
   status: 'open' | 'taken' | 'closed';
   /** centavos, the base rate for that date: weekday, weekend or holiday (R-24 closed by customer booking § 2.3) */
   price: number;
+  /** WHICH of those rates `price` is: rate_kind(), the branch unit_price() took (D-082) */
+  rateKind: RateKind;
   /** for the guests asked about (0 when none were): the fee, and base + fee + that day's surcharge */
   extraGuestPrice: number;
   total: number;

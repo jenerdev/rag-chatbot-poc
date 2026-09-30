@@ -31,6 +31,7 @@ import type {
   BookingsConfig,
   NewBooking,
   Quote,
+  RateKind,
   RoomAvailability,
   SlotAvailability,
   SlotSummary,
@@ -193,7 +194,9 @@ async function pricedAvailability(
     p_guests: guests,
   });
   if (error) throw new Error(`Could not check room availability: ${error.message}`);
-  const closed = await closedDays(tenant, from, to);
+  // Which rate each date's price is, from the SAME branch unit_price() took
+  // (rate_kind(), D-082), never decided a second time here.
+  const [closed, kinds] = await Promise.all([closedDays(tenant, from, to), rateKinds(tenant, from, to)]);
 
   const open = data.filter((r) => statusOn(r.booked_date, r.status, closed) === 'open').length;
   console.log(
@@ -215,9 +218,24 @@ async function pricedAvailability(
     slot: r.slot,
     status: statusOn(r.booked_date, r.status, closed),
     price: r.price,
+    rateKind: kindOn(kinds, r.booked_date),
     extraGuestPrice: r.extra_guest_price,
     total: r.total,
   }));
+}
+
+/** rate_kinds() returns every date in the range, so a miss is a bug, not a weekday. */
+function kindOn(kinds: Map<string, RateKind>, date: string): RateKind {
+  const kind = kinds.get(date);
+  if (!kind) throw new Error(`No rate kind for ${date}`);
+  return kind;
+}
+
+/** Each date from `from` to `to` → its rate kind (schema-rate-kind.sql). */
+async function rateKinds(tenant: BookingTenant, from: string, to: string): Promise<Map<string, RateKind>> {
+  const { data, error } = await tenant.db.rpc('rate_kinds', { p_tenant_id: tenant.id, p_from: from, p_to: to });
+  if (error) throw new Error(`Could not load the rate kinds: ${error.message}`);
+  return new Map(data.map((d) => [d.day, d.kind]));
 }
 
 /**

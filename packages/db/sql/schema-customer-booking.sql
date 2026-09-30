@@ -108,6 +108,13 @@ alter table bookings add  constraint bookings_no_overlap exclude using gist (
 
 -- 6. unit_price(): the calendar first, then weekend/weekday as before. Same
 --    signature, so `create or replace` keeps its grants.
+--    GUARDED (D-082, 2026-09-30): schema-rate-kind.sql replaces this with a
+--    body that asks rate_kind(). Once that file has run, re-running THIS file
+--    must not put the inline copy back, so the definition is skipped.
+do $guard$
+begin
+  if to_regprocedure('public.rate_kind(bigint, date)') is null then
+    execute $ddl$
 create or replace function unit_price(p_tenant_id bigint, p_unit_id bigint, p_slot_id bigint, p_date date)
 returns bigint
 language sql stable
@@ -127,7 +134,11 @@ as $$
          end
   from public.unit_rates r
   where r.tenant_id = p_tenant_id and r.unit_id = p_unit_id and r.slot_id = p_slot_id
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 7. unit_quote(), with the surcharge. Its return type gains a column, so it
 --    is DROPPED and re-created, and its grants re-applied (step 12). Every

@@ -104,6 +104,7 @@ export type {
   RequestLine,
   RequestQuote,
   RequestReceipt,
+  RateKind,
   RoomAvailability,
   SlotAvailability,
   SlotSummary,

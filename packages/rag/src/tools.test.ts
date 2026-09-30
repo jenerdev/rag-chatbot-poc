@@ -141,8 +141,8 @@ describe('per_room: check_availability checks rooms', () => {
   const config = vi.mocked(bookingsConfig);
   const HARBOR = { ...TENANT, id: 67, slug: 'harbor' } as unknown as TenantContext;
   const ROOMS = [
-    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, extraGuestPrice: 0, total: 350000 },
-    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, extraGuestPrice: 25000, total: 625000 },
+    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, rateKind: 'weekday', extraGuestPrice: 0, total: 350000 },
+    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, rateKind: 'weekday', extraGuestPrice: 25000, total: 625000 },
   ];
 
   beforeEach(() => {
@@ -173,7 +173,7 @@ describe('per_room: check_availability checks rooms', () => {
       extra_guest_fee: '₱250.00',
       slot: 'Night',
       status: 'open',
-      price: '₱3,500.00',
+      price: '₱3,500.00 (weekday rate)',
     });
     // No total without a guest count: there is no party to price.
     expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,extra_guest_fee,included_guests,price,slot,status,unit')).toBe(true);
@@ -183,7 +183,19 @@ describe('per_room: check_availability checks rooms', () => {
   it("with a guest count, each row carries that party's extra charge and total, from the database", async () => {
     const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28","guests":3}' });
     const [, family] = (record.result as { slots: Record<string, unknown>[] }).slots;
-    expect(family).toMatchObject({ unit: 'Family Room', price: '₱6,000.00', extra_guest_charge: '₱250.00', total: '₱6,250.00' });
+    expect(family).toMatchObject({ unit: 'Family Room', price: '₱6,000.00 (weekday rate)', extra_guest_charge: '₱250.00', total: '₱6,250.00' });
+  });
+
+  // D-082: the price says which rate it is; a closed row sells nothing, so no label.
+  it('the price names its rate kind, from the row; a closed row has none', async () => {
+    rooms.mockResolvedValueOnce([
+      { ...ROOMS[0], date: '2026-12-24', rateKind: 'holiday' },
+      { ...ROOMS[0], date: '2026-12-25', rateKind: 'peak' },
+      { ...ROOMS[0], date: '2026-12-26', rateKind: 'closed', status: 'closed' },
+    ] as never);
+    const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-12-24","date_to":"2026-12-26"}' });
+    const prices = (record.result as { slots: { price: string }[] }).slots.map((r) => r.price);
+    expect(prices).toEqual(['₱3,500.00 (holiday rate)', '₱3,500.00 (peak rate)', '₱3,500.00']);
   });
 
   it('a resolved date ("bukas") reaches the rooms check too', async () => {
@@ -220,6 +232,7 @@ describe('per_room: check_availability checks rooms', () => {
         slot: 'Overnight',
         status: 'open',
         price: 1600000,
+        rateKind: 'weekend',
         extraGuestPrice: 50000,
         total: 1650000,
       },
@@ -235,7 +248,7 @@ describe('per_room: check_availability checks rooms', () => {
       status: 'open',
       included_guests: 30,
       extra_guest_fee: '₱250.00',
-      price: '₱16,000.00',
+      price: '₱16,000.00 (weekend rate)',
       extra_guest_charge: '₱500.00',
       total: '₱16,500.00',
     });

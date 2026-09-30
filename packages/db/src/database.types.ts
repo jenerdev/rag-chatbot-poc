@@ -746,6 +746,14 @@ export interface Database {
         }[];
       };
       /**
+       * sql/schema-rate-kind.sql § 3 — each date's rate kind, from rate_kind(),
+       * the branch unit_price() prices by (D-082). Invoker; at most 366 days.
+       */
+      rate_kinds: {
+        Args: { p_tenant_id: number; p_from: string; p_to: string };
+        Returns: { day: string; kind: 'weekday' | 'weekend' | 'holiday' | 'peak' | 'closed' }[];
+      };
+      /**
        * sql/schema-customer-booking.sql § 11 — THE public write: pending rows only,
        * one per unit per night, priced by the trigger. Security definer; checks
        * the token's tenant itself.

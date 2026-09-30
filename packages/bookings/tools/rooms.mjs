@@ -240,7 +240,7 @@ try {
   check(
     rooms.map((r) => `${r.unit} ${r.status}`).join(', ') === 'Garden Room taken, Family Room taken'
       && forSix.map((r) => r.unit).join(',') === 'Family Room'
-      && keys === 'capacity,date,extraGuestPrice,extraPersonRate,price,slot,standardCapacity,status,total,unit',
+      && keys === 'capacity,date,extraGuestPrice,extraPersonRate,price,rateKind,slot,standardCapacity,status,total,unit',
     'room availability: priced active rooms, capacity filter, no guest data',
     `${rooms.map((r) => `${r.unit} ${r.status} ${r.price}`).join(', ')} · 6 guests: ${forSix.map((r) => r.unit).join(',')} · keys ${keys}`,
   );
@@ -466,6 +466,21 @@ try {
         before === 2000000 && after === 2500000 && weekday === 1600000 && mixed instanceof BookingInputError && kept === 2500000,
         'holiday rate: weekend when unset, holiday_price when set; a rate edit without it keeps it',
         `unset ${before} · set ${after} · weekday ${weekday} · mixed: ${described(mixed)} · kept ${kept}`,
+      );
+    }
+
+    // 23b. Each row says WHICH rate its price is (D-082), from rate_kind(),
+    //      the branch unit_price() took, so the label and the price agree:
+    //      Thursday weekday, Friday weekend, the peak and the plain holiday
+    //      both at the holiday_price that 23 left set.
+    {
+      const on = async (day) => (await checkRoomAvailability(chat, { from: day, unit: 'Hall' }))[0];
+      const rows = await Promise.all([THU, FRI, PEAK, HOLIDAY].map(on));
+      const got = rows.map((r) => `${r?.rateKind} ${r?.price}`).join(', ');
+      check(
+        got === 'weekday 1600000, weekend 2000000, peak 2500000, holiday 2500000',
+        'rate kind: each row names the rate its price is (weekday, weekend, peak, holiday)',
+        got,
       );
     }
 

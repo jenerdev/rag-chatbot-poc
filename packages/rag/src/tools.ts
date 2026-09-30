@@ -423,7 +423,12 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
             extra_guest_fee: r.extraPersonRate === null ? null : money(r.extraPersonRate, config.currency),
             slot: r.slot,
             status: r.status,
-            price: money(r.price, config.currency),
+            // D-082: the price says WHICH rate it is, "₱20,000.00 (weekend
+            // rate)", from rate_kind(), the branch unit_price() took. In the
+            // price text itself, because the model copies a price as written:
+            // a separate `rate` field was mentioned 0 times in 4. No tool TEXT
+            // changed (the D-080 lesson), so the baselines stand.
+            price: r.status === 'closed' ? money(r.price, config.currency) : `${money(r.price, config.currency)} (${r.rateKind} rate)`,
             ...(guests ? { extra_guest_charge: money(r.extraGuestPrice, config.currency), total: money(r.total, config.currency) } : {}),
           })),
         });
