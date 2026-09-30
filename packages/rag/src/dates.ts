@@ -448,7 +448,23 @@ const PRICE = /\b(?:how\s+much|magkano|price|prices|pricing|rate|rates|cost|cost
  * the documents do answer ("Magkano po ang security deposit?") is untouched.
  */
 export function asksUndatedPrice(message: string, today: string): boolean {
-  return PRICE.test(message.toLowerCase()) && resolveDates(message, today).length === 0;
+  return PRICE.test(message.toLowerCase()) && !asksExtraGuest(message, today) && resolveDates(message, today).length === 0;
+}
+
+// --- the extra-guest fee (D-085) ------------------------------------------------
+
+/** "extra guest", "additional person", "per head", "dagdag na tao". */
+const EXTRA_GUEST =
+  /\b(?:(?:extra|additional|excess|dagdag(?:\s+na)?)\s+(?:guests?|persons?|people|pax|heads?|tao)|per\s+(?:extra\s+)?(?:head|person|pax))\b/;
+
+/**
+ * "How much is per extra guest?" with no date. The fee is set per room
+ * (units.extra_person_rate) and does not change with the date, so it needs
+ * no date; D-081 had answered it "rates vary by date", 4 of 4. With a date
+ * it is an availability turn: every row carries the fee already.
+ */
+export function asksExtraGuest(message: string, today: string): boolean {
+  return EXTRA_GUEST.test(message.toLowerCase()) && resolveDates(message, today).length === 0;
 }
 
 /**

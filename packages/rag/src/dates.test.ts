@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, asksExtraGuest, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -333,6 +333,22 @@ describe('asksUndatedPrice (D-081)', () => {
     for (const m of ['What time is check-in?', 'Is it available?', 'Pwede po bang magdala ng aso?']) {
       expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
     }
+  });
+});
+
+describe('asksExtraGuest (D-085)', () => {
+  it('the extra guest fee, with no date, English and Tagalog', () => {
+    for (const m of ['how much is Per extra guest', 'What is the fee for additional persons?', 'magkano po ang extra guest?', 'magkano ang dagdag na tao?', 'how much per head?']) {
+      expect(asksExtraGuest(m, WEDNESDAY), m).toBe(true);
+      // ...and D-081's "rates vary by date" leaves it alone.
+      expect(asksUndatedPrice(m, WEDNESDAY), m).toBe(false);
+    }
+  });
+
+  it('with a date it is an availability turn; the rate alone is still D-081', () => {
+    expect(asksExtraGuest('how much per extra guest on Saturday?', WEDNESDAY)).toBe(false);
+    expect(asksExtraGuest('room rates please', WEDNESDAY)).toBe(false);
+    expect(asksUndatedPrice('room rates please', WEDNESDAY)).toBe(true);
   });
 });
 

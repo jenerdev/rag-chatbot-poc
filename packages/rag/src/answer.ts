@@ -3,14 +3,14 @@
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
-import { asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
+import { asksExtraGuest, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
 import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
-import { executeTool, toolsFor } from './tools.js';
+import { executeTool, extraGuestLines, toolsFor } from './tools.js';
 import type { PromptTools, TenantTools } from './tools.js';
 import type {
   Answer,
@@ -302,11 +302,12 @@ async function smallTalk(
  * Only tenants with tools get dates: without check_availability there is
  * nothing to pass a date to, and the northwind prompt stays byte-identical.
  */
-function withDates(
+async function withDates(
+  tenant: TenantContext,
   tools: TenantTools,
   message: string,
   history: HistoryMessage[],
-): { prompt: PromptTools | null; precheck: ToolCall[] } {
+): Promise<{ prompt: PromptTools | null; precheck: ToolCall[] }> {
   const { prompt } = tools;
   if (!prompt) return { prompt: null, precheck: [] };
   // The user's earlier questions, so a bare "What about the day after
@@ -314,6 +315,12 @@ function withDates(
   const earlier = history.filter((h) => h.role === 'user').map((h) => h.content);
   const plan = planDates(message, prompt.today, earlier);
   if (plan.lines.length === 0) {
+    // D-085: "How much is per extra guest?" needs no date; the fee is the
+    // room's, from the database, in this turn's lines.
+    if (tools.priced && asksExtraGuest(message, prompt.today)) {
+      console.log('[query] the extra guest fee, no date: the terms from the database (D-085)');
+      return { prompt: { ...prompt, dates: await extraGuestLines(tenant) }, precheck: [] };
+    }
     // D-084: "What rooms do you have?" lists the rooms, with no price and no
     // question back. In the same per-turn slot as a date's lines.
     if (tools.rooms && asksRoomList(message, prompt.today)) {
@@ -420,7 +427,7 @@ export async function answerQuestion({
   // "Thanks! Is it free tomorrow?": the thanks is answered in front of the
   // answer. Shown, never saved (see thanksPrefix).
   const prefix = thanksPrefix(message, replyIn) ?? '';
-  const { prompt: promptTools, precheck } = withDates(tools, message, history);
+  const { prompt: promptTools, precheck } = await withDates(tenant, tools, message, history);
   // The marker is what is saved; this is what is shown (D-047).
   const friendly = refusalText(tenant, replyIn);
 
@@ -511,7 +518,7 @@ export async function answerQuestionStream({
     toolsFor(tenant),
   ]);
   const prefix = thanksPrefix(message, replyIn) ?? '';
-  const { prompt: promptTools, precheck } = withDates(tools, message, history);
+  const { prompt: promptTools, precheck } = await withDates(tenant, tools, message, history);
   // The marker is what is saved; the friendly text is what is streamed (D-047).
   const friendly = refusalText(tenant, replyIn);
 

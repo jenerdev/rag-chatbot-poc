@@ -25,6 +25,7 @@ import {
   checkAvailability,
   checkPricedAvailability,
   checkRoomAvailability,
+  bookingPage,
   hasBookingPage,
   listRooms,
   listSlots,
@@ -233,6 +234,37 @@ const PRICE_LINES = [
   'If the user asks a price without giving a date, your whole reply is one',
   'question asking which date they mean, because the rate depends on it.',
 ];
+
+/**
+ * D-085: the extra-guest terms, for a turn that asks about them with no
+ * date. From bookingPage(), the read the public booking page makes on the
+ * same chat token, so nothing here is more than a visitor may see. Numbers
+ * and room names only: the staff-written description stays out of the
+ * prompt (Rule 3). The fee does not depend on the date; the rate does.
+ */
+export async function extraGuestLines(tenant: TenantContext): Promise<string[]> {
+  const page = await bookingPage(tenant);
+  const terms = page.units.map((u) => {
+    const covers = u.standardCapacity === null ? null : `its rate covers ${u.standardCapacity} guests`;
+    const most = u.capacity === null ? '' : `, up to ${u.capacity} guests in all`;
+    if (u.extraPersonRate === null || covers === null) return `- ${u.name}: no extra guest fee${most}.`;
+    // Full at its included guests (harbor's Garden Room: 2 of 2). Written as
+    // "each guest above that … up to 2", the model turned it into "up to 4".
+    if (u.capacity !== null && u.capacity <= u.standardCapacity!) {
+      return `- ${u.name}: ${covers}, the most it holds, so it takes no extra guests.`;
+    }
+    return `- ${u.name}: ${covers}; each guest above that is ${money(u.extraPersonRate, page.currency)}${most}.`;
+  });
+  return [
+    'The user is asking about the extra guest fee, and gives no date. The fee',
+    'does not depend on the date, so do not ask for one. The terms, from the',
+    'database:',
+    ...terms,
+    'Answer from these lines, with the figures as written, and say how many',
+    'guests the rate covers. If they also ask the rate itself, say it',
+    'depends on the date and ask which date.',
+  ];
+}
 
 /** 350000 centavos → "₱3,500.00". The model reads prices as a person would, never as raw centavos. */
 function money(centavos: number, currency: string): string {
