@@ -6687,3 +6687,20 @@ with only known failures.
 **Trap avoided:** "no digit in the reply" looked like a safe test for "the
 model did not answer a price". A fee stated as a fraction is an answer
 with no digit. The question, not the reply, now decides.
+
+## Suggested questions on a new chat · done 2026-09-30 (D-089)
+
+**What:** a super user sets up to six questions per tenant on the
+platform form; a visitor sees them as buttons on a new chat, and a click
+asks the question.
+
+**Why it matters:** a first-time visitor sees what the assistant can
+answer, and the business steers them to its best answers.
+
+**Observed:** verify 102b (the shape rule, the public read, null clears);
+harbor's page shows its four sample questions, villa's shows none.
+
+**Trap avoided:** `tenant_public()` changed its return type, so the older
+`create or replace` in schema-roles.sql would have failed on a re-run;
+it is guarded on the new column. And the column goes out through
+`tenant_public()` only, the one door a token has to `tenants`.

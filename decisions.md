@@ -2690,3 +2690,35 @@ five failures are this session's known ones.
 
 **Open:** harbor's documents state no reservation fee. That is content,
 for the owner to write on the Knowledge base screen, not code.
+
+## D-089 · Suggested questions: per tenant, set by a super user, a click sends · **Added 2026-09-30**
+
+**Decision:** a tenant has up to six suggested questions,
+`tenants.suggested_questions` (jsonb array of 1–6 strings, each 1–120
+characters, `tenants_suggested_questions_shape` via the immutable
+`suggested_questions_ok()`; null = none). They reach the chat only through
+`tenant_public()`, which gains the column (dropped and re-created, grants
+re-applied; `schema-roles.sql` § 5 guarded on the column, trap 20), and
+`TenantContext.suggestedQuestions`. The chat shows them as buttons on a
+new, empty chat; a click calls the same `send()` as typing, so the answer
+is the ordinary pipeline's. Edited on the platform tenant form, beside the
+fallback messages (`updateTenantSchema.suggestedQuestions`, zod first,
+Postgres again). Not shown when the knowledge base is empty.
+
+**Why:** the user asked for configurable predefined prompts, and chose
+super-user-only configuration and send-on-click. Stored like the fallback
+messages because it is the same kind of thing: per-tenant words a visitor
+sees, public by design, so `tenant_public()`'s column list is the right
+boundary and no new policy or table is needed.
+
+**Measured:** verify 102b: six bad shapes refused (seven items, empty
+array, a number, an empty string, 121 characters, an object), the
+platform's write read back in order by anon, null clears; verify 42 pins
+the new public column list; the only verify failure is the known roles
+check. Web tests 25/25 (the schema's 2 new); pipeline tests 346/346;
+typecheck; both pipeline isolation suites. Harbor was given four sample
+questions (its column was null) and renders four buttons; villa, with
+none, renders none. Not verified: a click in a real browser, and the
+platform form's editor in a browser. The platform HTTP walk could not run:
+its probe tenant `probe-tm` (created 2026-09-29, not by this change) still
+exists, so its create step gets 409 and the rest is skipped.
