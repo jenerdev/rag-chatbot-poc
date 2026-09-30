@@ -2602,3 +2602,35 @@ many guests the rate covers" was added after villa's reply left out the
 every failure is dated or northwind: `antecedent`, `lang-followup`,
 `tool-leak` (known), `rt-leak-2` (3 of 4 before; 0 harbor rows),
 `book-for-me-harbor` (the date flip).
+
+## D-086 · The chatbot knows the booking horizon · **Added 2026-09-30**
+
+**Decision:** two parts, both from the bookings config (D-078) and ONE
+definition of the last date, `lastBookingDate(today, maxAdvanceDays)` in
+`@rag/bookings`, now used by the booking page, the request check and the
+chatbot.
+- **A date past it** (priced tenants): the tool row keeps date, unit and
+  slot, says `status: 'not yet bookable'`, and has no price; the result
+  gets `not_yet_bookable: { dates, meaning }` naming the last date, only
+  when such a date is in it (`horizonNote()`, like D-080's `closedNote()`),
+  so the tool TEXT and its baselines are unchanged.
+- **"How far in advance can I book?"** with no date: `horizonLines()` in
+  the per-turn slot (D-085's), the days ahead, the last date and the max
+  stay. `asksHorizon()` in `dates.ts`; a bare "in advance" is left out,
+  so "Do I pay in advance?" stays the deposit question.
+`TenantTools.horizon` carries the numbers for a tenant with a booking page.
+
+**Why:** the user: "chatbot should also know about Booking horizon". Before,
+"How far in advance can I book?" refused on both tenants, and "Is 10
+December 2027 available?" was "Yes, open" WITH prices on both, a date the
+booking page refuses (horizon 365 days: the last date 30 September 2027).
+
+**Measured:** both tenants: the horizon question names 30 September 2027
+(English and Taglish); 10 December 2027 "not yet bookable … up to 30
+September 2027", no price; 30 September 2027 itself still open and priced;
+"Do I pay in advance?" the deposit from the documents. Tests 343/343,
+bookings 99/99, rooms 35/35, both isolation suites, typecheck, northwind's
+snapshot. Battery **55/61** (`original 9/10 · tool 8/9 · lang 9/10 · date
+10/11 · rooms 12/13 · book 4/5 · price 3/3`); neither part fired on any
+battery turn (0 lines, 0 rows). `date-docs` failed once and passed 4 of 4
+on repeat (trap 10); the others are this session's known and dated flips.

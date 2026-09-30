@@ -6640,3 +6640,20 @@ failure on this path.
 "each guest above 2, up to 2", and the model invented "up to 4". Numbers
 that contradict each other get "fixed" by the model; the line now says
 what they mean.
+
+## The chatbot knows the booking horizon · done 2026-09-30 (D-086)
+
+**What:** "How far in advance can I book?" is answered (365 days: up to
+30 September 2027, stays up to 14 nights), and a date past that is "not
+yet bookable", with no price, instead of "Yes, open".
+
+**Why it matters:** the chat was telling guests a date was open and what
+it cost, when the booking page would refuse it.
+
+**Observed:** 8 of 8 live checks on villa and harbor, including the last
+bookable day still open and the deposit question untouched. Battery 55/61,
+nothing on this path; `date-docs` 4 of 4 on repeat.
+
+**Trap avoided:** the page, the request check and now the chatbot each
+needed "today + max_advance_days". Written three times, the three could
+drift; it is one function, `lastBookingDate()`.
