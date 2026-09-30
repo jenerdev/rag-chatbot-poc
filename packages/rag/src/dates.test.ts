@@ -5,7 +5,7 @@
 // tested from both, because "next Friday" means something different on each.
 
 import { describe, expect, it } from 'vitest';
-import { addDays, asksAvailability, asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
+import { addDays, asksAvailability, asksExtraGuest, asksHorizon, asksRoomList, roomListReply, asksUndatedPrice, dateInstructions, guestCount, isDateOnly, MAX_DATE_CHECKS, planDates, resolveDates } from './dates.js';
 
 const SUNDAY = '2026-09-27';
 const WEDNESDAY = '2026-09-30';
@@ -363,6 +363,19 @@ describe('asksExtraGuest (D-085)', () => {
     expect(asksExtraGuest('how much per extra guest on Saturday?', WEDNESDAY)).toBe(false);
     expect(asksExtraGuest('room rates please', WEDNESDAY)).toBe(false);
     expect(asksUndatedPrice('room rates please', WEDNESDAY)).toBe(true);
+  });
+});
+
+describe('roomListReply (D-087)', () => {
+  const ROOMS = [{ name: 'Garden Room', capacity: 2 }, { name: 'Cottage', capacity: null }];
+
+  it('names every room with its maximum, no price, in the reply language', () => {
+    expect(roomListReply(ROOMS, 'english')).toBe(
+      'Here are our rooms:\n- Garden Room (up to 2 guests)\n- Cottage\n\nTell me your dates and I can check which rooms are free and their rates.',
+    );
+    expect(roomListReply(ROOMS, 'taglish')).toContain('- Garden Room (up to 2 guests)');
+    expect(roomListReply(ROOMS, 'tagalog')).toContain('- Garden Room (hanggang 2 bisita)');
+    for (const l of ['english', 'taglish', 'tagalog'] as const) expect(roomListReply(ROOMS, l)).not.toMatch(/₱|\d{3}/);
   });
 });
 

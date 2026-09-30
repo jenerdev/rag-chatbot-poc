@@ -70,10 +70,13 @@ export interface TenantTools {
    */
   priced: boolean;
   /**
-   * The tenant books by room (per_room). Read by answer.ts only: a turn that
-   * asks which rooms there are, with no date, gets ROOM_LIST_LINES (D-084).
+   * A per_room tenant's active rooms (name and maximum guests, what the tool
+   * description already names); null for any other tenant. Read by
+   * answer.ts only: a turn that asks which rooms there are gets
+   * ROOM_LIST_LINES (D-084), and, if the reply does not name them all, the
+   * list written from these (D-087).
    */
-  rooms: boolean;
+  rooms: { name: string; capacity: number | null }[] | null;
   /**
    * How far ahead a stay may start, and how long it may be, for a tenant
    * with a booking page (D-086); null otherwise. Read by answer.ts only, for
@@ -89,7 +92,7 @@ export interface Horizon {
   maxNights: number;
 }
 
-const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false, rooms: false, horizon: null };
+const NO_TOOLS: TenantTools = { definitions: [], prompt: null, priced: false, rooms: null, horizon: null };
 
 /** The tenant's horizon, the same numbers the booking page enforces. */
 function horizonOf(config: BookingsConfig): Horizon {
@@ -179,7 +182,7 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
   return {
     definitions: [checkAvailabilityTool],
     priced,
-    rooms: false,
+    rooms: null,
     horizon: priced ? horizonOf(config) : null,
     prompt: {
       // Each sentence below answers a failure the battery MEASURED, not one
@@ -401,7 +404,7 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
   return {
     definitions: [tool],
     priced,
-    rooms: true,
+    rooms,
     horizon: priced ? horizonOf(config) : null,
     prompt: {
       // Written for rooms, in the shape the villa lines were MEASURED to work

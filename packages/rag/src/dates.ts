@@ -538,6 +538,43 @@ export const ROOM_LIST_LINES = [
   'they can tell you a date.',
 ];
 
+/**
+ * The same question at a tenant booked as a WHOLE (villa, D-087): it has no
+ * rooms in the database, only bedrooms in its documents, and with no line it
+ * refused "What rooms are available?" 2 of 2.
+ */
+export const WHOLE_PROPERTY_ROOM_LINES = [
+  'The user is asking which rooms there are, and gives no date. The property',
+  'is booked as a whole, not room by room. Do not ask for a date and do not',
+  'call check_availability. List the rooms and bedrooms the documents',
+  'describe, one per line, with what the documents say about each. Write no',
+  'price and no rate. End with one sentence saying the whole property is',
+  'booked together, and that for availability and rates they can tell you a',
+  'date.',
+];
+
+/**
+ * The room list written in code, for a per_room tenant (D-087): used when
+ * the model, given ROOM_LIST_LINES, still answered "Which date do you mean?"
+ * (harbor and alteza, "What rooms are available?", 4 of 4) instead of naming
+ * the rooms. Names and maximum guests from the database; no price.
+ */
+export function roomListReply(rooms: { name: string; capacity: number | null }[], language: LanguagePreference): string {
+  const holds = (c: number | null) => {
+    if (c === null) return '';
+    if (language === 'tagalog') return ` (hanggang ${c} bisita)`;
+    return ` (up to ${c} guest${c === 1 ? '' : 's'})`;
+  };
+  const lines = rooms.map((r) => `- ${r.name}${holds(r.capacity)}`).join('\n');
+  if (language === 'taglish') {
+    return `Ito po ang mga kwarto namin:\n${lines}\n\nPakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.`;
+  }
+  if (language === 'tagalog') {
+    return `Narito po ang aming mga kuwarto:\n${lines}\n\nPakisabi po ang petsa upang masuri ko kung alin ang bakante at ang presyo.`;
+  }
+  return `Here are our rooms:\n${lines}\n\nTell me your dates and I can check which rooms are free and their rates.`;
+}
+
 export const PRICE_NEEDS_DATE: Record<LanguagePreference, string> = {
   english:
     'Our rates vary depending on whether your visit falls on a weekday, weekend, or holiday. ' +

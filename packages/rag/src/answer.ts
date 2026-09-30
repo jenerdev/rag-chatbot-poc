@@ -3,7 +3,7 @@
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
-import { asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES } from './dates.js';
+import { asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES, roomListReply, WHOLE_PROPERTY_ROOM_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
@@ -328,10 +328,11 @@ async function withDates(
       return { prompt: { ...prompt, dates: await extraGuestLines(tenant) }, precheck: [] };
     }
     // D-084: "What rooms do you have?" lists the rooms, with no price and no
-    // question back. In the same per-turn slot as a date's lines.
-    if (tools.rooms && asksRoomList(message, prompt.today)) {
-      console.log('[query] rooms asked with no date: the room list, no prices (D-084)');
-      return { prompt: { ...prompt, dates: ROOM_LIST_LINES }, precheck: [] };
+    // question back. In the same per-turn slot as a date's lines. A tenant
+    // booked as a whole lists the bedrooms its documents describe (D-087).
+    if (asksRoomList(message, prompt.today)) {
+      console.log(`[query] rooms asked with no date: the room list, no prices (D-084${tools.rooms ? '' : ', whole property'})`);
+      return { prompt: { ...prompt, dates: tools.rooms ? ROOM_LIST_LINES : WHOLE_PROPERTY_ROOM_LINES }, precheck: [] };
     }
     return { prompt, precheck: [] };
   }
@@ -381,6 +382,31 @@ function acceptReply(matches: RetrievedChunk[], records: ToolCallRecord[], text:
  */
 function asksPriceWithoutDate(tools: TenantTools, message: string): boolean {
   return tools.priced && tools.prompt !== null && asksUndatedPrice(message, tools.prompt.today);
+}
+
+/**
+ * D-087: a per_room tenant's room-list turn. With ROOM_LIST_LINES in the
+ * prompt, the model still answered "Which date do you mean?" to "What rooms
+ * are available?" 4 of 4, because the tools block's "ask which date" rule
+ * won. So the reply is checked: if it called no tool and does not name
+ * every room, it is replaced by the list written in code. A reply that does
+ * name them (with the documents' details) is kept.
+ */
+function roomListRooms(tools: TenantTools, message: string): { name: string; capacity: number | null }[] | null {
+  return tools.rooms && tools.prompt && asksRoomList(message, tools.prompt.today) ? tools.rooms : null;
+}
+
+function explainRooms(
+  rooms: { name: string; capacity: number | null }[] | null,
+  records: ToolCallRecord[],
+  reply: string,
+  replyIn: LanguagePreference,
+): string {
+  if (!rooms || rooms.length === 0 || records.length > 0) return reply;
+  const text = reply.toLowerCase();
+  if (rooms.every((r) => text.includes(r.name.toLowerCase()))) return reply;
+  console.log('[query] a room-list turn that did not name the rooms: the list written in code (D-087)');
+  return roomListReply(rooms, replyIn);
 }
 
 function explainPrice(
@@ -466,7 +492,12 @@ export async function answerQuestion({
     undefined,
     precheck,
   );
-  const reply = explainPrice(asksPriceWithoutDate(tools, message), records, acceptReply(matches, records, text), replyIn);
+  const reply = explainRooms(
+    roomListRooms(tools, message),
+    records,
+    explainPrice(asksPriceWithoutDate(tools, message), records, acceptReply(matches, records, text), replyIn),
+    replyIn,
+  );
   await saveMessages(tenant, id, message, reply);
   return {
     conversationId: id,
@@ -561,8 +592,10 @@ export async function answerQuestionStream({
     //
     // An undated price question is held too, with chunks or without: its
     // refusal is replaced by D-081's text, and a streamed one could not be.
+    // So is a room-list turn (D-087), whose reply may be replaced by the list.
     const undatedPrice = asksPriceWithoutDate(tools, message);
-    const hold = matches.length === 0 || undatedPrice;
+    const listRooms = roomListRooms(tools, message);
+    const hold = matches.length === 0 || undatedPrice || listRooms !== null;
     const { text, records } = await toolLoop(
       tenant,
       buildPrompt(tenant, matches, history, message, promptTools, language),
@@ -570,7 +603,7 @@ export async function answerQuestionStream({
       onTool,
       precheck,
     );
-    const reply = explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn);
+    const reply = explainRooms(listRooms, records, explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn), replyIn);
     // Held text was never streamed, so it goes out whole, already swapped.
     if (hold) onDelta(displayReply(reply, friendly));
     else filter.finish();
