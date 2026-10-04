@@ -10,8 +10,9 @@
 > night, `request_booking()` for the stay. Nothing adds up a discount in
 > TypeScript, and a code is never readable by a customer.
 >
-> Written 2026-10-04, against `b6c81b6` on `master`. **Status: in progress,
-> Phase 0 started 2026-10-04** on `feat/promos`. § 7's five questions were
+> Written 2026-10-04, against `b6c81b6` on `master`. **Status: complete,
+> 2026-10-04; the walk owed** (Phases 0–6 on `feat/promos`). D-097. Every
+> recommendation of § 7 taken. Battery at its baseline in every phase. § 7's five questions were
 > answered 2026-10-04: every recommendation taken, by the user's instruction.
 >
 > Read [§ 0](#0-the-five-rules) first. Rule 1 is booking-types' Rule 2 again,

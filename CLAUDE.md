@@ -128,6 +128,26 @@
 > `northwind-prompt-post-emoji.txt`; `isRefusal()` tolerates a decorated
 > marker and `storedReply()` saves it exact. `**bold**` is drawn too
 > (D-091 amended), still as elements, never HTML.
+>
+> **A booking is born pending** since 2026-10-04 (D-095): the staff route
+> inserts `pending`, `PATCH /bookings/[id]` confirms (the whole group, one
+> statement) or cancels, and confirming is what takes the span;
+> `schema-pending-default.sql` is the column default. Every decision takes a
+> **note** (D-096, `decision_note`, `schema-decision-note.sql`), shown on
+> the row. Tools that seed bookings pass `status: 'confirmed'`.
+>
+> **A tenant defines promos** since 2026-10-04 (D-097,
+> [`plan/promos.md`](./plan/promos.md), Phases 0–6; the walk owed). A promo
+> is fixed or percent (an integer: centavos, or hundredths of a percent), a
+> validity range over the STAY dates, an optional code, an optional usage
+> limit. ONE SQL function, `promo_discount()`, makes every discount; the
+> trigger and `request_booking()` store it and `price` net of it, the two
+> quotes preview the same rows. A customer reaches a promo only through
+> `promo_for_request()` (definer); a chat token reads nothing from `promos`.
+> Uses are counted, never stored, and the limit holds under the request
+> lock on both doors. Owners and admins manage them at
+> `/t/<slug>/admin/promos`; the booking page takes a code, the staff form a
+> picker. The chatbot is untouched: no prompt text, no tool text.
 
 ## What this is
 
@@ -175,13 +195,14 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/holidays/page.tsx  S-7 the holiday calendar — 404 unless the tenant has the application
   app/t/[tenant]/admin/members/page.tsx   S-8 the tenant's members — for OWNERS (members:manage); others see one sentence
   app/t/[tenant]/admin/slots/page.tsx     S-9 slots — owners and admins (slots:read/write); 404 unless the tenant has the application
+  app/t/[tenant]/admin/promos/page.tsx    S-10 promos (D-097) — owners and admins (promos:read/write); 404 unless the tenant has the application
   app/platform/page.tsx          the platform: login → tenant list → the tenant form (super users only; not linked from /)
   app/platform/reset/page.tsx    where a super user's invite or reset email lands
   app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members — every one on withPlatformRoute() but the three session/password ones
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, promos-screen, admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -206,7 +227,7 @@ packages/
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     110 checks (77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     116 checks (111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -217,9 +238,10 @@ packages/
     src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
-    tools/isolation.mjs    29 cross-tenant checks, no API key
+    tools/isolation.mjs    31 cross-tenant checks, no API key (16b room photos, 16c promos)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
-    tools/rooms.mjs        39 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates and slots
+    src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
+    tools/rooms.mjs        45 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions and promos
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -252,14 +274,14 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 110 checks, no API key needed
+pnpm --filter @rag/db verify    # 116 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 20 of them, code filters alone (RLS bypassed)
-pnpm --filter @rag/bookings isolation   # 29 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation   # 31 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
-pnpm --filter @rag/bookings rooms       # 39 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots; no API key
+pnpm --filter @rag/bookings rooms       # 45 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev

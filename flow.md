@@ -335,6 +335,10 @@ return 404, with no redirect.
 | `DELETE` | `/api/t/<slug>/holidays/:day` | remove a day (404 if not there) | `removeCalendarDay` | admin |
 | `POST` | `/api/t/<slug>/holidays/copy` | copy chosen days to another year | `copyCalendarDays` | admin |
 | `GET` | `/t/<slug>/admin/holidays` | the Holidays screen | `app/t/[tenant]/admin/holidays/page.tsx` → `HolidaysScreen` | public page, admin data |
+| `GET` / `POST` | `/api/t/<slug>/promos` | the promos with their use counts (`?all=1` for retired) / create one (D-097) | `listPromos` / `createPromo` | admin (`promos:read` / `promos:write`) |
+| `PATCH` / `DELETE` | `/api/t/<slug>/promos/:id` | edit or retire (`active: false`) / delete a never-used promo | `updatePromo` / `deletePromo` | admin |
+| `GET` | `/t/<slug>/admin/promos` | the Promos screen | `app/t/[tenant]/admin/promos/page.tsx` → `PromosScreen` | public page, admin data |
+| | | `book/quote` and `book/request` take `promoCode`; `bookings/quote` and `bookings` take `promoId`. The discount is the database's (`promo_discount()`), the code resolved by `promo_for_request()` | | |
 | `GET` | `/t/<slug>/admin/members` | the Members screen (S-8) | `app/t/[tenant]/admin/members/page.tsx` → `MembersScreen` | public page, OWNER data |
 | `GET` / `POST` / `PATCH` / `DELETE` | `/api/t/<slug>/members` | list with emails / add an existing account / change a role / remove | `listMembers` … `removeMember` (`@rag/pipeline` members.ts) | owner (`members:manage`) |
 | `GET` | `/platform`, `/platform/reset` | the platform screen; where a super user's invite lands | `app/platform/…` → `PlatformScreen`, `ResetPassword` | public page, PLATFORM data |

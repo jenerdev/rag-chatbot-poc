@@ -7251,3 +7251,12 @@ preview's discount line, then the row. Back on Promos: uses 1 of 1; Retire
 SUMMER500; Delete is offered only for an unused promo. On
 `/t/villa/admin/promos` the page is there; on `/t/northwind/admin/promos`
 it is the 404.
+
+## Promos, Phase 6: the record · done 2026-10-04
+
+**What:** D-097 in `decisions.md` (the decision, the why, every number from
+Phases 0–5); CLAUDE.md's header gains the promos paragraph, the layout the
+page, the screen, `promos.ts` and the new counts (verify 116, isolation
+31, rooms 45), the commands their counts; flow.md § 5 the promo routes;
+plan/promos.md marked complete with the walk owed. Seven phases in one
+day on `feat/promos`, five commits before this one.

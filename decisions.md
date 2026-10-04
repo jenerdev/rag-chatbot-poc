@@ -3030,3 +3030,52 @@ and the decision is a different moment, shown with its status.
 column; `Insert` never, `Update` text). The rooms suite's check 4c
 (the note stored trimmed on the whole group, shown on a cancel, 501
 characters refused) and the live suites run once the SQL file is in.
+
+## D-097 · Promos: a discount the tenant defines, computed by the database in the one place every price is made · **Added 2026-10-04 (plan/promos.md)**
+
+**Decision:** a `promos` table per tenant (name; `kind` fixed or percent;
+an integer `value`, centavos or hundredths of a percent; a validity range
+over the STAY dates; an optional code, unique per tenant ignoring case; an
+optional usage limit; active) and two columns on `bookings`, `promo_id`
+and `discount`. The discount is `promo_discount()`'s and nothing else's
+(Rule 1): a fixed amount on the FIRST row of a stay, capped at that
+night's price, a percentage on every row rounded half up (q5); the insert
+trigger stores it and `price` net of it, `request_booking()` resolves a
+typed code under the tenant's request lock and stores every night's
+share, and the two quotes preview the same rows in the same order. A
+customer reaches a promo only through `promo_for_request()`, security
+definer (Rule 2): the promo for a typed code with a reason when it does
+not apply ('dates', 'exhausted'), or the automatic one with the largest
+discount for this stay, and nothing for a wrong or another tenant's code;
+`promos` has no policy for a chat token. Uses are `count(distinct
+request)` pending or confirmed, computed never stored (§ 2.3), and the
+limit is checked under the lock on both doors (Rule 3): a staff booking
+counts (q2). A stored discount never changes (Rule 4); a used promo is
+retired, never deleted. Tenant-wide for now (q4). `promos:read` /
+`promos:write` for owners and admins; the Promos screen; a code field on
+the booking page and a picker on the staff form, the automatic promo
+pre-selected. The chatbot is untouched (Rule 5): no prompt text, no tool
+text, the three baselines byte-identical.
+
+**Why:** the user: "add discount/promo management page … fixed amount,
+percentage … validity date range … requires promo code? … limit of usage
+… only 10 customer can avail". Every number a visitor or a receipt shows
+already came from one SQL function per night and one per stay; a
+discount computed anywhere else would be the first second copy of a
+price, and a code readable from the browser would be the first secret a
+chat token could list.
+
+**Measured (Phases 0–5, one day, on `feat/promos`):** verify 115/116
+(111–116: a chat token sees 0 promos and inserts none; a code is unique
+per tenant and free at another; the lookup's four answers; 10 % off every
+night of a coded request, `1600000 − 160000 = 1440000`, stored; a fixed
+promo on the first night only, `50000, 0`, its limit refused with 23514,
+freed by a cancel, counted 1; the trigger refusing another tenant's
+promo, overwriting a forged discount, keeping a stored one after an
+edit); rooms 45/45 (the package's five functions, the quotes, the
+receipts, the staff path, retire and delete); bookings isolation 31/31
+both ways (B's promo invisible and untouchable at A, its code "No such
+promo code." to A's customer); pipeline isolation both ways; tests
+99/355/58; battery 56–57/61, the known set, in every phase. verify
+needed a D-095 catch-up first (its row builders now insert confirmed).
+The walk is the user's.
