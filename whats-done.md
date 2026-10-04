@@ -6998,3 +6998,13 @@ an amount): its cells right-align, its header is centred. **On a phone
 other cell a line with its column name in front (`data-label` on every
 `<td>`, an escaped attribute), empty cells left out; the header row is
 visually hidden, kept for screen readers.
+
+## Tables, Phase 5: the record · done 2026-10-04
+
+**What:** D-091 in `decisions.md` (the decision, the why, every number
+from Phases 0–4); CLAUDE.md's header gains the tables paragraph, the
+Layout block `reply-text`, `lib/tables.ts` and `packages/rag/src/tables.ts`,
+rule 1 the `table:` verdicts, and the Frontend convention its one
+exception; flow.md's diagram line and a step 11d; plan/tables.md marked
+complete. The plan is done: five phases and a walk in one day, on
+`feat/tables`, five commits so far.

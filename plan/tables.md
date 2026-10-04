@@ -9,8 +9,10 @@
 > `<table>`, the replies written in code use it, and then the model is told
 > to use it too, measured by the battery.
 >
-> Written 2026-10-04, against `89dfd49` on `master`. **Status: in progress,
-> Phase 0 started 2026-10-04** on `feat/tables`. § 7's four questions were
+> Written 2026-10-04, against `89dfd49` on `master`. **Status: complete,
+> 2026-10-04, walk included** (Phases 0–5 on `feat/tables`); D-091, with
+> D-081, D-082 and D-087 amended. Battery at its baseline (56–57/61, the
+> known set) across seven full runs. § 7's four questions were
 > answered 2026-10-04: every recommendation taken, by the user's instruction
 > (a rate card with no date joins Phase 2, amending D-081).
 >

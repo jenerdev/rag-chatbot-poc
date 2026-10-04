@@ -176,7 +176,7 @@ sequenceDiagram
         loop each fragment
             O-->>R: delta
             R-->>A: event: delta (HELD instead if there were zero chunks)
-            A->>A: append to the answer (React escapes it)
+            A->>A: append to the answer (React escapes it; a pipe table block is drawn as a table, D-091)
         end
         Note over R: zero chunks and no tool call → the reply is replaced by the refusal (D-035)
     end
@@ -252,6 +252,14 @@ sequenceDiagram
     may check availability and then points at the page. The button is a
     Link in the header, shown when `hasBookingPage()` is true, not a line in
     a reply: the chat renders no links, and no tool can write.
+11d. **A list is a table** (D-091). The reply is text, and stays text,
+    except for a pipe-table block (`| a | b |` over `|---|---|`), which
+    `apps/web/lib/tables.ts` splits out and `reply-text.tsx` draws as a
+    `<table>` with every cell a React child. The replies code writes (the
+    room list, the rate card, the extra-guest terms) come from
+    `packages/rag/src/tables.ts`; the model writes its own from an example
+    in its instruction lines. The rate kind is said once in the sentence
+    above the table. On a phone each row is a card.
 12. **Both messages are saved**, including refusals, so a later "what about the
     second one?" has an unbroken transcript to resolve against.
 

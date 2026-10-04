@@ -2800,3 +2800,48 @@ as "no price for that slot": BEFORE triggers fire in name order, and
 path now says "retired" before it inserts, as it does for closed dates.
 
 **Browser:** the user walked the Slots screen (2026-09-30).
+
+## D-091 · A list in a reply is a pipe table, drawn by ONE hand-written parser into elements, never into HTML · **Added 2026-10-04 (plan/tables.md)**
+
+**Decision:** room lists, room details, availability, prices and the
+extra-guest terms are presented as a table. The chat recognises exactly
+ONE block syntax, a GitHub pipe table (a header line over a `|---|`
+separator), parsed by `apps/web/lib/tables.ts` (pure, no dependency,
+never throws) into segments that `components/reply-text.tsx` renders as
+`<table>` with every cell a React CHILD. Nothing else is parsed: no bold,
+links, headings or lists, and `dangerouslySetInnerHTML` stays absent. A
+block without the separator is text; a short row is padded, a long one
+cut; a row still streaming is text until its closing `|` lands. Three
+writers share the shape: `packages/rag/src/tables.ts` (`pipeTable()`) for
+the replies code writes (`roomListReply()`, D-087; the rate card for an
+undated price, amending D-081; the extra-guest terms handed to the model),
+and the instruction lines in `tools.ts` and `dates.ts` for the model's
+own, each an example of what TO write (D-017). Rule 4: a one-room or
+one-slot question is a sentence; a table of the other open rooms may
+follow it. The rate kind is named once in the sentence, not in every cell
+(D-082 amended). On a phone each row is a card with the column names in
+front (`data-label`). No tool definition and no base prompt changed:
+northwind's prompt and both tool definitions are byte-identical to their
+baselines.
+
+**Why:** the user: "present them as a table format". A markdown library
+would have turned every reply into markup, which is the one thing the chat
+has refused since the POC (textContent, never innerHTML); one block shape,
+parsed into elements, keeps that rule and gives the table. The model
+could not be trusted to write the shape every time, so the replies code
+writes are guaranteed, and the model's are measured.
+
+**Measured (plan/tables.md Phases 0–4, one day):** web tests 46 (15
+parser, 4 component); pipeline 351. Phase 3's first run (52/61) found two
+checks stricter than Rule 4 and one regression, `rt-leak`, 0 of 3 with the
+new sentence order: a prohibition held 1 of 3, an example sentence 3 of 3.
+Then three full runs 56, 57, 57/61, the Phase 0 set (`antecedent`,
+`lang-followup`, and 18 October's `rt-leak-2` and `book-for-me-harbor`)
+with only the known flips moving; `tool 9/9` in every run of the day, so
+no documents answer was lost to a tables sentence (trap 10). Table
+verdicts true on every list answer and false on every one-slot answer,
+three runs of three. The walk's request to drop "(weekend rate)" from
+every cell cost two more wordings, each 3 of 3 (`rt-tagalog` had copied
+the example in English; `price-villa` had lost its price to a table), and
+a full run at 56/61. Six probe questions, lines in the morning, tables by
+night; a table document in northwind came back as a table end to end.

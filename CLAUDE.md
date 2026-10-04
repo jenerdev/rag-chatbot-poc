@@ -111,6 +111,17 @@
 > false`), not deleted, and a retired slot takes no new booking from anyone
 > (`bookings_slot_active`). `listSlots()` returns active slots unless asked
 > for history; availability leaves retired slots' rows out.
+>
+> **Lists in a reply are tables** since 2026-10-04 (D-091,
+> [`plan/tables.md`](./plan/tables.md), Phases 0–5, all done, walk included).
+> The chat draws ONE block syntax, a pipe table, with a hand-written parser
+> (`apps/web/lib/tables.ts`) into elements, never HTML; everything else is
+> still text. `packages/rag/src/tables.ts` writes the tables code makes (the
+> D-087 room list, the rate card for an undated price, D-081 amended), and
+> the tool instruction lines show the model one to write. The rate kind is
+> named once in the sentence, not in every cell (D-082 amended). No tool
+> definition and no base prompt changed; the battery judges `tableOk` on
+> the list answers and its absence on a one-slot price (Rule 4).
 
 ## What this is
 
@@ -164,7 +175,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -180,6 +191,7 @@ apps/web/              Next.js 15, App Router
   lib/env.ts             fail-fast config (D-023)
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser
   lib/money.ts           centavos ↔ pesos, by string, never × 100 — browser-safe
+  lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
@@ -207,6 +219,7 @@ packages/
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
+    src/tables.ts          pipeTable(): the ONE writer of a table into a reply (D-091); the browser's parser draws exactly this shape
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
     tools/prompt-eval.mjs  the battery, 61 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-* + 3 price-*), three tenants; seeds its own bookings
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
@@ -303,7 +316,10 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    tool text; before it, the pre-customer-booking file). The three `price-*`
    cases compare the reply with the TOOL's row, never a typed number; the
    `lang-*` cases ask facts that are still in the documents (the deposit,
-   the extension, the cook), because the rates are not.
+   the extension, the cook), because the rates are not. Since D-091 the
+   battery also prints `table:` on every rt-*, tool-* and price-* case and
+   judges it on `rt-list`, `rt-guests`, `tool-partial` (true) and
+   `price-villa` (false, Rule 4).
 2. **No request holds a key that bypasses RLS, and no secret reaches the
    browser** (plan/auth-rls.md Rule 2).
    - Requests use `tenant.db`: the publishable key plus a tenant token.
@@ -554,7 +570,10 @@ All are expanded in `risks.md`.
   goes to a Client Component: pages pass named props.
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
-  markdown rendering is what would take it away. Tenant branding follows the
+  markdown rendering is what would take it away. The ONE exception is a pipe
+  table (D-091): `lib/tables.ts` parses that block shape alone, and
+  `reply-text.tsx` renders every cell as a child, so the rule still holds.
+  Tenant branding follows the
   same rule: theme colours reach the page as CSS custom properties through the
   `style` prop, from the allowlist in `lib/branding.ts` (D-030).
 - `console.log` in the pipeline is deliberate: `[ingest]`, `[retrieve]`,

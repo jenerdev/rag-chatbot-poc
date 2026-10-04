@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Tables in the reply (planned 2026-10-04, not started):**
+**Tables in the reply (2026-10-04, COMPLETE on `feat/tables`, not merged):**
 [`plan/tables.md`](./plan/tables.md). Room lists, room details, rates and
 prices as a table: a hand-written pipe-table parser in the browser (one
 block syntax, elements never HTML), the code-written room list as a table,
@@ -92,7 +92,7 @@ no date, amending D-081) decides Phase 2's second half.
 - [x] Phase 2 — the code-written tables (2026-10-04): `pipeTable()`, the room list as a table, `rateCardReply()` replacing D-081's sentence for a tenant with rates (D-081 and D-087 amended); pipeline tests 351/351, typecheck, northwind identical; six probes show the tables in English, Taglish and Tagalog; battery 55/61, `leak-2` and `lang-tagalog-2` the model's flips (1 of 2 on repeat), neither reaching this code
 - [x] Phase 3 — the model's tables (2026-10-04): villa, harbor, room-list and extra-guest lines as table examples; `tableOk` judged on `rt-list`, `rt-guests`, `tool-partial`, absent on `price-villa`; `rt-leak` regressed 0 of 3 and was fixed with an example sentence (3 of 3); runs 5–7: 56, 57, 57/61, the Phase 0 set; baselines byte-identical; six probes, six tables
 - [x] Phase 4 — the browser walk (2026-10-04, the user: "done testing"); request 1 from it done: the rate kind left the price cell and is said once in the sentence (D-082 amended), measured 3 of 3 on `price-villa`, `rt-tagalog`; battery 56/61, `rt-inactive`'s check accepts harbor's "no room by that name". Verified over HTTP 2026-10-04: the dev server answers with the tables, and a dated room question streams 127 deltas after the tool event, so the table forms live (`stream-tables-phase4.txt`). The questions to ask are in whats-done.md under "Tables, Phase 4"
-- [ ] Phase 5 — the record (D-091, CLAUDE.md, flow.md)
+- [x] Phase 5 — the record (2026-10-04): D-091; CLAUDE.md header, layout, rule 1, convention; flow.md 11d; the plan marked complete
 
 **Tenant management and roles (planned and decided 2026-09-29, not started):**
 [`plan/tenant-management.md`](./plan/tenant-management.md). A `/platform`
@@ -1142,6 +1142,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — tables Phase 5 (the record)
+- **Did:** D-091; CLAUDE.md (header, layout, rule 1, the convention); flow.md
+  11d; plan/tables.md complete. The plan is done on `feat/tables`.
+- **Next:** merge `feat/tables` into `master` when you are ready; the three
+  open items above (closed-dates walk, the verify roles check, the nav walk).
 
 ### 2026-10-04 — tables Phase 4: the walk done; request 1, no "(weekend rate)" on every row
 - **Did:** the rate kind is its own `rate` field, the price cell the bare
