@@ -1207,6 +1207,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-05 — the dashboard's "would clash on Confirm" counts competing pendings (D-098 amended), on master
+- **Did:** the `clashing` subquery also counts a pending stay whose unit
+  and span another pending stay wants; the caption says both; the SQL
+  re-run by the user. Verified on harbor: two pending stays on the same
+  room, slot and night (#7230, #6519) → `clashing: 2`, `pendingStaff: 2`.
+  Web typecheck clean.
+
 ### 2026-10-05 — staff requests, Phases 0–4, on `feat/staff-requests`
 - **Did:** the plan; `booking_reference()`, the fill trigger,
   `request_booking()` calling it, the counted backfill (run twice: the

@@ -3148,6 +3148,17 @@ new failures (`rt-price`, `rt-standard`, 3 of 3) are the user's two
 confirmed bookings on 2026-10-20, the battery's free weekday that day
 (trap 24, the date kind). The browser walk is the user's.
 
+**Amended 2026-10-05, "would clash on Confirm":** the count was pending
+stays whose span is already CONFIRMED for the unit. The user: "it should
+already count when 2 or more pending bookings have same room/slot/date."
+It now also counts a pending stay whose unit and span are wanted by
+ANOTHER pending stay (a different group): confirming either makes the
+other the 409, so both count. Since D-099 the first kind can only arise
+in the trigger's one-statement window; the second is what staff meet
+every day. The screen's caption says both. The list's `clash` flags
+(D-099, the Requests section) are unchanged: they warn where Confirm
+WILL fail now, which a pending-versus-pending pair does not.
+
 ## D-099 · A pending booking cannot be born on a span that is already confirmed; the staff list says which pending rows would clash · **Added 2026-10-05 (plan/staff-clash.md). Amends D-095's cost line**
 
 **Decision:** one BEFORE INSERT trigger, `bookings_pending_not_taken`

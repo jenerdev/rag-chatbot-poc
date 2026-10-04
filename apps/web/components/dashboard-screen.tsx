@@ -166,7 +166,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
               </Link>
               <Link href={`${base}/bookings`} className={`stat${b.attention.clashing > 0 ? ' warn' : ''}`}>
                 <strong>{b.attention.clashing}</strong>
-                <span>would clash on Confirm</span>
+                <span>would clash on Confirm (a night already confirmed, or wanted by another pending stay)</span>
               </Link>
               <Link href={`${base}/unanswered`} className={`stat${data.chat.openUnanswered > 0 ? ' warn' : ''}`}>
                 <strong>{data.chat.openUnanswered}</strong>

@@ -7661,3 +7661,19 @@ in the layout and the commands, rule 8's twelfth definer function with
 its direct-session admission; flow.md § 5's two requests rows; the plan's
 status line. Nothing in the chat, the prompts or the tools changed in
 this plan, and the three baselines were identical at Phase 0 and Phase 3.
+
+## Dashboard: "would clash on Confirm" counts competing pendings · done 2026-10-05, on master (D-098 amended)
+
+**What:** the user: "on dashboard on would clash on confirm. it should
+already count when 2 or more pending bookings have same room/slot/date."
+The `clashing` subquery in `tenant_dashboard()` (`schema-dashboard.sql`,
+re-run by the user) now counts a pending stay whose unit and span are
+already confirmed OR wanted by another pending stay of a different
+group; the screen's caption names both. The list's `clash` flags are
+unchanged (they mark where Confirm fails now; D-098's amendment says why).
+
+**Observed:** on harbor, two pending staff stays on the same room, slot
+and night, #7230 and #6519 (the user's walk), and the function answers
+`clashing: 2, pendingStaff: 2, pendingRequests: 0`: both count, because
+confirming either makes the other the 409. Web typecheck clean; the
+parser and the type are unchanged (the key kept its name and shape).

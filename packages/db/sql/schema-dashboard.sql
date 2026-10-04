@@ -110,11 +110,17 @@ begin
                             where b.tenant_id = p_tenant_id and b.source = 'web' and b.status = 'pending' and upper(b.during) > now()),
         'pendingStaff',    (select count(distinct coalesce(b.group_id::text, 'b' || b.id::text)) from public.bookings b
                             where b.tenant_id = p_tenant_id and b.source = 'staff' and b.status = 'pending' and upper(b.during) > now()),
-        -- A pending row whose span is already CONFIRMED for the same unit: Confirm would be the 409 (D-070).
+        -- A pending stay that would clash on Confirm: its span is already CONFIRMED
+        -- for the same unit (the 409, D-070), OR another PENDING stay wants the
+        -- same unit and span (2026-10-05, D-098 amended: confirming either one
+        -- makes the other the 409, so both count; since D-099 the first kind is
+        -- rare, the second is the one staff see every day).
         'clashing',        (select count(distinct coalesce(p.group_id::text, 'b' || p.id::text)) from public.bookings p
                             where p.tenant_id = p_tenant_id and p.status = 'pending' and upper(p.during) > now()
                               and exists (select 1 from public.bookings c
-                                          where c.tenant_id = p.tenant_id and c.unit_id = p.unit_id and c.status = 'confirmed' and c.during && p.during))
+                                          where c.tenant_id = p.tenant_id and c.unit_id = p.unit_id and c.during && p.during
+                                            and (c.status = 'confirmed'
+                                                 or (c.status = 'pending' and coalesce(c.group_id::text, 'b' || c.id::text) <> coalesce(p.group_id::text, 'b' || p.id::text)))))
       ),
       'today', jsonb_build_object(
         'checkIns',  (select count(*) from public.bookings b where b.tenant_id = p_tenant_id and b.status = 'confirmed' and b.booked_date = v_today),
