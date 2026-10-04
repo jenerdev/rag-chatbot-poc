@@ -782,6 +782,11 @@ export interface Database {
         Args: Record<never, never>;
         Returns: boolean;
       };
+      /** sql/schema-staff-requests.sql § 1 — the ONE maker of a booking reference (D-100); a token of that tenant, service_role or a direct session, else 42501. */
+      booking_reference: {
+        Args: { p_tenant_id: number };
+        Returns: string;
+      };
       /** sql/schema-roles.sql § 9 — one tenant's members with their email and role; a member of that tenant or the platform, else 42501. */
       member_emails: {
         Args: { p_tenant_id: number };

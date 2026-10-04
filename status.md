@@ -79,15 +79,15 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff requests (planned 2026-10-05, not started):**
+**Staff requests (planned 2026-10-05, in progress on `feat/staff-requests`):**
 [`plan/staff-requests.md`](./plan/staff-requests.md). Every booking gets
 a group and a reference from ONE SQL function (`booking_reference()`,
 called by `request_booking()` and by a fill trigger; a counted backfill),
 and the Requests section lists every pending stay, web or staff, decided
 with the same buttons. Four § 7 questions with recommendations.
-- [ ] § 7 answered
-- [ ] Phase 0 — baseline
-- [ ] Phase 1 — SQL (`schema-staff-requests.sql`, the 21st file; the backfill; rooms +4)
+- [x] § 7 answered (2026-10-05): every recommendation taken
+- [x] Phase 0 — baseline (2026-10-05, on `c3c7fa3`): rooms 48/48, bookings isolation 31/31 both ways, verify 117/118 (the known roles check), tests 59/102/359, the three baselines identical; the backfill's before: villa 5 rows without group or reference, harbor 3 without a group and 5 without a reference (one grouped), alteza 8/8
+- [x] Phase 1 — SQL (2026-10-05): `schema-staff-requests.sql` (the 21st file: `booking_reference()`, the fill trigger, `request_booking()` calling it, the counted backfill, grants), the promos file's `request_booking` step guarded on it, the typed function. The first run rolled back (my caller check refused the editor's own session; now `session_user <> 'postgres'`); the second took: every tenant **0 rows** without a group or a reference, `booking_reference()` → `HAR-G23UG9` on the service client, rooms **49/49** (4f: a 2-room staff booking `ROO-BSWX4Z` on both rows; three single bookings each with a group and a reference of its own)
 - [ ] Phase 2 — the package and the screen
 - [ ] Phase 3 — the walls and the walk
 - [ ] Phase 4 — the record (D-100)

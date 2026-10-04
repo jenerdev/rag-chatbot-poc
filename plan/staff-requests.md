@@ -12,8 +12,10 @@
 > function; the Requests section lists every pending stay, web or staff,
 > and decides either with the same button.
 >
-> Written 2026-10-05, against `8c521b2` on `master`. **Status: planned, not
-> started.** § 7 has four questions with recommendations.
+> Written 2026-10-05, against `8c521b2` on `master`. **Status: in progress,
+> Phase 0 started 2026-10-05** on `feat/staff-requests`. § 7's four
+> questions were answered 2026-10-05: every recommendation taken, by the
+> user's instruction.
 >
 > Read [§ 0](#0-the-four-rules) first.
 

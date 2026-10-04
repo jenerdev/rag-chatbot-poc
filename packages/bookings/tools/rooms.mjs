@@ -276,6 +276,25 @@ try {
         'D-099: the trigger\'s words reach the caller; the constraint\'s refusal keeps the sentence; the list flags the clashing pending row',
         `package "${viaPackage?.message}" · constraint "${confirmedInsert?.message}" · P2 clash ${p2Row?.clash} · P1 clash ${p1Row?.clash}`,
       );
+      // 4f. D-100 (plan/staff-requests.md): every staff booking has a group
+      //     and a reference of the web shape, from the fill trigger. The
+      //     2-room booking `first` has ONE reference on both rows (a BEFORE
+      //     ROW trigger sees the rows before it in the same statement,
+      //     § 2.1); the single `second` has its own group and a different
+      //     reference; P1 and P2 (single, same night) differ from each other.
+      {
+        const shape = /^[A-Z]{3}-[A-Z2-9]{6}$/;
+        const firstRefs = [...new Set(firstRows.map((b) => b.reference))];
+        const secondRow = (await listBookings(probe, { from: weekLater, to: weekLater })).find((b) => b.id === second.bookings[0].id);
+        const refs = [firstRefs[0], secondRow?.reference, p1Row?.reference, p2Row?.reference];
+        check(
+          firstRows.length === 2 && firstRefs.length === 1 && shape.test(firstRefs[0] ?? '')
+            && !!secondRow?.groupId && secondRow.groupId !== first.groupId && shape.test(secondRow?.reference ?? '')
+            && shape.test(p1Row?.reference ?? '') && shape.test(p2Row?.reference ?? '') && new Set(refs).size === 4,
+          'D-100: a 2-room staff booking has ONE reference; single staff bookings each have a group and their own reference, all of the web shape',
+          `2-room ${firstRefs.join('/')} (${firstRows.length} rows) · single ${secondRow?.reference} group ${secondRow?.groupId ? 'set' : 'NULL'} · P1 ${p1Row?.reference} · P2 ${p2Row?.reference}`,
+        );
+      }
     }
   }
 

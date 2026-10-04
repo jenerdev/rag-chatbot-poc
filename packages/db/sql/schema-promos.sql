@@ -312,8 +312,16 @@ create trigger bookings_compute_during
 
 -- 5. request_booking() with p_promo_code. The 10-parameter function is
 --    dropped: with both, a call that omits the code would match both.
+--    GUARDED (D-100, 2026-10-05): schema-staff-requests.sql replaces this with a
+--    body that calls booking_reference(). Once that file has run, re-running
+--    THIS file must not put the inline reference loop back, so the
+--    definition is skipped (CLAUDE.md trap 20).
 drop function if exists request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text);
 
+do $guard$
+begin
+  if to_regprocedure('public.booking_reference(bigint)') is null then
+    execute $ddl$
 create or replace function request_booking (
   p_tenant_id  bigint,
   p_slot_id    bigint,
@@ -528,6 +536,10 @@ begin
     order by b.booked_date, un.sort_order, un.name;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. EXECUTE grants: revoke from all three, grant back exactly who needs it.
 revoke all on function promo_uses(bigint, bigint, uuid, bigint)                 from public, anon, authenticated;

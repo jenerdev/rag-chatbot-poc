@@ -7545,3 +7545,56 @@ flow.md § 5's bookings row (born pending, `clash` on the list, the 409 in
 words); the plan's status line. Nothing in the chat, the prompts or the
 tools changed in this plan, and the three baselines were identical at
 Phase 0 and Phase 3.
+
+## Staff requests, Phase 0: baseline · done 2026-10-05, on `feat/staff-requests` (from `c3c7fa3` on master)
+
+**What:** the plan (`plan/staff-requests.md`), its four questions answered
+with every recommendation taken; every suite on the branch's first
+commit; the backfill's "before", counted per tenant.
+
+**Observed:** rooms **48/48**; bookings isolation **31/31** on tokens and
+**31/31** on filters alone; verify **117/118** (the roles check open since
+tenant management); tests **59** (web), **102** (bookings), **359**
+(pipeline); `prompt-snapshot` and both tool definitions byte-identical to
+their baselines. Rows missing a group or a reference before the file:
+villa 5 of 5 (both), harbor 3 without a group and 5 without a reference
+(a 2-room staff booking already shared a group), alteza 8 of 15 (both),
+northwind none. No battery: nothing in this plan touches a prompt, a tool
+or an availability read; Phase 3 runs it once.
+
+## Staff requests, Phase 1: SQL · done 2026-10-05, on `feat/staff-requests`
+
+**What:** `sql/schema-staff-requests.sql`, the 21st file: `booking_reference(
+p_tenant_id)`, security definer (the twelfth), the ONE place the shape is
+written, three letters of the slug and six of the 30-letter alphabet,
+retried while a row of the tenant has the result; a BEFORE INSERT trigger
+`bookings_aa_fill_group_and_reference` (named to fire first) that gives a
+row its own `group_id` when the insert names none and the group's
+`reference` when a row of the same statement already set one, else a new
+one; `request_booking()` re-defined with the loop replaced by the call,
+everything else byte-for-byte; a counted backfill; grants. The promos
+file's `request_booking` step is now guarded on
+`to_regprocedure('public.booking_reference(bigint)')`, so re-running it
+cannot put the inline loop back (trap 20). `Database` gains the function.
+rooms gains 4f.
+
+**Observed:** the FIRST run rolled back whole: the function was absent
+afterwards (`PGRST202`) and the counts were unchanged. The cause was my
+caller check: the backfill calls `booking_reference()` from the SQL
+editor's own session, which carries neither a tenant claim nor
+`service_role`, so the function raised and the editor's transaction
+undid every step. Fixed by testing `session_user <> 'postgres'`: the
+LOGIN role is `authenticator` behind PostgREST and `postgres` in a direct
+session, while a definer's `current_user` is always its owner and could
+not be used. The second run took: every tenant has **0** rows without a
+group or a reference; `booking_reference()` on the service client
+answered `HAR-G23UG9`; rooms **49/49**, 4f: the 2-room staff booking of
+check 4b carries `ROO-BSWX4Z` on both rows (a BEFORE ROW trigger sees the
+rows before it in the same statement, § 2.1 proven on a real insert), and
+the three single staff bookings each have a group of their own and
+references `ROO-UBAPDW`, `ROO-3BA5MG`, `ROO-27UUWP`, all of the web shape;
+check 24's web request still gets its reference from `request_booking()`.
+
+**What it avoided:** a second copy of the alphabet (Rule 1); a group with
+N references (§ 2.1); the promos file quietly restoring the old
+`request_booking` (§ 2.2).
