@@ -1,0 +1,76 @@
+today 2026-10-04 · FREE 2026-10-18
+
+=== harbor · What rooms do you have?
+refused: false · sources: 4 · tools: none
+Here are the rooms available at Harbor Inn:
+
+| Room            | Guests | Details                                                                                     |
+|-----------------|--------|---------------------------------------------------------------------------------------------|
+| Garden Room     | up to 2| On the ground floor, opens onto the garden, has one queen bed, suited to couples.          |
+| Family Room     | up to 6| The largest room, on the ground floor beside the terrace, has two queen beds and a bunk bed.|
+| Loft            | up to 3| On the top floor under the roof beams, has one queen bed and a daybed, with a skylight.    |
+| Sea View Suite  | up to 2| On the first floor facing the harbour, has a king bed, a sitting area, and a private balcony. |
+
+For which rooms are free and their rates, you can tell me a date.
+
+=== villa · What rooms do you have?
+refused: false · sources: 5 · tools: none
+Here are the rooms available at Villa Amihan:
+
+| Room     | Details                                                                                   |
+|----------|-------------------------------------------------------------------------------------------|
+| Dalisay  | The largest bedroom. It has one queen bed and one double-deck bunk, sleeping five. It has its own toilet and bath. |
+| Marikit  | Has one queen bed and sleeps two.                                                        |
+| Liwayway | Has two double-deck bunks and sleeps four.                                               |
+| Tala     | Has one double bed and one single bed and sleeps three.                                  |
+
+The whole property is booked together, and for availability and rates, you can tell me a date.
+
+=== harbor · What rooms are open on 18 October 2026?
+refused: false · sources: 4 · tools: check_availability{"date_from":"2026-10-18"}
+On 18 October 2026, the following rooms are open:
+
+| Room           | Guests | Price                      |
+|----------------|--------|----------------------------|
+| Garden Room    | up to 2| ₱4,500.00 (weekend rate)  |
+| Family Room    | up to 6| ₱7,500.00 (weekend rate)  |
+| Loft           | up to 3| ₱5,800.00 (weekend rate)  |
+| Sea View Suite | up to 2| ₱9,500.00 (weekend rate)  |
+
+Taken: None.
+
+=== villa · What's open on 18 October 2026?
+refused: false · sources: 5 · tools: check_availability{"date_from":"2026-10-18"}
+Yes, the 22-Hour Whole Day, Day Tour, and Overnight slots are open on 18 October 2026. Here are the details:
+
+| Slot            | Status | Price                      |
+|-----------------|--------|----------------------------|
+| 22-Hour Whole Day | open   | ₱27,000.00 (weekend rate) |
+| Day Tour        | open   | ₱12,000.00 (weekend rate) |
+| Overnight       | open   | ₱20,000.00 (weekend rate) |
+
+=== villa · Room rates please
+refused: false · sources: 5 · tools: none
+Here are our rates:
+
+| Slot | Weekday | Weekend | Holiday |
+|---|---|---|---|
+| 22-Hour Whole Day | ₱22,000.00 | ₱27,000.00 | ₱27,000.00 |
+| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱12,000.00 |
+| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |
+
+The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. Tell me your preferred date and I can give you the exact rate.
+
+=== harbor · Magkano ang extra guest?
+refused: false · sources: 4 · tools: none
+Narito po ang detalye tungkol sa extra guest fee para sa mga kwarto:
+
+| Room | Rate covers | Extra guest | Up to |
+|---|---|---|---|
+| Garden Room | 2 guests | none | 2 guests |
+| Family Room | 2 guests | ₱250.00 | 6 guests |
+| Loft | 2 guests | ₱250.00 | 3 guests |
+| Sea View Suite | 2 guests | none | 2 guests |
+
+Ang rate po ng bawat kwarto ay depende sa date, kung gusto niyo po malaman, anong date po ang gusto niyo?
+

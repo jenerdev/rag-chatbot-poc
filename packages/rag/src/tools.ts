@@ -214,12 +214,35 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
         // A question with no date in it could not satisfy the instruction, so
         // the model fell back on the refusal. A tools-block sentence can
         // cost a documents answer.
+        //
+        // plan/tables.md Phase 3 (D-091): the two "Open:/Taken:" lines became
+        // a table with one row per slot, in the same shape (an example of
+        // what TO write). The browser draws exactly this block
+        // (apps/web/lib/tables.ts). A rate-less tenant gets no Price column.
+        // The last sentence is Rule 4: one slot asked is a sentence, not a
+        // one-row table (price-villa pins it).
         'When you answer about availability, start with one sentence that',
         'answers the question and names the date, for example "Yes, the',
         'Overnight slot is open on 8 October 2026." Then, for each date, write',
-        'two lines: "Open:" followed by the open slots and "Taken:" followed by',
-        'the taken ones. Never say a whole day is free unless every slot on it',
-        'is open.',
+        ...(priced
+          ? [
+              'a table with one row per slot and the columns Slot, Status and Price,',
+              'for example:',
+              '| Slot | Status | Price |',
+              '|---|---|---|',
+              '| Overnight | open | ₱16,000.00 (weekday rate) |',
+              '| Day Tour | taken |  |',
+            ]
+          : [
+              'a table with one row per slot and the columns Slot and Status, for',
+              'example:',
+              '| Slot | Status |',
+              '|---|---|',
+              '| Overnight | open |',
+              '| Day Tour | taken |',
+            ]),
+        'Never say a whole day is free unless every slot on it is open. When',
+        'the user asks about one slot only, answer in a sentence, with no table.',
         // Phase 6 (tool-ask): "I don't know based on the documents I have.
         // Please provide a specific date…", the refusal glued to the question.
         // D-046 tried "without giving any date or day at all" here. It did not
@@ -254,12 +277,13 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
 const PRICE_LINES = [
   'For what a slot costs on a date, ALWAYS call check_availability; the',
   'documents do not hold the rates. Quote a price only from the tool result,',
-  "never from the documents or from memory. Write each open slot's price",
-  'after it, for example "Open: Overnight ₱16,000.00; Day Tour ₱9,500.00".',
-  'If the user says how many guests, pass it as guests, and quote the',
-  '"total" from the result, naming the extra guest charge, for example',
-  '"Overnight (32 guests): ₱16,000.00 + ₱500.00 for 2 extra guests =',
-  '₱16,500.00". Never add up a total yourself.',
+  "never from the documents or from memory. Write each slot's price in the",
+  "table's Price column exactly as the tool gives it, for example",
+  '"₱16,000.00 (weekday rate)".',
+  'If the user says how many guests, pass it as guests, add a Total column',
+  'with the "total" from the result, and name the extra guest charge under',
+  'the table, for example "Overnight (32 guests): ₱16,000.00 + ₱500.00 for',
+  '2 extra guests = ₱16,500.00". Never add up a total yourself.',
   'If the user asks a price without giving a date, your whole reply is one',
   'question asking which date they mean, because the rate depends on it.',
 ];
@@ -289,9 +313,24 @@ export async function extraGuestLines(tenant: TenantContext): Promise<string[]> 
     'does not depend on the date, so do not ask for one. The terms, from the',
     'database:',
     ...terms,
-    'Answer from these lines, with the figures as written, and say how many',
-    'guests the rate covers. If they also ask the rate itself, say it',
-    'depends on the date and ask which date.',
+    // plan/tables.md Phase 3: the same terms as a table the model copies.
+    // Rows are written in code (tables.ts), figures as above; "none" where
+    // a room takes no extra guest.
+    'Answer with this table, with the figures as written, and say how many',
+    'guests the rate covers:',
+    pipeTable(
+      ['Room', 'Rate covers', 'Extra guest', 'Up to'],
+      page.units.map((u) => [
+        u.name,
+        u.standardCapacity === null ? '' : `${u.standardCapacity} guests`,
+        u.extraPersonRate === null || u.standardCapacity === null || (u.capacity !== null && u.capacity <= u.standardCapacity)
+          ? 'none'
+          : money(u.extraPersonRate, page.currency),
+        u.capacity === null ? '' : `${u.capacity} guests`,
+      ]),
+    ),
+    'If they also ask the rate itself, say it depends on the date and ask',
+    'which date.',
   ];
 }
 
@@ -420,20 +459,39 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
         'know. Never state availability or a room price without a tool result',
         'from this turn.',
         // rt-list, rt-guests: open rooms first, each with capacity and price.
+        // plan/tables.md Phase 3 (D-091): the one-room-per-line list became a
+        // table in the same shape (an example of what TO write); the browser
+        // draws exactly this block. Rule 4: one room asked is a sentence
+        // (rt-taken pins it).
         'When you answer about rooms, start with one sentence that names the',
-        'date. Then list each open room on its own line with how many guests it',
-        'holds and its price, for example "Garden Room (up to 2 guests):',
-        '₱3,500.00". Then one line "Taken:" with the taken rooms, if any.',
+        'date. Then write a table of the open rooms with the columns Room,',
+        'Guests and Price, one row per room, for example:',
+        '| Room | Guests | Price |',
+        '|---|---|---|',
+        '| Garden Room | up to 2 | ₱3,500.00 (weekday rate) |',
+        '| Loft | up to 3 | ₱4,800.00 (weekday rate) |',
+        'Then one line "Taken:" with the taken rooms, if any. When the user',
+        'asks about one room only, answer in a sentence, with no table.',
+        // rt-leak, after the table lines: with "one sentence, then a table"
+        // the model answered "the Overnight slot is free at Harbor Inn" to
+        // villa's slot 3 of 3 (it had written "rooms available for the
+        // Overnight slot" before, which the check let pass). A prohibition
+        // ("never call it open") held 1 of 3; D-017 again. So: the sentence
+        // TO write, with an example.
+        'If the user names a room or booking period that is not in the tool',
+        `result, your first sentence says so, for example "${tenant.businessName}`,
+        'has no room or booking period by that name. Here is what is open on',
+        'that date:" and then the table of the open rooms.',
         // rt-price, rt-mix (plan § 2.7): the documents may hold an old or a
         // whole-venue rate.
         "Quote a room's price only from the tool result, never from the",
         'documents. The tool gives the base rate for that date.',
         // rt-guests, and plan/extra-guests.md (rt-extra, rt-standard, R-37):
         // the total is the TOOL's, never one the model adds up.
-        'If the user says how many guests, pass it as guests, and quote each',
-        'room\'s "total" from the result, naming its extra guest charge, for',
-        'example "Loft (3 guests): ₱4,800.00 + ₱250.00 for 1 extra guest =',
-        '₱5,050.00". Never add up a total yourself.',
+        'If the user says how many guests, pass it as guests, add a Total',
+        'column with each room\'s "total" from the result, and name its extra',
+        'guest charge under the table, for example "Loft (3 guests): ₱4,800.00',
+        '+ ₱250.00 for 1 extra guest = ₱5,050.00". Never add up a total yourself.',
         // rt-over: a room too small for the party is not in the result.
         'A room that holds fewer guests than asked is not in the result; say',
         'it holds fewer, and offer the rooms that are.',

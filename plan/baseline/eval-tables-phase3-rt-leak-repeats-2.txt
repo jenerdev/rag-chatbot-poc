@@ -1,0 +1,15 @@
+PASS  [rt-leak] harbor want rooms
+      A: Harbor Inn has no room or booking period by that name. Here is what is open on 18 October 2026:  | Room           | Guests | Price                     | |----------------|--------|---------------------------| | 
+      why: villa rows in harbor's tool results: 0; the reply calls villa's Overnight open: false; says it has no such period: true; table: true
+      A: Yes, the Garden Room is available on 18 October 2026, as it is part of the whole property booking. Here are the available slots:  | Slot              | Status | Price                      | |-------------------|
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: true; table: true
+PASS  [rt-leak] harbor want rooms
+      A: Harbor Inn has no room or booking period by that name. Here is what is open on 18 October 2026:  | Room           | Guests | Price                     | |----------------|--------|---------------------------| | 
+      why: villa rows in harbor's tool results: 0; the reply calls villa's Overnight open: false; says it has no such period: true; table: true
+      A: Yes, the Garden Room is available on 18 October 2026, as the whole property is open for booking. Here are the available slots:  | Slot              | Status | Price                      | |-------------------|--
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: true; table: true
+PASS  [rt-leak] harbor want rooms
+      A: Harbor Inn has no room or booking period by that name. Here is what is open on 18 October 2026:  | Room           | Guests | Price                   | |----------------|--------|-------------------------| | Gard
+      why: villa rows in harbor's tool results: 0; the reply calls villa's Overnight open: false; says it has no such period: true; table: true
+      A: Yes, the Garden Room is available on 18 October 2026, as it is part of the whole property. Here are the available slots:  | Slot               | Status | Price                     | |--------------------|-------
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: true; table: true

@@ -1,0 +1,9 @@
+PASS  [rt-leak] harbor want rooms
+      A: On 18 October 2026, the following rooms are available for the Overnight slot:  | Room           | Guests | Price                     | |----------------|--------|---------------------------| 
+      A: Yes, the Garden Room is available on 18 October 2026, as it is part of the whole property. Here are the available slots:  | Slot              | Status | Price                       | |-------
+FAIL  [rt-leak] harbor want rooms
+      A: On 18 October 2026, the Overnight slot is free at Harbor Inn. Here are the available rooms:  | Room           | Guests | Price                     | |----------------|--------|---------------
+      A: Yes, the Garden Room is available on 18 October 2026, as it is part of the whole property. Here are the available slots:  | Slot              | Status | Price                      | |--------
+FAIL  [rt-leak] harbor want rooms
+      A: On 18 October 2026, the Overnight slot is available at Harbor Inn. Here are the open rooms:  | Room           | Guests | Price                     | |----------------|--------|---------------
+      A: Yes, the Garden Room is available on 18 October 2026, as it is part of the whole property which has open slots. Here are the available options:  | Slot              | Status | Price          

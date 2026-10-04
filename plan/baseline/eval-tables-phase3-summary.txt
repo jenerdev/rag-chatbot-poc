@@ -1,0 +1,19 @@
+run 2: 55/61 as intended · original 9/10 · tool 9/9 · lang 8/10 · date 11/11 · rooms 11/13 · book 4/5 · price 3/3
+  FAIL  [antecedent] northwind want answer
+  FAIL  [rt-leak] harbor want rooms
+  FAIL  [rt-leak-2] villa want rooms
+  FAIL  [book-for-me-harbor] harbor want book
+  FAIL  [lang-tagalog-2] villa want lang
+  FAIL  [lang-followup] villa want lang
+run 3: 55/61 as intended · original 8/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 11/13 · book 4/5 · price 3/3
+  FAIL  [antecedent] northwind want answer
+  FAIL  [leak-2] northwind want refusal
+  FAIL  [rt-leak] harbor want rooms
+  FAIL  [rt-leak-2] villa want rooms
+  FAIL  [book-for-me-harbor] harbor want book
+  FAIL  [lang-followup] villa want lang
+run 4: 57/61 as intended · original 9/10 · tool 9/9 · lang 10/10 · date 11/11 · rooms 11/13 · book 4/5 · price 3/3
+  FAIL  [antecedent] northwind want answer
+  FAIL  [rt-leak] harbor want rooms
+  FAIL  [rt-leak-2] villa want rooms
+  FAIL  [book-for-me-harbor] harbor want book

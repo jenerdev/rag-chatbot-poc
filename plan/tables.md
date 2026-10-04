@@ -80,8 +80,10 @@ trap 10 says a tools sentence can cost a documents answer.
 The instruction says WHEN to write a table (open rooms on a date, the room
 list, a priced day, the extra-guest terms) and shows one. It does not say
 "use tables". A single room's status ("Is the Sea View Suite free?",
-`rt-taken`) and a single slot's price (`price-villa`) stay a sentence: a
-one-row table reads worse than "Yes, open, ₱20,000.00 (weekend rate)".
+`rt-taken`) and a single slot's price (`price-villa`) are answered in a
+sentence: a one-row table reads worse than "Yes, open, ₱20,000.00 (weekend
+rate)". A table of the OTHER open rooms may follow that sentence (Phase 3
+measured the model offering them, and kept it).
 
 ---
 
@@ -293,8 +295,11 @@ Each phase ends with its checks run and both record files updated
   independently in the .mjs so a parser bug cannot bless itself); judged on
   `rt-list`, `rt-guests` and `price-villa-guests` (the list answers);
   printed, not judged, on every other `rt-*`, `tool-*` and `price-*` case.
-  `rt-taken` and `price-villa` must stay a sentence (Rule 4), checked by
-  `!tableOk`.
+  `price-villa` must stay a sentence (Rule 4), checked by `!tableOk`;
+  `rt-taken` must say taken BEFORE any table (a table of the other open
+  rooms may follow it: measured in run 1, and a better reply). Judged on
+  `rt-list`, `rt-guests` and `tool-partial` (villa's list answer), not on
+  `price-villa-guests`, which is one slot asked and so a sentence.
 - Done when: the full battery is at its baseline count with the three
   table verdicts green, three runs in a row (trap 24: a flip is repeated
   before it is believed); the three baseline diffs are still clean;

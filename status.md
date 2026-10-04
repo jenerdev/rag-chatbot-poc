@@ -90,7 +90,7 @@ no date, amending D-081) decides Phase 2's second half.
 - [x] Phase 0 — baseline (2026-10-04): tests 13+14+99+5+346+27, typecheck, verify 109/110 (the open item); northwind and villa byte-identical, harbor differs by its new Day Tour slot (data; `harbor-tools-tables-phase0.txt` is the new baseline); battery 56/61, 57 with `lang-tagalog-2`'s repeat, the two flips 3 of 3 on 18 Oct (trap 24); six probes saved
 - [x] Phase 1 — the renderer (2026-10-04): `lib/tables.ts` + 15 tests, `reply-text.tsx` + 4, CSS, the bubble renders through it; web tests 46/46, typecheck, no dangerouslySetInnerHTML; a table document in northwind came back as a pipe table 3/3 and was deleted; the browser look is owed to Phase 4
 - [x] Phase 2 — the code-written tables (2026-10-04): `pipeTable()`, the room list as a table, `rateCardReply()` replacing D-081's sentence for a tenant with rates (D-081 and D-087 amended); pipeline tests 351/351, typecheck, northwind identical; six probes show the tables in English, Taglish and Tagalog; battery 55/61, `leak-2` and `lang-tagalog-2` the model's flips (1 of 2 on repeat), neither reaching this code
-- [ ] Phase 3 — the model's tables (tool lines, dates.ts lines, `tableOk` in the battery)
+- [x] Phase 3 — the model's tables (2026-10-04): villa, harbor, room-list and extra-guest lines as table examples; `tableOk` judged on `rt-list`, `rt-guests`, `tool-partial`, absent on `price-villa`; `rt-leak` regressed 0 of 3 and was fixed with an example sentence (3 of 3); runs 5–7: 56, 57, 57/61, the Phase 0 set; baselines byte-identical; six probes, six tables
 - [ ] Phase 4 — the browser walk (desktop and 360px, three tenants)
 - [ ] Phase 5 — the record (D-091, CLAUDE.md, flow.md)
 
@@ -1142,6 +1142,16 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — tables Phase 3 (the model's tables), on `feat/tables`
+- **Did:** the instruction lines (villa, harbor, `PRICE_LINES`, `ROOM_LIST_LINES`,
+  `WHOLE_PROPERTY_ROOM_LINES`, `extraGuestLines()`) show a table to write;
+  `tableOk()` in the battery. Seven full runs. Run 1 (52/61): two checks
+  stricter than Rule 4 (fixed) and `rt-leak` 0 of 3 with the new sentence
+  order; a prohibition held 1 of 3, an example sentence 3 of 3. Runs 5–7:
+  56, 57, 57/61, the Phase 0 set plus the known flips; `tool 9/9` every
+  run. Three baselines byte-identical; six probes, six tables.
+- **Next:** Phase 4, the browser walk (desktop and 360px, three tenants).
 
 ### 2026-10-04 — tables Phase 2 (the code-written tables), on `feat/tables`
 - **Did:** `packages/rag/src/tables.ts` (`pipeTable()`), `roomListReply()` as a

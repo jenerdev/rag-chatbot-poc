@@ -92,6 +92,30 @@ const roomRows = (last) => callsFor(last).flatMap((c) => c.result?.slots ?? []);
 /** "₱3,500.00" → "3,500": what a reply must contain to be quoting that price. */
 const pesos = (price) => String(price ?? '').replace(/[^\d,.]/g, '').replace(/\.00$/, '');
 const TAKEN_WORDS = ['taken', 'not available', 'unavailable', 'booked', 'not open'];
+/**
+ * Is there a well-formed pipe table in the reply (plan/tables.md Phase 3)?
+ * Written here on its own, NOT imported from apps/web/lib/tables.ts, so a
+ * parser bug cannot bless itself: a header line, a separator line of dashes
+ * directly under it, at least one row, and every row with the header's
+ * column count. Judged on the list answers (rt-list, rt-guests,
+ * tool-partial), judged ABSENT on the one-slot price (price-villa; Rule 4);
+ * rt-taken, one room asked, must say taken BEFORE any table (a table of
+ * the other open rooms may follow). Printed on every other rt-*, tool-*
+ * and price-* case. price-villa-guests is one slot asked, so a sentence,
+ * not judged: the first run judged it and the sentence was right.
+ */
+const tableOk = (reply) => {
+  const lines = reply.split('\n').map((l) => l.trim());
+  const row = (l) => /^\|.*\|$/.test(l);
+  for (let i = 0; i + 2 < lines.length; i++) {
+    if (!row(lines[i]) || !/^\|(\s*:?-+:?\s*\|)+$/.test(lines[i + 1])) continue;
+    const width = lines[i].split('|').length;
+    let j = i + 2;
+    while (j < lines.length && row(lines[j]) && lines[j].split('|').length === width) j++;
+    if (j > i + 2) return true;
+  }
+  return false;
+};
 
 // --- the book-* cases (plan/customer-booking.md Phase 5) ---------------------
 /** Does the reply send the visitor to the booking page (the Book button)? */
@@ -261,7 +285,10 @@ const CASES = [
         says(last.reply, ['overnight']) &&
         says(last.reply, TAKEN_WORDS) &&
         !/(slots|following|these)[^.:\n]{0,40}available\s*:/i.test(last.reply) &&
-        namesDate(last.reply, NEXT),
+        namesDate(last.reply, NEXT) &&
+        // plan/tables.md Phase 3: villa's list answer (three slots, one open)
+        // is a table, one row per slot.
+        tableOk(last.reply),
       detail: `tool: Overnight ${slotStatus(last, NEXT, 'Overnight') ?? '?'}, Day Tour ${slotStatus(last, NEXT, 'Day Tour') ?? '?'}; names the date: ${namesDate(last.reply, NEXT)}`,
     }),
     note: 'only some slots are open; the reply must name them, not call the day free',
@@ -364,7 +391,7 @@ const CASES = [
       const named = open.filter((r) => last.reply.includes(r.unit));
       const priced = open.filter((r) => last.reply.includes(pesos(r.price)));
       return {
-        ok: open.length > 0 && named.length === open.length && priced.length === open.length && namesDate(last.reply, H_FREE),
+        ok: open.length > 0 && named.length === open.length && priced.length === open.length && namesDate(last.reply, H_FREE) && tableOk(last.reply),
         detail: `${open.length} open rows; named ${named.length}, priced ${priced.length}; names the date: ${namesDate(last.reply, H_FREE)}`,
       };
     },
@@ -384,7 +411,7 @@ const CASES = [
       // TOTAL (3 above its standard of 2), and that is the number to quote.
       const quoted = family?.total ?? family?.price;
       return {
-        ok: family?.status === 'open' && last.reply.includes('Family Room') && last.reply.includes(pesos(quoted)) && tooSmall.length === 0,
+        ok: family?.status === 'open' && last.reply.includes('Family Room') && last.reply.includes(pesos(quoted)) && tooSmall.length === 0 && tableOk(last.reply),
         detail: `guests arg ${JSON.stringify(callsFor(last).map((c) => c.args?.guests))}; Family Room ${family?.status ?? '(no row)'} ${quoted ?? ''}; smaller rooms offered: ${tooSmall.join(', ') || 'none'}`,
       };
     },
@@ -400,8 +427,13 @@ const CASES = [
       const everything = `${last.reply} ${JSON.stringify(callsFor(last))}`;
       const pii = everything.includes('Battery Harbor') || everything.includes('555-0277');
       return {
-        ok: row?.status === 'taken' && says(last.reply, TAKEN_WORDS) && namesDate(last.reply, H_BOOKED) && !pii,
-        detail: `tool: Sea View Suite ${row?.status ?? '(no row)'}; names the date: ${namesDate(last.reply, H_BOOKED)}; guest data present: ${pii}`,
+        // plan/tables.md Rule 4, as measured in Phase 3: one room asked is
+        // answered in a SENTENCE first; a table of the other open rooms may
+        // follow it (the model offered them 1 of 1, and that is a better
+        // reply, not a worse one). So the text before any table must say
+        // taken; the rest is free.
+        ok: row?.status === 'taken' && says(last.reply.split('|')[0], TAKEN_WORDS) && namesDate(last.reply, H_BOOKED) && !pii,
+        detail: `tool: Sea View Suite ${row?.status ?? '(no row)'}; names the date: ${namesDate(last.reply, H_BOOKED)}; guest data present: ${pii}; taken said before any table: ${says(last.reply.split('|')[0], TAKEN_WORDS)}`,
       };
     },
     note: "the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere",
@@ -469,9 +501,15 @@ const CASES = [
     check: (last) => {
       const villaRows = roomRows(last).filter((r) => r.slot === 'Overnight');
       const claims = /overnight[^.\n]{0,40}\b(is|are)\s+(open|available|free)\b/i.test(last.reply);
+      // plan/tables.md Phase 3: a reply that SAYS harbor has no such period
+      // ("has no room or booking period by that name") and then shows its
+      // own rooms invents nothing, whatever the sentence after it says
+      // about its Night stay. Before this, the case passed on word order
+      // alone ("rooms available for the Overnight slot" never matched).
+      const disclaims = /\b(no|not|don't|doesn't|wala|walang)\b[^.\n]{0,60}\b(overnight|period|slot)\b/i.test(last.reply);
       return {
-        ok: villaRows.length === 0 && !claims,
-        detail: `villa rows in harbor's tool results: ${villaRows.length}; the reply calls villa's Overnight open: ${claims}`,
+        ok: villaRows.length === 0 && (!claims || disclaims),
+        detail: `villa rows in harbor's tool results: ${villaRows.length}; the reply calls villa's Overnight open: ${claims}; says it has no such period: ${disclaims}`,
       };
     },
     note: "villa's slot, asked of harbor: harbor's tool cannot see it, and the reply must not invent it",
@@ -565,7 +603,7 @@ const CASES = [
     check: (last) => {
       const row = roomRows(last).find((r) => r.date === FREE && r.slot === 'Overnight');
       return {
-        ok: Boolean(row) && last.reply.includes(pesos(row.price)) && namesDate(last.reply, FREE),
+        ok: Boolean(row) && last.reply.includes(pesos(row.price)) && namesDate(last.reply, FREE) && !tableOk(last.reply),
         detail: `tool: Overnight ${FREE} ${row?.price ?? '(no row)'}; quoted: ${row ? last.reply.includes(pesos(row.price)) : false}; names the date: ${namesDate(last.reply, FREE)}`,
       };
     },
@@ -1113,6 +1151,10 @@ for (const c of RUN) {
     // The verdict on its own line too: a long reply pushes it past the
     // 360-character cut below (found on book-how-tl, customer booking Phase 5).
     why = verdict.detail;
+    // plan/tables.md Phase 3: whether the reply holds a well-formed table,
+    // printed on every tool, room and price case so the instruction can be
+    // tuned against a count, not an impression.
+    if (/^(rt|tool|price)-/.test(c.id)) why += `; table: ${tableOk(last.reply)}`;
   } else if (c.want === 'no-transcript') {
     const other = await ask(tenants[c.transcriptOf.tenant], c.transcriptOf.turns);
     const own = await getMessages(tenants[c.transcriptOf.tenant], other.conversationId);

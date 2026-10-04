@@ -6866,3 +6866,59 @@ date, is named in words, never guessed.
 used to get the rates sentence; it now gets the rate table. The gate is
 the same (a price word, no date, no figure in the reply), so the fix, if
 one is wanted, is a narrower gate, not a different card.
+
+## Tables, Phase 3: the model's tables · done 2026-10-04, on `feat/tables`
+
+**What:** the model is told to write a table where it used to write lines,
+in the places that already hold per-tenant prompt text and nowhere else
+(plan/tables.md Rule 3). `tools.ts`: villa's "Open:/Taken:" two lines are a
+`| Slot | Status | Price |` table (no Price column for a rate-less tenant);
+`PRICE_LINES` point at the Price column and a Total column; harbor's
+one-room-per-line list is a `| Room | Guests | Price |` table, then
+"Taken:"; `extraGuestLines()` hands the model the terms as a table written
+in code (`pipeTable()`) to copy. `dates.ts`: `ROOM_LIST_LINES` ask for
+Room, Guests, Details; `WHOLE_PROPERTY_ROOM_LINES` for Room, Details. Each
+instruction is an example of what TO write (D-017). The battery gained
+`tableOk()` (its own parser, not the browser's, so a bug cannot bless
+itself), judged on `rt-list`, `rt-guests` and `tool-partial`, judged
+absent on `price-villa`, printed on every rt-*, tool-* and price-* case.
+
+**Why it matters:** the tables now reach the screen from every writer. The
+six Phase 0 probes, every one lines on 2026-10-04 morning, are six tables
+(`probes-tables-phase3.txt`), and the model pads its columns with spaces,
+which the browser's parser trims.
+
+**Observed:**
+- tests 351/351, typecheck clean; northwind's prompt, villa's and
+  harbor's tool DEFINITIONS byte-identical to their baselines (the
+  instruction lines are not in the definitions);
+- **run 1 (52/61) found two checks stricter than Rule 4 and one real
+  regression.** `price-villa-guests`, one slot asked, was answered in a
+  sentence, which Rule 4 wants, and the check demanded a table: the check
+  was wrong, not the reply. `rt-taken` answered "the Sea View Suite is
+  taken" and then offered the other rooms as a table: a better reply than
+  the bare sentence, so the check now asks that "taken" come BEFORE any
+  table. `rt-leak` ("Is the Overnight slot at Villa Amihan free?", asked
+  of harbor) fell to 0 of 3 (runs 1–4): with "one sentence, then a table"
+  the model opened with "the Overnight slot is free at Harbor Inn". It
+  had passed before on word order alone ("rooms available for the
+  Overnight slot" never matched the regex). A prohibition ("never call it
+  open") held 1 of 3. An example sentence ("Harbor Inn has no room or
+  booking period by that name. Here is what is open on that date:") held
+  **3 of 3**, written verbatim, and the check now accepts a reply that
+  disclaims the period by name (`disclaims`), while a bare "the Overnight
+  slot is free" still fails;
+- **runs 5, 6, 7: 56, 57, 57 of 61**, the Phase 0 set (`antecedent`,
+  `lang-followup`, `rt-leak-2` and `book-for-me-harbor` on 18 October)
+  with the known model flips moving alone: `leak-2`'s control in run 5,
+  `lang-tagalog-2` in run 7, and `book-for-me-harbor` passing in run 7.
+  `tool 9/9` in all seven runs: no documents or tool answer was lost to a
+  tables sentence (trap 10 did not fire). Table verdicts: 13–14 true of 26
+  printed per run; true on every list answer, false on every one-slot
+  answer, three runs out of three.
+
+**Trap avoided:** run 1's three failures read like "the model cannot do
+tables". Reading each `why:` line showed two were my checks contradicting
+the plan's own rule, and one was a sentence-order regression the old
+check had never really tested. Trap 24's instruction, repeat before
+rewording, is what turned 0 of 3 into a wording fix instead of a shrug.
