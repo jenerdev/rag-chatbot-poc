@@ -10,7 +10,7 @@ import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
 import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
-import { executeTool, extraGuestLines, horizonLines, toolsFor } from './tools.js';
+import { executeTool, extraGuestLines, horizonLines, rateCardReply, toolsFor } from './tools.js';
 import type { PromptTools, TenantTools } from './tools.js';
 import type {
   Answer,
@@ -414,8 +414,16 @@ function explainPrice(
   records: ToolCallRecord[],
   reply: string,
   replyIn: LanguagePreference,
+  rateCard: string | null,
 ): string {
   if (!undatedPrice || records.length > 0 || /\d/.test(reply)) return reply;
+  // plan/tables.md Phase 2 (§ 7 q1): a tenant with rates gets the rate card,
+  // written in code from the booking page's rows (rateCardReply); D-081's
+  // sentence is the fallback when there is no card to give.
+  if (rateCard !== null) {
+    console.log('[query] a price with no date, answered with no figure: the reply is the rate card (D-091)');
+    return rateCard;
+  }
   console.log('[query] a price with no date, answered with no figure: the reply is PRICE_NEEDS_DATE (D-081)');
   return PRICE_NEEDS_DATE[replyIn];
 }
@@ -492,10 +500,11 @@ export async function answerQuestion({
     undefined,
     precheck,
   );
+  const undatedPrice = asksPriceWithoutDate(tools, message);
   const reply = explainRooms(
     roomListRooms(tools, message),
     records,
-    explainPrice(asksPriceWithoutDate(tools, message), records, acceptReply(matches, records, text), replyIn),
+    explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn, undatedPrice ? await rateCardReply(tenant, replyIn) : null),
     replyIn,
   );
   await saveMessages(tenant, id, message, reply);
@@ -603,7 +612,12 @@ export async function answerQuestionStream({
       onTool,
       precheck,
     );
-    const reply = explainRooms(listRooms, records, explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn), replyIn);
+    const reply = explainRooms(
+      listRooms,
+      records,
+      explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn, undatedPrice ? await rateCardReply(tenant, replyIn) : null),
+      replyIn,
+    );
     // Held text was never streamed, so it goes out whole, already swapped.
     if (hold) onDelta(displayReply(reply, friendly));
     else filter.finish();

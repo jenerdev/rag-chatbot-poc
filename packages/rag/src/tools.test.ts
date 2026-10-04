@@ -17,6 +17,7 @@ vi.mock('@rag/bookings', () => {
     checkPricedAvailability: vi.fn(),
     checkRoomAvailability: vi.fn(),
     hasBookingPage: vi.fn(),
+    bookingPage: vi.fn(),
     lastBookingDate: vi.fn(() => '2027-09-30'),
     listRooms: vi.fn(),
     bookingsConfig: vi.fn(),
@@ -30,9 +31,9 @@ vi.mock('./applications.js', () => ({
   enabledApplications: vi.fn(async () => ['bookings']),
 }));
 
-import { BookingInputError, bookingsConfig, checkAvailability, checkPricedAvailability, checkRoomAvailability, hasBookingPage, lastBookingDate } from '@rag/bookings';
+import { BookingInputError, bookingPage, bookingsConfig, checkAvailability, checkPricedAvailability, checkRoomAvailability, hasBookingPage, lastBookingDate } from '@rag/bookings';
 import { planDates } from './dates.js';
-import { executeTool } from './tools.js';
+import { executeTool, rateCardReply } from './tools.js';
 import type { TenantContext } from './types.js';
 
 const TENANT = { id: 3, slug: 'villa', businessName: 'Villa Amihan', assistantName: 'Lia', fallbackMessages: {}, db: {} } as unknown as TenantContext;
@@ -282,3 +283,55 @@ describe('per_room: check_availability checks rooms', () => {
   });
 });
 
+
+describe('rateCardReply (plan/tables.md Phase 2, § 7 q1)', () => {
+  const page = vi.mocked(bookingPage);
+  const unit = (name: string, rates: { slot: string; weekdayPrice: number; weekendPrice: number; holidayPrice: number | null }[]) => ({
+    id: 1,
+    name,
+    description: null,
+    capacity: 4,
+    standardCapacity: 2,
+    extraPersonRate: 25000,
+    rates: rates.map((r, i) => ({ slotId: i + 1, ...r })),
+  });
+  const PAGE = { currency: 'PHP', units: [] as ReturnType<typeof unit>[] };
+
+  it('one unit: a Slot column, no Room column, the weekend price where no holiday price is set', async () => {
+    page.mockResolvedValueOnce({
+      ...PAGE,
+      units: [unit('Villa', [{ slot: 'Overnight', weekdayPrice: 1600000, weekendPrice: 2000000, holidayPrice: null }, { slot: 'Day Tour', weekdayPrice: 950000, weekendPrice: 1200000, holidayPrice: 1400000 }])],
+    } as never);
+    expect(await rateCardReply(TENANT, 'english')).toBe(
+      'Here are our rates:\n\n' +
+        '| Slot | Weekday | Weekend | Holiday |\n|---|---|---|---|\n' +
+        '| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |\n' +
+        '| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱14,000.00 |\n\n' +
+        'The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. ' +
+        'Tell me your preferred date and I can give you the exact rate.',
+    );
+  });
+
+  it('several units: a Room column first, one row per unit and slot, in Tagalog', async () => {
+    page.mockResolvedValueOnce({
+      ...PAGE,
+      units: [
+        unit('Garden Room', [{ slot: 'Night', weekdayPrice: 350000, weekendPrice: 450000, holidayPrice: null }]),
+        unit('Sea | View', [{ slot: 'Night', weekdayPrice: 800000, weekendPrice: 950000, holidayPrice: 1100000 }]),
+      ],
+    } as never);
+    const reply = await rateCardReply(TENANT, 'tagalog');
+    expect(reply).toContain('| Kwarto | Slot | Karaniwang araw | Sabado at Linggo | Pista opisyal |\n|---|---|---|---|---|\n');
+    expect(reply).toContain('| Garden Room | Night | ₱3,500.00 | ₱4,500.00 | ₱4,500.00 |\n');
+    // A pipe in a tenant-typed room name cannot split the row.
+    expect(reply).toContain('| Sea View | Night | ₱8,000.00 | ₱9,500.00 | ₱11,000.00 |');
+    expect(reply).toMatch(/^Narito po ang aming mga presyo:/);
+  });
+
+  it('null when there is no page to read, so the caller falls back to PRICE_NEEDS_DATE', async () => {
+    page.mockRejectedValueOnce(new Error('nothing priced'));
+    expect(await rateCardReply(TENANT, 'english')).toBeNull();
+    page.mockResolvedValueOnce({ ...PAGE, units: [] } as never);
+    expect(await rateCardReply(TENANT, 'english')).toBeNull();
+  });
+});

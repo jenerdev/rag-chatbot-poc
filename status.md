@@ -89,7 +89,7 @@ no date, amending D-081) decides Phase 2's second half.
 - [x] § 7 answered (2026-10-04: every recommendation taken)
 - [x] Phase 0 — baseline (2026-10-04): tests 13+14+99+5+346+27, typecheck, verify 109/110 (the open item); northwind and villa byte-identical, harbor differs by its new Day Tour slot (data; `harbor-tools-tables-phase0.txt` is the new baseline); battery 56/61, 57 with `lang-tagalog-2`'s repeat, the two flips 3 of 3 on 18 Oct (trap 24); six probes saved
 - [x] Phase 1 — the renderer (2026-10-04): `lib/tables.ts` + 15 tests, `reply-text.tsx` + 4, CSS, the bubble renders through it; web tests 46/46, typecheck, no dangerouslySetInnerHTML; a table document in northwind came back as a pipe table 3/3 and was deleted; the browser look is owed to Phase 4
-- [ ] Phase 2 — the code-written tables (D-087; the rate card if q1)
+- [x] Phase 2 — the code-written tables (2026-10-04): `pipeTable()`, the room list as a table, `rateCardReply()` replacing D-081's sentence for a tenant with rates (D-081 and D-087 amended); pipeline tests 351/351, typecheck, northwind identical; six probes show the tables in English, Taglish and Tagalog; battery 55/61, `leak-2` and `lang-tagalog-2` the model's flips (1 of 2 on repeat), neither reaching this code
 - [ ] Phase 3 — the model's tables (tool lines, dates.ts lines, `tableOk` in the battery)
 - [ ] Phase 4 — the browser walk (desktop and 360px, three tenants)
 - [ ] Phase 5 — the record (D-091, CLAUDE.md, flow.md)
@@ -1142,6 +1142,17 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — tables Phase 2 (the code-written tables), on `feat/tables`
+- **Did:** `packages/rag/src/tables.ts` (`pipeTable()`), `roomListReply()` as a
+  table, `rateCardReply()` from `bookingPage()` for an undated price (§ 7
+  q1; D-081 and D-087 amended in decisions.md). Pipeline tests 351/351;
+  typecheck clean; northwind byte-identical. Probes: the D-087 list and the
+  rate card as tables at villa and harbor, English, Taglish, Tagalog; the
+  deposit keeps its figure. Battery 55/61: Phase 0's four plus `leak-2`
+  (the control flip) and `lang-tagalog-2`, each 1 of 2 on repeat, neither
+  reaching the new code; the card fired on `lang-pin-window`'s setup turns.
+- **Next:** Phase 3, the model's tables (tool lines, dates.ts lines, `tableOk`).
 
 ### 2026-10-04 — tables Phase 1 (the renderer), on `feat/tables`
 - **Did:** `apps/web/lib/tables.ts` (parseSegments, pure, strict on the

@@ -2457,6 +2457,16 @@ flips trap 24 records.
 **Cost, recorded:** an undated price of something the documents lack
 ("how much is parking?" at villa) now gets the rates text, not the refusal.
 
+**Amended 2026-10-04 (plan/tables.md Phase 2, § 7 q1):** for a tenant with
+rates, the fixed sentence is replaced by the **rate card**, a table written
+in code (`rateCardReply()` in `tools.ts`): every priced unit's weekday,
+weekend and holiday rate per slot, from `bookingPage()`, the rows the
+public booking page already shows on the same chat token, with the
+sentence under it saying a holiday can carry a surcharge and asking for
+the date. The gate is D-081's (a price word, no date, no tool call, no
+figure in the reply); `PRICE_NEEDS_DATE` remains the fallback when there
+is no card to give. Recorded as D-091's second half.
+
 ## D-082 · Every price says which rate it is, from the one branch that chose it · **Added 2026-09-30**
 
 **Decision:** `rate_kind(tenant, date)` (`sql/schema-rate-kind.sql`) is the
@@ -2661,6 +2671,12 @@ available?" still asks for a date (`rt-ask`). Tests 344/344; typecheck;
 northwind's snapshot. Battery **55/61**; no room rule fired on any battery
 turn; `lang-tagalog-2` (a pets question) 2 of 4 on repeat, its known flip;
 the rest this session's known and dated failures.
+
+**Amended 2026-10-04 (plan/tables.md Phase 2):** `roomListReply()` writes
+the same two facts per room as a pipe table (`| Room | Guests |`, Tagalog
+`| Kwarto | Bisita |`), through `packages/rag/src/tables.ts`, the one
+writer; the sentence before and after is unchanged. The chat draws it
+(D-091).
 
 ## D-088 · A named fee is not the nightly rate: D-081 leaves it alone · **Added 2026-09-30. Narrows D-081**
 

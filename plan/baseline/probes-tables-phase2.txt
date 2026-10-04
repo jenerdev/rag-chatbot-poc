@@ -1,0 +1,67 @@
+=== harbor · What rooms are available?
+refused: false · sources: 4 · tools: none · table: true
+Here are our rooms:
+
+| Room | Guests |
+|---|---|
+| Garden Room | up to 2 guests |
+| Family Room | up to 6 guests |
+| Loft | up to 3 guests |
+| Sea View Suite | up to 2 guests |
+
+Tell me your dates and I can check which rooms are free and their rates.
+
+=== harbor · Anong mga kwarto ang bakante?
+refused: false · sources: 4 · tools: none · table: true
+Ito po ang mga kwarto namin:
+
+| Room | Guests |
+|---|---|
+| Garden Room | up to 2 guests |
+| Family Room | up to 6 guests |
+| Loft | up to 3 guests |
+| Sea View Suite | up to 2 guests |
+
+Pakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.
+
+=== villa · Room rates please
+refused: false · sources: 5 · tools: none · table: true
+Here are our rates:
+
+| Slot | Weekday | Weekend | Holiday |
+|---|---|---|---|
+| 22-Hour Whole Day | ₱22,000.00 | ₱27,000.00 | ₱27,000.00 |
+| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱12,000.00 |
+| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |
+
+The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. Tell me your preferred date and I can give you the exact rate.
+
+=== harbor · Room rates please
+refused: false · sources: 4 · tools: none · table: true
+Here are our rates:
+
+| Room | Slot | Weekday | Weekend | Holiday |
+|---|---|---|---|---|
+| Garden Room | Night | ₱3,500.00 | ₱4,500.00 | ₱4,500.00 |
+| Family Room | Night | ₱6,000.00 | ₱7,500.00 | ₱7,500.00 |
+| Loft | Night | ₱4,800.00 | ₱5,800.00 | ₱5,800.00 |
+| Sea View Suite | Night | ₱8,000.00 | ₱9,500.00 | ₱9,500.00 |
+
+The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. Tell me your preferred date and I can give you the exact rate.
+
+=== villa · Magkano po ang rates niyo?
+refused: false · sources: 5 · tools: none · table: true
+Ito po ang rates namin:
+
+| Slot | Weekday | Weekend | Holiday |
+|---|---|---|---|
+| 22-Hour Whole Day | ₱22,000.00 | ₱27,000.00 | ₱27,000.00 |
+| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱12,000.00 |
+| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |
+
+Depende po ang rate kung weekday, weekend, o holiday ang date niyo, at pwedeng may surcharge sa holiday. Pakisabi po ang preferred date niyo para maibigay ko ang exact rate.
+
+=== villa · Magkano po ang security deposit?
+refused: false · sources: 5 · tools: none · table: false
+Ang security deposit po natin is ₱2,000, na ibinabayad in cash kasama ng balance on arrival.
+

@@ -36,6 +36,8 @@ import {
 import type { BookingsConfig, SlotSummary } from '@rag/bookings';
 import { APPLICATIONS, enabledApplications } from './applications.js';
 import type { ApplicationKey } from './applications.js';
+import type { LanguagePreference } from './language.js';
+import { pipeTable } from './tables.js';
 import type { TenantContext, ToolCallRecord } from './types.js';
 
 /**
@@ -594,3 +596,77 @@ function summarise(result: unknown): string {
   if (r.slots) return `${r.slots.length} slots, ${r.slots.filter((s) => s.status === 'open').length} open`;
   return JSON.stringify(result);
 }
+
+/**
+ * The rate card, for a price asked with no date (plan/tables.md § 7 q1,
+ * amending D-081): every priced unit's weekday, weekend and holiday rate
+ * per slot, as a table, from bookingPage(), the read the public booking
+ * page makes on the same chat token. So nothing here is more than a
+ * visitor already sees on /t/<slug>/book, and no rate comes from the
+ * model's memory (R-23): the model never writes this reply; code does.
+ *
+ * The holiday column is what unit_price() charges on a rate_calendar day:
+ * holiday_price, or the weekend price when none is set (customer booking
+ * § 2.3). A holiday's SURCHARGE is per date and is not in the card, which
+ * the sentence under it says; the exact rate for a date is still the
+ * tool's (D-083). A tenant with one unit (villa) gets no Room column.
+ *
+ * Null when the page cannot be built (nothing priced), so the caller falls
+ * back to PRICE_NEEDS_DATE.
+ */
+export async function rateCardReply(tenant: TenantContext, language: LanguagePreference): Promise<string | null> {
+  let page;
+  try {
+    page = await bookingPage(tenant);
+  } catch {
+    return null;
+  }
+  const t = RATE_CARD[language];
+  const oneUnit = page.units.length === 1;
+  const header = oneUnit ? [t.slot, t.weekday, t.weekend, t.holiday] : [t.room, t.slot, t.weekday, t.weekend, t.holiday];
+  const rows = page.units.flatMap((u) =>
+    u.rates.map((r) => {
+      const cells = [r.slot, money(r.weekdayPrice, page.currency), money(r.weekendPrice, page.currency), money(r.holidayPrice ?? r.weekendPrice, page.currency)];
+      return oneUnit ? cells : [u.name, ...cells];
+    }),
+  );
+  if (rows.length === 0) return null;
+  return `${t.intro}\n\n${pipeTable(header, rows)}\n\n${t.outro}`;
+}
+
+/** The rate card's words, in the reply language (D-043). The English outro is D-081's sentence, with the card above it. */
+const RATE_CARD: Record<LanguagePreference, { intro: string; outro: string; room: string; slot: string; weekday: string; weekend: string; holiday: string }> = {
+  english: {
+    intro: 'Here are our rates:',
+    outro:
+      'The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. ' +
+      'Tell me your preferred date and I can give you the exact rate.',
+    room: 'Room',
+    slot: 'Slot',
+    weekday: 'Weekday',
+    weekend: 'Weekend',
+    holiday: 'Holiday',
+  },
+  taglish: {
+    intro: 'Ito po ang rates namin:',
+    outro:
+      'Depende po ang rate kung weekday, weekend, o holiday ang date niyo, at pwedeng may surcharge sa holiday. ' +
+      'Pakisabi po ang preferred date niyo para maibigay ko ang exact rate.',
+    room: 'Room',
+    slot: 'Slot',
+    weekday: 'Weekday',
+    weekend: 'Weekend',
+    holiday: 'Holiday',
+  },
+  tagalog: {
+    intro: 'Narito po ang aming mga presyo:',
+    outro:
+      'Nakadepende po ang presyo kung karaniwang araw, Sabado at Linggo, o pista opisyal ang inyong petsa, at maaaring may dagdag-bayad sa pista opisyal. ' +
+      'Pakisabi po ang nais ninyong petsa upang maibigay ko ang eksaktong presyo.',
+    room: 'Kwarto',
+    slot: 'Slot',
+    weekday: 'Karaniwang araw',
+    weekend: 'Sabado at Linggo',
+    holiday: 'Pista opisyal',
+  },
+};

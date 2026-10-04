@@ -6817,3 +6817,52 @@ characters in a cell (`reply-text.test.ts`).
 
 **Owed to Phase 4:** the browser look of that reply. The static markup is
 tested; the pixels are not.
+
+## Tables, Phase 2: the code-written tables · done 2026-10-04, on `feat/tables`
+
+**What:** the two replies code writes for a list are now tables.
+`packages/rag/src/tables.ts` (`pipeTable()`, the ONE writer; a `|` or a
+newline in a cell becomes a space). `roomListReply()` (D-087) writes
+`| Room | Guests |` (Tagalog `| Kwarto | Bisita |`). New
+`rateCardReply()` in `tools.ts` (plan § 7 q1, amending D-081): a price
+asked with no date, that called no tool and holds no figure, gets every
+priced unit's weekday, weekend and holiday rate per slot from
+`bookingPage()`, the public page's own read on the chat token, with the
+"a holiday can carry a surcharge, tell me a date" sentence under it;
+`PRICE_NEEDS_DATE` is the fallback when no card can be built. A tenant
+with one unit gets no Room column. Both `answerQuestion` paths pass the
+card into `explainPrice()`; the stream already held such turns.
+
+**Why it matters:** "room rates please" now shows the rates, as a visitor
+expects of a price list, and not one figure of it comes from the model:
+the rows are `unit_rates`, formatted by `money()`. The holiday column is
+exactly what `unit_price()` charges on a calendar day (`holiday_price`,
+or the weekend price when none is set), and the surcharge, which is per
+date, is named in words, never guessed.
+
+**Observed:**
+- pipeline tests 351/351 (2 writer, 3 rate card, the room list rewritten);
+  typecheck clean; northwind's prompt byte-identical (no prompt text
+  changed: the card is read by `answer.ts`, never by `buildPrompt()`);
+- the six Phase 2 probes (`probes-tables-phase2.txt`): "What rooms are
+  available?" at harbor, the D-087 question the model answers "Which
+  date?", is the 4-row table, in English and in Taglish; "Room rates
+  please" is the card at villa (3 slots, no Room column) and harbor (4
+  rooms × Night); "Magkano po ang rates niyo?" is the Taglish card; the
+  security deposit keeps its ₱2,000 (D-081's gate unchanged). Harbor's
+  card lists Night only: its new Day Tour slot has no `unit_rates` row, so
+  the page does not offer it either (the same filter);
+- battery **55/61** (`original 8/10 · tool 9/9 · lang 8/10 · date 11/11 ·
+  rooms 12/13 · book 4/5 · price 3/3`): Phase 0's four (`antecedent`,
+  `lang-followup`, `rt-leak-2`, `book-for-me-harbor`, the last two 18
+  October's flips) plus `leak-2`, whose leak half held and whose villa
+  CONTROL refused the Wi-Fi question (trap 24's recorded flip), and
+  `lang-tagalog-2`; both 1 of 2 on repeat. Neither reaches this phase's
+  code: northwind has no tools, and the pets question has no price word.
+  The rate card FIRED on two turns, both setup turns of `lang-pin-window`,
+  which passed, the same two turns D-081 recorded.
+
+**Cost, recorded:** D-081's cost grows. "How much is parking?" at villa
+used to get the rates sentence; it now gets the rate table. The gate is
+the same (a price word, no date, no figure in the reply), so the fix, if
+one is wanted, is a narrower gate, not a different card.

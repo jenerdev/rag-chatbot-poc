@@ -47,6 +47,7 @@
 // so the tool is called once for the whole span (planDates).
 
 import type { LanguagePreference } from './language.js';
+import { pipeTable } from './tables.js';
 
 /** One date expression found in a message, and what it resolves to. */
 export interface DateMention {
@@ -569,21 +570,26 @@ export const WHOLE_PROPERTY_ROOM_LINES = [
  * the model, given ROOM_LIST_LINES, still answered "Which date do you mean?"
  * (harbor and alteza, "What rooms are available?", 4 of 4) instead of naming
  * the rooms. Names and maximum guests from the database; no price.
+ *
+ * A TABLE since plan/tables.md Phase 2 (D-091): the same two facts per
+ * room, in the one block shape the chat draws (tables.ts). The sentence
+ * before and after is unchanged.
  */
 export function roomListReply(rooms: { name: string; capacity: number | null }[], language: LanguagePreference): string {
   const holds = (c: number | null) => {
     if (c === null) return '';
-    if (language === 'tagalog') return ` (hanggang ${c} bisita)`;
-    return ` (up to ${c} guest${c === 1 ? '' : 's'})`;
+    if (language === 'tagalog') return `hanggang ${c} bisita`;
+    return `up to ${c} guest${c === 1 ? '' : 's'}`;
   };
-  const lines = rooms.map((r) => `- ${r.name}${holds(r.capacity)}`).join('\n');
+  const header = language === 'tagalog' ? ['Kwarto', 'Bisita'] : ['Room', 'Guests'];
+  const table = pipeTable(header, rooms.map((r) => [r.name, holds(r.capacity)]));
   if (language === 'taglish') {
-    return `Ito po ang mga kwarto namin:\n${lines}\n\nPakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.`;
+    return `Ito po ang mga kwarto namin:\n\n${table}\n\nPakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.`;
   }
   if (language === 'tagalog') {
-    return `Narito po ang aming mga kuwarto:\n${lines}\n\nPakisabi po ang petsa upang masuri ko kung alin ang bakante at ang presyo.`;
+    return `Narito po ang aming mga kuwarto:\n\n${table}\n\nPakisabi po ang petsa upang masuri ko kung alin ang bakante at ang presyo.`;
   }
-  return `Here are our rooms:\n${lines}\n\nTell me your dates and I can check which rooms are free and their rates.`;
+  return `Here are our rooms:\n\n${table}\n\nTell me your dates and I can check which rooms are free and their rates.`;
 }
 
 export const PRICE_NEEDS_DATE: Record<LanguagePreference, string> = {
