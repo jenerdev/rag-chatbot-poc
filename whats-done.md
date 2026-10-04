@@ -7516,3 +7516,19 @@ staff member of harbor posting a booking on the confirmed 2026-10-20
 Garden Room night got `409 {"error":"taken on 2026-10-20: Garden Room is
 already confirmed for that slot"}`, and the list for that day showed the
 two confirmed rows with `clash=false` and no new row.
+
+## Staff clash, Phase 3: the suites · done 2026-10-05, on `feat/staff-clash`
+
+**Observed:** rooms **48/48**; bookings isolation **31/31** on tokens and
+**31/31** on filters alone; pipeline isolation **23/23** and **21/21**;
+verify **117/118** (the roles check open since tenant management); tests
+**59** (web), **102** (bookings), **359** (pipeline); the three baselines
+byte-identical. The battery once: **55/61**, `original 8/10 · tool 9/9 ·
+lang 10/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`:
+`antecedent`, `leak-2`, `rt-leak-2`, `book-for-me-harbor` are the known
+set, `lang-tagalog-2` and `lang-followup` passed this run, and
+`rt-price`/`rt-standard` are the user's two confirmed bookings on
+2026-10-20, the battery's free weekday until today moves past it
+(dashboard Phase 5). The trigger did not touch the battery: its fixtures
+seed `confirmed`, which the trigger ignores, and `tool 9/9` holds. The
+walk is the user's, on harbor's Bookings screen.
