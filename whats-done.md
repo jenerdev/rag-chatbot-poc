@@ -6781,3 +6781,39 @@ before the first edit.
 is wrong, overwrite it" or as "code changed". Reading the diff showed one
 slot, and `listSlots()` is where it comes from; the file is replaced with
 its reason written down.
+
+## Tables, Phase 1: the renderer · done 2026-10-04, on `feat/tables`
+
+**What:** the chat draws a pipe table in a reply as a `<table>`.
+`apps/web/lib/tables.ts` (`parseSegments()`, pure, no dependency) splits a
+reply into text and table segments; `components/reply-text.tsx` hands
+every segment to React as children; `.reply-table` CSS beside `.bubble`;
+the assistant bubble in `chat-screen.tsx` renders `<ReplyText>`. No prompt
+text changed.
+
+**Why it matters:** plan/tables.md Rule 1. The chat has relied on "never
+markup, always text" since the POC. A table had to arrive without giving
+that up, so the parser knows ONE block shape and produces strings, and the
+component puts them in `<td>` as text. A `<script>` in a cell is six
+characters in a cell (`reply-text.test.ts`).
+
+**Observed:**
+- web tests 46/46 (15 parser, 4 component, the 27 before); typecheck clean;
+  `grep dangerouslySetInnerHTML apps/web` prints nothing. vitest needed
+  two config lines: the `@/` alias and `jsx: 'automatic'`;
+- a reply with no table is ONE text segment byte for byte (tested), and
+  the six Phase 0 probe replies hold 0 `|` characters, so they render as
+  before;
+- the parser is strict on the separator and tolerant below it: a block
+  without `|---|` is text, a separator with no header is text, a short row
+  is padded, a long one cut, a row still streaming (no closing `|`) is text
+  under the table, a `|` in prose does nothing;
+- end to end (`plan/tables-phase1-doc.mjs`, `doc-tables-phase1.txt`): a
+  three-row table document ingested into northwind and asked for word for
+  word came back as the pipe table, 3/3 rows and the separator line; the
+  document deleted after (`true`), northwind back to its one document.
+  The first run failed to delete it (the script read `documentId` where
+  `IngestResult` says `id`), was cleaned up by title and re-run.
+
+**Owed to Phase 4:** the browser look of that reply. The static markup is
+tested; the pixels are not.

@@ -14,13 +14,17 @@
 //      `textContent, NEVER innerHTML`, written out at every call site. React
 //      escapes children by default, so the rule now costs nothing — and comes
 //      back the moment anyone reaches for dangerouslySetInnerHTML.
-//   2. No markdown rendering in the MVP. Newlines are handled by CSS
-//      (white-space: pre-wrap), not by parsing.
+//   2. No markdown rendering, with ONE exception since plan/tables.md (D-091):
+//      a pipe table in the reply is drawn as a <table> by <ReplyText>, from
+//      lib/tables.ts, a hand-written parser that knows that one block shape
+//      and hands React strings, never markup. Everything else is still text:
+//      newlines are handled by CSS (white-space: pre-wrap), not by parsing.
 
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { Source, ToolCallRecord } from '@rag/pipeline';
 import { SourcesPanel } from '@/components/sources-panel';
+import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { BrandHeader } from '@/components/brand-header';
 import { TenantNav } from '@/components/tenant-nav';
@@ -374,7 +378,13 @@ export function ChatScreen({
               return (
                 <div className="turn assistant" key={turn.id}>
                   <div className="speaker">{assistantName}</div>
-                  {turn.text === '' && !turn.error ? <Thinking /> : <div className="bubble">{turn.text}</div>}
+                  {turn.text === '' && !turn.error ? (
+                    <Thinking />
+                  ) : (
+                    <div className="bubble">
+                      <ReplyText text={turn.text} />
+                    </div>
+                  )}
                   <SourcesPanel
                     sources={turn.sources}
                     toolCalls={turn.toolCalls}

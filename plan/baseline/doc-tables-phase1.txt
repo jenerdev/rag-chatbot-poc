@@ -1,0 +1,10 @@
+ingested #519
+refused: false · sources: 2
+| Room | Seats | Rate per hour |
+|---|---|---|
+| Kestrel | 4 | ₱500.00 |
+| Osprey | 8 | ₱900.00 |
+| Harrier | 16 | ₱1,600.00 |
+
+pipe rows named: 3/3 · separator line: true
+deleted #519: true
