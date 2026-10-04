@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff requests (planned 2026-10-05, in progress on `feat/staff-requests`):**
+**Staff requests (2026-10-05, COMPLETE on `feat/staff-requests`, walked by the user; merge owed):**
 [`plan/staff-requests.md`](./plan/staff-requests.md). Every booking gets
 a group and a reference from ONE SQL function (`booking_reference()`,
 called by `request_booking()` and by a fill trigger; a counted backfill),
@@ -92,7 +92,7 @@ with the same buttons. Four § 7 questions with recommendations.
 - [x] The backfill defect, repaired (2026-10-05): the HTTP smoke found the first backfill gave harbor's 2-room staff booking (#926, #927) TWO references (`HAR-9KCBC9`, `HAR-KBNJYU`), a volatile function in an UPDATE's SET running once per ROW; the file now computes the reference into a variable first, and step 4b repairs a split group. Re-run by the user: #926 and #927 both `HAR-9KCBC9`; 26 rows in 24 groups, 0 split, 0 missing either column
 - [x] Phase 3, the suites (2026-10-05): rooms 50/50, bookings isolation 31/31 both ways, pipeline isolation 23 (RLS) / 21 (filters), verify 117/118 (the known roles check), tests 59/102/359, the three baselines identical, battery **53/61** (`original 8/10 · tool 9/9 · lang 8/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`): the known six plus `rt-price`/`rt-standard`, still the user's bookings on 2026-10-20
 - [x] Phase 3, the walk — by the user, 2026-10-05 ("done testing"): a staff booking in Requests with a reference and "by staff", confirmed there; a 2-room staff booking one row with one reference; a staff stay declined with a note
-- [ ] Phase 4 — the record (D-100)
+- [x] Phase 4 — the record (2026-10-05): D-100, CLAUDE.md (header, 21 sql files, rooms 50, rule 8's twelfth definer function), flow.md § 5's requests rows, the plan marked done
 
 **Staff clash (2026-10-05, COMPLETE; walked by the user; merged into `master` at `ccb0eba`, a fast-forward that brought the dashboard with it):**
 [`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
@@ -1206,6 +1206,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — staff requests, Phases 0–4, on `feat/staff-requests`
+- **Did:** the plan; `booking_reference()`, the fill trigger,
+  `request_booking()` calling it, the counted backfill (run twice: the
+  first rolled back on my caller check, the repaired version fixed the
+  one split group); staff stays in Requests; every suite green, rooms 50,
+  battery 53/61 the known set; the user's walk; D-100.
+- **Next:** merge `feat/staff-requests` into master.
 
 ### 2026-10-05 — staff clash, Phases 0–4, on `feat/staff-clash`
 - **Did:** the plan; the trigger (`schema-taken-span.sql`, run by the

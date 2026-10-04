@@ -3207,3 +3207,58 @@ the known set; over HTTP a staff POST on harbor's confirmed night
 `409 {"error":"taken on 2026-10-20: Garden Room is already confirmed for
 that slot"}`. The walk, by the user: refused in words; two pendings, one
 confirmed, the other warned and cancelled.
+
+## D-100 · Every stay is a group with one reference, whoever made it; the Requests section decides every pending stay · **Added 2026-10-05 (plan/staff-requests.md)**
+
+**Decision:** `booking_reference(p_tenant_id)` (`sql/schema-staff-requests.sql`,
+the 21st file) is the ONE place a reference's shape is written: three
+letters of the slug, six from a 30-letter alphabet, retried while a row
+of the tenant has the result; security definer (the twelfth, D-042's
+shape), because `tenants` has no policy for a token, and it checks its
+caller first: the token's own tenant, `service_role`, or a direct session
+(`session_user = 'postgres'`, where the backfill runs). `request_booking()`
+calls it instead of its inline loop (the promos file's definition is
+guarded on this file's marker, trap 20). A BEFORE INSERT trigger,
+`bookings_aa_fill_group_and_reference`, gives a row its own `group_id`
+when the insert names none and the group's `reference` when a row of the
+same statement already set one, else a new one, so a several-rooms staff
+booking gets ONE reference; a counted backfill gave every older row both.
+`listRequests()` and `decide()` read every source: the Requests section
+lists every pending stay, web or staff, labelled "from the booking page"
+or "by staff", with the same Confirm and Decline (one group, one
+statement, the same 409 and closed-date words); `source` is on the
+request, and `groupSize` on the list row, so "group booking" means
+several rows, not "has a group". The staff list keeps its own Confirm
+(q4). D-070, D-095 and D-099 stand untouched: a pending row holds
+nothing, is born pending, cannot be born on a confirmed night, and
+Confirm takes the span.
+
+**Why:** the user: "why staff created booking doesnt have a reference
+number?" and "why staff created booking dont show up on 'Requests'
+section on top". A reference existed only where `request_booking()` made
+one, and the Requests section listed only what had a group. One shape
+for a stay removes both special cases, and the reference lives in one
+function the way every price lives in `unit_quote()`.
+
+**Learned:** a volatile function in an UPDATE's SET is evaluated once per
+ROW. The first backfill wrote `set reference = booking_reference(…)` and
+harbor's one 2-room staff booking got two references, found by the Phase
+2 HTTP smoke (the trigger was right; rooms 4f proved one reference per
+2-room insert). The file now calls the function into a variable first,
+and a repair step keeps the lowest id's reference on a split group. The
+first run of the file rolled back whole because the function refused the
+SQL editor's own session; a definer's `current_user` is its owner, so the
+LOGIN role, `session_user`, is what tells a direct session from
+PostgREST's `authenticator`.
+
+**Measured (Phases 0–3, one day, on `feat/staff-requests`):** backfill
+before villa 5/5, harbor 3 without a group and 5 without a reference,
+alteza 8/8; after **0** everywhere, 26 rows in 24 groups, 0 split. rooms
+50/50 (4f: `ROO-BSWX4Z` on both rows of a 2-room booking, three singles
+each with a group and their own reference; 4g: a staff stay listed with
+`source: 'staff'` and `clash: true`, declined with its note, a fresh one
+confirmed with its note); bookings isolation 31/31 both ways (28 counts
+B's web requests by source, A's list 0); pipeline isolation 23/21; verify
+117/118; tests 59/102/359; the three baselines byte-identical; battery
+53/61, the known set; over HTTP harbor's requests route listed five
+stays, staff and web, each with a reference. The walk, by the user.

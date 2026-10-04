@@ -7650,3 +7650,14 @@ set (`antecedent`, `leak-2`, `rt-leak-2`, `book-for-me-harbor`,
 names) and `rt-price`/`rt-standard`, the user's two confirmed bookings on
 2026-10-20 (dashboard Phase 5). `tool 9/9`: the fill trigger and the
 reference touched nothing the chatbot reads. The walk is the user's.
+
+## Staff requests, Phase 4: the record · done 2026-10-05, on `feat/staff-requests`
+
+**What:** D-100 in decisions.md (the one reference function, the fill
+trigger, the backfill and both of its lessons, the Requests section for
+every source, what stands from D-070/D-095/D-099, every measured value,
+the user's walk); CLAUDE.md's header paragraph, 21 sql files, rooms 50
+in the layout and the commands, rule 8's twelfth definer function with
+its direct-session admission; flow.md § 5's two requests rows; the plan's
+status line. Nothing in the chat, the prompts or the tools changed in
+this plan, and the three baselines were identical at Phase 0 and Phase 3.

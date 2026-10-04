@@ -174,6 +174,18 @@
 > `clash`, and the Bookings screen warns and disables Confirm on such a
 > row; the server stays the guard (trap 21). The customer door was
 > SQL-guarded already (`request_booking()`'s own check).
+>
+> **Every stay is a group with one reference** since 2026-10-05 (D-100,
+> [`plan/staff-requests.md`](./plan/staff-requests.md), Phases 0–4, all
+> done, walk included). `booking_reference()` (`sql/schema-staff-requests.sql`,
+> the 21st file; the twelfth definer function) is the ONE place the shape
+> is written; `request_booking()` calls it, and a BEFORE INSERT trigger
+> fills `group_id` and `reference` for any insert that brings none, one
+> reference per statement's group. Every older row was backfilled. The
+> Requests section lists every pending stay, web or staff ("by staff"),
+> decided with the same buttons; the list row shows `ref …` and says
+> "group booking" only for several rows (`groupSize`). A volatile function
+> in an UPDATE's SET runs once per ROW: the backfill learned it.
 
 ## What this is
 
@@ -250,7 +262,7 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (20 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (21 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
@@ -269,7 +281,7 @@ packages/
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
     src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409; the constraint's own 23P01 keeps the sentence
-    tools/rooms.mjs        48 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos and the taken-span trigger (4d, 4e, 26b)
+    tools/rooms.mjs        50 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b) and references on staff stays (4f, 4g)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -312,7 +324,7 @@ pnpm --filter @rag/pipeline isolation -- --filters-only   # 21 of them, code fil
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
 pnpm --filter @rag/bookings isolation   # 31 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
-pnpm --filter @rag/bookings rooms       # 48 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger; no API key
+pnpm --filter @rag/bookings rooms       # 50 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
@@ -461,13 +473,15 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    in the same file, mints `{ sub, app_super }` with NO tenant, still
    `authenticated`, still five minutes, still no role parameter; with no
    tenant claim every tenant policy is false for it, and `app_is_super()`
-   demands a `platform_admins` row. Eleven functions are `security definer`
+   demands a `platform_admins` row. Twelve functions are `security definer`
    (`tenant_public`, `check_availability`, `check_room_availability`,
    `request_booking`, `app_role`, `tenant_applications_validate`,
    `tenant_applications_no_delete_live`, `memberships_keep_an_owner`,
-   `member_emails`, `user_id_by_email`, `platform_dashboard`; D-042 as
-   amended by D-054, D-071, D-076 and D-098), each with `search_path = ''`
-   and each checking its caller itself. `tenant_dashboard()` is NOT one: it
+   `member_emails`, `user_id_by_email`, `platform_dashboard`,
+   `booking_reference`; D-042 as amended by D-054, D-071, D-076, D-098
+   and D-100), each with `search_path = ''` and each checking its caller
+   itself (`booking_reference` also admits a direct session, `session_user
+   = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
    is `security invoker`, so it reads under the token's own RLS, and it
    refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a
    stranger, and it can write `pending` rows only.

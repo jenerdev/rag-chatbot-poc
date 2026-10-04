@@ -329,8 +329,8 @@ return 404, with no redirect.
 | `GET` | `/t/<slug>/book` | the customer booking page (404 without the application or a priced unit) | `app/t/[tenant]/book/page.tsx` → `BookingPageScreen` | public |
 | `POST` | `/api/t/<slug>/book/quote` | a stay's price night by night, and whether it is still open | `quoteRequest` | open |
 | `POST` | `/api/t/<slug>/book/request` | send a request: `pending` rows via `request_booking()`; honeypot + per-IP window | `requestBooking` | open |
-| `GET` | `/api/t/<slug>/bookings/requests` | customers' requests, one per group, with `clash` | `listRequests` | admin |
-| `PATCH` | `/api/t/<slug>/bookings/requests/:groupId` | `{ action: confirm \| decline }`, the whole group; 409 on a clash | `confirmRequest` / `declineRequest` | admin |
+| `GET` | `/api/t/<slug>/bookings/requests` | every stay waiting for a decision, web or staff (D-100), one per group with its reference, `source` and `clash` | `listRequests` | admin |
+| `PATCH` | `/api/t/<slug>/bookings/requests/:groupId` | `{ action: confirm \| decline }`, the whole group, any source; 409 on a clash | `confirmRequest` / `declineRequest` | admin |
 | `GET` / `PUT` | `/api/t/<slug>/holidays` | the holiday calendar / add or change a day | `listCalendar` / `setCalendarDay` | admin |
 | `DELETE` | `/api/t/<slug>/holidays/:day` | remove a day (404 if not there) | `removeCalendarDay` | admin |
 | `POST` | `/api/t/<slug>/holidays/copy` | copy chosen days to another year | `copyCalendarDays` | admin |

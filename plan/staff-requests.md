@@ -12,8 +12,10 @@
 > function; the Requests section lists every pending stay, web or staff,
 > and decides either with the same button.
 >
-> Written 2026-10-05, against `8c521b2` on `master`. **Status: in progress,
-> Phase 0 started 2026-10-05** on `feat/staff-requests`. § 7's four
+> Written 2026-10-05, against `8c521b2` on `master`. **Status: Phases 0–4
+> done 2026-10-05, walk included,** on `feat/staff-requests`; the record is
+> D-100, which also holds the backfill lesson (a volatile function in an
+> UPDATE's SET runs once per row). § 7's four
 > questions were answered 2026-10-05: every recommendation taken, by the
 > user's instruction.
 >
