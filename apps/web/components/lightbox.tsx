@@ -38,6 +38,27 @@ export function useLightbox() {
   return { open, show, close, step };
 }
 
+/**
+ * The three icons as inline SVG strokes, not text glyphs: a "‹" or "×"
+ * character sits on a text baseline and never centres in a round button
+ * the same way across fonts; a 24px path in a flex-centred button does.
+ */
+function Chevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d={dir === 'left' ? 'M15 5 8 12l7 7' : 'm9 5 7 7-7 7'} />
+    </svg>
+  );
+}
+
+function Cross() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
 export function Lightbox({ open, close, step }: { open: LightboxState | null; close: () => void; step: (by: number) => void }) {
   if (!open) return null;
   return (
@@ -48,10 +69,10 @@ export function Lightbox({ open, close, step }: { open: LightboxState | null; cl
         {open.photos.length > 1 && (
           <>
             <button type="button" className="lightbox-nav prev" onClick={() => step(-1)} aria-label="Previous photo">
-              ‹
+              <Chevron dir="left" />
             </button>
             <button type="button" className="lightbox-nav next" onClick={() => step(1)} aria-label="Next photo">
-              ›
+              <Chevron dir="right" />
             </button>
             <div className="lightbox-count">
               {open.index + 1} / {open.photos.length}
@@ -59,7 +80,7 @@ export function Lightbox({ open, close, step }: { open: LightboxState | null; cl
           </>
         )}
         <button type="button" className="lightbox-close" onClick={close} aria-label="Close">
-          ×
+          <Cross />
         </button>
       </div>
     </div>
