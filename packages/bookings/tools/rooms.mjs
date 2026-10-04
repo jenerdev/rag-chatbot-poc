@@ -227,6 +227,44 @@ try {
       'D-096: the decision note is stored trimmed on the whole group, shown on a cancel, and bounded',
       `confirm "${noteOnBoth}" · cancel ${secondRow?.status} "${secondRow?.decisionNote}" · 501 chars: ${tooLong?.constructor?.name}`,
     );
+
+    // 4d. D-099 (plan/staff-clash.md): a pending booking cannot be BORN on a
+    //     span already confirmed for that unit. The day after weekLater, used
+    //     nowhere else. Two pendings may share a night (Rule 3); once one is
+    //     confirmed, a third pending is refused by the trigger with words that
+    //     name the date and the unit (23P01, the constraint's code, Rule 2);
+    //     a several-rooms insert with one clashing room writes no row (§ 2.3);
+    //     a CONFIRMED insert on that night is still the constraint's refusal.
+    //     The words are asserted on a RAW insert on the staff token, wall 2
+    //     alone; the package's own sentence is Phase 2's.
+    {
+      const d8 = (() => {
+        const d = new Date(`${weekLater}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + 1);
+        return d.toISOString().slice(0, 10);
+      })();
+      const p1 = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d8, guestName: 'Pending C' });
+      const p2 = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d8, guestName: 'Pending D' });
+      const twoPending = p1.bookings[0].status === 'pending' && p2.bookings[0].status === 'pending';
+      const confirmedP1 = await confirmBooking(probe, p1.bookings[0].id);
+      const raw = await probe.db
+        .from('bookings')
+        .insert({ tenant_id: probe.id, unit_id: garden.id, slot_id: night.id, booked_date: d8, status: 'pending', guest_name: 'Pending E', guest_phone: '0', guest_count: 1, source: 'staff' })
+        .select('id');
+      const words = /^taken on \d{4}-\d{2}-\d{2}: Garden Room is already confirmed for that slot$/.test(raw.error?.message ?? '');
+      const viaPackage = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d8, guestName: 'Pending F' }));
+      const family8Before = (await listBookings(probe, { from: d8, to: d8 })).filter((b) => b.unit === 'Family Room').length;
+      const group8 = await thrown(() => createBookings(probe, { rooms: [{ unitId: family.id, guestCount: 1 }, { unitId: garden.id, guestCount: 1 }], slotId: night.id, date: d8, guestName: 'Group X' }));
+      const family8After = (await listBookings(probe, { from: d8, to: d8 })).filter((b) => b.unit === 'Family Room').length;
+      const confirmedInsert = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d8, guestName: 'Pending G', status: 'confirmed' }));
+      const p2Still = (await listBookings(probe, { from: d8, to: d8 })).find((b) => b.id === p2.bookings[0].id)?.status;
+      check(
+        twoPending && confirmedP1 === true && raw.error?.code === '23P01' && words && viaPackage instanceof BookingConflictError
+          && group8 instanceof BookingConflictError && family8After === family8Before && confirmedInsert instanceof BookingConflictError && p2Still === 'pending',
+        'D-099: two pendings may share a night; once one is confirmed, a pending insert is refused in words (23P01), a group with one clashing room writes no row, a confirmed insert is still the constraint\'s, the other pending stays',
+        `pending ${twoPending} · confirm ${confirmedP1} · raw ${raw.error?.code} "${raw.error?.message}" · package ${viaPackage?.constructor?.name} · group ${group8?.constructor?.name}, Family rows ${family8Before} → ${family8After} · confirmed ${confirmedInsert?.constructor?.name} · P2 ${p2Still}`,
+      );
+    }
   }
 
   // 5. The same room again is a 409. Then a group that clashes on ONE room:
@@ -686,6 +724,29 @@ try {
           && !quoteAfter.available && late instanceof BookingConflictError && after === before,
         'confirm: whole group; a clashing confirm is 409 and changes nothing; decline; the nights are gone',
         `confirm ${confirmed}/${again} · clash ${clashing.clash} · ${described(refusedConfirm)} · then ${stillPending} · decline ${declined} → ${afterDecline} · quote available ${quoteAfter.available} · late ${described(late)} · rows ${before} → ${after}`,
+      );
+    }
+
+    // 26b. D-099, the customer's door, wall 2 ALONE: request_booking() called
+    //      directly on the chat token for the nights confirmed in 26 (the
+    //      package refuses up front in 26; this skips that). The function's
+    //      OWN availability check answers first, 23P01 "That date is no longer
+    //      available", before any insert the trigger would see; either way the
+    //      door is refused in SQL and no row is written. The first run of this
+    //      check expected the trigger's words and learned the function's come
+    //      first (Phase 1).
+    {
+      const before = (await listBookings(probe, { from: THU, to: FRI })).length;
+      const direct = await chat.db.rpc('request_booking', {
+        p_tenant_id: probe.id, p_slot_id: night.id, p_unit_ids: [hall.id], p_guests: [32], p_check_in: THU, p_nights: 2,
+        p_name: 'Rooms Probe', p_phone: '09170009999', p_email: 'rooms-probe-9999@example.com', p_notes: null, p_promo_code: null,
+      });
+      const after = (await listBookings(probe, { from: THU, to: FRI })).length;
+      const refusedInSql = direct.error?.code === '23P01' && /no longer available|^taken on \d{4}-\d{2}-\d{2}: Hall is already confirmed/.test(direct.error?.message ?? '');
+      check(
+        refusedInSql && after === before,
+        'D-099: request_booking() on a confirmed night is refused in SQL (its own check first, the trigger behind it): 23P01, nothing saved',
+        `${direct.error?.code} "${direct.error?.message}" · rows ${before} → ${after}`,
       );
     }
 

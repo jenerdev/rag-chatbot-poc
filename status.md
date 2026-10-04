@@ -79,15 +79,15 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff clash (planned 2026-10-05, not started):**
+**Staff clash (planned 2026-10-05, in progress on `feat/staff-clash`, branched from `feat/dashboard`'s head; merges after the dashboard):**
 [`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
 be born on a night already confirmed for that unit (a trigger, `23P01`,
 words, every door), and the staff list carries `clash` with the Requests
 section's warning and disabled Confirm. Amends D-095's cost line. Four
 § 7 questions with recommendations; recommended after the dashboard merge.
-- [ ] § 7 answered
-- [ ] Phase 0 — baseline
-- [ ] Phase 1 — SQL (`schema-taken-span.sql`, the 20th file; rooms +5)
+- [x] § 7 answered (2026-10-05): every recommendation taken; q3's merge is the user's, so the branch starts from the dashboard's head
+- [x] Phase 0 — baseline (2026-10-05, on `5077028`): rooms 45/45, bookings isolation 31/31 both ways, verify 117/118 (the known roles check), tests 59/99/359, the three baselines identical; no battery (no prompt, tool or availability change; Phase 3 runs it once)
+- [x] Phase 1 — SQL (2026-10-05): `schema-taken-span.sql` (the 20th file) run by the user; rooms **47/47** (4d: two pendings share a night, then a pending insert on the confirmed one is `23P01` "taken on 2026-11-24: Garden Room is already confirmed for that slot" on a raw staff insert and a `BookingConflictError` through the package, a group with one clashing room writes no row, a confirmed insert is still the constraint's, the other pending stays; 26b: `request_booking()` on a confirmed night is refused by its OWN check first, "That date is no longer available", so the customer door was already SQL-guarded and the trigger stands behind it)
 - [ ] Phase 2 — the package, the route, the screen
 - [ ] Phase 3 — the walls and the walk
 - [ ] Phase 4 — the record (D-099)

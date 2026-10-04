@@ -15,8 +15,12 @@
 > trigger, or through the race it leaves, with the same warning and the
 > same disabled Confirm the Requests section has.
 >
-> Written 2026-10-05, against `c365308` on `feat/dashboard`. **Status:
-> planned, not started.** § 7 has four questions with recommendations.
+> Written 2026-10-05, against `c365308` on `feat/dashboard`. **Status: in
+> progress, Phase 0 started 2026-10-05** on `feat/staff-clash`. § 7's four
+> questions were answered 2026-10-05: every recommendation taken, by the
+> user's instruction, with one deviation on q3: the dashboard merge is
+> the user's to do (its walk is owed), so this branch starts from
+> `feat/dashboard`'s head (`5077028`) and merges after it.
 >
 > Read [§ 0](#0-the-four-rules) first.
 
@@ -61,6 +65,13 @@ message: the trigger's words name the date and the unit, and
 `createBookings()` passes them through instead of its generic sentence.
 `request_booking()`'s caller, `requestBooking()`, maps the same code the
 same way; the booking page shows the words.
+
+**Learned in Phase 1:** the customer's door was already refused in SQL.
+`request_booking()` checks the confirmed rows itself and raises `23P01`
+"That date is no longer available" before any insert, so the trigger
+stands behind that check, never in front of it. The staff door is the
+one that had no SQL check; the trigger is its wall 2. rooms 26b asserts
+the customer door is refused in SQL by either message.
 
 ### Rule 3 — A pending row still holds nothing
 

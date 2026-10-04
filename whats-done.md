@@ -7431,3 +7431,60 @@ invoker one; flow.md § 5 gains the three routes and "every role the
 dashboard"; the plan's status line says Phases 0–6 done and the walk
 owed. Nothing in the chat, the prompts or the tools changed in this
 plan, and the three baselines were identical at Phase 0 and Phase 5.
+
+## Staff clash, Phase 0: baseline · done 2026-10-05, on `feat/staff-clash` (from `feat/dashboard`'s head, `5077028`)
+
+**What:** the plan (`plan/staff-clash.md`), its four questions answered
+with every recommendation taken; q3's "merge the dashboard first" is the
+user's merge to make, so the branch starts from the dashboard's head and
+merges after it. Every suite on the branch's first commit, and the trigger
+file (`sql/schema-taken-span.sql`, the 20th) written so Phase 1 can start
+with the user's run.
+
+**Observed:** rooms **45/45**; bookings isolation **31/31** on tokens and
+**31/31** on filters alone; verify **117/118** (the roles check open since
+tenant management); tests **59** (web), **99** (bookings), **359**
+(pipeline); `prompt-snapshot` and both tool definitions byte-identical to
+their baselines. The battery was not run: nothing in this plan touches a
+prompt, a tool or an availability read, and Phase 3 runs it once as the
+proof. After the user ran the file, a service-role pending insert on
+harbor's confirmed 2026-10-20 Garden Room night was refused with
+`23P01: taken on 2026-10-20: Garden Room is already confirmed for that
+slot`, and rooms was still 45/45 under the trigger: no existing check
+inserts a pending row on a confirmed night, because check 26's "late"
+request is already refused up front by the package (wall 1), which the
+trigger now backs (wall 2).
+
+## Staff clash, Phase 1: SQL · done 2026-10-05, on `feat/staff-clash`
+
+**What:** `sql/schema-taken-span.sql`, the 20th file, run by the user: one
+BEFORE INSERT trigger, `bookings_pending_not_taken`, that refuses a
+`pending` row whose unit and span overlap a `confirmed` row of the same
+tenant, with `23P01` (the exclusion constraint's own code, so every map
+holds) and words naming the date and the unit. Named to fire after
+`bookings_compute_during` (name order), `search_path = ''`, every name
+qualified; a null span is refused rather than passed vacuously. Two rooms
+checks.
+
+**Observed:** rooms **47/47**. Check 4d, on the probe tenant: two pending
+bookings on the same Garden Room night both created (Rule 3), the first
+confirmed; then a RAW pending insert on the staff token refused `23P01
+"taken on 2026-11-24: Garden Room is already confirmed for that slot"`
+(wall 2 alone, the words asserted exactly); the same through
+`createBookings()` a `BookingConflictError`; a Family + Garden group a
+`BookingConflictError` with Family's rows `0 → 0` (one statement, § 2.3);
+a CONFIRMED insert on that night still the constraint's
+`BookingConflictError`; the second pending still `pending` (Phase 2's
+`clash` row). Check 26b: `request_booking()` called directly on the chat
+token for the nights confirmed in 26 was refused `23P01 "That date is no
+longer available"` with rows `4 → 4`.
+
+**Learned:** the first run of 26b expected the trigger's words and got
+the function's: `request_booking()` already checks confirmed rows itself
+(schema-customer-booking.sql, "no longer available") BEFORE it inserts,
+so the customer's door was SQL-guarded all along and the trigger stands
+behind that check. The staff door had no SQL check; the trigger is its
+wall 2. Recorded in the plan under Rule 2. Before the SQL ran, rooms was
+45/45; after it, still 45/45 with no check changed: no existing check
+inserts a pending row on a confirmed night, and the fixtures seed
+`confirmed`, which the trigger ignores (§ 2.4).
