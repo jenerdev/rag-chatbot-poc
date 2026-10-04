@@ -7386,3 +7386,35 @@ screen never divides (the refusal rate and the occupancy percent arrive
 computed) and never adds (the window's counts are separate keys). The
 stray `components_placeholder_do_not_use.txt` a mis-aimed write left at
 the repo root was deleted before anything was staged.
+
+## Dashboard, Phase 5: the suites · done 2026-10-05, on `feat/dashboard`
+
+**Observed:** verify **117/118** (the one failure is the pre-existing
+roles check on villa's staff member, open in status.md since tenant
+management); rooms **45/45**; bookings isolation **31/31** on tokens and
+**31/31** on filters alone; pipeline isolation **23/23** on tokens and
+**21/21** on filters alone (22 is RLS-only, like 21); `prompt-snapshot`
+byte-identical to `northwind-prompt-post-emoji.txt`, villa's definitions
+to `villa-tools-post-villa-prices.txt`, harbor's to
+`harbor-tools-tables-phase0.txt` (`diff --strip-trailing-cr`, nothing
+printed). The battery once: **54/61**, `original 8/10 · tool 9/9 · lang
+9/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`.
+
+**The battery, read:** `antecedent`, `leak-2`, `rt-leak-2`,
+`book-for-me-harbor` and `lang-tagalog-2` are the known set (Phase 0 had
+the same five plus `lang-followup`, which passed this time). `rt-price`
+and `rt-standard` are new and held **3 of 3** each on repeat, so not a
+flip. Their `why:` says `quotes it: false` with the tool's row present
+(Garden Room ₱3,500.00; Family Room ₱6,000.00) and `[query] dates:` shows
+the pre-check ran (`date_from 2026-10-20`), so neither trap 18 nor the
+prompt. The reply says "On 20 October 2026, a weekday, the Garden Room is
+taken" and tables the two open rooms. It is right: harbor holds two
+CONFIRMED staff bookings on 2026-10-20, #926 (Garden Room) and #927
+(Family Room), made by the user on 2026-09-27 during a walk, and the
+battery's "free weekday" is computed from today (`H_WEEKDAY`, now
+2026-10-20). On 2026-10-04 it was a different date. This is trap 24's
+date-driven kind, with the user's data as the cause; nothing in this
+branch touched the prompt, the tools or a query the chat makes, and the
+three baselines say so. Not deleted: they are the user's rows. The
+battery will pass those two cases again when today moves past them, or
+if the user clears those two bookings.

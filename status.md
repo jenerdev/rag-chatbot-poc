@@ -94,7 +94,8 @@ with recommendations. No chatbot change.
 - [x] Phase 2 — `@rag/pipeline` (2026-10-05): `dashboard.ts` (typed shapes, the parser with date normalisation, the clamp, the two calls); tests 359/359; pipeline isolation 22–23 green both ways
 - [x] Phase 3 — routes and permissions (2026-10-05): `dashboard:read` (every member), `/api/t/[tenant]/dashboard?days=`, `/api/platform/dashboard`; web tests 59/59, typecheck; 401/401/404 on the dev server
 - [x] Phase 4 — screens (2026-10-05): `bar-chart.tsx` (inline SVG, the dataviz rules), `dashboard-screen.tsx` + the page (S-11), Dashboard first in the staff nav, the Pulse strip on `/platform`; web tests 59/59, typecheck; `plan/dashboard-phase4-walk.mjs` **14/14** over HTTP (staff sees no money, admin does, harbor has occupancy, villa none, northwind `bookings: null`, `?days` clamped, a harbor cookie refused on villa, three pages 200)
-- [ ] Phase 5 — the walls and the walk
+- [x] Phase 5, the suites (2026-10-05): verify 117/118 (the known roles check), rooms 45/45, bookings isolation 31/31 both ways, pipeline isolation 23 (RLS) / 21 (filters), the three baselines byte-identical, battery **54/61** (`original 8/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`): the known set plus `rt-price` and `rt-standard`, 3 of 3 each, because the battery's free weekday is now 2026-10-20 and the user's two staff bookings #926/#927 (made 2026-09-27) occupy the Garden and Family Rooms that night; the replies are right (trap 24, the date kind)
+- [ ] Phase 5, the walk — **by the user:** harbor as staff (no Revenue card), as owner (Revenue), villa, northwind (three cards), the Pulse strip on `/platform`, 360 px
 - [ ] Phase 6 — the record (D-098)
 
 **Promos (2026-10-04, COMPLETE; walked by the user; merged into `master` at `263e9d7`):**
@@ -1176,6 +1177,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 5, the suites, on `feat/dashboard`
+- **Did:** every suite; three baselines identical; battery 54/61, the two
+  new failures explained by the user's bookings on the battery's date.
+- **Next:** Phase 6, the record; the user's browser walk.
 
 ### 2026-10-05 — dashboard Phase 4 (screens), on `feat/dashboard`
 - **Did:** the chart component, the Dashboard screen and page, the nav link
