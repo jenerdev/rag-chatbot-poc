@@ -90,7 +90,7 @@ role inside; a counts-only Pulse strip on `/platform`. § 7 has six questions
 with recommendations. No chatbot change.
 - [ ] § 7 answered
 - [x] Phase 0 — baseline (2026-10-04): every suite green, baselines identical, battery 56/61 the known set; two runs died on transient errors (fetch failed, JWT expired) and the battery now reloads the tenant per case
-- [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). **Owed: re-run the file once** for the two `::date` casts on the chart buckets
+- [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). re-run 2026-10-05 for the two `::date` casts: every bucket now a `YYYY-MM-DD` date raw
 - [x] Phase 2 — `@rag/pipeline` (2026-10-05): `dashboard.ts` (typed shapes, the parser with date normalisation, the clamp, the two calls); tests 359/359; pipeline isolation 22–23 green both ways
 - [x] Phase 3 — routes and permissions (2026-10-05): `dashboard:read` (every member), `/api/t/[tenant]/dashboard?days=`, `/api/platform/dashboard`; web tests 59/59, typecheck; 401/401/404 on the dev server
 - [x] Phase 4 — screens (2026-10-05): `bar-chart.tsx` (inline SVG, the dataviz rules), `dashboard-screen.tsx` + the page (S-11), Dashboard first in the staff nav, the Pulse strip on `/platform`; web tests 59/59, typecheck; `plan/dashboard-phase4-walk.mjs` **14/14** over HTTP (staff sees no money, admin does, harbor has occupancy, villa none, northwind `bookings: null`, `?days` clamped, a harbor cookie refused on villa, three pages 200)
@@ -1182,7 +1182,7 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **Did:** D-098, CLAUDE.md, flow.md § 5, the plan's status.
 - **Next:** the user's walk (harbor as staff and as owner, villa,
   northwind, the Pulse strip, 360 px), then merge `feat/dashboard` into
-  master. Owed: re-run `schema-dashboard.sql` once for the `::date` casts.
+  master.
 
 ### 2026-10-05 — dashboard Phase 5, the suites, on `feat/dashboard`
 - **Did:** every suite; three baselines identical; battery 54/61, the two
