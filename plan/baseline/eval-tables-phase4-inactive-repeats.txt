@@ -1,0 +1,9 @@
+FAIL  [rt-inactive] harbor want rooms
+      A: Harbor Inn has no room or booking period by that name. Here is what is open on 18 October 2026, a weekend:  | Room           | Guests | Price      | |----------------|--------|------------| | Garden Room    | up to 2| ₱4,500.00  | | Family Room    |
+      why: a tool row for the Old Annex: false; the reply calls it open: false; table: true
+PASS  [rt-inactive] harbor want rooms
+      A: Harbor Inn cannot accommodate a booking for the Old Annex on 18 October 2026, as it is closed for renovation until further notice. Here is what is open on that date:  | Room           | Guests | Price     | |----------------|--------|-----------| | Ga
+      why: a tool row for the Old Annex: false; the reply calls it open: false; table: true
+PASS  [rt-inactive] harbor want rooms
+      A: Harbor Inn cannot accommodate a booking for the Old Annex on 18 October 2026, as it is closed for renovation until further notice. Here is what is open on that date:  | Room           | Guests | Price     | |----------------|--------|-----------| | Ga
+      why: a tool row for the Old Annex: false; the reply calls it open: false; table: true

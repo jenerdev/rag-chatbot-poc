@@ -1,0 +1,6 @@
+FAIL  [price-villa] villa want price
+      A: The Overnight slot is open on 18 October 2026, a weekend.   | Slot      | Status | Price      | |-----------|--------|------------| | Overnight | open   | ₱20,000.00 | | Day Tour  | open   
+FAIL  [price-villa] villa want price
+      A: The Overnight slot is open on 18 October 2026, a weekend.   | Slot      | Status | Price      | |-----------|--------|------------| | Overnight | open   | ₱20,000.00 | | Day Tour  | open   
+FAIL  [price-villa] villa want price
+      A: The Overnight slot is open on 18 October 2026, a weekend.   | Slot      | Status | Price       | |-----------|--------|-------------| | Overnight | open   | ₱20,000.00  | | Day Tour  | open

@@ -91,7 +91,7 @@ no date, amending D-081) decides Phase 2's second half.
 - [x] Phase 1 — the renderer (2026-10-04): `lib/tables.ts` + 15 tests, `reply-text.tsx` + 4, CSS, the bubble renders through it; web tests 46/46, typecheck, no dangerouslySetInnerHTML; a table document in northwind came back as a pipe table 3/3 and was deleted; the browser look is owed to Phase 4
 - [x] Phase 2 — the code-written tables (2026-10-04): `pipeTable()`, the room list as a table, `rateCardReply()` replacing D-081's sentence for a tenant with rates (D-081 and D-087 amended); pipeline tests 351/351, typecheck, northwind identical; six probes show the tables in English, Taglish and Tagalog; battery 55/61, `leak-2` and `lang-tagalog-2` the model's flips (1 of 2 on repeat), neither reaching this code
 - [x] Phase 3 — the model's tables (2026-10-04): villa, harbor, room-list and extra-guest lines as table examples; `tableOk` judged on `rt-list`, `rt-guests`, `tool-partial`, absent on `price-villa`; `rt-leak` regressed 0 of 3 and was fixed with an example sentence (3 of 3); runs 5–7: 56, 57, 57/61, the Phase 0 set; baselines byte-identical; six probes, six tables
-- [ ] Phase 4 — the browser walk (desktop and 360px, three tenants)
+- [x] Phase 4 — the browser walk (2026-10-04, the user: "done testing"); request 1 from it done: the rate kind left the price cell and is said once in the sentence (D-082 amended), measured 3 of 3 on `price-villa`, `rt-tagalog`; battery 56/61, `rt-inactive`'s check accepts harbor's "no room by that name". Verified over HTTP 2026-10-04: the dev server answers with the tables, and a dated room question streams 127 deltas after the tool event, so the table forms live (`stream-tables-phase4.txt`). The questions to ask are in whats-done.md under "Tables, Phase 4"
 - [ ] Phase 5 — the record (D-091, CLAUDE.md, flow.md)
 
 **Tenant management and roles (planned and decided 2026-09-29, not started):**
@@ -1142,6 +1142,24 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — tables Phase 4: the walk done; request 1, no "(weekend rate)" on every row
+- **Did:** the rate kind is its own `rate` field, the price cell the bare
+  amount, the rate named once in the sentence (D-082 amended). Two wording
+  fixes measured 3 of 3 each (`rt-tagalog` copied the example in English;
+  `price-villa` lost its price to a table). Battery 56/61; `rt-inactive`
+  flips between two refusals, both accepted now. Baselines identical.
+- **Request 2:** the table's look: a tinted header (`--accent-soft`, themed)
+  and alternating row stripes (`--bg`), column dividers, `width: 100%`, a centred header over an amount column; on a phone each row is a card
+  with the column names in front (`data-label`); web tests 46/46.
+- **Next:** the user's remaining requests from the walk; then Phase 5, the record.
+
+### 2026-10-04 — tables Phase 4 (the walk): the HTTP half
+- **Did:** the running dev server answers harbor's room list as a table; the
+  dated room question streams 1 tool event then 127 deltas, so the table
+  forms live (§ 2.2). No browser tools this session: the walk itself is
+  owed to the user, questions listed in whats-done.md.
+- **Next:** the user walks Phase 4; then Phase 5, the record (D-091, CLAUDE.md, flow.md).
 
 ### 2026-10-04 — tables Phase 3 (the model's tables), on `feat/tables`
 - **Did:** the instruction lines (villa, harbor, `PRICE_LINES`, `ROOM_LIST_LINES`,

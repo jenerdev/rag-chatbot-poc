@@ -175,29 +175,33 @@ describe('per_room: check_availability checks rooms', () => {
       extra_guest_fee: '₱250.00',
       slot: 'Night',
       status: 'open',
-      price: '₱3,500.00 (weekday rate)',
+      price: '₱3,500.00',
+      rate: 'weekday',
     });
     // No total without a guest count: there is no party to price.
-    expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,extra_guest_fee,included_guests,price,slot,status,unit')).toBe(true);
+    expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,extra_guest_fee,included_guests,price,rate,slot,status,unit')).toBe(true);
     expect(content).not.toContain('350000');
   });
 
   it("with a guest count, each row carries that party's extra charge and total, from the database", async () => {
     const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28","guests":3}' });
     const [, family] = (record.result as { slots: Record<string, unknown>[] }).slots;
-    expect(family).toMatchObject({ unit: 'Family Room', price: '₱6,000.00 (weekday rate)', extra_guest_charge: '₱250.00', total: '₱6,250.00' });
+    expect(family).toMatchObject({ unit: 'Family Room', price: '₱6,000.00', rate: 'weekday', extra_guest_charge: '₱250.00', total: '₱6,250.00' });
   });
 
-  // D-082: the price says which rate it is; a closed row sells nothing, so no label.
-  it('the price names its rate kind, from the row; a closed row has none', async () => {
+  // D-082 as amended 2026-10-04: the rate kind is its own field, named once
+  // in the sentence by the instruction lines; a closed row sells nothing,
+  // so it has none, and the price text is the bare amount everywhere.
+  it('each row carries its rate kind as a field; a closed row has none', async () => {
     rooms.mockResolvedValueOnce([
       { ...ROOMS[0], date: '2026-12-24', rateKind: 'holiday' },
       { ...ROOMS[0], date: '2026-12-25', rateKind: 'peak' },
       { ...ROOMS[0], date: '2026-12-26', rateKind: 'closed', status: 'closed' },
     ] as never);
     const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-12-24","date_to":"2026-12-26"}' });
-    const prices = (record.result as { slots: { price: string }[] }).slots.map((r) => r.price);
-    expect(prices).toEqual(['₱3,500.00 (holiday rate)', '₱3,500.00 (peak rate)', '₱3,500.00']);
+    const rows = (record.result as { slots: { price: string; rate?: string }[] }).slots;
+    expect(rows.map((r) => r.price)).toEqual(['₱3,500.00', '₱3,500.00', '₱3,500.00']);
+    expect(rows.map((r) => r.rate)).toEqual(['holiday', 'peak', undefined]);
   });
 
   // D-083: villa's 24 December. The base (weekend) rate is ₱20,000, the
@@ -205,7 +209,7 @@ describe('per_room: check_availability checks rooms', () => {
   it("quotes the day price, the holiday surcharge in, not the base rate", async () => {
     rooms.mockResolvedValueOnce([{ ...ROOMS[0], date: '2026-12-24', rateKind: 'holiday', price: 2000000, dayPrice: 2400000, total: 2400000 }] as never);
     const { record, content } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-12-24"}' });
-    expect((record.result as { slots: { price: string }[] }).slots[0]!.price).toBe('₱24,000.00 (holiday rate)');
+    expect((record.result as { slots: { price: string }[] }).slots[0]!.price).toBe('₱24,000.00');
     expect(content).not.toContain('20,000');
   });
 
@@ -219,7 +223,7 @@ describe('per_room: check_availability checks rooms', () => {
     ] as never);
     const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2027-09-30","date_to":"2027-10-01"}' });
     const result = record.result as { slots: Record<string, unknown>[]; not_yet_bookable?: { dates: string[]; meaning: string } };
-    expect(result.slots[0]).toMatchObject({ date: '2027-09-30', status: 'open', price: '₱3,500.00 (weekday rate)' });
+    expect(result.slots[0]).toMatchObject({ date: '2027-09-30', status: 'open', price: '₱3,500.00', rate: 'weekday' });
     expect(result.slots[1]).toEqual({ date: '2027-10-01', unit: 'Garden Room', slot: 'Night', status: 'not yet bookable' });
     expect(result.not_yet_bookable?.dates).toEqual(['2027-10-01']);
     expect(result.not_yet_bookable?.meaning).toContain('30 September 2027');
@@ -276,7 +280,8 @@ describe('per_room: check_availability checks rooms', () => {
       status: 'open',
       included_guests: 30,
       extra_guest_fee: '₱250.00',
-      price: '₱16,000.00 (weekend rate)',
+      price: '₱16,000.00',
+      rate: 'weekend',
       extra_guest_charge: '₱500.00',
       total: '₱16,500.00',
     });

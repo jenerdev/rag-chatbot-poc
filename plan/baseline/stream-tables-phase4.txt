@@ -1,0 +1,390 @@
+event: meta
+data: {"conversationId":"fb32b03d-919e-4cd4-9cdd-829e801fe9f9","searchQuery":"What rooms are open on 18 October 2026?","sources":[{"id":413,"documentId":307,"documentTitle":"Harbor Inn Guest Guide","content":"a private balcony.\n\nThe Old Annex, the separate cottage behind the garden, is closed for renovation until further notice and cannot be booked.\n\nRATES\n\nOur 2025 brochure listed the Garden Room from ₱3,000 per night. Those rates are out of date. Staff and the online booking check always give the current price for the date you ask about.\n\nFor weddings, reunions and other events, the whole inn can be reserved for exclusive use at ₱40,000 per night, which includes every room, the terrace and the jetty. Exclusive use is arranged directly with the owners and is not a room booking.\n\nRates may be higher on public holidays and during Holy Week. The owners confirm any holiday charge when you book.\n\nBOOKING","similarity":0.394883706741619,"foundBy":"both"},{"id":412,"documentId":307,"documentTitle":"Harbor Inn Guest Guide","content":"Harbor Inn — Guest Guide\n\nHarbor Inn is a small inn on the harbour front in Puerto Galera, Oriental Mindoro. It has five rooms, a breakfast terrace and a jetty for guests arriving by boat. The inn is run by the Dela Rosa family, who live on site.\n\nROOMS\n\nThe Garden Room is on the ground floor and opens onto the garden. It has one queen bed and is suited to couples.\n\nThe Family Room is the largest room, on the ground floor beside the terrace. It has two queen beds and a bunk bed, and it is the only room that can take a family of five or six.\n\nThe Loft is on the top floor under the roof beams. It has one queen bed and a daybed, and a skylight over the bed. The stairs to the Loft are steep and are not suitable for small children.\n\nThe Sea View Suite is on the first floor facing the harbour. It has a king bed, a sitting area and a private balcony.\n\nThe Old Annex, the separate cottage behind the garden, is closed for renovation until further notice and cannot be booked.\n\nRATES","similarity":0.336365706754183,"foundBy":"both"},{"id":414,"documentId":307,"documentTitle":"Harbor Inn Guest Guide","content":"is not a room booking.\n\nRates may be higher on public holidays and during Holy Week. The owners confirm any holiday charge when you book.\n\nBOOKING\n\nTo book a room, press the Book button at the top of this chat to open Harbor Inn's booking page. Choose your check-in date, the number of nights, the rooms and the number of guests in each. The page shows the price of every night and sends your booking request to the Dela Rosa family, who reply to confirm it.\n\nA booking request is not a booking until the family confirms it. This chat can check which rooms are free and quote their rates, but it cannot make, change or confirm a booking.\n\nCHECK-IN AND CHECK-OUT\n\nCheck-in is from 2:00 PM and check-out is at 12:00 noon the next day. Early check-in can be arranged if the room is free the night before.\n\nBREAKFAST","similarity":0.350247561399873,"foundBy":"both"},{"id":415,"documentId":307,"documentTitle":"Harbor Inn Guest Guide","content":"Check-in is from 2:00 PM and check-out is at 12:00 noon the next day. Early check-in can be arranged if the room is free the night before.\n\nBREAKFAST\n\nBreakfast is served on the terrace from 7:00 AM to 10:00 AM and is included in every room rate. Guests choose between a Filipino breakfast of garlic rice, egg and longganisa, and a continental breakfast.\n\nGETTING HERE AND PARKING\n\nMost guests arrive by boat from Batangas Port to Muelle Pier, which is a five-minute walk from the inn. There are four parking spaces behind the inn for guests who bring a car on the ferry.\n\nWI-FI\n\nThe Wi-Fi network is HarborInnGuests and the password is saltwater-lantern-58. The signal is strongest on the terrace.\n\nHOUSE RULES\n\nQuiet hours are from 10:00 PM to 7:00 AM. Smoking is allowed only on the jetty. Pets are not allowed in the rooms.","similarity":0.24524284744471,"foundBy":"keyword"}]}
+
+event: tool
+data: {"name":"check_availability","args":{"date_from":"2026-10-18"},"result":{"slots":[{"date":"2026-10-18","unit":"Garden Room","capacity":2,"included_guests":2,"extra_guest_fee":"₱250.00","slot":"Night","status":"open","price":"₱4,500.00 (weekend rate)"},{"date":"2026-10-18","unit":"Family Room","capacity":6,"included_guests":2,"extra_guest_fee":"₱250.00","slot":"Night","status":"open","price":"₱7,500.00 (weekend rate)"},{"date":"2026-10-18","unit":"Loft","capacity":3,"included_guests":2,"extra_guest_fee":"₱250.00","slot":"Night","status":"open","price":"₱5,800.00 (weekend rate)"},{"date":"2026-10-18","unit":"Sea View Suite","capacity":2,"included_guests":2,"extra_guest_fee":"₱250.00","slot":"Night","status":"open","price":"₱9,500.00 (weekend rate)"}]}}
+
+event: delta
+data: {"text":"On"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"18"}
+
+event: delta
+data: {"text":" October"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"202"}
+
+event: delta
+data: {"text":"6"}
+
+event: delta
+data: {"text":","}
+
+event: delta
+data: {"text":" the"}
+
+event: delta
+data: {"text":" following"}
+
+event: delta
+data: {"text":" rooms"}
+
+event: delta
+data: {"text":" are"}
+
+event: delta
+data: {"text":" open"}
+
+event: delta
+data: {"text":":\n\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" Room"}
+
+event: delta
+data: {"text":"           "}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" Guests"}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" Price"}
+
+event: delta
+data: {"text":"                    "}
+
+event: delta
+data: {"text":" |\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":"----------------"}
+
+event: delta
+data: {"text":"-|"}
+
+event: delta
+data: {"text":"--------"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":"----------------"}
+
+event: delta
+data: {"text":"-----------"}
+
+event: delta
+data: {"text":"|\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" Garden"}
+
+event: delta
+data: {"text":" Room"}
+
+event: delta
+data: {"text":"    "}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" up"}
+
+event: delta
+data: {"text":" to"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"2"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" ₱"}
+
+event: delta
+data: {"text":"4"}
+
+event: delta
+data: {"text":","}
+
+event: delta
+data: {"text":"500"}
+
+event: delta
+data: {"text":"."}
+
+event: delta
+data: {"text":"00"}
+
+event: delta
+data: {"text":" ("}
+
+event: delta
+data: {"text":"week"}
+
+event: delta
+data: {"text":"end"}
+
+event: delta
+data: {"text":" rate"}
+
+event: delta
+data: {"text":")"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":" |\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" Family"}
+
+event: delta
+data: {"text":" Room"}
+
+event: delta
+data: {"text":"    "}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" up"}
+
+event: delta
+data: {"text":" to"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"6"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" ₱"}
+
+event: delta
+data: {"text":"7"}
+
+event: delta
+data: {"text":","}
+
+event: delta
+data: {"text":"500"}
+
+event: delta
+data: {"text":"."}
+
+event: delta
+data: {"text":"00"}
+
+event: delta
+data: {"text":" ("}
+
+event: delta
+data: {"text":"week"}
+
+event: delta
+data: {"text":"end"}
+
+event: delta
+data: {"text":" rate"}
+
+event: delta
+data: {"text":")"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":" |\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" Loft"}
+
+event: delta
+data: {"text":"           "}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" up"}
+
+event: delta
+data: {"text":" to"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"3"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" ₱"}
+
+event: delta
+data: {"text":"5"}
+
+event: delta
+data: {"text":","}
+
+event: delta
+data: {"text":"800"}
+
+event: delta
+data: {"text":"."}
+
+event: delta
+data: {"text":"00"}
+
+event: delta
+data: {"text":" ("}
+
+event: delta
+data: {"text":"week"}
+
+event: delta
+data: {"text":"end"}
+
+event: delta
+data: {"text":" rate"}
+
+event: delta
+data: {"text":")"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":" |\n"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" Sea"}
+
+event: delta
+data: {"text":" View"}
+
+event: delta
+data: {"text":" Suite"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":" |"}
+
+event: delta
+data: {"text":" up"}
+
+event: delta
+data: {"text":" to"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":"2"}
+
+event: delta
+data: {"text":"|"}
+
+event: delta
+data: {"text":" ₱"}
+
+event: delta
+data: {"text":"9"}
+
+event: delta
+data: {"text":","}
+
+event: delta
+data: {"text":"500"}
+
+event: delta
+data: {"text":"."}
+
+event: delta
+data: {"text":"00"}
+
+event: delta
+data: {"text":" ("}
+
+event: delta
+data: {"text":"week"}
+
+event: delta
+data: {"text":"end"}
+
+event: delta
+data: {"text":" rate"}
+
+event: delta
+data: {"text":")"}
+
+event: delta
+data: {"text":" "}
+
+event: delta
+data: {"text":" |\n\n"}
+
+event: delta
+data: {"text":"Taken"}
+
+event: delta
+data: {"text":":"}
+
+event: delta
+data: {"text":" None"}
+
+event: delta
+data: {"text":"."}
+
+event: done
+data: {}
+

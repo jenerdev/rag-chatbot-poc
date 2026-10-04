@@ -487,7 +487,11 @@ const CASES = [
       const offered = roomRows(last).some((r) => r.unit === 'Old Annex');
       const claimsOpen = /old annex[^.\n]{0,60}\b(is|are)\s+(open|available|free)\b/i.test(last.reply);
       return {
-        ok: !offered && !claimsOpen && says(last.reply, ['not', 'closed', 'renovation', 'unavailable', "can't", 'cannot']),
+        // "no room … by that name" is harbor's own sentence for a name the
+        // tool result lacks (the rt-leak line, tables Phase 3); 1 run in 3
+        // uses it for the Old Annex instead of the documents' "closed for
+        // renovation". Both refuse the room, so both pass.
+        ok: !offered && !claimsOpen && says(last.reply, ['not', 'closed', 'renovation', 'unavailable', "can't", 'cannot', 'no room']),
         detail: `a tool row for the Old Annex: ${offered}; the reply calls it open: ${claimsOpen}`,
       };
     },

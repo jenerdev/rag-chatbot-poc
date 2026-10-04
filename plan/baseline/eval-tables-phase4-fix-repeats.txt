@@ -1,0 +1,18 @@
+PASS  [price-villa] villa want price
+      A: The Overnight on 18 October 2026, a weekend, is ₱20,000.00.  || tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true
+      why: tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true; table: false
+PASS  [price-villa] villa want price
+      A: The Overnight on 18 October 2026, a weekend, is ₱20,000.00.  || tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true
+      why: tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true; table: false
+PASS  [price-villa] villa want price
+      A: The Overnight on 18 October 2026, a weekend, is ₱20,000.00.  || tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true
+      why: tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true; table: false
+PASS  [rt-tagalog] harbor want rooms
+      A: Yes po, may mga bakanteng kwarto tayo sa 18 October 2026, which is a weekend. Narito po ang mga available na kwarto:  | Room            | Guests | Price      | |-----------------|--------|------------| | Garden Room     |
+      why: tool for 2026-10-18: true; taglish? true (tl 13, en 8, en-share 0.38); facts kept; table: true
+PASS  [rt-tagalog] harbor want rooms
+      A: Yes po, may mga bakanteng kwarto tayo sa 18 October 2026, which is a weekend. Narito po ang mga available na kwarto:  | Room           | Guests | Price      | |----------------|--------|------------| | Garden Room    | up
+      why: tool for 2026-10-18: true; taglish? true (tl 13, en 8, en-share 0.38); facts kept; table: true
+PASS  [rt-tagalog] harbor want rooms
+      A: Yes po, may mga bakanteng kwarto tayo sa 18 October 2026, which is a weekend. Narito po ang mga available na kwarto:  | Room            | Guests | Price      | |-----------------|--------|------------| | Garden Room     |
+      why: tool for 2026-10-18: true; taglish? true (tl 12, en 8, en-share 0.40); facts kept; table: true

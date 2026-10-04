@@ -2511,6 +2511,17 @@ guest count, so villa's 24 December is quoted ₱20,000.00 (holiday rate)
 where the price is ₱24,000.00. That predates this decision (the user's own
 bug note) and is not fixed by it.
 
+**Amended 2026-10-04 (plan/tables.md Phase 4, the user's walk):** the rate
+kind LEFT the price text. In a table of one date, "₱4,500.00 (weekend
+rate)" repeated the same label on every row, and the user asked for the
+redundant words to go. Each row now carries `price` as the bare amount and
+`rate` as its own field (`weekday | weekend | holiday | peak`; none on a
+closed row), and the instruction lines ask for the rate ONCE, in the
+sentence above the table ("On 18 October 2026, a weekend, these rooms are
+open:"). The amount is still `rate_kind()`'s branch, and `pesos()` in the
+battery never read the label. The 0-of-4 measurement above was made with
+no instruction asking for the field; the new sentence example asks.
+
 ## D-083 · The chatbot quotes the DAY price, a holiday's surcharge in · **Added 2026-09-30. Closes the open item D-082 recorded**
 
 **Decision:** `check_room_availability()` gains one column, `day_price`:

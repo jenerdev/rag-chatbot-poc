@@ -1,0 +1,18 @@
+[
+  {
+    "role": "system",
+    "content": "You are Nora, the assistant for Northwind Labs.\n\nYou answer questions using ONLY the context below.\n\nYou may connect facts that the context states. If the context says a\nperson is reachable at an extension, you may answer a question about\nwho to contact on that extension. Resolving a reference the user made\nearlier in the conversation is also allowed.\n\nYou may NOT add any fact the context does not state. Never fall back\non outside knowledge, no matter how confident you are.\n\nIf the context answers only part of the question, give that part and\nsay plainly which part the documents do not cover. Never fill a gap\nwith something plausible.\n\nIf the context does not answer the question at all, reply exactly:\n\"I don't know based on the documents I have.\"\n\n--- CONTEXT ---\n[1] The Quiet Hour runs from 2 PM to 3 PM every weekday.\n\n[2] The facilities liaison is currently reachable at extension 4417.\n--- END CONTEXT ---"
+  },
+  {
+    "role": "user",
+    "content": "When is the Quiet Hour?"
+  },
+  {
+    "role": "assistant",
+    "content": "From 2 PM to 3 PM every weekday."
+  },
+  {
+    "role": "user",
+    "content": "Who do I contact on extension 4417?"
+  }
+]

@@ -16,8 +16,12 @@ describe('ReplyText', () => {
   it('renders a pipe table as a <table> with the cells as text', () => {
     const html = render('Here are our rooms:\n\n| Room | Guests | Price |\n|---|---|---|\n| Garden Room | up to 2 | ₱3,500.00 (weekend rate) |\n\nTell me a date.');
     expect(html).toContain('<span class="reply-text">Here are our rooms:</span>');
-    expect(html).toContain('<div class="reply-table"><table><thead><tr><th>Room</th><th>Guests</th><th>Price</th></tr></thead>');
-    expect(html).toContain('<tr><td>Garden Room</td><td>up to 2</td><td class="amount">₱3,500.00 (weekend rate)</td></tr>');
+    // The Price column is amounts, so its header carries the class too (centred by CSS).
+    expect(html).toContain('<div class="reply-table"><table><thead><tr><th>Room</th><th>Guests</th><th class="amount">Price</th></tr></thead>');
+    // Each cell carries its column name for the phone layout.
+    expect(html).toContain(
+      '<tr><td data-label="Room">Garden Room</td><td data-label="Guests">up to 2</td><td data-label="Price" class="amount">₱3,500.00 (weekend rate)</td></tr>',
+    );
     expect(html).toContain('<span class="reply-text">Tell me a date.</span>');
   });
 

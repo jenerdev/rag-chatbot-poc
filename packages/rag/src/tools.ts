@@ -222,15 +222,18 @@ export async function toolsFor(tenant: TenantContext): Promise<TenantTools> {
         // The last sentence is Rule 4: one slot asked is a sentence, not a
         // one-row table (price-villa pins it).
         'When you answer about availability, start with one sentence that',
-        'answers the question and names the date, for example "Yes, the',
-        'Overnight slot is open on 8 October 2026." Then, for each date, write',
+        'answers the question and names the date' +
+          (priced ? ' and which rate applies, from the' : ', for example "Yes, the'),
+        ...(priced
+          ? ['rows\' "rate", for example "Yes, the Overnight slot is open on 8', 'October 2026, a weekday." Then, for each date, write']
+          : ['Overnight slot is open on 8 October 2026." Then, for each date, write']),
         ...(priced
           ? [
               'a table with one row per slot and the columns Slot, Status and Price,',
               'for example:',
               '| Slot | Status | Price |',
               '|---|---|---|',
-              '| Overnight | open | ₱16,000.00 (weekday rate) |',
+              '| Overnight | open | ₱16,000.00 |',
               '| Day Tour | taken |  |',
             ]
           : [
@@ -279,7 +282,15 @@ const PRICE_LINES = [
   'documents do not hold the rates. Quote a price only from the tool result,',
   "never from the documents or from memory. Write each slot's price in the",
   "table's Price column exactly as the tool gives it, for example",
-  '"₱16,000.00 (weekday rate)".',
+  '"₱16,000.00". The rate that applies (weekday, weekend or holiday) is',
+  'named once, in the sentence above the table, not in the cells.',
+  // Rule 4, measured after the rate kind left the cell: "How much is the
+  // Overnight on …?" became a sentence with no price in it over a table of
+  // every slot, 4 of 4. The one-slot sentence, with its price, as an
+  // example of what TO write.
+  'When the user asks the price of one slot, answer in one sentence with',
+  'the price in it and no table, for example "The Overnight on 8 October',
+  '2026, a weekday, is ₱16,000.00."',
   'If the user says how many guests, pass it as guests, add a Total column',
   'with the "total" from the result, and name the extra guest charge under',
   'the table, for example "Overnight (32 guests): ₱16,000.00 + ₱500.00 for',
@@ -463,13 +474,19 @@ async function roomTools(tenant: TenantContext, config: BookingsConfig, slots: S
         // table in the same shape (an example of what TO write); the browser
         // draws exactly this block. Rule 4: one room asked is a sentence
         // (rt-taken pins it).
+        // The rate kind (D-082 as amended): a FRAGMENT, not a whole sentence.
+        // The first version gave a full example sentence ("On 8 October
+        // 2026, a weekday, these rooms are open:"), and rt-tagalog copied it
+        // verbatim, in English, over the Taglish instruction (tl 0, en 8).
         'When you answer about rooms, start with one sentence that names the',
-        'date. Then write a table of the open rooms with the columns Room,',
-        'Guests and Price, one row per room, for example:',
+        'date and, from the rows\' "rate", which rate applies (for example',
+        '"…on 8 October 2026, a weekday…"). Then write a table of the open',
+        'rooms with the columns Room, Guests and Price, one row per room, for',
+        'example:',
         '| Room | Guests | Price |',
         '|---|---|---|',
-        '| Garden Room | up to 2 | ₱3,500.00 (weekday rate) |',
-        '| Loft | up to 3 | ₱4,800.00 (weekday rate) |',
+        '| Garden Room | up to 2 | ₱3,500.00 |',
+        '| Loft | up to 3 | ₱4,800.00 |',
         'Then one line "Taken:" with the taken rooms, if any. When the user',
         'asks about one room only, answer in a sentence, with no table.',
         // rt-leak, after the table lines: with "one sentence, then a table"
@@ -596,17 +613,20 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
             extra_guest_fee: r.extraPersonRate === null ? null : money(r.extraPersonRate, config.currency),
             slot: r.slot,
             status: r.status,
-            // D-082: the price says WHICH rate it is, "₱20,000.00 (weekend
-            // rate)", from rate_kind(), the branch unit_price() took. In the
-            // price text itself, because the model copies a price as written:
-            // a separate `rate` field was mentioned 0 times in 4. No tool TEXT
-            // changed (the D-080 lesson), so the baselines stand.
-            //
             // D-083: the DAY price, surcharge in: unit_quote()'s own price
             // with no guest count. The base rate alone quoted villa's 24
             // December at ₱20,000.00, where the page and the stored row say
             // ₱24,000.00. With guests, `total` is this plus the extra charge.
-            price: r.status === 'closed' ? money(r.dayPrice, config.currency) : `${money(r.dayPrice, config.currency)} (${r.rateKind} rate)`,
+            price: money(r.dayPrice, config.currency),
+            // D-082, amended 2026-10-04 (tables Phase 4, the user's walk): the
+            // rate kind used to be IN the price text, "₱20,000.00 (weekend
+            // rate)", because a separate field was mentioned 0 times in 4.
+            // In a table of one date that label repeated on every row, and
+            // the user called it redundant. So it is its own field again, and
+            // the instruction lines now ask for it ONCE, in the sentence
+            // above the table ("On 18 October 2026, a weekend, …"). A closed
+            // row sells nothing, so it has no rate.
+            ...(r.status === 'closed' ? {} : { rate: r.rateKind }),
             ...(guests ? { extra_guest_charge: money(r.extraGuestPrice, config.currency), total: money(r.total, config.currency) } : {}),
           })),
         });

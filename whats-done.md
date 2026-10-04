@@ -6922,3 +6922,79 @@ tables". Reading each `why:` line showed two were my checks contradicting
 the plan's own rule, and one was a sentence-order regression the old
 check had never really tested. Trap 24's instruction, repeat before
 rewording, is what turned 0 of 3 into a wording fix instead of a shrug.
+
+## Tables, Phase 4: the browser walk · HTTP half done 2026-10-04; the walk is owed to the user
+
+**What:** without a browser to drive, the half that can be proven over
+HTTP was: the running `pnpm dev` answers `/api/t/harbor/chat` with the
+room-list table (the Details column written by the model, well-formed,
+4 sources), so the dev server is on the Phase 2–3 code; and a dated room
+question on the streamed form arrived as **1 `tool` event then 127
+`delta` events**, token by token ("On", " ", "18", " October", …), saved in
+`plan/baseline/stream-tables-phase4.txt`. So a chunked tool turn is NOT
+held: the header line lands as text, the separator turns it into a table,
+and the rows fill in cell by cell. That is plan § 2.2's moment, and it is
+what the walk should watch once.
+
+**Owed to the user (plan § 5 Phase 4), with `pnpm dev` running:** on villa,
+harbor and alteza, desktop and 360px, as a visitor: "What rooms do you
+have?", "What rooms are open on 18 October 2026?", "What's open on 18
+October 2026?" (villa), "Do you have a room for 5 people on 18 October
+2026?" (harbor), "Magkano ang extra guest?", "Anong mga kwarto ang meron
+kayo?", "Room rates please". Each table scrolls sideways on the phone and
+never overflows the bubble; prices line up on the right; a refusal
+("What is the capital of France?") and a greeting ("hello") are untouched.
+Watch the dated room question form on screen.
+
+## Tables, Phase 4: the walk, and the first request from it · done 2026-10-04
+
+**What:** the user walked Phase 4 ("done testing") and asked for the
+redundant words to go: "₱4,500.00 (weekend rate)" on every row of a
+one-date table. The rate kind left the price text (D-082 amended): each
+row carries `price` as the bare amount and `rate` as its own field (none
+on a closed row), and the instruction lines ask for the rate once, in the
+sentence above the table. `reply-text.tsx`'s comment and six tests follow.
+
+**Why it matters:** the label was put INSIDE the price so the model would
+say it at all (D-082 measured a separate field ignored 0 of 4, with no
+instruction asking). A table changed the economics: the same four words
+on four rows. The information is kept, said once: "On 18 October 2026, a
+weekend, these rooms are open:".
+
+**Observed, three wordings deep:**
+- tests 351/351, typecheck, three baselines byte-identical throughout;
+  the six probes: six tables, 0 "(… rate)" labels, each dated reply naming
+  the rate once (`probes-tables-phase4-rate.txt`);
+- **run 1 (55/61)** moved two cases. `rt-tagalog` copied harbor's full
+  example sentence verbatim, in English (tl 0, en 8): the example became
+  a FRAGMENT ("…on 8 October 2026, a weekday…") and Taglish came back 3 of
+  3 ("Yes po, may mga bakanteng kwarto tayo sa 18 October 2026, which is a
+  weekend"). `price-villa` lost its price from the sentence and fell to a
+  table of every slot, 4 of 4: `PRICE_LINES` gained the one-slot sentence
+  to write ("The Overnight on 8 October 2026, a weekday, is ₱16,000.00."),
+  and it came back 3 of 3, verbatim;
+- **run 2 (56/61)**: the Phase 0 set less `lang-followup` (passed), plus
+  `leak-2`'s control flip and `rt-inactive`, which on repeat is 1 of 3
+  the generic "Harbor Inn has no room or booking period by that name" and
+  2 of 3 the documents' "closed for renovation"; both refuse the room, so
+  the check now accepts both. `tool 9/9`, `price 3/3`, `lang 10/10`;
+  0 labels left in any reply.
+
+**Trap avoided:** three wording edits, each measured 3 of 3 on its case
+before the full run, and the full run read case by case. The rt-leak
+sentence from Phase 3 turned up again under rt-inactive, which is the
+cost of an example the model likes: it uses it where it fits.
+
+**Request 2 (the look):** "simple css styling, header background and
+even:odd alternate stripe". `.reply-table` now tints the header with
+`--accent-soft` (a theme key, so a tenant's accent colours it) and every
+even row with `--bg`; the per-cell borders are gone. CSS only; web tests
+46/46; the dev server picks it up without a restart. Then, the user: the
+table is `width: 100%` of the bubble, so it consumes the space, and a
+`--line` divider stands between columns (none before the first). An
+amount column is decided per COLUMN in `reply-text.tsx` (every filled cell
+an amount): its cells right-align, its header is centred. **On a phone
+(≤ 560px) each row is a card:** the first cell is the title (tinted), each
+other cell a line with its column name in front (`data-label` on every
+`<td>`, an escaped attribute), empty cells left out; the header row is
+visually hidden, kept for screen readers.
