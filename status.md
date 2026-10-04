@@ -1148,7 +1148,10 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   on a room-list turn, `room-cards.tsx` (cards + lightbox), CSS. Tests
   355 + 55; typecheck; isolation 30/30 both ways; battery 56/61
   (`lang-taglish` 2 of 2 on repeat). The browser look is owed to the user.
-- **Next:** the user walks the cards; commit; the three open items.
+- **Then:** a Photo column (View → the lightbox) on the rate card and any
+  other room table: `roomCardsView` `cards` | `column` on every per_room
+  turn; `lightbox.tsx` shared. Web 56; battery 57/61, the known set.
+- **Next:** the user walks the cards and the column; commit; the three open items.
 
 ### 2026-10-04 — the rate card only for the stay (D-093)
 - **Did:** `asksUndatedPrice()` narrowed: a stay word or a bare question;

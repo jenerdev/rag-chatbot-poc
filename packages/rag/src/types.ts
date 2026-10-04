@@ -117,8 +117,10 @@ export interface Answer {
   sources: Source[];
   /** Empty for a tenant with no tools, and for any turn where the model called none. */
   toolCalls: ToolCallRecord[];
-  /** Present on a room-list turn at a per_room tenant (D-094); absent otherwise. */
+  /** Present at a per_room tenant (D-094): every active room's photos. Absent elsewhere. */
   roomCards?: RoomCard[];
+  /** `cards` on a room-list turn, `column` otherwise (see StreamMeta). */
+  roomCardsView?: 'cards' | 'column';
   /**
    * What retrieval actually searched for, which is not always what was typed
    * (D-016). Returned so the UI can show it — a retriever silently searching
@@ -142,8 +144,15 @@ export interface StreamMeta {
   conversationId: string;
   searchQuery: string;
   sources: Source[];
-  /** Present on a room-list turn at a per_room tenant (D-094); absent otherwise. */
+  /** Present at a per_room tenant (D-094): every active room's photos. Absent elsewhere. */
   roomCards?: RoomCard[];
+  /**
+   * How the browser uses them: `cards` on a room-list turn (one card per
+   * room in place of the table), `column` on every other turn (a Photo
+   * column with a View button on any table whose first column names rooms:
+   * the rate card, a dated availability table, the extra-guest terms).
+   */
+  roomCardsView?: 'cards' | 'column';
 }
 
 /** One document in the admin list. `chunkCount` of 0 is the R-7 orphan the UI flags. */

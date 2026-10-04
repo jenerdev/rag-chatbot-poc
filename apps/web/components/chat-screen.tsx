@@ -67,8 +67,9 @@ type Turn =
       sources: Source[];
       /** Filled in by `tool` events, one per call, before the answer that uses them (plan/bookings.md Phase 7). */
       toolCalls: ToolCallRecord[];
-      /** From `meta` on a room-list turn (D-094): the rooms' photos, drawn as cards around the reply's table. */
+      /** From `meta` at a per_room tenant (D-094): the rooms' photos, drawn as cards or as a Photo column on the reply's table. */
       roomCards?: RoomCard[];
+      roomCardsView?: 'cards' | 'column';
       searchQuery: string;
       question: string;
       error?: string;
@@ -201,6 +202,7 @@ export function ChatScreen({
                       sources: data.sources,
                       toolCalls: [],
                       roomCards: data.roomCards,
+                      roomCardsView: data.roomCardsView,
                       searchQuery: data.searchQuery,
                       question: text,
                     }
@@ -385,7 +387,7 @@ export function ChatScreen({
                     <Thinking />
                   ) : (
                     <div className="bubble">
-                      <ReplyText text={turn.text} cards={turn.roomCards} />
+                      <ReplyText text={turn.text} cards={turn.roomCards} view={turn.roomCardsView} />
                     </div>
                   )}
                   <SourcesPanel

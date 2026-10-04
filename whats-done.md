@@ -7057,3 +7057,11 @@ cards. **Why it matters:** a visitor asking about rooms sees them.
 dev server's meta with harbor's and alteza's photos; battery 56/61 with
 `lang-taglish` a 2-of-2-on-repeat flip. **Owed:** the browser look (the
 cards, the lightbox, the phone), yours.
+
+## A Photo column on the rate card and every room table · done 2026-10-04 (D-094 amended)
+
+**What:** the photos go with every per_room turn, flagged `cards` or
+`column`; in column view a room table gains a Photo column whose View
+button opens the shared lightbox. **Observed:** web 56; typecheck; the
+rate card, a dated table and the room list at harbor each flagged as
+designed over HTTP, villa untouched; battery 57/61, the known set.

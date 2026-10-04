@@ -148,6 +148,10 @@ main { max-width: 820px; margin: 0 auto; padding: 20px; }
 .reply-table tbody tr:nth-child(even) td { background: var(--bg); }
 .reply-table td.amount { text-align: right; white-space: nowrap; }
 .reply-table th.amount { text-align: center; }
+/* The Photo column (D-094): a View button that opens the lightbox. */
+.reply-table th.photo, .reply-table td.photo { text-align: center; white-space: nowrap; }
+.photo-link { border: 1px solid var(--accent); border-radius: 999px; background: transparent; color: var(--accent); padding: 2px 10px; font-size: 13px; cursor: pointer; }
+.photo-link:hover { background: var(--accent); color: #fff; }
 /* Room cards (D-094, components/room-cards.tsx): a room-list reply as one
    card per room with its photo, in place of the table. Two across on a
    desktop, one on a phone. The lightbox is the photo large on a dark

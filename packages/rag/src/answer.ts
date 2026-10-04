@@ -517,8 +517,9 @@ export async function answerQuestion({
     sources,
     searchQuery,
     toolCalls: records,
-    // D-094: the room cards' photos, on a room-list turn only.
-    ...(listRooms !== null ? { roomCards: await roomPhotos(tenant) } : {}),
+    // D-094: the rooms' photos at a per_room tenant, as cards on a room-list
+    // turn, as a Photo column on any other table that names rooms.
+    ...(tools.rooms ? { roomCards: await roomPhotos(tenant), roomCardsView: listRooms !== null ? 'cards' : 'column' } : {}),
   };
 }
 
@@ -572,11 +573,12 @@ export async function answerQuestionStream({
   // The marker is what is saved; the friendly text is what is streamed (D-047).
   const friendly = refusalText(tenant, replyIn);
 
-  // D-094: a room-list turn at a per_room tenant carries the rooms' photos in
-  // `meta`, so the cards can be drawn around the table the reply will hold.
-  // Known before the model is called, from the message alone.
-  const roomCards = roomListRooms(tools, message) !== null ? await roomPhotos(tenant) : undefined;
-  onMeta({ conversationId: id, searchQuery, sources, ...(roomCards ? { roomCards } : {}) });
+  // D-094: a per_room tenant's rooms' photos travel in `meta`, before the
+  // model is called: cards on a room-list turn (known from the message
+  // alone), a Photo column on any other table that names rooms.
+  const roomCards = tools.rooms ? await roomPhotos(tenant) : undefined;
+  const roomCardsView = roomListRooms(tools, message) !== null ? 'cards' : 'column';
+  onMeta({ conversationId: id, searchQuery, sources, ...(roomCards ? { roomCards, roomCardsView } : {}) });
   // The thanks goes out first, ahead of whatever the answer turns out to be.
   if (prefix) onDelta(prefix);
 

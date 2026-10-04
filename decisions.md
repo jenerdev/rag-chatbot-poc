@@ -2948,3 +2948,19 @@ table); typecheck; bookings isolation **30/30 both ways** (16b: A's
 with 0, and every alteza room with 1–2; the reply still held the table.
 Battery 56/61: the known set plus `lang-taglish`, a Tagalog lean (tl 19,
 en 4) that passed 2 of 2 on repeat; villa never reaches this code.
+
+**D-094 amended 2026-10-04 (the same day, the user: "for price list rates
+list table format, please include 1 new column view photo"):** a per_room
+tenant's photos travel with EVERY turn's `meta` and JSON reply
+(`roomCards`), with `roomCardsView` saying how the browser uses them:
+`cards` on a room-list turn, `column` on every other. In column view a
+table whose first column names rooms keeps its shape and gains a Photo
+column: a "View" button ("View (2)" when there are more) on the rows whose
+room has photos, an empty cell on the rest, opening the same lightbox
+(`components/lightbox.tsx`, shared with the cards). So the rate card, a
+dated availability table and the extra-guest terms all carry it. Two reads
+per turn at a per_room tenant (units, unit_images), the same two the
+cards already made. Measured: web tests 56 (a column-view case), typecheck;
+the dev server: "Room rates please" and a dated room question at harbor
+`column` with 4 rooms, the room list `cards`, villa nothing; battery 57/61,
+the known set.

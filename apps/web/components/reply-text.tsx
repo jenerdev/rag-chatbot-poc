@@ -11,10 +11,17 @@
 // The text segments keep the bubble's `white-space: pre-wrap`, so a reply
 // with no table in it renders exactly as it did before this component
 // existed (lib/tables.test.ts: one segment, byte for byte).
+//
+// D-094: with the rooms' photos (`cards`), a table whose first column names
+// rooms is drawn as cards (`view: 'cards'`, a room-list turn) or as the
+// table plus a Photo column whose View button opens the lightbox
+// (`view: 'column'`: the rate card, a dated availability table, the
+// extra-guest terms). Any other table is a table.
 
 import type { RoomCard } from '@rag/pipeline';
 import { parseInline, parseSegments } from '@/lib/tables';
-import { RoomCards, tableIsRooms } from '@/components/room-cards';
+import { cardFor, RoomCards, tableIsRooms } from '@/components/room-cards';
+import { Lightbox, useLightbox } from '@/components/lightbox';
 
 /** A cell that is an amount: "₱3,500.00". A leading emoji the model added does not change that. */
 function isAmount(cell: string): boolean {
@@ -45,50 +52,76 @@ function amountColumns(rows: string[][]): boolean[] {
 }
 
 /**
- * `cards`: on a room-list turn (D-094), the rooms' photos. A table whose
- * first column names those rooms is then drawn as cards instead of a table;
- * any other table in the same reply is still a table.
+ * One table. With `cards`, a Photo column is appended: a View button on
+ * the rows whose room has photos, an empty cell on the rest.
  */
-export function ReplyText({ text, cards }: { text: string; cards?: RoomCard[] }) {
+function Table({ header, rows, cards }: { header: string[]; rows: string[][]; cards?: RoomCard[] }) {
+  const lightbox = useLightbox();
+  const amounts = amountColumns(rows);
+  const photoColumn = cards !== undefined;
   return (
     <>
-      {parseSegments(text).map((segment, i) =>
-        segment.kind === 'text' ? (
-          <span className="reply-text" key={i}>
-            {inline(segment.text)}
-          </span>
-        ) : cards && cards.length > 0 && tableIsRooms(segment.rows, cards) ? (
-          <RoomCards key={i} header={segment.header} rows={segment.rows} cards={cards} />
-        ) : (
-          <div className="reply-table" key={i}>
-            <table>
-              <thead>
-                <tr>
-                  {segment.header.map((cell, j) => (
-                    <th key={j} className={amountColumns(segment.rows)[j] ? 'amount' : undefined}>
-                      {cell}
-                    </th>
+      <div className="reply-table">
+        <table>
+          <thead>
+            <tr>
+              {header.map((cell, j) => (
+                <th key={j} className={amounts[j] ? 'amount' : undefined}>
+                  {cell}
+                </th>
+              ))}
+              {photoColumn && <th className="photo">Photo</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, j) => {
+              const card = photoColumn ? cardFor(cards, row[0] ?? '') : undefined;
+              return (
+                <tr key={j}>
+                  {row.map((cell, k) => (
+                    // data-label: the column's name, which the phone layout
+                    // prints in front of the value (globals.css, 560px). An
+                    // attribute, so React escapes it like a child.
+                    <td key={k} data-label={header[k] ?? ''} className={amounts[k] ? 'amount' : undefined}>
+                      {inline(cell)}
+                    </td>
                   ))}
+                  {photoColumn && (
+                    <td data-label="Photo" className="photo">
+                      {card && card.photos.length > 0 ? (
+                        <button type="button" className="photo-link" onClick={() => lightbox.show(card.name, card.photos)}>
+                          View{card.photos.length > 1 ? ` (${card.photos.length})` : ''}
+                        </button>
+                      ) : null}
+                    </td>
+                  )}
                 </tr>
-              </thead>
-              <tbody>
-                {segment.rows.map((row, j) => (
-                  <tr key={j}>
-                    {row.map((cell, k) => (
-                      // data-label: the column's name, which the phone layout
-                      // prints in front of the value (globals.css, 560px). An
-                      // attribute, so React escapes it like a child.
-                      <td key={k} data-label={segment.header[k] ?? ''} className={amountColumns(segment.rows)[k] ? 'amount' : undefined}>
-                        {inline(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ),
-      )}
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {photoColumn && <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} />}
+    </>
+  );
+}
+
+export function ReplyText({ text, cards, view = 'column' }: { text: string; cards?: RoomCard[]; view?: 'cards' | 'column' }) {
+  const rooms = cards !== undefined && cards.length > 0 ? cards : undefined;
+  return (
+    <>
+      {parseSegments(text).map((segment, i) => {
+        if (segment.kind === 'text') {
+          return (
+            <span className="reply-text" key={i}>
+              {inline(segment.text)}
+            </span>
+          );
+        }
+        const isRooms = rooms !== undefined && tableIsRooms(segment.rows, rooms);
+        if (isRooms && view === 'cards') return <RoomCards key={i} header={segment.header} rows={segment.rows} cards={rooms!} />;
+        return <Table key={i} header={segment.header} rows={segment.rows} cards={isRooms ? rooms : undefined} />;
+      })}
     </>
   );
 }

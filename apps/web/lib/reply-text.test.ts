@@ -54,7 +54,7 @@ describe('ReplyText', () => {
       { name: 'Loft', photos: [] },
     ];
     const text = 'Here are our rooms:\n\n| Room | Guests | Details |\n|---|---|---|\n| **Garden Room** | up to 2 | Opens onto the garden. |\n| Loft | up to 3 |  |\n\nTell me a date.';
-    const html = renderToStaticMarkup(createElement(ReplyText, { text, cards }));
+    const html = renderToStaticMarkup(createElement(ReplyText, { text, cards, view: 'cards' }));
     expect(html).toContain('<div class="room-cards">');
     expect(html).toContain('<img src="https://x/garden-1.webp" alt="Garden Room" loading="lazy"/>');
     expect(html).toContain('<span class="room-card-count">2 photos</span>');
@@ -64,6 +64,24 @@ describe('ReplyText', () => {
     expect(html).not.toContain('alt="Loft"');
     expect(html).not.toContain('<table');
     expect(html).toContain('<span class="reply-text">Tell me a date.</span>');
+  });
+
+  it('in column view, a room table keeps its shape and gains a Photo column with a View button', () => {
+    const cards = [
+      { name: 'Garden Room', photos: ['https://x/g1.webp', 'https://x/g2.webp'] },
+      { name: 'Loft', photos: [] },
+    ];
+    const text = '💰 Here are our rates:\n\n| Room | Slot | Weekday | Weekend | Holiday |\n|---|---|---|---|---|\n| Garden Room | Night | ₱3,500.00 | ₱4,500.00 | ₱4,500.00 |\n| Loft | Night | ₱4,800.00 | ₱5,800.00 | ₱5,800.00 |';
+    const html = renderToStaticMarkup(createElement(ReplyText, { text, cards, view: 'column' }));
+    expect(html).toContain('<table');
+    expect(html).not.toContain('room-cards');
+    expect(html).toContain('<th class="photo">Photo</th>');
+    expect(html).toContain('<td data-label="Photo" class="photo"><button type="button" class="photo-link">View (2)</button></td>');
+    // The Loft has no photo: an empty Photo cell.
+    expect(html).toContain('<td data-label="Room">Loft</td>');
+    expect(html).toContain('<td data-label="Photo" class="photo"></td>');
+    // The amount columns are still found with the extra column in place.
+    expect(html).toContain('<th class="amount">Weekday</th>');
   });
 
   it('a table that names none of the rooms is still a table, cards or not', () => {
