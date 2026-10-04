@@ -35,6 +35,7 @@ import type {
   RequestReceipt,
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
+import { discountLines, optionalCode, promoForStay, promoMessage } from './promos.js';
 import { addDays, lastBookingDate, localDate, pageSettings, parseRequest } from './validate.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,8 +148,9 @@ export async function hasBookingPage(tenant: BookingTenant): Promise<boolean> {
  */
 export async function quoteRequest(
   tenant: BookingTenant,
-  input: { slotId?: unknown; rooms?: unknown; checkIn?: unknown; nights?: unknown },
+  input: { slotId?: unknown; rooms?: unknown; checkIn?: unknown; nights?: unknown; promoCode?: unknown },
 ): Promise<RequestQuote> {
+  const code = optionalCode(input.promoCode);
   const config = await requireConfig(tenant);
   const today = localDate(config.timezone);
   const request = parseRequest(
@@ -220,11 +222,25 @@ export async function quoteRequest(
         basePrice: q.base_price,
         extraGuestPrice: q.extra_guest_price,
         surcharge: q.surcharge,
+        discount: 0,
         price: q.price,
         holiday: holiday.get(date) ?? null,
       });
     }
   }
+
+  // The promo (D-097), by the same two functions request_booking() uses, on
+  // the same rows in the same order: the typed code, or the automatic one.
+  // A code that does not apply changes nothing and says why (promoMessage);
+  // the request would refuse it in the same words.
+  const subtotal = lines.reduce((sum, l) => sum + l.price, 0);
+  const found = await promoForStay(tenant, code, request.checkIn, lastNight, subtotal);
+  const applied = found !== null && found.reason === null ? found : null;
+  const discounts = await discountLines(tenant, applied?.id ?? null, lines.map((l) => l.price));
+  lines.forEach((line, i) => {
+    line.discount = discounts[i] ?? 0;
+    line.price -= line.discount;
+  });
 
   return {
     slotId: request.slotId,
@@ -235,6 +251,9 @@ export async function quoteRequest(
     total: lines.reduce((sum, l) => sum + l.price, 0),
     currency: config.currency,
     available,
+    promo: applied ? { id: applied.id, name: applied.name, kind: applied.kind, value: applied.value } : null,
+    discount: discounts.reduce((sum, d) => sum + d, 0),
+    promoMessage: promoMessage(code, found),
   };
 }
 
@@ -259,9 +278,12 @@ export async function requestBooking(
     phone?: unknown;
     email?: unknown;
     notes?: unknown;
+    /** a promo code the customer typed (D-097); resolved by request_booking() under the lock */
+    promoCode?: unknown;
   },
 ): Promise<RequestReceipt> {
   const config = await requireConfig(tenant);
+  const promoCode = optionalCode(input.promoCode);
   const request = parseRequest(input, {
     today: localDate(config.timezone),
     bookingType: config.bookingType,
@@ -286,6 +308,7 @@ export async function requestBooking(
     p_phone: request.phone,
     p_email: request.email,
     p_notes: request.notes,
+    p_promo_code: promoCode,
   });
   if (error) throw requestError(error);
   if (!data || data.length === 0) throw new Error('The request was saved but nothing came back');
@@ -314,6 +337,7 @@ export async function requestBooking(
     basePrice: r.base_price,
     extraGuestPrice: r.extra_guest_price,
     surcharge: r.surcharge,
+    discount: r.discount ?? 0,
     price: r.price,
     holiday: holiday.get(r.booked_date) ?? null,
   }));
@@ -331,6 +355,7 @@ export async function requestBooking(
     endsAt: data[data.length - 1]!.ends_at,
     lines,
     total: lines.reduce((sum, l) => sum + l.price, 0),
+    discount: lines.reduce((sum, l) => sum + l.discount, 0),
     currency: config.currency,
     instructions: settings.instructions,
   };
@@ -498,6 +523,9 @@ function requestError(error: { code?: string; message: string }): Error {
   if (error.code === '22023') return new BookingInputError(error.message);
   if (error.code === '23P01') return new BookingConflictError('That date is no longer available. Please choose another.');
   if (error.code === '54000') return new BookingLimitError(error.message);
+  // A promo whose uses ran out between the quote and the request (D-097): a
+  // conflict in the database's own words, like a night taken meanwhile.
+  if (error.code === '23514' && /promo/.test(error.message)) return new BookingConflictError(error.message);
   // A unit that is not this tenant's, inactive, or gone: one answer.
   if (error.code === '23503') return new BookingInputError('No such unit or slot.');
   if (error.code === '23514' && /holds at most/.test(error.message)) return new BookingInputError('That is more guests than the room holds.');

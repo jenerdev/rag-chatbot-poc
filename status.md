@@ -89,7 +89,7 @@ one. § 7 has five questions with recommendations. No chatbot change.
 - [ ] § 7 answered
 - [x] Phase 0 — baseline (2026-10-04): both SQL files confirmed in; verify 109/110 after its row builders learned `status: 'confirmed'` (a D-095 catch-up); rooms 41/41; both isolation suites both ways; tests, typecheck, three baselines identical; battery 57/61, the known set
 - [x] Phase 1 — schema (2026-10-04): `schema-promos.sql` run by the user (the table and its RLS, the two booking columns, the three functions, the trigger with the discount, `request_booking()` with `p_promo_code`, the 10-parameter form dropped, the two older files guarded); the typed schema; verify 111–116 all green, **115/116**; rooms 41/41; bookings isolation 30/30 both ways
-- [ ] Phase 2 — `@rag/bookings` (`promos.ts`, the quotes and writers take a promo)
+- [x] Phase 2 — `@rag/bookings` (2026-10-04): `promos.ts` (list with uses, create, update, retire, delete-unused), `quoteRequest`/`requestBooking` take a code, `quote`/`createBookings` a promo id, `listBookings` the promo; rooms **45/45** (21a–21d), isolation 30/30 both ways, tests and typecheck green
 - [ ] Phase 3 — routes and permissions (`promos:read/write`)
 - [ ] Phase 4 — screens (Promos; the page's code field; the staff picker)
 - [ ] Phase 5 — the walls and the walk
@@ -1158,6 +1158,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — promos Phase 2 (`@rag/bookings`), on `feat/promos`
+- **Did:** `promos.ts`; the quotes and writers take a promo; the list names
+  it. Rooms 45/45 (four new checks; three first failed on my comparisons,
+  the data right each time); isolation 30/30 both ways; tests, typecheck.
+- **Next:** Phase 3, routes and permissions (`promos:read/write`).
 
 ### 2026-10-04 — promos Phase 1 (the schema), on `feat/promos`
 - **Did:** `schema-promos.sql` (run by the user), the typed schema, the two

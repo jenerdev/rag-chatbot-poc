@@ -22,6 +22,7 @@ import {
   MAX_UNIT_NAME,
 } from './constants.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
+import { discountLines } from './promos.js';
 import { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
 import type {
   BookingGroup,
@@ -44,6 +45,7 @@ import {
   parseConfig,
   parseRooms,
   positiveInt,
+  optionalPositiveInt,
   requireText,
   validateRange,
 } from './validate.js';
@@ -343,7 +345,7 @@ export async function listBookings(
   let query = tenant.db
     .from('bookings')
     .select(
-      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, decision_note, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
+      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
     )
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
@@ -352,11 +354,18 @@ export async function listBookings(
   const { data, error } = await query.order('booked_date').order('id');
   if (error) throw new Error(`Could not load bookings: ${error.message}`);
 
-  // Names are joined here rather than embedded in the select. Both lookups
-  // are tenant-scoped, so a unit name can only come from this tenant.
-  const [units, slots] = await Promise.all([listUnits(tenant), listSlots(tenant, { retired: true })]);
+  // Names are joined here rather than embedded in the select. All three
+  // lookups are tenant-scoped, so a name can only come from this tenant.
+  // The promo names (D-097) include retired promos: a booking keeps its name.
+  const [units, slots, promos] = await Promise.all([
+    listUnits(tenant),
+    listSlots(tenant, { retired: true }),
+    tenant.db.from('promos').select('id, name').eq('tenant_id', tenant.id),
+  ]);
+  if (promos.error) throw new Error(`Could not load promos: ${promos.error.message}`);
   const unitName = new Map(units.map((u) => [u.id, u.name]));
   const slotName = new Map(slots.map((s) => [s.id, s.name]));
+  const promoName = new Map(promos.data.map((p) => [p.id, p.name]));
 
   return data.map((b) => ({
     id: b.id,
@@ -371,6 +380,9 @@ export async function listBookings(
     guestCount: b.guest_count,
     notes: b.notes,
     decisionNote: b.decision_note,
+    promoId: b.promo_id,
+    promoName: b.promo_id === null ? null : (promoName.get(b.promo_id) ?? null),
+    discount: b.discount,
     price: b.price,
     basePrice: b.base_price,
     extraGuestPrice: b.extra_guest_price,
@@ -442,7 +454,12 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
   // holds nothing until someone presses Confirm, exactly like a customer's
   // request (D-070). The tools that seed test bookings pass 'confirmed'.
   const status = input.status === undefined ? 'pending' : bookableStatus(input.status);
-  const groupId = rooms.length > 1 ? randomUUID() : null;
+  // D-097: a promo the staff member picked. The trigger checks it (this
+  // tenant's, offered, covering the date, uses left) and stores the discount.
+  // A booking with a promo always has a group id, so promo_uses() counts it
+  // as one use however many rooms it has.
+  const promoId = optionalPositiveInt(input.promoId, 'Promo');
+  const groupId = rooms.length > 1 || promoId !== null ? randomUUID() : null;
 
   const { data, error } = await tenant.db
     .from('bookings')
@@ -458,6 +475,7 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
         guest_count: room.guestCount,
         notes,
         group_id: groupId,
+        promo_id: promoId,
       })),
     )
     .select('id');
@@ -498,11 +516,12 @@ export async function createBooking(tenant: BookingTenant, input: NewBooking): P
  */
 export async function quote(
   tenant: BookingTenant,
-  input: { unitId?: unknown; rooms?: unknown; guestCount?: unknown; slotId: unknown; date: unknown },
+  input: { unitId?: unknown; rooms?: unknown; guestCount?: unknown; slotId: unknown; date: unknown; promoId?: unknown },
 ): Promise<Quote> {
   const { currency } = await requirePerRoom(tenant);
   const rooms = parseRooms(input);
   const slotId = positiveInt(input.slotId, 'Slot');
+  const promoId = optionalPositiveInt(input.promoId, 'Promo');
   if (!isIsoDate(input.date)) throw new BookingInputError(`"${String(input.date)}" is not a date. Use YYYY-MM-DD.`);
   const date = input.date;
 
@@ -554,11 +573,40 @@ export async function quote(
         extraGuests: q.extra_guests,
         extraGuestPrice: q.extra_guest_price,
         surcharge: q.surcharge,
+        discount: 0,
         price: q.price,
       };
     }),
   );
-  return { date, slotId, slot: slotName, lines, total: lines.reduce((sum, l) => sum + l.price, 0), currency };
+  // D-097: the promo the staff member picked, previewed by promo_discount(),
+  // the same function the trigger will store from, on the same rows in the
+  // same order (the first room carries a fixed amount). The promo must be
+  // this tenant's and offered; the trigger refuses the rest at insert, and
+  // the preview says so first, in words.
+  let promo: Quote['promo'] = null;
+  if (promoId !== null) {
+    const { data: p, error } = await tenant.db.from('promos').select('id, name, kind, value, active, valid_from, valid_to').eq('tenant_id', tenant.id).eq('id', promoId).maybeSingle();
+    if (error) throw new Error(`Could not read the promo: ${error.message}`);
+    if (!p) throw new BookingInputError('No such promo.');
+    if (!p.active) throw new BookingInputError(`The promo "${p.name}" is no longer offered.`);
+    if (date < p.valid_from || date > p.valid_to) throw new BookingInputError(`The promo "${p.name}" covers stays from ${p.valid_from} to ${p.valid_to}.`);
+    promo = { id: p.id, name: p.name, kind: p.kind, value: p.value };
+    const discounts = await discountLines(tenant, p.id, lines.map((l) => l.price));
+    lines.forEach((line, i) => {
+      line.discount = discounts[i] ?? 0;
+      line.price -= line.discount;
+    });
+  }
+  return {
+    date,
+    slotId,
+    slot: slotName,
+    lines,
+    total: lines.reduce((sum, l) => sum + l.price, 0),
+    currency,
+    promo,
+    discount: lines.reduce((sum, l) => sum + l.discount, 0),
+  };
 }
 
 /** A retired slot's refusal (D-090), in the code's words and for the trigger's (bookings_slot_active). */
@@ -574,6 +622,11 @@ function writeError(error: { code?: string; message: string }, date: string): Er
   if (closed) return closed;
   if (error.code === '23514' && /slot retired/.test(error.message)) return new BookingInputError(RETIRED);
   if (error.code === '23P01') return new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
+  // D-097: a promo's limit is a conflict (someone else took the last use); an
+  // ended, retired or wrong-dated promo is bad input, in the trigger's words.
+  if (error.code === '23514' && /reached its limit/.test(error.message)) return new BookingConflictError(error.message);
+  if (error.code === '23514' && /promo/.test(error.message)) return new BookingInputError(error.message);
+  if (error.code === '23503' && /Promo/.test(error.message)) return new BookingInputError('No such promo.');
   if (error.code === '23503') return new BookingInputError('No such unit or slot.');
   if (error.code === '23514' && /holds at most/.test(error.message)) {
     return new BookingInputError('That is more guests than the room holds.');

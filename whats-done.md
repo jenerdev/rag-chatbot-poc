@@ -7144,3 +7144,38 @@ and `promo_uses` counts 1; the trigger refuses another tenant's promo
 the stored `160000` alone. Rooms 41/41; bookings isolation 30/30 both
 ways; typecheck clean. Every existing booking: `promo_id null`, `discount
 null`, `price` as it was.
+
+## Promos, Phase 2: `@rag/bookings` · done 2026-10-04, on `feat/promos`
+
+**What:** `promos.ts`: `listPromos` (with `uses` from `promo_uses()`),
+`createPromo`, `updatePromo`, `retirePromo`, `deletePromo` (unused only;
+a used one is "Retire it instead"), every input validated in words (kind,
+an integer value with percent ≤ 10000, the range, the code shape, the
+limit), a duplicate code refused in words (23505); `promoForStay()`,
+`discountLines()`, `promoMessage()`, `optionalCode()` for the quotes.
+`quoteRequest()` takes `promoCode`: the typed code or the automatic promo
+through `promo_for_request()`, each line's discount through
+`promo_discount()` in insert order, the total net, `promo`, `discount` and
+a `promoMessage` when a typed code did not apply (nothing changes then).
+`requestBooking()` passes `p_promo_code` and reads `discount` back; the
+receipt carries `discount`. Staff: `quote()` and `createBookings()` take
+`promoId` (a booking with a promo always has a group id, so it is ONE
+use); `listBookings` carries `promoId`, `promoName`, `discount`. Error
+maps: a promo's limit is a 409 in the database's words; a retired or
+wrong-dated one a 400; the request's 22023 messages pass through.
+
+**Observed:** rooms **45/45** (21a–21d new): five bad inputs refused in
+words, the code trimmed, a duplicate refused, listed with 0 uses; the
+chat token's quote with the code takes 10 % off each night
+(`3700000 → 3330000, −370000`), a wrong code and one outside the range
+change nothing and say why; the receipt equals the quote, the stored rows
+name the promo with `165000, 205000`, uses 1; a fixed ₱500 lands on the
+first room only in the staff quote AND the stored rows (`50000, 0`), the
+limit is a `BookingConflictError` in words, a retired promo is refused by
+the staff quote and is "No such promo code" to a customer, a used promo's
+delete says "Retire it instead", an unused one deletes, and an edited
+value leaves the stored `165000, 205000` alone. Bookings isolation 30/30
+both ways; tests 99/355/56; typecheck. Three of the four checks first
+failed on MY comparisons (every row against the first night's discount; an
+out-of-range quote against the in-range total): the printed data was right
+each time, and the comparisons were fixed, not the code.

@@ -43,6 +43,11 @@ import {
   cancelBooking,
   confirmBooking,
   createBookings,
+  createPromo,
+  deletePromo,
+  listPromos,
+  retirePromo,
+  updatePromo,
   createSlot,
   deleteSlot,
   listSlots,
@@ -471,6 +476,97 @@ try {
         q.available && q.total === 3700000 && got === `${THU} 1600000+50000+0=1650000, ${FRI} 2000000+50000+0=2050000`,
         'quote: a Thursday + Friday stay is priced night by night',
         `${got} · total ${q.total} · available ${q.available}`,
+      );
+    }
+
+    // --- promos (plan/promos.md Phase 2, D-097) ---------------------------------
+    // Through the package only: the screens and the page will call nothing else.
+    // Dates: stays two to five weeks after THU, inside a promo valid from THU
+    // for 60 days; a distinct contact per request (3 open per contact).
+    {
+      const P_FROM = THU;
+      const P_TO = next(THU, 60);
+      const promoStay = (n, overrides = {}) => stay({ checkIn: next(THU, 7 * n), nights: 2, ...contact(50 + n), ...overrides });
+      const tenPct = (q) => q.lines.reduce((sum, l) => sum + Math.round((l.basePrice + l.extraGuestPrice + l.surcharge) * 0.1), 0);
+
+      // 21a. createPromo validates in words; listPromos lists with 0 uses;
+      //      a duplicate code is refused in words; retired ones need `all`.
+      const bad = await Promise.all([
+        thrown(() => createPromo(probe, { name: 'x', kind: 'half', value: 1, validFrom: P_FROM, validTo: P_TO })),
+        thrown(() => createPromo(probe, { name: 'x', kind: 'percent', value: 12345, validFrom: P_FROM, validTo: P_TO })),
+        thrown(() => createPromo(probe, { name: 'x', kind: 'fixed', value: 100, validFrom: P_TO, validTo: P_FROM })),
+        thrown(() => createPromo(probe, { name: 'x', kind: 'fixed', value: 100, validFrom: P_FROM, validTo: P_TO, code: 'a b' })),
+        thrown(() => createPromo(probe, { name: 'x', kind: 'fixed', value: 100, validFrom: P_FROM, validTo: P_TO, maxUses: 0 })),
+      ]);
+      const ten = await createPromo(probe, { name: 'Ten percent', kind: 'percent', value: 1000, validFrom: P_FROM, validTo: P_TO, code: ' ten-10 ' });
+      const dup = await thrown(() => createPromo(probe, { name: 'again', kind: 'fixed', value: 1, validFrom: P_FROM, validTo: P_TO, code: 'TEN-10' }));
+      const listed = await listPromos(probe);
+      check(
+        bad.every((e) => e instanceof BookingInputError) && ten.code === 'ten-10' && ten.uses === 0 && dup instanceof BookingInputError && /already used/.test(dup.message)
+          && listed.length === 1 && listed[0].id === ten.id,
+        'promos: five bad inputs refused in words; created with the code trimmed; a duplicate code refused; listed with 0 uses',
+        `${bad.map(described).join(' | ')} · code "${ten.code}" · dup: ${described(dup)} · listed ${listed.length}`,
+      );
+
+      // 21b. quoteRequest on the chat token: the code takes 10 % off every
+      //      night (rounded), the total is net, the promo is named; a wrong
+      //      code and one outside its dates change nothing and say why.
+      const plain = await quoteRequest(chat, promoStay(2));
+      const coded = await quoteRequest(chat, promoStay(2, { promoCode: 'TEN-10' }));
+      const wrong = await quoteRequest(chat, promoStay(2, { promoCode: 'NOPE-9' }));
+      const outside = await quoteRequest(chat, promoStay(2, { checkIn: next(P_TO, 1), promoCode: 'TEN-10' }));
+      check(
+        coded.promo?.id === ten.id && coded.discount === tenPct(plain) && coded.total === plain.total - coded.discount
+          && coded.lines.every((l, i) => l.discount === Math.round(plain.lines[i].price * 0.1) && l.price === plain.lines[i].price - l.discount)
+          && wrong.promo === null && wrong.discount === 0 && wrong.total === plain.total && wrong.promoMessage === 'No such promo code.'
+          && outside.promo === null && outside.discount === 0 && /covers stays from/.test(outside.promoMessage ?? ''),
+        'quoteRequest: the code takes 10 % off each night and the total; a wrong code and one outside its dates change nothing and say why',
+        `plain ${plain.total} · coded ${coded.total} (−${coded.discount}, "${coded.promo?.name}") · wrong "${wrong.promoMessage}" · outside "${outside.promoMessage}"`,
+      );
+
+      // 21c. requestBooking with the code: the receipt's discount is the
+      //      quote's, the stored rows carry promo and discount, the staff list
+      //      names the promo; uses becomes 1.
+      const receipt = await requestBooking(chat, promoStay(2, { promoCode: 'ten-10' }));
+      const storedRows = (await listBookings(probe, { from: next(THU, 14), to: next(THU, 15) })).filter((b) => b.guestName === 'Rooms Probe' && b.promoId === ten.id);
+      const usesAfter = (await listPromos(probe)).find((p) => p.id === ten.id)?.uses;
+      check(
+        receipt.discount === coded.discount && receipt.total === coded.total && receipt.lines.every((l, i) => l.discount === coded.lines[i].discount)
+          && storedRows.length === 2 && storedRows.every((b, i) => b.promoName === 'Ten percent' && b.discount === coded.lines[i].discount) && usesAfter === 1,
+        "requestBooking with the code: the receipt equals the quote; the rows carry the promo's name and discount; uses 1",
+        `receipt −${receipt.discount} = ${receipt.total} · stored ${storedRows.map((b) => `${b.promoName}/${b.discount}`).join(', ')} · uses ${usesAfter}`,
+      );
+
+      // 21d. Staff: a fixed ₱500 promo with max_uses 1, picked by id. quote()
+      //      puts it on the FIRST room only; createBookings stores the same;
+      //      a second staff booking with it is a 409 in words; retired, a
+      //      quote refuses it; deletePromo refuses a used promo in words and
+      //      deletes an unused one; an edited value leaves the stored
+      //      discount alone (Rule 4).
+      const five = await createPromo(probe, { name: 'Five hundred off', kind: 'fixed', value: 50000, validFrom: P_FROM, validTo: P_TO, maxUses: 1 });
+      const staffDate = next(THU, 21);
+      const sq = await quote(probe, { rooms: [{ unitId: garden.id, guestCount: 1 }, { unitId: family.id, guestCount: 2 }], slotId: night.id, date: staffDate, promoId: five.id });
+      const sb = await createBookings(probe, { rooms: [{ unitId: garden.id, guestCount: 1 }, { unitId: family.id, guestCount: 2 }], slotId: night.id, date: staffDate, guestName: 'Promo Staff', promoId: five.id });
+      const sbRows = (await listBookings(probe, { from: staffDate, to: staffDate })).filter((b) => b.groupId === sb.groupId);
+      const limit = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: next(THU, 28), guestName: 'Over limit', promoId: five.id }));
+      const retired = await retirePromo(probe, ten.id);
+      const retiredQuote = await thrown(() => quote(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: staffDate, promoId: ten.id }));
+      const retiredRequest = await quoteRequest(chat, promoStay(4, { promoCode: 'TEN-10' }));
+      const deleteUsed = await thrown(() => deletePromo(probe, five.id));
+      const unused = await createPromo(probe, { name: 'Unused', kind: 'fixed', value: 1, validFrom: P_FROM, validTo: P_TO });
+      const deletedUnused = await deletePromo(probe, unused.id);
+      await updatePromo(probe, ten.id, { value: 5000 });
+      const keptRows = (await listBookings(probe, { from: next(THU, 14), to: next(THU, 15) })).filter((b) => b.promoId === ten.id);
+      check(
+        sq.discount === 50000 && sq.lines[0].discount === 50000 && sq.lines[1].discount === 0 && sq.total === sq.lines.reduce((s, l) => s + l.price, 0)
+          && sbRows.map((b) => b.discount).join(',') === '50000,0' && sb.total === sq.total
+          && limit instanceof BookingConflictError && /limit/.test(limit.message)
+          && retired === true && retiredQuote instanceof BookingInputError && /no longer offered/.test(retiredQuote.message)
+          && retiredRequest.promo === null && retiredRequest.promoMessage === 'No such promo code.'
+          && deleteUsed instanceof BookingInputError && /Retire it/.test(deleteUsed.message) && deletedUnused === true
+          && keptRows.map((b) => b.discount).join(',') === coded.lines.map((l) => l.discount).join(','),
+        'staff promos: a fixed amount on the first room, stored the same; the limit is a 409; retired is refused; delete only when unused; an edit leaves stored discounts alone',
+        `quote ${sq.lines.map((l) => l.discount).join(',')} = ${sq.total} · stored ${sbRows.map((b) => b.discount).join(',')} · limit ${described(limit)} · retired quote ${described(retiredQuote)} · retired code "${retiredRequest.promoMessage}" · delete used ${described(deleteUsed)} · unused ${deletedUnused} · kept ${keptRows.map((b) => b.discount).join(',')}`,
       );
     }
 

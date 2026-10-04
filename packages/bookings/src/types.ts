@@ -62,7 +62,12 @@ export interface BookingSummary {
   notes: string | null;
   /** what staff wrote when they confirmed or cancelled it (D-096); null until then */
   decisionNote: string | null;
-  /** centavos, the TOTAL, set by the database; null for whole_resort and for bookings made before prices existed */
+  /** the promo it got (D-097), by id and name; null without one */
+  promoId: number | null;
+  promoName: string | null;
+  /** centavos, part of `price`; null without a promo and for old rows */
+  discount: number | null;
+  /** centavos, the TOTAL (net of the discount), set by the database; null for whole_resort and for bookings made before prices existed */
   price: number | null;
   /** its parts (extra-guests D-068): the rate, the extra-guest fee, and the holiday surcharge. Null likewise */
   basePrice: number | null;
@@ -124,8 +129,56 @@ export interface NewBooking {
   guestPhone?: unknown;
   guestCount?: unknown;
   notes?: unknown;
-  /** Staff create confirmed bookings. 'pending' is for the future request_booking tool (§ 7). */
+  /** Born pending unless named (D-095); the tools that seed bookings pass 'confirmed'. */
   status?: unknown;
+  /** A promo the staff member picked (D-097). The trigger checks it and stores the discount. */
+  promoId?: unknown;
+}
+
+// --- promos (plan/promos.md, D-097) -------------------------------------------
+
+export type PromoKind = 'fixed' | 'percent';
+
+/** A promo as the Promos screen shows it. Members read; owners and admins write. */
+export interface Promo {
+  id: number;
+  name: string;
+  kind: PromoKind;
+  /** centavos for fixed; hundredths of a percent for percent (1250 = 12.50 %) */
+  value: number;
+  /** the STAY dates it covers, inclusive */
+  validFrom: string;
+  validTo: string;
+  /** null = automatic: applies by itself to every eligible stay */
+  code: string | null;
+  /** null = unlimited */
+  maxUses: number | null;
+  active: boolean;
+  /** distinct pending or confirmed requests that used it, counted now */
+  uses: number;
+  createdAt: string;
+}
+
+/** What createPromo accepts. Loose types on purpose: this package validates them itself. */
+export interface NewPromo {
+  name: unknown;
+  kind: unknown;
+  value: unknown;
+  validFrom: unknown;
+  validTo: unknown;
+  code?: unknown;
+  maxUses?: unknown;
+}
+
+/** promo_for_request()'s answer for one stay. `reason` says why it does not apply, or null. */
+export interface PromoForStay {
+  id: number;
+  name: string;
+  kind: PromoKind;
+  value: number;
+  validFrom: string;
+  validTo: string;
+  reason: 'dates' | 'exhausted' | null;
 }
 
 export type BookingType = 'whole_resort' | 'per_room';
@@ -201,11 +254,18 @@ export interface Quote {
     extraGuests: number;
     extraGuestPrice: number;
     surcharge: number;
+    /** centavos, this room's share of the promo (D-097): a fixed amount on the first line; 0 without one */
+    discount: number;
+    /** centavos, net of the discount */
     price: number;
   }[];
-  /** centavos */
+  /** centavos, net of the discount */
   total: number;
   currency: string;
+  /** the promo applied (D-097), or null */
+  promo: { id: number; name: string; kind: PromoKind; value: number } | null;
+  /** centavos, the sum of the lines' discounts */
+  discount: number;
 }
 
 export interface RateSummary {
@@ -310,7 +370,9 @@ export interface RequestLine {
   basePrice: number;
   extraGuestPrice: number;
   surcharge: number;
-  /** centavos: base + extra + surcharge */
+  /** centavos, this night's share of the promo (D-097): a fixed amount on the first line, a percentage on each; 0 without one */
+  discount: number;
+  /** centavos: base + extra + surcharge − discount */
   price: number;
   /** a holiday or peak label for this date, or null */
   holiday: string | null;
@@ -323,11 +385,17 @@ export interface RequestQuote {
   checkIn: string;
   nights: number;
   lines: RequestLine[];
-  /** centavos, the sum of the lines */
+  /** centavos, the sum of the lines (net of the discount) */
   total: number;
   currency: string;
   /** false when a night is already CONFIRMED for one of the units; a request would be refused */
   available: boolean;
+  /** the promo applied (D-097): a typed code that applies, or the automatic one; null otherwise */
+  promo: { id: number; name: string; kind: PromoKind; value: number } | null;
+  /** centavos, the sum of the lines' discounts; 0 without a promo */
+  discount: number;
+  /** why a TYPED code did not apply, in words; null when it did or none was typed */
+  promoMessage: string | null;
 }
 
 /** What a customer gets back after sending a request: the stored rows, never recomputed. */
@@ -340,8 +408,10 @@ export interface RequestReceipt {
   startsAt: string;
   endsAt: string;
   lines: RequestLine[];
-  /** centavos, the sum of the STORED prices */
+  /** centavos, the sum of the STORED prices (net of the discount) */
   total: number;
+  /** centavos, the sum of the STORED discounts (D-097); 0 without a promo */
+  discount: number;
   currency: string;
   instructions: string | null;
 }

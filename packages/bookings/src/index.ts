@@ -81,6 +81,7 @@ export {
   updateAccommodation,
 } from './accommodations.js';
 export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder } from './images.js';
+export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from './promos.js';
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { closedDays } from './closed.js';
@@ -90,6 +91,10 @@ export type {
   Accommodation,
   AccommodationInput,
   BookingGroup,
+  NewPromo,
+  Promo,
+  PromoForStay,
+  PromoKind,
   BookingPage,
   BookingRequest,
   BookingStatus,
