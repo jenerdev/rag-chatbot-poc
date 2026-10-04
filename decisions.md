@@ -2991,7 +2991,10 @@ had, now for staff: nothing is held until someone says so.
 **Cost, stated:** until confirmed, a staff booking leaves the date OPEN to
 the chatbot, the booking page and other staff, exactly as a request does.
 Confirm promptly, or the span can be taken by another confirmed booking,
-and Confirm then answers 409.
+and Confirm then answers 409. **Amended by D-099 (2026-10-05):** once a
+night is confirmed, no further pending booking can be created on it from
+any door (a trigger), and a pending one already there is flagged `clash`
+on the list and refused at Confirm.
 
 **Measured:** tests 99/355/56; typecheck; rooms **40/40** (4b new: born
 pending, a second pending allowed on the same night, Confirm takes the
@@ -3144,3 +3147,63 @@ phase; the battery 56/61 at Phase 0 and 54/61 at Phase 5, where the two
 new failures (`rt-price`, `rt-standard`, 3 of 3) are the user's two
 confirmed bookings on 2026-10-20, the battery's free weekday that day
 (trap 24, the date kind). The browser walk is the user's.
+
+## D-099 · A pending booking cannot be born on a span that is already confirmed; the staff list says which pending rows would clash · **Added 2026-10-05 (plan/staff-clash.md). Amends D-095's cost line**
+
+**Decision:** one BEFORE INSERT trigger, `bookings_pending_not_taken`
+(`sql/schema-taken-span.sql`, the 20th file), refuses a `pending` row
+whose unit and span overlap a `confirmed` row of the same tenant, with
+`23P01` (the exclusion constraint's own code, so every map to 409 holds
+unchanged) and words that name the date and the unit: "taken on
+2026-10-20: Garden Room is already confirmed for that slot". It runs as
+the caller with `search_path = ''`, named to fire after
+`bookings_compute_during` so it reads a computed span, and refuses a null
+span rather than passing it (trap 12). `taken.ts` is the ONE place the
+trigger's `23P01` is told apart from the constraint's: the trigger's words
+pass through to the caller, the constraint's text still gets the
+package's sentence. `listBookings()` carries `clash` on a pending row
+whose date, unit and slot are confirmed for another row, the Requests
+section's definition; the Bookings screen shows that section's warning
+under such a row and disables its Confirm, Cancel enabled. The screen is
+the courtesy and the server the guard (trap 21): a stale tab's Confirm
+still meets `bookings_no_overlap`'s 409.
+
+**What stands:** D-070 and D-095. A pending row still holds nothing:
+`bookings_no_overlap` is untouched, two pending rows may still share a
+night (§ 7 q2), the first one confirmed takes it, and the other's Confirm
+is the 409 it was. The trigger only stops a pending row being BORN on a
+night someone already holds. No lock (Rule 4): an insert that reads "no
+confirmed row" while a concurrent Confirm commits leaves a pending row
+beside a confirmed one, which is exactly what `clash` names and what
+Confirm then refuses; the window is one statement wide.
+
+**D-095's cost line, amended:** "until confirmed, a staff booking leaves
+the date OPEN … Confirm then answers 409" now reads: a pending booking
+leaves the date open to be CONFIRMED by someone else, and once it is, no
+further pending booking can be created on it from any door, and the one
+already there is flagged and refused at Confirm.
+
+**Learned (Phase 1):** the customer's door was SQL-guarded already:
+`request_booking()` checks the confirmed rows itself and raises `23P01`
+"That date is no longer available" before any insert, so the trigger
+stands behind that check. The staff door had no SQL check; the trigger is
+its wall 2.
+
+**Why:** the user: "i can still book a room/slot that was already taken
+using staff booking. or this is intentional?" It was D-095's stated cost,
+and the Requests section already warned where the staff list did not.
+
+**Measured (Phases 0–3, one day, on `feat/staff-clash`):** rooms 48/48
+(4d: two pendings share a night; after one is confirmed a raw staff
+insert is `23P01 "taken on 2026-11-24: Garden Room is already confirmed
+for that slot"`, the package a `BookingConflictError`, a Family + Garden
+group writes no Family row, a confirmed insert is still the constraint's;
+4e: the words through the package, the sentence for the constraint, `clash`
+true on the pending row and false on the confirmed; 26b: `request_booking()`
+refused by its own check, rows unchanged); bookings tests 102 (+3);
+web 59; typecheck; bookings isolation 31/31 both ways; pipeline isolation
+23/21; verify 117/118; the three baselines byte-identical; battery 55/61,
+the known set; over HTTP a staff POST on harbor's confirmed night
+`409 {"error":"taken on 2026-10-20: Garden Room is already confirmed for
+that slot"}`. The walk, by the user: refused in words; two pendings, one
+confirmed, the other warned and cancelled.

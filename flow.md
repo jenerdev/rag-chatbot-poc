@@ -319,7 +319,7 @@ return 404, with no redirect.
 | `GET` | `/api/t/<slug>/documents` | list with chunk counts | `listDocuments` | admin |
 | `GET` | `/api/t/<slug>/documents/:id/chunks` | expand a row to show its chunks | `getChunks` | admin |
 | `DELETE` | `/api/t/<slug>/documents/:id` | delete; chunks cascade | `deleteDocument` | admin |
-| `GET` / `POST` | `/api/t/<slug>/bookings` | list (`?unit=` per_room) / book one unit, or `rooms` as one group | `listBookings` / `createBooking(s)` | admin |
+| `GET` / `POST` | `/api/t/<slug>/bookings` | list (`?unit=` per_room; each pending row says `clash` when its night is already confirmed, D-099) / book one unit, or `rooms` as one group, born `pending` (D-095); a 409 in the trigger's words when that span is already confirmed (D-099) | `listBookings` / `createBooking(s)` | admin |
 | `POST` | `/api/t/<slug>/bookings/quote` | the price of rooms on a date, from `unit_price()` (per_room) | `quote` | admin |
 | `GET` / `POST` | `/api/t/<slug>/accommodations` | rooms with rates and photos / add a room (per_room; 404 otherwise) | `listAccommodations` / `createAccommodation` | admin |
 | `GET` / `PATCH` | `/api/t/<slug>/accommodations/:id` | one room / change or retire it | `getAccommodation` / `updateAccommodation` | admin |

@@ -7532,3 +7532,16 @@ set, `lang-tagalog-2` and `lang-followup` passed this run, and
 (dashboard Phase 5). The trigger did not touch the battery: its fixtures
 seed `confirmed`, which the trigger ignores, and `tool 9/9` holds. The
 walk is the user's, on harbor's Bookings screen.
+
+## Staff clash, Phase 4: the record · done 2026-10-05, on `feat/staff-clash`
+
+**What:** D-099 in decisions.md (the trigger, the one place its words are
+told from the constraint's, the `clash` flag, what stands from D-070 and
+D-095, the no-lock window, what Phase 1 learned about the customer door,
+every measured value, the user's walk); D-095's cost line amended in
+place with a pointer to D-099; CLAUDE.md's header paragraph, 20 sql
+files, `taken.ts` in the layout, rooms 48 in the layout and the commands;
+flow.md § 5's bookings row (born pending, `clash` on the list, the 409 in
+words); the plan's status line. Nothing in the chat, the prompts or the
+tools changed in this plan, and the three baselines were identical at
+Phase 0 and Phase 3.

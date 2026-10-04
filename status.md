@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff clash (planned 2026-10-05, in progress on `feat/staff-clash`, branched from `feat/dashboard`'s head; merges after the dashboard):**
+**Staff clash (2026-10-05, COMPLETE on `feat/staff-clash`, walked by the user; branched from `feat/dashboard`'s head, so merging it brings the dashboard too):**
 [`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
 be born on a night already confirmed for that unit (a trigger, `23P01`,
 words, every door), and the staff list carries `clash` with the Requests
@@ -91,7 +91,7 @@ section's warning and disabled Confirm. Amends D-095's cost line. Four
 - [x] Phase 2 — the package, the route, the screen (2026-10-05): `taken.ts` (the trigger's words pass through as the 409; the constraint's keep the sentence), `clash` on the staff list, the warning and disabled Confirm on the Bookings screen; tests **102**/59, typecheck; rooms **48/48** (4e: words through the package, the sentence for the constraint, P2 `clash` true, P1 false); over HTTP a staff POST on harbor's confirmed 2026-10-20 Garden Room night is `409 {"error":"taken on 2026-10-20: Garden Room is already confirmed for that slot"}`
 - [x] Phase 3, the suites (2026-10-05): rooms 48/48, bookings isolation 31/31 both ways, pipeline isolation 23 (RLS) / 21 (filters), verify 117/118 (the known roles check), tests 59/102/359, the three baselines identical, battery **55/61** (`original 8/10 · tool 9/9 · lang 10/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`): the known set, with `rt-price`/`rt-standard` still the user's two bookings on 2026-10-20
 - [x] Phase 3, the walk — by the user, 2026-10-05 ("done testing"): a staff booking on a confirmed night refused in words; two pendings on one night, one confirmed, the other warned with Confirm disabled, then cancelled
-- [ ] Phase 4 — the record (D-099)
+- [x] Phase 4 — the record (2026-10-05): D-099, D-095's cost line amended, CLAUDE.md (header, 20 sql files, `taken.ts`, rooms 48), flow.md § 5's bookings row, the plan marked done
 
 **Dashboard (2026-10-05, Phases 0–6 DONE on `feat/dashboard`; the user's browser walk owed, then merge):**
 [`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
@@ -1191,6 +1191,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — staff clash, Phases 0–4, on `feat/staff-clash`
+- **Did:** the plan; the trigger (`schema-taken-span.sql`, run by the
+  user); `taken.ts`, `clash` on the list, the screen's warning; every
+  suite green, rooms 48, battery 55/61 the known set; the user's walk;
+  D-099.
+- **Next:** merge. `feat/staff-clash` contains `feat/dashboard`, so one
+  merge into master brings both (the dashboard's own walk was the user's
+  testing on 2026-10-05).
 
 ### 2026-10-05 — dashboard Phase 6, the record, on `feat/dashboard`
 - **Did:** D-098, CLAUDE.md, flow.md § 5, the plan's status.

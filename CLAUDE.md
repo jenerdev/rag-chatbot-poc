@@ -161,6 +161,19 @@
 > `platform_dashboard()` (the eleventh definer function) gives `/platform`
 > a counts-only Pulse strip. `?days=7|30|90`, clamped. The chatbot is
 > untouched: the three baselines are byte-identical.
+>
+> **A pending booking cannot be born on a confirmed span** since 2026-10-05
+> (D-099, [`plan/staff-clash.md`](./plan/staff-clash.md), Phases 0–4, all
+> done, walk included). `bookings_pending_not_taken`
+> (`sql/schema-taken-span.sql`, the 20th file) refuses the INSERT of a
+> pending row whose unit and span overlap a confirmed one, `23P01` in
+> words ("taken on <date>: <unit> is already confirmed for that slot");
+> `taken.ts` passes those words through as the 409. A pending row still
+> holds nothing (D-070, D-095): two pendings may share a night, the first
+> confirmed wins, the other's Confirm is the 409. The staff list carries
+> `clash`, and the Bookings screen warns and disables Confirm on such a
+> row; the server stays the guard (trap 21). The customer door was
+> SQL-guarded already (`request_booking()`'s own check).
 
 ## What this is
 
@@ -237,7 +250,7 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (19 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (20 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
@@ -255,7 +268,8 @@ packages/
     tools/isolation.mjs    31 cross-tenant checks, no API key (16b room photos, 16c promos)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
-    tools/rooms.mjs        45 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions and promos
+    src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409; the constraint's own 23P01 keeps the sentence
+    tools/rooms.mjs        48 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos and the taken-span trigger (4d, 4e, 26b)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -298,7 +312,7 @@ pnpm --filter @rag/pipeline isolation -- --filters-only   # 21 of them, code fil
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
 pnpm --filter @rag/bookings isolation   # 31 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
-pnpm --filter @rag/bookings rooms       # 45 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots; no API key
+pnpm --filter @rag/bookings rooms       # 48 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
