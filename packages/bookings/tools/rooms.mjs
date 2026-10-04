@@ -294,6 +294,33 @@ try {
           'D-100: a 2-room staff booking has ONE reference; single staff bookings each have a group and their own reference, all of the web shape',
           `2-room ${firstRefs.join('/')} (${firstRows.length} rows) · single ${secondRow?.reference} group ${secondRow?.groupId ? 'set' : 'NULL'} · P1 ${p1Row?.reference} · P2 ${p2Row?.reference}`,
         );
+        // 4g. D-100, Phase 2: staff stays are in listRequests() with their
+        //     source and the clash; declineRequest() cancels one (P2, the
+        //     clashing pending); confirmRequest() confirms a fresh one on the
+        //     day after; a web request still says 'web' (check 25 proves that).
+        const d9 = (() => {
+          const d = new Date(`${d8}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + 1);
+          return d.toISOString().slice(0, 10);
+        })();
+        const fresh = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d9, guestName: 'Pending H' });
+        const freshRow = (await listBookings(probe, { from: d9, to: d9 })).find((b) => b.id === fresh.bookings[0].id);
+        const inRequests = await listRequests(probe, { from: d8 });
+        const p2Req = inRequests.find((r) => r.groupId === p2Row?.groupId);
+        const freshReq = inRequests.find((r) => r.groupId === freshRow?.groupId);
+        const declined = await declineRequest(probe, p2Row?.groupId, 'Double booked');
+        const confirmed = await confirmRequest(probe, freshRow?.groupId, 'Paid');
+        const after = await listBookings(probe, { from: d8, to: d9 });
+        const p2After = after.find((b) => b.id === p2.bookings[0].id);
+        const freshAfter = after.find((b) => b.id === fresh.bookings[0].id);
+        check(
+          p2Req?.source === 'staff' && p2Req.clash === true && p2Req.reference === p2Row?.reference
+            && freshReq?.source === 'staff' && freshReq.clash === false && freshReq.units.length === 1
+            && declined === true && p2After?.status === 'cancelled' && p2After?.decisionNote === 'Double booked'
+            && confirmed === true && freshAfter?.status === 'confirmed' && freshAfter?.decisionNote === 'Paid',
+          'D-100: staff stays are requests too: listed with source and clash, declined and confirmed by group with the note',
+          `P2 ${p2Req?.source} clash ${p2Req?.clash} ${p2Req?.reference} → decline ${declined} ${p2After?.status} "${p2After?.decisionNote}" · fresh ${freshReq?.source} clash ${freshReq?.clash} → confirm ${confirmed} ${freshAfter?.status} "${freshAfter?.decisionNote}"`,
+        );
       }
     }
   }

@@ -133,7 +133,9 @@ function BookingRow({
                 ? `${formatMoney(booking.basePrice ?? 0, perRoom.currency)} + ${formatMoney(booking.extraGuestPrice, perRoom.currency)} extra guests = ${formatMoney(booking.price, perRoom.currency)}`
                 : formatMoney(booking.price, perRoom.currency)
               : null,
-            booking.source === 'web' ? `request ${booking.reference}` : perRoom && booking.groupId ? 'group booking' : null,
+            // D-100: every stay has a reference; "group booking" means several rows, not "has a group".
+            booking.reference ? `ref ${booking.reference}` : null,
+            booking.source === 'web' ? 'from the booking page' : perRoom && booking.groupSize > 1 ? 'group booking' : null,
             // D-097: the promo it got, and this night's share of the discount (part of the price shown).
             booking.promoName ? `promo ${booking.promoName}${perRoom && booking.discount ? ` −${formatMoney(booking.discount, perRoom.currency)}` : ''}` : null,
             booking.status === 'confirmed' ? null : booking.status,
@@ -195,6 +197,8 @@ function RequestRow({
             request.total !== null ? formatMoney(request.total, currency) : null,
             request.guestPhone,
             request.guestEmail,
+            // D-100: which door it came through; both are decided here.
+            request.source === 'web' ? 'from the booking page' : 'by staff',
             pending ? null : request.status,
           ]
             .filter(Boolean)
@@ -625,7 +629,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               </div>
             </div>
             <p className="small muted">
-              Sent from the booking page. A request does not hold its dates: the first one you confirm gets them.
+              Every stay waiting for a decision: sent from the booking page, or made here by staff. A request does not hold its
+              dates: the first one you confirm gets them.
             </p>
             {requests.filter((r) => r.status === 'pending').length === 0 && (
               <div className="small muted">No requests waiting.</div>

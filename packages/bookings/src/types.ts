@@ -75,11 +75,13 @@ export interface BookingSummary {
   basePrice: number | null;
   extraGuestPrice: number | null;
   surcharge: number | null;
-  /** shared by every room of one multi-room booking, and by every night of a web request; null for a single staff booking */
+  /** shared by every room of one multi-room booking and by every night of a web request; since D-100 every row has one (a single booking is a group of one). Null only on a row older than the backfill, which there are none of */
   groupId: string | null;
+  /** D-100: how many rows the loaded window holds for this group; > 1 means several rooms or nights */
+  groupSize: number;
   /** 'web' for a customer's request (request_booking), 'staff' otherwise */
   source: 'staff' | 'web';
-  /** a web request's reference, for people; null for staff bookings */
+  /** the stay's reference, for people (D-100: every stay has one; null only on a row older than the backfill) */
   reference: string | null;
   guestEmail: string | null;
   createdAt: string;
@@ -418,10 +420,12 @@ export interface RequestReceipt {
   instructions: string | null;
 }
 
-/** A web request as staff see it: one group, all its nights. Guest data, so staff only. */
+/** A stay waiting for a decision, or decided, as staff see it: one group, all its nights. Guest data, so staff only. */
 export interface BookingRequest {
   groupId: string;
   reference: string;
+  /** D-100: 'web' from the booking page (request_booking), 'staff' made on the Bookings screen; both are decided here */
+  source: 'staff' | 'web';
   /** every row of a group has the same status (confirm and decline are one statement) */
   status: BookingStatus;
   guestName: string;

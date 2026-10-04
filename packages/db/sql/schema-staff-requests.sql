@@ -313,6 +313,7 @@ declare
   v_no_group int;
   v_no_ref   int;
   v_group    record;
+  v_ref      text;
 begin
   select count(*) filter (where group_id is null), count(*) filter (where reference is null)
     into v_no_group, v_no_ref from public.bookings;
@@ -320,11 +321,16 @@ begin
 
   update public.bookings set group_id = gen_random_uuid() where group_id is null;
 
+  -- ONE call per group, into a variable, THEN the update. The first version
+  -- put the call in the UPDATE's SET, and a volatile function in SET is
+  -- evaluated once per ROW: harbor's 2-room staff booking (#926, #927) got
+  -- two references (found by the Phase 2 HTTP smoke; repaired in step 4b).
   for v_group in
     select distinct b.tenant_id, b.group_id from public.bookings b where b.reference is null
   loop
+    v_ref := public.booking_reference(v_group.tenant_id);
     update public.bookings b
-       set reference = public.booking_reference(v_group.tenant_id)
+       set reference = v_ref
      where b.tenant_id = v_group.tenant_id and b.group_id = v_group.group_id and b.reference is null;
   end loop;
 
@@ -333,6 +339,32 @@ begin
   raise notice 'backfill after: % rows without a group, % without a reference', v_no_group, v_no_ref;
 end
 $backfill$;
+
+-- 4b. The repair for the first run's defect, idempotent: a group whose rows
+--     carry more than one reference keeps the one on its lowest id, and the
+--     count of such groups is printed before (must be 0 after).
+do $repair$
+declare
+  v_split int;
+  v_group record;
+  v_keep  text;
+begin
+  select count(*) into v_split from (
+    select b.tenant_id, b.group_id from public.bookings b
+    group by b.tenant_id, b.group_id having count(distinct b.reference) > 1
+  ) s;
+  raise notice 'repair: % group(s) with more than one reference', v_split;
+  for v_group in
+    select b.tenant_id, b.group_id from public.bookings b
+    group by b.tenant_id, b.group_id having count(distinct b.reference) > 1
+  loop
+    select b.reference into v_keep from public.bookings b
+     where b.tenant_id = v_group.tenant_id and b.group_id = v_group.group_id order by b.id limit 1;
+    update public.bookings b set reference = v_keep
+     where b.tenant_id = v_group.tenant_id and b.group_id = v_group.group_id and b.reference is distinct from v_keep;
+  end loop;
+end
+$repair$;
 
 -- 5. EXECUTE grants: revoke from all three, grant back exactly who needs it.
 --    booking_reference is called by the trigger as the caller (a staff

@@ -376,6 +376,10 @@ export async function listBookings(
   // it, or in the one-statement window it leaves (plan Rule 4). A warning,
   // never the guard (trap 21): the server still answers at Confirm.
   const taken = new Set(data.filter((b) => b.status === 'confirmed').map((b) => `${b.booked_date}|${b.unit_id}|${b.slot_id}`));
+  // D-100: every row has a group now, so "has a group" no longer means
+  // "several rooms"; the screen asks the size instead, over the loaded rows.
+  const groupSize = new Map<string, number>();
+  for (const b of data) if (b.group_id) groupSize.set(b.group_id, (groupSize.get(b.group_id) ?? 0) + 1);
 
   return data.map((b) => ({
     id: b.id,
@@ -399,6 +403,7 @@ export async function listBookings(
     extraGuestPrice: b.extra_guest_price,
     surcharge: b.surcharge,
     groupId: b.group_id,
+    groupSize: b.group_id ? (groupSize.get(b.group_id) ?? 1) : 1,
     source: b.source,
     reference: b.reference,
     guestEmail: b.guest_email,

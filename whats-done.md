@@ -7598,3 +7598,41 @@ check 24's web request still gets its reference from `request_booking()`.
 **What it avoided:** a second copy of the alphabet (Rule 1); a group with
 N references (§ 2.1); the promos file quietly restoring the old
 `request_booking` (§ 2.2).
+
+## Staff requests, Phase 2: the package and the screen · done 2026-10-05, on `feat/staff-requests`
+
+**What:** `listRequests()` drops its `source = 'web'` filter and says
+`source` on each stay; `decide()` (confirm and decline) drops the same
+filter, so a staff stay is decided by group like a web request, one
+statement, the same 409 and closed-date words. `listBookings()` adds
+`groupSize` over the loaded rows, because every row has a group now and
+"has a group" no longer means several rooms (§ 2.4). The Bookings
+screen: the Requests intro says "sent from the booking page, or made here
+by staff"; each request row says "by staff" or "from the booking page";
+each list row shows `ref HAR-…`, and "group booking" only when
+`groupSize > 1`.
+
+**Observed:** bookings tests **102/102**, web **59/59**, `pnpm typecheck`
+clean. rooms **50/50**, 4g on the probe: the clashing pending staff
+booking of 4d is in `listRequests()` with `source: 'staff'`, `clash:
+true` and its reference; `declineRequest()` on its group is `true` and
+the row is `cancelled` with the note "Double booked"; a fresh staff
+booking on the next day is listed with `clash: false` and
+`confirmRequest()` confirms it with the note "Paid". Bookings isolation
+**31/31** both ways, check 28 now counting B's web requests by source
+(`B list 1 (1 web)`) with A's list still 0. Over HTTP, a throwaway staff
+member of harbor got `200` from the requests route with five stays, staff
+and web, each with a reference.
+
+**Found by that smoke, owed a re-run:** harbor's 2-room staff booking,
+rows #926 and #927, one group, carried `HAR-9KCBC9` and `HAR-KBNJYU`. The
+first backfill wrote `set reference = booking_reference(tenant)` inside
+the UPDATE, and Postgres evaluates a volatile function in SET once per
+row. The fill trigger was right (rooms 4f proved one reference per
+2-room insert); only the one-off backfill was wrong, and only groups of
+several rows were affected: one group in the whole database. The file now
+calls the function into a variable before the update, and a new step 4b
+repairs a split group by keeping the reference on its lowest id, printing
+how many it found. The Requests list showed that group once, under the
+first row's reference, so the screen was right by accident until the
+repair runs.

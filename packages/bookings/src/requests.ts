@@ -362,8 +362,9 @@ export async function requestBooking(
 }
 
 /**
- * Web requests whose first night is on or after `from` (default: today), one
- * per group, newest first, any status. STAFF ONLY: guest data.
+ * Every stay, a web request or a staff booking (D-100), whose first night is
+ * on or after `from` (default: today), one per group, newest first, any
+ * status. STAFF ONLY: guest data.
  *
  * `clash` says a night is now CONFIRMED for another booking of the same unit,
  * so confirming would be refused. It is read from check_availability, which
@@ -377,9 +378,10 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .select('id, group_id, reference, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
+    .select('id, group_id, reference, source, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
     .eq('tenant_id', tenant.id)
-    .eq('source', 'web')
+    // D-100: every source. A staff booking is a group with a reference too and
+    // waits for the same decision; the row says which door it came through.
     // A stay that began up to MAX_STAY_NIGHTS before `from` still has rows
     // after it; they are read so its group is whole, then dropped below.
     .gte('booked_date', addDays(from, -MAX_STAY_NIGHTS))
@@ -430,6 +432,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
       return {
         groupId,
         reference: first.reference ?? '',
+        source: first.source as 'staff' | 'web',
         status,
         guestName: first.guest_name,
         guestPhone: first.guest_phone,
@@ -485,7 +488,7 @@ async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' |
     .update({ status: to, decision_note: decision })
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
-    .eq('source', 'web')
+    // D-100: any source; a staff stay is decided here like a web request.
     .in('status', ['pending', to])
     .select('id');
   if (error?.code === '23P01') {

@@ -554,10 +554,14 @@ try {
     const declined = await declineRequest(a, bGroup);
     const missing = await confirmRequest(a, '00000000-0000-0000-0000-000000000000');
     const still = (await webRows(b)).map((r) => r.status).join(',');
+    // D-100: listRequests() lists staff stays too, so B's list is counted by
+    // source; A's must be empty whatever B holds.
+    const bWeb = bList.filter((r) => r.source === 'web');
     check(
-      aList.length === 0 && bList.length === 1 && bList[0].groupId === bGroup && confirmed === false && declined === false && missing === false && still === 'pending',
-      "requests A: sees none of B's; cannot confirm or decline B's (false, like a missing id); B's stays pending",
-      `A list ${aList.length} · B list ${bList.length} · confirm ${confirmed} · decline ${declined} · missing ${missing} · B still ${still}`,
+      aList.length === 0 && bWeb.length === 1 && bWeb[0].groupId === bGroup && bList.every((r) => r.source === 'web' || r.source === 'staff')
+        && confirmed === false && declined === false && missing === false && still === 'pending',
+      "requests A: sees none of B's (web or staff); cannot confirm or decline B's (false, like a missing id); B's stays pending",
+      `A list ${aList.length} · B list ${bList.length} (${bWeb.length} web) · confirm ${confirmed} · decline ${declined} · missing ${missing} · B still ${still}`,
     );
   }
 
