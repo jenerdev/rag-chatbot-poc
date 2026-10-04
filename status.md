@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Tables in the reply (2026-10-04, COMPLETE on `feat/tables`, not merged):**
+**Tables in the reply (2026-10-04, COMPLETE; merged into `master` at `6e91499`):**
 [`plan/tables.md`](./plan/tables.md). Room lists, room details, rates and
 prices as a table: a hand-written pipe-table parser in the browser (one
 block syntax, elements never HTML), the code-written room list as a table,
