@@ -79,6 +79,19 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
+**Staff clash (planned 2026-10-05, not started):**
+[`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
+be born on a night already confirmed for that unit (a trigger, `23P01`,
+words, every door), and the staff list carries `clash` with the Requests
+section's warning and disabled Confirm. Amends D-095's cost line. Four
+§ 7 questions with recommendations; recommended after the dashboard merge.
+- [ ] § 7 answered
+- [ ] Phase 0 — baseline
+- [ ] Phase 1 — SQL (`schema-taken-span.sql`, the 20th file; rooms +5)
+- [ ] Phase 2 — the package, the route, the screen
+- [ ] Phase 3 — the walls and the walk
+- [ ] Phase 4 — the record (D-099)
+
 **Dashboard (2026-10-05, Phases 0–6 DONE on `feat/dashboard`; the user's browser walk owed, then merge):**
 [`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
 from the rows the database already holds: needs-attention counts, today's
