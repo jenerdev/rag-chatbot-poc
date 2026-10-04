@@ -7636,3 +7636,17 @@ repairs a split group by keeping the reference on its lowest id, printing
 how many it found. The Requests list showed that group once, under the
 first row's reference, so the screen was right by accident until the
 repair runs.
+
+## Staff requests, Phase 3: the suites · done 2026-10-05, on `feat/staff-requests`
+
+**Observed:** rooms **50/50**; bookings isolation **31/31** on tokens and
+**31/31** on filters alone; pipeline isolation **23/23** and **21/21**;
+verify **117/118** (the roles check open since tenant management); tests
+**59** (web), **102** (bookings), **359** (pipeline); the three baselines
+byte-identical. The battery once: **53/61**, `original 8/10 · tool 9/9 ·
+lang 8/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`: the known
+set (`antecedent`, `leak-2`, `rt-leak-2`, `book-for-me-harbor`,
+`lang-tagalog-2`, `lang-followup`, the last two the flips CLAUDE.md rule 1
+names) and `rt-price`/`rt-standard`, the user's two confirmed bookings on
+2026-10-20 (dashboard Phase 5). `tool 9/9`: the fill trigger and the
+reference touched nothing the chatbot reads. The walk is the user's.
