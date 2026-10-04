@@ -127,14 +127,18 @@ async function bookingChecks(probeId) {
   // An insert that is SUPPOSED to fail. If it succeeds, the guard is missing:
   // the row is removed so it cannot affect later checks, and the error is null.
   const insertExpectingFailure = async (row) => {
-    const { data, error } = await supabase.from('bookings').insert(row).select('id');
+    // D-095: a row that names no status is born pending and holds nothing, so
+    // every row these checks insert is confirmed unless it says otherwise.
+    const confirmed = (r) => ({ status: 'confirmed', ...r });
+    const { data, error } = await supabase.from('bookings').insert(Array.isArray(row) ? row.map(confirmed) : confirmed(row)).select('id');
     if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
     return error;
   };
   const book = (row) =>
     supabase
       .from('bookings')
-      .insert({ tenant_id: probeId, guest_name: 'verify.mjs probe', ...row })
+      // status 'confirmed' (D-095): the default is pending, which holds nothing.
+      .insert({ tenant_id: probeId, guest_name: 'verify.mjs probe', status: 'confirmed', ...row })
       .select('id, during')
       .single();
 
@@ -492,6 +496,7 @@ async function authChecks(probeId, anyChunk) {
   const { data: probeUnit } = await supabase.from('units').select('id').eq('tenant_id', probeId).limit(1).single();
   const { data: probeSlot } = await supabase.from('slots').select('id').eq('tenant_id', probeId).eq('name', 'Evening').single();
   const newBooking = (tenantId) => ({
+    status: 'confirmed', // D-095: the default is now pending, and a pending row holds nothing; these checks need a row that does
     tenant_id: tenantId,
     unit_id: probeUnit?.id,
     slot_id: probeSlot?.id,
@@ -795,7 +800,8 @@ async function bookingTypeChecks(probeId) {
     // guest_count on EVERY row: a per_room booking must have one
     // (schema-extra-guests.sql), and a multi-row insert sends a missing key as
     // NULL (trap 15). 1 guest is inside every room's standard.
-    const booking = (row) => ({ tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', guest_count: 1, ...row });
+    // status 'confirmed' on every row (D-095): the default is pending, which holds nothing.
+    const booking = (row) => ({ tenant_id: roomsId, slot_id: night.id, guest_name: 'verify.mjs probe', guest_count: 1, status: 'confirmed', ...row });
     const insertExpectingFailure = async (rows) => {
       const { data, error } = await supabase.from('bookings').insert(rows).select('id');
       if (!error) await supabase.from('bookings').delete().in('id', data.map((r) => r.id));
@@ -1273,7 +1279,7 @@ async function customerBookingChecks() {
     {
       const avail = await chat.rpc('check_availability', { p_tenant_id: bookId, p_from: thursday, p_to: thursday });
       const overnightOpen = avail.data?.find((r) => r.slot === 'Overnight')?.status;
-      const staffBooking = await staff.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: addDays(thursday, 1), guest_name: 'Staff guest', guest_count: 20 }).select('id').single();
+      const staffBooking = await staff.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: addDays(thursday, 1), guest_name: 'Staff guest', guest_count: 20, status: 'confirmed' }).select('id').single();
       const group = (await rowsOf()).find((r) => r.source === 'web')?.group_id;
       const confirm = await staff.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', bookId).eq('group_id', group ?? '');
       const statuses = (await rowsOf()).filter((r) => r.source === 'web').map((r) => r.status).join(',');

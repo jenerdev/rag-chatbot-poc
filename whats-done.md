@@ -7089,3 +7089,26 @@ the rows show it. **Observed:** tests 99/355/56, typecheck clean.
 from D-095) run by the user; THEN rooms (check 4c), isolation and the
 battery. Until the column exists every bookings list selects a missing
 column, so run it before opening the Bookings screen.
+
+## Promos, Phase 0: the baseline · done 2026-10-04, on `feat/promos`
+
+**What:** every suite on `b6c81b6`, with the two owed SQL files confirmed
+in first (the column present; a raw insert born pending), § 7's five
+questions answered with every recommendation.
+
+**Observed, all in `plan/baseline/*-promos-phase0*`:**
+- verify **109/110** (the known roles item), after a D-095 catch-up: five
+  of its own row builders (`book()`, `newBooking()`, `booking()`, the
+  expecting-failure helper, the staff row of the request check) named no
+  status and relied on the old default; under the new default those rows
+  were pending, held nothing, and 8 checks failed ("the exclusion
+  constraint is missing", availability all open, a group with one clash
+  saved). Each now says `status: 'confirmed'`; D-095's rule held exactly
+  as designed, in a place that needed to know it;
+- rooms **41/41** (4c, the decision note, green now the column exists);
+  bookings isolation 30/30 both ways; pipeline isolation both ways; tests
+  13/14/5/99/355/56; typecheck; northwind's prompt (post-emoji baseline),
+  villa's and harbor's tool definitions byte-identical;
+- battery **57/61** (`antecedent`, `rt-leak-2`, the `leak-2` control and
+  `lang-tagalog-2` flips), `tool 9/9 · price 3/3 · book 5/5`. The counts
+  Phase 5 must hold.

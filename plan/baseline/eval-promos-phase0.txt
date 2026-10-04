@@ -1,0 +1,773 @@
+$ node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs "promos-phase0"
+==============================================================================
+PROMPT EVAL: promos-phase0
+==============================================================================
+[bookings] villa booked #4275: 2026-10-14, unit 1, slot 2, confirmed
+fixture: 1 villa booking(s) seeded; today 2026-10-04, booked 2026-10-14, next 2026-10-15, free 2026-10-18
+
+[bookings] harbor booked #4276: 2026-10-16, unit 131, slot 155, confirmed
+fixture: 1 harbor booking(s) seeded; booked 2026-10-16, free 2026-10-18, weekday 2026-10-19
+[query] reply language: english
+[retrieve] northwind vector:4 keyword:2 -> fused:4 [both both vector vector]
+[query] "What temperature does the Bay 3 freezer run at?" -> 4 chunks 0.530/both 0.316/both 0.364/vector 0.289/vector
+[openai] chat: 881 in + 18 out
+PASS  [direct] northwind want answer
+      Q: What temperature does the Bay 3 freezer run at?
+      A: The sample freezer in Bay 3 operates at minus 68 degrees Celsius. ❄️
+
+[query] reply language: english
+[retrieve] northwind vector:3 keyword:1 -> fused:3 [both vector vector]
+[query] "Who do I contact on extension 4417?" -> 3 chunks 0.372/both 0.318/vector 0.281/vector
+[openai] chat: 739 in + 20 out
+PASS  [inference] northwind want answer
+      Q: Who do I contact on extension 4417?
+      note: context says "...liaison, currently reachable at extension 4417"
+      A: You can contact the Kessler Seismograph Annex liaison at extension 4417. 📞
+
+[query] reply language: english
+[retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+[query] "What colours are the visitor badges and what does each one mean?" -> 1 chunks 0.404/both
+[openai] chat: 457 in + 47 out
+[query] reply language: english
+[openai] rewrite: 158 in + 10 out
+[rewrite] "Which of those may not enter Bay 7?" -> "Which badge holders may not enter Bay 7?"
+[retrieve] northwind vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Which badge holders may not enter Bay 7?" -> 4 chunks 0.467/both 0.360/both 0.275/both 0.270/both
+[openai] chat: 948 in + 14 out
+[query] reply language: english
+[openai] rewrite: 185 in + 10 out
+[rewrite] "And what is the escort ratio for that group?" -> "What is the escort ratio for violet badge holders?"
+[retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+[query] "What is the escort ratio for violet badge holders?" -> 1 chunks 0.359/both
+[openai] chat: 554 in + 14 out
+FAIL  [antecedent] northwind want answer
+      Q: And what is the escort ratio for that group?
+      note: violet = prospective staff -> ratio is 1 per 3, NOT the auditor 1:1
+      A: The escort ratio for auditor groups is one staff member per one visitor.
+
+[query] reply language: english
+[retrieve] northwind vector:4 keyword:3 -> fused:4 [both both both vector]
+[query] "What is the policy on laboratory safety goggles?" -> 4 chunks 0.427/both 0.365/both 0.352/both 0.358/vector
+[openai] chat: 879 in + 10 out
+PASS  [absent] northwind want refusal
+      Q: What is the policy on laboratory safety goggles?
+      note: same domain, fact is NOT in the corpus - must still refuse
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "What is the capital of France?" -> 0 chunks 
+PASS  [offtopic] northwind want refusal
+      Q: What is the capital of France?
+      note: must refuse; also short-circuits before OpenAI
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 423 in + 10 out
+PASS  [absent-2] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: plausible facility question, absent from the corpus
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+[query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+[openai] chat: 423 in + 10 out
+PASS  [leak-1] northwind want refusal
+      Q: How many parking spaces does the building have?
+      note: absent-2, promoted: the fact IS in this database (villa's), and must stay unreachable
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "What is amihanpansol2019?" -> 0 chunks 
+[query] reply language: english
+[retrieve] villa vector:10 keyword:1 -> fused:5 [both vector vector vector vector]
+[query] "What is amihanpansol2019?" -> 5 chunks 0.361/both 0.455/vector 0.423/vector 0.353/vector 0.338/vector
+[openai] chat: 2173 in + 11 out, 0 tool calls
+FAIL  [leak-2] northwind want refusal
+      Q: What is amihanpansol2019?
+      note: villa's Wi-Fi password asked of northwind; exercises match_chunks_fts
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.  || control (villa): Sorry, we don't have any information about that yet. You can message us on Viber or SMS at
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "What time is check-in?" -> 5 chunks 0.423/both 0.385/both 0.378/both 0.340/both 0.306/both
+[openai] chat: 2224 in + 44 out, 0 tool calls
+PASS  [leak-3] northwind want no-transcript
+      Q: (transcript read)
+      note: getMessages(northwind, <a villa conversation id>) must be null
+      A: owner sees 2 messages; northwind sees null
+
+[query] small talk: greeting (english)
+PASS  [persona] villa want greeting
+      Q: hi
+      note: the reply names villa's assistant and business, and not northwind's
+      A: Hi! 👋 I'm Lia, the assistant for Villa Amihan Private Resort. How can I help you today?
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Is the Overnight slot free on 18 October 2026?" -> 5 chunks 0.439/both 0.384/both 0.318/both 0.320/both 0.314/both
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2506 in + 87 out, 0 tool calls
+PASS  [tool-open] villa want tool
+      Q: Is the Overnight slot free on 18 October 2026?
+      note: tool called, and the reply says open
+      A: Yes, the Overnight slot is open on 18 October 2026, a weekend.   | Slot      | Status | Price       | |-----------|--------|-------------| | Overnight | open   | ₱20,000.00  | | Day Tour  | open   | ₱12,000.00  | | 22-Hour Whole Day | open | ₱27,000.00  |  || tool says Overnight 2026-10-18 is open; names the date: true
+      why: tool says Overnight 2026-10-18 is open; names the date: true; table: true
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Can I book the Day Tour on 15 October 2026?" -> 5 chunks 0.426/both 0.395/both 0.367/both 0.385/both 0.354/both
+[query] dates: {"date_from":"2026-10-15"}
+[bookings] villa rooms 2026-10-15..2026-10-15: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-15"} -> 3 slots, 1 open
+[openai] chat: 2437 in + 31 out, 0 tool calls
+PASS  [tool-taken] villa want tool
+      Q: Can I book the Day Tour on 15 October 2026?
+      note: the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end
+      A: No, the Day Tour slot is taken on 15 October 2026, a weekday. However, the Overnight slot is open if you're interested.  || tool says Day Tour 2026-10-15 is taken; names the date: true
+      why: tool says Day Tour 2026-10-15 is taken; names the date: true; table: false
+
+[query] reply language: english
+[retrieve] villa vector:4 keyword:6 -> fused:5 [vector keyword vector keyword vector]
+[query] "Is 15 October 2026 free?" -> 5 chunks 0.296/vector 0.110/keyword 0.284/vector 0.209/keyword 0.268/vector
+[query] dates: {"date_from":"2026-10-15"}
+[bookings] villa rooms 2026-10-15..2026-10-15: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-15"} -> 3 slots, 1 open
+[openai] chat: 2451 in + 88 out, 0 tool calls
+PASS  [tool-partial] villa want tool
+      Q: Is 15 October 2026 free?
+      note: only some slots are open; the reply must name them, not call the day free
+      A: Yes, the Overnight slot is open on 15 October 2026, a weekday.   | Slot              | Status | Price      | |-------------------|--------|------------| | 22-Hour Whole Day | taken  | ₱22,000.00 | | Day Tour          | taken  | ₱9,500.00  | | Overnight         | open   | ₱16,000.00 |  || tool: Overnight open, Day Tour taken; names the date: true
+      why: tool: Overnight open, Day Tour taken; names the date: true; table: true
+
+[query] reply language: english
+[retrieve] villa vector:3 keyword:4 -> fused:5 [both keyword vector keyword vector]
+[query] "Is it available?" -> 5 chunks 0.270/both 0.228/keyword 0.260/vector 0.245/keyword 0.254/vector
+[openai] chat: 2002 in + 8 out, 0 tool calls
+PASS  [tool-ask] villa want tool
+      Q: Is it available?
+      note: no date given: no tool call, and the reply asks for one, without the refusal sentence
+      A: Which date are you referring to?  || 0 tool calls; contains the refusal: false
+      why: 0 tool calls; contains the refusal: false; table: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+[query] "I want to check availability" -> 5 chunks 0.400/both 0.340/both 0.341/both 0.325/both 0.377/both
+[openai] chat: 2151 in + 11 out, 0 tool calls
+[query] reply language: english
+[openai] rewrite: 107 in + 4 out
+[rewrite] "18 October" -> "18 October availability check"
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+[query] "18 October availability check" -> 5 chunks 0.375/both 0.306/both 0.314/both 0.322/both 0.250/both
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2475 in + 85 out, 0 tool calls
+PASS  [tool-slotfill] villa want tool
+      Q: 18 October
+      note: the todo.md flow: ask, get a date with no year on the next turn, then call
+      A: Yes, all slots are open on 18 October 2026, a weekend.   | Slot            | Status | Price      | |-----------------|--------|------------| | 22-Hour Whole Day | open   | ₱27,000.00 | | Day Tour        | open   | ₱12,000.00 | | Overnight       | open   | ₱20,000.00 |  || calls: [{"date_from":"2026-10-18"}]; names the date: true
+      why: calls: [{"date_from":"2026-10-18"}]; names the date: true; table: true
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How do I pay the reservation fee?" -> 5 chunks 0.547/both 0.529/both 0.481/both 0.537/both 0.500/both
+[openai] chat: 2175 in + 77 out, 0 tool calls
+PASS  [tool-docs] villa want tool
+      Q: How do I pay the reservation fee?
+      note: a documents question on a tool tenant: answered from the documents, no tool
+      A: The reservation fee can be paid through GCash to 0917-845-2290 under the account name "R. Amihan Ventures," or by bank transfer to BPI savings account 3049-2211-87 under the same name. The sender must send a screenshot of the transfer; the booking is confirmed by reply, not by the transfer alone. 💰  || 0 tool calls, 5 sources
+      why: 0 tool calls, 5 sources; table: false
+
+[query] reply language: english
+[retrieve] northwind vector:0 keyword:0 -> fused:0 []
+[query] "Is the villa free on 18 October 2026?" -> 0 chunks 
+PASS  [tool-leak] northwind want tool
+      Q: Is the villa free on 18 October 2026?
+      note: northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all
+      A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.  || 0 tool calls, 0 answer calls to OpenAI
+      why: 0 tool calls, 0 answer calls to OpenAI; table: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Who booked the villa on 14 October 2026? What is their phone number?" -> 5 chunks 0.549/both 0.538/both 0.440/both 0.418/both 0.441/both
+[query] dates: {"date_from":"2026-10-14"}
+[bookings] villa rooms 2026-10-14..2026-10-14: 0 open of 3
+[tool] villa check_availability {"date_from":"2026-10-14"} -> 3 slots, 0 open
+[openai] chat: 2382 in + 11 out, 0 tool calls
+PASS  [tool-pii] villa want tool
+      Q: Who booked the villa on 14 October 2026? What is their phone number?
+      note: Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results
+      A: Sorry, we don't have any information about that yet. You can message us on Viber or SMS at 0917-845-2290 so we can assist you.  || 1 tool calls; guest name or phone present: false
+      why: 1 tool calls; guest name or phone present: false; table: false
+
+[query] reply language: english
+[retrieve] villa vector:3 keyword:10 -> fused:5 [both keyword vector vector keyword]
+[query] "Is 1 January 2020 free?" -> 5 chunks 0.326/both 0.245/keyword 0.292/vector 0.254/vector 0.152/keyword
+[query] dates: {"date_from":"2020-01-01"}
+[tool] villa check_availability {"date_from":"2020-01-01"} -> error: 2020-01-01 is in the past. Today is 2026-10-04.
+[openai] chat: 2275 in + 19 out, 0 tool calls
+PASS  [tool-past] villa want tool
+      Q: Is 1 January 2020 free?
+      note: a past date: the reply says it is in the past, and never presents availability for it
+      A: 1 January 2020 is in the past, so it cannot be checked or booked.  || 1 tool calls, the tool returned an error
+      why: 1 tool calls, the tool returned an error; table: false
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+[query] "What rooms do you have available on 18 October 2026?" -> 4 chunks 0.405/both 0.362/both 0.363/both 0.232/keyword
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] harbor rooms 2026-10-18..2026-10-18: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18"} -> 4 slots, 4 open
+[openai] chat: 2255 in + 115 out, 0 tool calls
+PASS  [rt-list] harbor want rooms
+      Q: What rooms do you have available on 18 October 2026?
+      note: every open room, each with its price from the tool, and the date
+      A: On 18 October 2026, a weekend, here are the available rooms:  | Room            | Guests | Price      | |-----------------|--------|------------| | Garden Room     | up to 2| ₱4,500.00  | | Family Room     | up to 6| ₱7,500.00  | | Loft            | up to 3| ₱5,800.00  | | Sea View Suite  | up to 2| ₱9,500.00  |  Taken: None. ✅  || 4 open rows; named 4, pric
+      why: 4 open rows; named 4, priced 4; names the date: true; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+[query] "Do you have a room for 5 people on 18 October 2026?" -> 4 chunks 0.370/both 0.408/both 0.366/both 0.236/keyword
+[openai] chat: 1928 in + 26 out, 1 tool call
+[bookings] harbor rooms 2026-10-18..2026-10-18 5 guests: 1 open of 1
+[tool] harbor check_availability {"date_from":"2026-10-18","guests":5} -> 1 slots, 1 open
+[openai] chat: 2045 in + 95 out, 0 tool calls
+PASS  [rt-guests] harbor want rooms
+      Q: Do you have a room for 5 people on 18 October 2026?
+      note: only the Family Room holds 5: it is offered with its price, the smaller rooms are not
+      A: On 18 October 2026, a weekend, the following room is available for 5 people:  | Room         | Guests | Price      | Total       | |--------------|--------|------------|-------------| | Family Room  | up to 6| ₱7,500.00  | ₱8,250.00   |  The Family Room can accommodate your group, and the total includes an extra guest charge of ₱750.00. ✅  || guests arg [5];
+      why: guests arg [5]; Family Room open ₱8,250.00; smaller rooms offered: none; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:3 -> fused:4 [both both both vector]
+[query] "Is the Sea View Suite free on 16 October 2026?" -> 4 chunks 0.369/both 0.375/both 0.315/both 0.448/vector
+[query] dates: {"date_from":"2026-10-16"}
+[bookings] harbor rooms 2026-10-16..2026-10-16: 3 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-16"} -> 4 slots, 3 open
+[openai] chat: 2255 in + 103 out, 0 tool calls
+PASS  [rt-taken] harbor want rooms
+      Q: Is the Sea View Suite free on 16 October 2026?
+      note: the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere
+      A: On 16 October 2026, the Sea View Suite is taken. Here are the other rooms that are open:  | Room          | Guests | Price      | |---------------|--------|------------| | Garden Room   | up to 2| ₱4,500.00  | | Family Room   | up to 6| ₱7,500.00  | | Loft          | up to 3| ₱5,800.00  |  Taken: Sea View Suite.  || tool: Sea View Suite taken; names the date
+      why: tool: Sea View Suite taken; names the date: true; guest data present: false; taken said before any table: true; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Do you have any rooms available?" -> 4 chunks 0.446/both 0.421/both 0.399/both 0.283/both
+[openai] chat: 1918 in + 13 out, 0 tool calls
+PASS  [rt-ask] harbor want rooms
+      Q: Do you have any rooms available?
+      note: no date: no tool call, and the reply asks for one
+      A: Which date are you interested in for checking availability? 📅  || 0 tool calls; contains the refusal: false
+      why: 0 tool calls; contains the refusal: false; table: false
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "How much is the Garden Room for the night of 19 October 2026?" -> 4 chunks 0.588/both 0.389/both 0.386/both 0.270/both
+[query] dates: {"date_from":"2026-10-19"}
+[bookings] harbor rooms 2026-10-19..2026-10-19: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-19"} -> 4 slots, 4 open
+[openai] chat: 2254 in + 31 out, 0 tool calls
+PASS  [rt-price] harbor want rooms
+      Q: How much is the Garden Room for the night of 19 October 2026?
+      note: the tool's price, not the out-of-date brochure price in the documents
+      A: On 19 October 2026, a weekday, the Garden Room is available for ₱3,500.00 for the night. 📅  || tool: Garden Room ₱3,500.00; quotes it: true; quotes the 2025 brochure's 3,000: false
+      why: tool: Garden Room ₱3,500.00; quotes it: true; quotes the 2025 brochure's 3,000: false; table: false
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+[query] "How much does a room cost on 18 October 2026?" -> 4 chunks 0.424/both 0.327/both 0.379/both 0.222/keyword
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] harbor rooms 2026-10-18..2026-10-18: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18"} -> 4 slots, 4 open
+[openai] chat: 2255 in + 121 out, 0 tool calls
+PASS  [rt-mix] harbor want rooms
+      Q: How much does a room cost on 18 October 2026?
+      note: plan § 2.7: room prices from the tool, never the whole-inn event rate from the documents
+      A: On 18 October 2026, a weekend rate applies. Here are the room costs:  | Room            | Guests | Price      | |-----------------|--------|------------| | Garden Room     | up to 2| ₱4,500.00  | | Family Room     | up to 6| ₱7,500.00  | | Loft            | up to 3| ₱5,800.00  | | Sea View Suite  | up to 2| ₱9,500.00  |  No rooms are taken on that date. ✅  |
+      why: 4 rows, 4 tool prices quoted; the whole-inn 40,000 quoted: false; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:3 keyword:3 -> fused:3 [both both both]
+[query] "Can I book the Old Annex on 18 October 2026?" -> 3 chunks 0.555/both 0.361/both 0.322/both
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] harbor rooms 2026-10-18..2026-10-18: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18"} -> 4 slots, 4 open
+[openai] chat: 2046 in + 131 out, 0 tool calls
+PASS  [rt-inactive] harbor want rooms
+      Q: Can I book the Old Annex on 18 October 2026?
+      note: a retired room, named in the documents, is never offered as available
+      A: Harbor Inn cannot book the Old Annex on 18 October 2026, as it is closed for renovation until further notice. Here is what is open on that date:  | Room           | Guests | Price      | |----------------|--------|------------| | Garden Room    | up to 2| ₱4,500.00  | | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea Vie
+      why: a tool row for the Old Annex: false; the reply calls it open: false; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:2 -> fused:4 [both both vector vector]
+[query] "Is the Overnight slot at Villa Amihan free on 18 October 2026?" -> 4 chunks 0.447/both 0.404/both 0.445/vector 0.392/vector
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] harbor rooms 2026-10-18..2026-10-18: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18"} -> 4 slots, 4 open
+[openai] chat: 2258 in + 125 out, 0 tool calls
+PASS  [rt-leak] harbor want rooms
+      Q: Is the Overnight slot at Villa Amihan free on 18 October 2026?
+      note: villa's slot, asked of harbor: harbor's tool cannot see it, and the reply must not invent it
+      A: Harbor Inn has no room or booking period by that name. Here is what is open on 18 October 2026, a weekend:  | Room           | Guests | Price      | |----------------|--------|------------| | Garden Room    | up to 2| ₱4,500.00  | | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea View Suite | up to 2| ₱9,500.00  |  Taken
+      why: villa rows in harbor's tool results: 0; the reply calls villa's Overnight open: false; says it has no such period: true; table: true
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:8 -> fused:5 [both both both vector keyword]
+[query] "Is the Garden Room free on 18 October 2026?" -> 5 chunks 0.333/both 0.323/both 0.301/both 0.378/vector 0.283/keyword
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2531 in + 95 out, 0 tool calls
+FAIL  [rt-leak-2] villa want rooms
+      Q: Is the Garden Room free on 18 October 2026?
+      note: harbor's room, asked of villa, the other way round
+      A: Yes, the Garden Room is available on 18 October 2026, which falls on a weekend. Here are the available slots:  | Slot              | Status | Price      | |-------------------|--------|------------| | 22-Hour Whole Day | open   | ₱27,000.00 | | Day Tour          | open   | ₱12,000.00 | | Overnight         | open   | ₱20,000.00 |  || harbor rows in villa's to
+      why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: true; table: true
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "How much is the Loft for 3 guests on 19 October 2026?" -> 4 chunks 0.378/both 0.486/both 0.272/both 0.369/both
+[query] dates: {"date_from":"2026-10-19","guests":3}
+[bookings] harbor rooms 2026-10-19..2026-10-19 3 guests: 2 open of 2
+[tool] harbor check_availability {"date_from":"2026-10-19","guests":3} -> 2 slots, 2 open
+[openai] chat: 2190 in + 52 out, 0 tool calls
+PASS  [rt-extra] harbor want rooms
+      Q: How much is the Loft for 3 guests on 19 October 2026?
+      note: 3 guests in a room covering 2: the tool’s total (base + ₱250), and the charge named
+      A: On 19 October 2026, a weekday, the Loft for 3 guests costs ₱5,050.00. This includes the base price of ₱4,800.00 plus ₱250.00 for 1 extra guest.  || tool: Loft ₱4,800.00 + ₱250.00 = ₱5,050.00; quotes the total: true; names the extra charge: true
+      why: tool: Loft ₱4,800.00 + ₱250.00 = ₱5,050.00; quotes the total: true; names the extra charge: true; table: false
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Can 3 people stay in the Garden Room on 18 October 2026?" -> 4 chunks 0.517/both 0.384/both 0.362/both 0.272/both
+[openai] chat: 1928 in + 28 out, 0 tool calls
+PASS  [rt-over] harbor want rooms
+      Q: Can 3 people stay in the Garden Room on 18 October 2026?
+      note: more guests than a room holds: the room is not offered for them, and the reply says it holds 2
+      A: The Garden Room holds up to 2 guests, so it cannot accommodate 3 people. Here is what is open on that date:  || Garden Room rows priced for 3: 0; the reply offers it for 3: false
+      why: Garden Room rows priced for 3: 0; the reply offers it for 3: false; table: false
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "How much is the Family Room for 2 guests on 19 October 2026?" -> 4 chunks 0.457/both 0.471/both 0.416/both 0.300/both
+[query] dates: {"date_from":"2026-10-19","guests":2}
+[bookings] harbor rooms 2026-10-19..2026-10-19 2 guests: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-19","guests":2} -> 4 slots, 4 open
+[openai] chat: 2344 in + 28 out, 0 tool calls
+PASS  [rt-standard] harbor want rooms
+      Q: How much is the Family Room for 2 guests on 19 October 2026?
+      note: within the included guests: the base price, and no extra charge
+      A: On 19 October 2026, the Family Room is available for ₱6,000.00 for 2 guests. ✅  || tool: Family Room ₱6,000.00; an extra charge named: false
+      why: tool: Family Room ₱6,000.00; an extra charge named: false; table: false
+
+[query] reply language: taglish
+[retrieve] harbor vector:3 keyword:2 -> fused:4 [both vector keyword vector]
+[query] "May bakanteng kwarto po ba kayo sa 18 October 2026?" -> 4 chunks 0.306/both 0.277/vector 0.236/keyword 0.266/vector
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] harbor rooms 2026-10-18..2026-10-18: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18"} -> 4 slots, 4 open
+[openai] chat: 2509 in + 130 out, 0 tool calls
+PASS  [rt-tagalog] harbor want rooms
+      Q: May bakanteng kwarto po ba kayo sa 18 October 2026?
+      note: rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)
+      A: Yes po, may mga bakanteng kwarto tayo sa 18 October 2026, na isang weekend. Narito ang mga available na kwarto:  | Room            | Guests | Price      | |-----------------|--------|------------| | Garden Room     | up to 2| ₱4,500.00  | | Family Room     | up to 6| ₱7,500.00  | | Loft            | up to 3| ₱5,800.00  | | Sea View Suite  | up to 2| ₱9,500.0
+      why: tool for 2026-10-18: true; taglish? true (tl 10, en 5, en-share 0.33); facts kept; table: true
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector vector]
+[query] "How much is the Overnight on 18 October 2026?" -> 5 chunks 0.375/both 0.344/both 0.293/both 0.373/vector 0.371/vector
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2457 in + 23 out, 0 tool calls
+PASS  [price-villa] villa want price
+      Q: How much is the Overnight on 18 October 2026?
+      note: villa's price from the tool for that date; the documents no longer have one
+      A: The Overnight on 18 October 2026, a weekend, is ₱20,000.00.  || tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true
+      why: tool: Overnight 2026-10-18 ₱20,000.00; quoted: true; names the date: true; table: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How much is the Day Tour on 18 October 2026 for 32 guests?" -> 5 chunks 0.389/both 0.403/both 0.372/both 0.351/both 0.326/both
+[query] dates: {"date_from":"2026-10-18","guests":32}
+[bookings] villa rooms 2026-10-18..2026-10-18 32 guests: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18","guests":32} -> 3 slots, 3 open
+[openai] chat: 2513 in + 43 out, 0 tool calls
+PASS  [price-villa-guests] villa want price
+      Q: How much is the Day Tour on 18 October 2026 for 32 guests?
+      note: guests passed to the tool; the total and the extra-guest charge are the TOOL's (R-37)
+      A: The Day Tour on 18 October 2026, a weekend, is ₱12,000.00 + ₱500.00 for 2 extra guests = ₱12,500.00.  || tool: Day Tour 2026-10-18 total ₱12,500.00 (extra ₱500.00); quoted total: true, extra: true
+      why: tool: Day Tour 2026-10-18 total ₱12,500.00 (extra ₱500.00); quoted total: true, extra: true; table: false
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector keyword]
+[query] "Magkano po ang Overnight sa Sabado?" -> 5 chunks 0.398/both 0.397/both 0.329/both 0.435/vector 0.304/keyword
+[query] dates: {"date_from":"2026-10-10"}
+[bookings] villa rooms 2026-10-10..2026-10-10: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-10"} -> 3 slots, 3 open
+[openai] chat: 2687 in + 27 out, 0 tool calls
+PASS  [price-villa-tl] villa want price
+      Q: Magkano po ang Overnight sa Sabado?
+      note: "sa Sabado" resolved in code and checked up front; the price is the tool's for that Saturday
+      A: Ang Overnight po natin sa 10 October 2026, na weekend, is ₱20,000.00. 📅  || tool: Overnight 2026-10-10 ₱20,000.00; quoted: true; (not judged) taglish? false (tl 5, en 1, en-share 0.17); facts kept
+      why: tool: Overnight 2026-10-10 ₱20,000.00; quoted: true; (not judged) taglish? false (tl 5, en 1, en-share 0.17); facts kept; table: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "How do I book?" -> 5 chunks 0.516/both 0.438/both 0.444/both 0.379/both 0.384/both
+[openai] chat: 2137 in + 160 out, 0 tool calls
+PASS  [book-how] villa want book
+      Q: How do I book?
+      note: villa's 04 document: press the Book button; no longer Viber first
+      A: To book at Villa Amihan, you need to go to the booking page by pressing the Book button at the top of this chat. There, you can choose the slot, date, number of nights for an Overnight stay, and the number of guests. The page will show you the exact price for that date, including any weekend and holiday rates, and will send a booking request to the owners wi
+      why: refused false; names the Book button or page: true; claims a booking: false
+
+[query] reply language: taglish
+[retrieve] villa vector:4 keyword:10 -> fused:5 [both both both both keyword]
+[query] "Paano po mag-book?" -> 5 chunks 0.365/both 0.278/both 0.279/both 0.273/both 0.211/keyword
+[openai] chat: 2424 in + 172 out, 0 tool calls
+PASS  [book-how-tl] villa want book
+      Q: Paano po mag-book?
+      note: the same in Tagalog: the page is named; the Taglish mix is printed (D-043)
+      A: Para po mag-book, you need to visit ang booking page ng Villa Amihan. I-click niyo lang po ang Book button sa taas ng chat. Dito, you can choose the slot, date, at para sa Overnight stay, ang number of nights at guests. Makikita niyo po ang exact price para sa date na iyon, kasama ang weekend at holiday rates, at mag-send ng booking request sa owners gamit a
+      why: names the page: true; claims: false; (not judged) taglish? true (tl 41, en 14, en-share 0.25); facts kept
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "How can I reserve a room?" -> 4 chunks 0.399/both 0.507/both 0.386/both 0.327/both
+[openai] chat: 1918 in + 90 out, 0 tool calls
+PASS  [book-how-harbor] harbor want book
+      Q: How can I reserve a room?
+      note: harbor's new BOOKING section
+      A: To book a room, press the Book button at the top of this chat to open Harbor Inn's booking page. Choose your check-in date, the number of nights, the rooms, and the number of guests in each. The page shows the price of every night and sends your booking request to the Dela Rosa family, who will reply to confirm it. Please note that a booking request is not a
+      why: refused false; names the page: true; claims: false
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Please book the Overnight on 18 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234." -> 5 chunks 0.423/both 0.442/both 0.419/both 0.409/both 0.394/both
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2455 in + 95 out, 0 tool calls
+PASS  [book-for-me] villa want book
+      Q: Please book the Overnight on 18 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234.
+      note: asked to book: no write tool exists, so the reply must send them to the page, never say it booked
+      A: I can't make a booking for you, but I can tell you that the Overnight slot is open on 18 October 2026, a weekend, and it costs ₱20,000.00.   To proceed with the booking, please visit the Villa Amihan booking page. If you have any questions, you can reach out to 0917-845-2290 on Viber or SMS, or email villaamihan.bookings@gmail.com. 📅  || claims a booking: f
+      why: claims a booking: false; names the page: true; 1 tool call(s)
+
+[query] reply language: english
+[retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+[query] "Book the Garden Room for 2 guests on 18 October 2026, please." -> 4 chunks 0.559/both 0.424/both 0.432/both 0.328/both
+[query] dates: {"date_from":"2026-10-18","guests":2}
+[bookings] harbor rooms 2026-10-18..2026-10-18 2 guests: 4 open of 4
+[tool] harbor check_availability {"date_from":"2026-10-18","guests":2} -> 4 slots, 4 open
+[openai] chat: 2348 in + 80 out, 0 tool calls
+PASS  [book-for-me-harbor] harbor want book
+      Q: Book the Garden Room for 2 guests on 18 October 2026, please.
+      note: the same for a room: availability may be checked, the booking is the page's
+      A: On 18 October 2026, a weekend, the Garden Room is available for 2 guests at a price of ₱4,500.00.   To proceed with the booking, please press the Book button at the top of this chat to open Harbor Inn's booking page. Choose your check-in date and complete the booking request. The Dela Rosa family will confirm it. ✅  || claims a booking: false; names the page
+      why: claims a booking: false; names the page: true; 1 tool call(s)
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:4 -> fused:5 [both both both both vector]
+[query] "Magkano po ang security deposit?" -> 5 chunks 0.456/both 0.429/both 0.334/both 0.353/both 0.389/vector
+[openai] chat: 2435 in + 30 out, 0 tool calls
+PASS  [lang-tagalog] villa want lang
+      Q: Magkano po ang security deposit?
+      note: pure Tagalog in, Taglish out, and the deposit from 04-booking-and-payment
+      A: Ang security deposit po natin is ₱2,000, at ito ay ibinabayad in cash kasama ng balance on arrival. 💰  || taglish? true (tl 6, en 3, en-share 0.33); facts kept
+      why: taglish? true (tl 6, en 3, en-share 0.33); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:9 keyword:0 -> fused:5 [vector vector vector vector vector]
+[query] "Pwede po bang magdala ng aso?" -> 5 chunks 0.307/vector 0.283/vector 0.279/vector 0.273/vector 0.270/vector
+[openai] chat: 2459 in + 50 out, 0 tool calls
+FAIL  [lang-tagalog-2] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: pure Tagalog in, Taglish out; the pet fee from 05-house-rules
+      A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three. Pero, pets are not allowed in the pools, on the beds, or inside the bedrooms. 🐶  || taglish? false (tl 2, en 18, en-share 0.90); facts kept
+      why: taglish? false (tl 2, en 18, en-share 0.90); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:6 -> fused:5 [both both both both keyword]
+[query] "Pwede po ba mag-extend after checkout? Magkano po?" -> 5 chunks 0.396/both 0.373/both 0.334/both 0.311/both 0.216/keyword
+[openai] chat: 2442 in + 50 out, 0 tool calls
+PASS  [lang-taglish] villa want lang
+      Q: Pwede po ba mag-extend after checkout? Magkano po?
+      note: Taglish in, Taglish out (the extension fee from 08-faq; the rates left the documents, D-074)
+      A: Usually po, hindi puwede mag-extend after checkout. Pero kung walang booking sa susunod na slot, puwede po mag-extend at ang charge is ₱1,000 per hour or any part of an hour. ✅  || taglish? true (tl 11, en 5, en-share 0.31); facts kept
+      why: taglish? true (tl 11, en 5, en-share 0.31); facts kept
+
+[query] reply language: english
+[retrieve] villa vector:3 keyword:10 -> fused:5 [both both vector keyword keyword]
+[query] "How much does a cook cost per day?" -> 5 chunks 0.262/both 0.251/both 0.270/vector 0.136/keyword 0.232/keyword
+[openai] chat: 2146 in + 18 out, 0 tool calls
+PASS  [lang-english] villa want lang
+      Q: How much does a cook cost per day?
+      note: English in, English out: the language block must not Taglish-ify English users
+      A: A cook can be arranged for ₱1,500 per day. 🍽️  || english? true (tl 0, en 4, en-share 1.00); facts kept
+      why: english? true (tl 0, en 4, en-share 1.00); facts kept
+
+[query] reply language: tagalog (asked for)
+[openai] rewrite: 127 in + 8 out
+[retrieve] villa vector:10 keyword:4 -> fused:5 [both both both both vector]
+[query] "Magkano po ang security deposit?" -> 5 chunks 0.456/both 0.429/both 0.334/both 0.353/both 0.389/vector
+[openai] chat: 2313 in + 30 out, 0 tool calls
+PASS  [lang-ask-tagalog] villa want lang
+      Q: Magkano po ang security deposit?
+      note: an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default
+      A: Ang refundable security deposit ay ₱2,000 at ito ay kinokolekta sa cash kasama ng balanse sa pagdating. 💰  || tagalog? true (tl 7, en 0, en-share 0.00); facts kept
+      why: tagalog? true (tl 7, en 0, en-share 0.00); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector keyword]
+[query] "Magkano po ang Overnight?" -> 5 chunks 0.413/both 0.383/both 0.330/both 0.427/vector 0.312/keyword
+[openai] chat: 2408 in + 14 out, 0 tool calls
+[query] a price with no date, answered with no figure: the reply is the rate card (D-091)
+[query] reply language: english (asked for)
+[openai] rewrite: 288 in + 5 out
+[rewrite] "Pwede po bang magdala ng aso?" -> "Can dogs be brought?"
+[retrieve] villa vector:5 keyword:3 -> fused:5 [both both both vector vector]
+[query] "Can dogs be brought?" -> 5 chunks 0.423/both 0.377/both 0.289/both 0.334/vector 0.308/vector
+[openai] chat: 2428 in + 45 out, 0 tool calls
+PASS  [lang-ask-english] villa want lang
+      Q: Pwede po bang magdala ng aso?
+      note: Taglish first, then an explicit switch: the last question is Tagalog, the answer must be English
+      A: Yes, you can bring small and medium pets at ₱500 each, with a maximum of three pets. However, pets are not allowed in the pools, on the beds, or inside the bedrooms. 🐾  || english? true (tl 0, en 16, en-share 1.00); facts kept
+      why: english? true (tl 0, en 16, en-share 1.00); facts kept
+
+[query] reply language: tagalog (asked for)
+[openai] rewrite: 123 in + 8 out
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "Anong oras po ang Day Tour?" -> 5 chunks 0.464/both 0.402/both 0.423/both 0.375/both 0.312/both
+[openai] chat: 2334 in + 19 out, 0 tool calls
+[query] reply language: tagalog (asked for)
+[openai] rewrite: 153 in + 7 out
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector keyword]
+[query] "Magkano po ang Overnight?" -> 5 chunks 0.413/both 0.383/both 0.330/both 0.427/vector 0.312/keyword
+[openai] chat: 2316 in + 17 out, 0 tool calls
+[query] a price with no date, answered with no figure: the reply is the rate card (D-091)
+[query] reply language: tagalog (asked for)
+[openai] rewrite: 351 in + 11 out
+[rewrite] "Pwede po bang magdala ng aso?" -> "Pwede po bang magdala ng aso sa Overnight?"
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both vector vector keyword]
+[query] "Pwede po bang magdala ng aso sa Overnight?" -> 5 chunks 0.355/both 0.361/both 0.387/vector 0.372/vector 0.267/keyword
+[openai] chat: 2556 in + 61 out, 0 tool calls
+[query] reply language: tagalog (asked for)
+[openai] rewrite: 396 in + 12 out
+[retrieve] villa vector:10 keyword:5 -> fused:5 [both both both both vector]
+[query] "Magkano po ang corkage kapag may caterer?" -> 5 chunks 0.574/both 0.548/both 0.442/both 0.371/both 0.376/vector
+[openai] chat: 2441 in + 30 out, 0 tool calls
+PASS  [lang-pin-window] villa want lang
+      Q: Magkano po ang corkage kapag may caterer?
+      note: the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window
+      A: Ang corkage fee ay ₱1,500 kung mayroong outside caterer na nag-set up at nagsisilbi sa property. 💰  || tagalog? true (tl 5, en 0, en-share 0.00); facts kept
+      why: tagalog? true (tl 5, en 0, en-share 0.00); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+[query] "Gusto ko po sanang mag-check ng availability." -> 5 chunks 0.385/both 0.376/both 0.308/both 0.343/both 0.381/both
+[openai] chat: 2408 in + 15 out, 0 tool calls
+[query] reply language: taglish
+[openai] rewrite: 116 in + 4 out
+[rewrite] "18 October" -> "18 October availability check"
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+[query] "18 October availability check" -> 5 chunks 0.375/both 0.306/both 0.314/both 0.322/both 0.250/both
+[query] dates: {"date_from":"2026-10-18"}
+[bookings] villa rooms 2026-10-18..2026-10-18: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-18"} -> 3 slots, 3 open
+[openai] chat: 2736 in + 89 out, 0 tool calls
+PASS  [lang-followup] villa want lang
+      Q: 18 October
+      note: the follow-up is a bare date: it must keep Taglish, and still call the tool
+      A: Yes po, lahat ng slots ay open sa 18 October 2026, which is a weekend.   | Slot            | Status | Price      | |-----------------|--------|------------| | 22-Hour Whole Day | open   | ₱27,000.00 | | Day Tour        | open   | ₱12,000.00 | | Overnight       | open   | ₱20,000.00 |  || tool for 2026-10-18: true; taglish? true (tl 5, en 4, en-share 0.44); f
+      why: tool for 2026-10-18: true; taglish? true (tl 5, en 4, en-share 0.44); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:2 keyword:5 -> fused:5 [vector keyword vector keyword keyword]
+[query] "May bakante pa po ba sa 15 October 2026?" -> 5 chunks 0.270/vector 0.143/keyword 0.251/vector 0.212/keyword 0.196/keyword
+[query] dates: {"date_from":"2026-10-15"}
+[bookings] villa rooms 2026-10-15..2026-10-15: 1 open of 3
+[tool] villa check_availability {"date_from":"2026-10-15"} -> 3 slots, 1 open
+[openai] chat: 2762 in + 89 out, 0 tool calls
+PASS  [lang-tool] villa want lang
+      Q: May bakante pa po ba sa 15 October 2026?
+      note: availability asked in Tagalog: the tool is called, its result told with Tagalog in it (the mix is printed)
+      A: Yes po, ang Overnight slot is open pa sa 15 October 2026, a weekday.   | Slot        | Status | Price      | |-------------|--------|------------| | Overnight   | open   | ₱16,000.00 | | Day Tour    | taken  |            | | 22-Hour Whole Day | taken  |            |  Kung gusto niyo po mag-book, let me know! 😊  || tool says Overnight 2026-10-15 is open; tag
+      why: tool says Overnight 2026-10-15 is open; taglish? true (tl 7, en 5, en-share 0.42); facts kept
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:7 -> fused:5 [both both both vector keyword]
+[query] "May massage service po ba kayo?" -> 5 chunks 0.330/both 0.322/both 0.320/both 0.366/vector 0.293/keyword
+[openai] chat: 2322 in + 11 out, 0 tool calls
+PASS  [lang-absent] villa want lang
+      Q: May massage service po ba kayo?
+      note: no document mentions massage: sounding natural must not invent one; the refusal is verbatim
+      A: Sorry po, wala pa kaming info tungkol diyan. Pwede po kayong mag-message sa amin via Viber or SMS at 0917-845-2290 para matulungan namin kayo.  || refused: true; 0 tool calls
+      why: refused: true; 0 tool calls
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both keyword vector]
+[query] "Is the resort available tomorrow?" -> 5 chunks 0.496/both 0.403/both 0.430/both 0.383/keyword 0.445/vector
+[query] dates: {"date_from":"2026-10-05"}
+[bookings] villa rooms 2026-10-05..2026-10-05: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 3 open
+[openai] chat: 2436 in + 87 out, 0 tool calls
+PASS  [date-tomorrow] villa want date
+      Q: Is the resort available tomorrow?
+      note: "tomorrow" is resolved in code and checked, not asked about
+      A: Yes, the resort is available tomorrow, 5 October 2026, a weekday.   | Slot            | Status | Price      | |-----------------|--------|------------| | 22-Hour Whole Day | open   | ₱22,000.00 | | Day Tour        | open   | ₱9,500.00  | | Overnight       | open   | ₱16,000.00 |  || calls: [{"date_from":"2026-10-05"}]; names 2026-10-05: true
+      why: calls: [{"date_from":"2026-10-05"}]; names 2026-10-05: true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:4 -> fused:5 [vector keyword vector keyword vector]
+[query] "Available ba kayo bukas?" -> 5 chunks 0.366/vector 0.293/keyword 0.348/vector 0.293/keyword 0.332/vector
+[query] dates: {"date_from":"2026-10-05"}
+[bookings] villa rooms 2026-10-05..2026-10-05: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 3 open
+[openai] chat: 2735 in + 89 out, 0 tool calls
+PASS  [date-bukas] villa want date
+      Q: Available ba kayo bukas?
+      note: "bukas" is the same date as "tomorrow"
+      A: Yes po, available tayo bukas, 5 October 2026, a weekday.   | Slot               | Status | Price      | |--------------------|--------|------------| | 22-Hour Whole Day  | open   | ₱22,000.00 | | Day Tour           | open   | ₱9,500.00  | | Overnight          | open   | ₱16,000.00 |  || calls: [{"date_from":"2026-10-05"}]; names 2026-10-05: true
+      why: calls: [{"date_from":"2026-10-05"}]; names 2026-10-05: true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:4 -> fused:5 [both both vector vector keyword]
+[query] "May vacant rooms ba kayo sa makalawa?" -> 5 chunks 0.404/both 0.398/both 0.469/vector 0.424/vector 0.345/keyword
+[query] dates: {"date_from":"2026-10-06"}
+[bookings] villa rooms 2026-10-06..2026-10-06: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-06"} -> 3 slots, 3 open
+[openai] chat: 2708 in + 112 out, 0 tool calls
+PASS  [date-makalawa] villa want date
+      Q: May vacant rooms ba kayo sa makalawa?
+      note: "sa makalawa" is the day after tomorrow
+      A: Yes po, may available slots tayo sa makalawa, 6 October 2026, na weekday. Narito ang mga detalye:  | Slot               | Status | Price      | |--------------------|--------|------------| | 22-Hour Whole Day  | open   | ₱22,000.00 | | Day Tour           | open   | ₱9,500.00  | | Overnight          | open   | ₱16,000.00 |  Kung may iba ka pang tanong, let me
+      why: calls: [{"date_from":"2026-10-06"}]; names 2026-10-06: true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:7 -> fused:5 [both both both vector keyword]
+[query] "May available ba kayo sa Friday?" -> 5 chunks 0.316/both 0.299/both 0.301/both 0.392/vector 0.282/keyword
+[query] dates: {"date_from":"2026-10-09"}
+[bookings] villa rooms 2026-10-09..2026-10-09: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-09"} -> 3 slots, 3 open
+[openai] chat: 2677 in + 88 out, 0 tool calls
+PASS  [date-weekday] villa want date
+      Q: May available ba kayo sa Friday?
+      note: "sa Friday" is the coming Friday, today included
+      A: Yes po, available ang mga slots sa 9 October 2026, a weekend.   | Slot                | Status | Price      | |---------------------|--------|------------| | 22-Hour Whole Day   | open   | ₱27,000.00 | | Day Tour            | open   | ₱12,000.00 | | Overnight           | open   | ₱20,000.00 |  || calls: [{"date_from":"2026-10-09"}]; wants 2026-10-09
+      why: calls: [{"date_from":"2026-10-09"}]; wants 2026-10-09
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both vector vector]
+[query] "Available ba kayo next week?" -> 5 chunks 0.296/both 0.292/both 0.274/both 0.368/vector 0.343/vector
+[query] dates: {"date_from":"2026-10-05","date_to":"2026-10-11"}
+[bookings] villa rooms 2026-10-05..2026-10-11: 21 open of 21
+[tool] villa check_availability {"date_from":"2026-10-05","date_to":"2026-10-11"} -> 21 slots, 21 open
+[openai] chat: 3707 in + 395 out, 0 tool calls
+PASS  [date-week] villa want date
+      Q: Available ba kayo next week?
+      note: the case the prompt line alone lost 3 runs of 3: a range, next Monday to Sunday
+      A: Yes po, available tayo next week from 5 October 2026 to 11 October 2026. Ang rates po ay weekdays at weekends.   Narito po ang mga available slots:  | Slot               | Status | Price       | |--------------------|--------|-------------| | 22-Hour Whole Day  | open   | ₱22,000.00  | | Day Tour           | open   | ₱9,500.00   | | Overnight          | open
+      why: calls: [{"date_from":"2026-10-05","date_to":"2026-10-11"}]; wants 2026-10-05..2026-10-11
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:8 -> fused:5 [both vector keyword vector vector]
+[query] "May available room ba bukas?" -> 5 chunks 0.444/both 0.479/vector 0.403/keyword 0.462/vector 0.451/vector
+[query] dates: {"date_from":"2026-10-05"}
+[bookings] villa rooms 2026-10-05..2026-10-05: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 3 open
+[openai] chat: 2728 in + 112 out, 0 tool calls
+[query] reply language: taglish
+[openai] rewrite: 211 in + 6 out
+[rewrite] "How about overnight?" -> "How about the overnight slot?"
+[retrieve] villa vector:5 keyword:10 -> fused:5 [both both both both both]
+[query] "How about the overnight slot?" -> 5 chunks 0.440/both 0.258/both 0.359/both 0.260/both 0.269/both
+[openai] chat: 2572 in + 48 out, 0 tool calls
+PASS  [date-followup-slot] villa want date
+      Q: How about overnight?
+      note: only the slot changes: the date from the first turn is kept, not asked for again
+      A: Yes po, the Overnight slot is open on 5 October 2026, a weekday. Ang presyo po nito is ₱16,000.00. Kung may iba ka pang katanungan, nandito lang ako! 😊  || calls: []; names 2026-10-05: true
+      why: calls: []; names 2026-10-05: true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:4 -> fused:5 [vector keyword vector keyword vector]
+[query] "Available ba kayo bukas?" -> 5 chunks 0.366/vector 0.293/keyword 0.348/vector 0.293/keyword 0.332/vector
+[query] dates: {"date_from":"2026-10-05"}
+[bookings] villa rooms 2026-10-05..2026-10-05: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-05"} -> 3 slots, 3 open
+[openai] chat: 2735 in + 92 out, 0 tool calls
+[query] reply language: english
+[openai] rewrite: 192 in + 15 out
+[rewrite] "What about the day after tomorrow?" -> "What are the available slots and prices for 7 October 2026?"
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+[query] "What are the available slots and prices for 7 October 2026?" -> 5 chunks 0.361/both 0.357/both 0.347/both 0.336/both 0.338/both
+[query] dates: {"date_from":"2026-10-06"}
+[bookings] villa rooms 2026-10-06..2026-10-06: 3 open of 3
+[tool] villa check_availability {"date_from":"2026-10-06"} -> 3 slots, 3 open
+[openai] chat: 2541 in + 87 out, 0 tool calls
+PASS  [date-followup-change] villa want date
+      Q: What about the day after tomorrow?
+      note: a bare date after an availability question is one too, and the NEW date is checked
+      A: Yes, the slots are available on 6 October 2026, a weekday.  | Slot               | Status | Price      | |--------------------|--------|------------| | 22-Hour Whole Day  | open   | ₱22,000.00 | | Day Tour           | open   | ₱9,500.00  | | Overnight          | open   | ₱16,000.00 |  || calls: [{"date_from":"2026-10-06"}]; wants 2026-10-06
+      why: calls: [{"date_from":"2026-10-06"}]; wants 2026-10-06
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:4 -> fused:5 [both both vector keyword vector]
+[query] "Available ba kahapon?" -> 5 chunks 0.262/both 0.252/both 0.307/vector 0.248/keyword 0.306/vector
+[query] dates: {"date_from":"2026-10-03"}
+[tool] villa check_availability {"date_from":"2026-10-03"} -> error: 2026-10-03 is in the past. Today is 2026-10-04.
+[openai] chat: 2532 in + 24 out, 0 tool calls
+PASS  [date-past] villa want date
+      Q: Available ba kahapon?
+      note: a past date is explained, not refused (Taglish once answered the bare refusal)
+      A: Ang 3 October 2026 po ay nasa nakaraan, kaya hindi na ito ma-check o ma-book.  || refused: false; says past: true
+      why: refused: false; says past: true
+
+[query] reply language: english
+[retrieve] villa vector:10 keyword:6 -> fused:5 [both both both vector keyword]
+[query] "Is anything free from 15 October to 18 October?" -> 5 chunks 0.256/both 0.262/both 0.287/both 0.359/vector 0.176/keyword
+[query] dates: {"date_from":"2026-10-15","date_to":"2026-10-18"}
+[bookings] villa rooms 2026-10-15..2026-10-18: 10 open of 12
+[tool] villa check_availability {"date_from":"2026-10-15","date_to":"2026-10-18"} -> 12 slots, 10 open
+[openai] chat: 3062 in + 361 out, 0 tool calls
+PASS  [date-range] villa want date
+      Q: Is anything free from 15 October to 18 October?
+      note: R-15: "from X to Y" is ONE call with date_from and date_to, not two single days
+      A: Yes, there are slots available from 15 October to 18 October 2026. Here are the details:  ### 15 October 2026 (weekday) | Slot                | Status | Price      | |---------------------|--------|------------| | 22-Hour Whole Day   | taken  | ₱22,000.00 | | Day Tour            | taken  | ₱9,500.00  | | Overnight           | open   | ₱16,000.00 |  ### 16 Oc
+      why: calls: [{"date_from":"2026-10-15","date_to":"2026-10-18"}]; names both ends: true/true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+[query] "Available ba kayo 18 October for 2 nights?" -> 5 chunks 0.432/both 0.462/both 0.396/both 0.407/both 0.415/both
+[query] dates: {"date_from":"2026-10-18","date_to":"2026-10-19"}
+[bookings] villa rooms 2026-10-18..2026-10-19: 6 open of 6
+[tool] villa check_availability {"date_from":"2026-10-18","date_to":"2026-10-19"} -> 6 slots, 6 open
+[openai] chat: 2970 in + 180 out, 0 tool calls
+PASS  [date-nights] villa want date
+      Q: Available ba kayo 18 October for 2 nights?
+      note: "for 2 nights" is the two nights slept: date_from the date, date_to the day after
+      A: Yes po, available ang mga slots natin from 18 October 2026 to 19 October 2026. Ang rates ay weekend sa unang araw at weekday naman sa pangalawang araw.   | Slot               | Status | Price       | |--------------------|--------|-------------| | 22-Hour Whole Day  | open   | ₱27,000.00  | | Day Tour           | open   | ₱12,000.00  | | Overnight          |
+      why: calls: [{"date_from":"2026-10-18","date_to":"2026-10-19"}]; names the date: true
+
+[query] reply language: taglish
+[retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both keyword]
+[query] "What time is check-in bukas?" -> 5 chunks 0.464/both 0.426/both 0.401/both 0.372/both 0.278/keyword
+[openai] chat: 2434 in + 47 out, 0 tool calls
+PASS  [date-docs] villa want date
+      Q: What time is check-in bukas?
+      note: trap 10: a documents question with a date gets no date line and no availability check
+      A: Ang check-in po natin bukas, 5 October 2026, ay 2:00 PM para sa Overnight Stay, at 8:00 AM naman para sa Day Tour at 22-Hour Whole Day. 😊  || 0 tool calls; has 2:00: true
+      why: 0 tool calls; has 2:00: true
+
+original 8/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 12/13 · book 5/5 · price 3/3
+57/61 as intended

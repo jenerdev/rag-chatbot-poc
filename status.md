@@ -79,6 +79,22 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
+**Promos (planned 2026-10-04, not started):**
+[`plan/promos.md`](./plan/promos.md). Discounts a tenant defines (fixed or
+percent, a validity range over the stay dates, an optional code, an optional
+usage limit), applied by the database in the one place every price is made,
+a customer reaching a promo only through one definer function, a Promos
+screen for owners and admins, the booking page and the staff form taking
+one. § 7 has five questions with recommendations. No chatbot change.
+- [ ] § 7 answered
+- [x] Phase 0 — baseline (2026-10-04): both SQL files confirmed in; verify 109/110 after its row builders learned `status: 'confirmed'` (a D-095 catch-up); rooms 41/41; both isolation suites both ways; tests, typecheck, three baselines identical; battery 57/61, the known set
+- [ ] Phase 1 — schema (`schema-promos.sql`, the 18th file)
+- [ ] Phase 2 — `@rag/bookings` (`promos.ts`, the quotes and writers take a promo)
+- [ ] Phase 3 — routes and permissions (`promos:read/write`)
+- [ ] Phase 4 — screens (Promos; the page's code field; the staff picker)
+- [ ] Phase 5 — the walls and the walk
+- [ ] Phase 6 — the record (D-097)
+
 **Tables in the reply (2026-10-04, COMPLETE; merged into `master` at `6e91499`):**
 [`plan/tables.md`](./plan/tables.md). Room lists, room details, rates and
 prices as a table: a hand-written pipe-table parser in the browser (one
@@ -1142,6 +1158,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — promos Phase 0 (baseline), on `feat/promos`
+- **Did:** § 7 answered, every recommendation taken. The two SQL files are
+  in. verify needed a D-095 catch-up (five row builders now insert
+  confirmed) and is 109/110; rooms 41/41; both isolation suites both ways;
+  tests, typecheck, three baselines identical; battery 57/61, the known set.
+- **Next:** Phase 1, the schema (`schema-promos.sql`).
 
 ### 2026-10-04 — a note on every decision (D-096), code done
 - **Did:** `decision_note` (sql file 17), the three decisions take a note,
