@@ -23,6 +23,8 @@ export type Role = (typeof ROLES)[number];
 export const PERMISSIONS = [
   /** GET /admin/session: any member may ask "am I logged in, and as what?" */
   'session',
+  /** the Dashboard (D-098): any member; tenant_dashboard() itself withholds money from a staff role */
+  'dashboard:read',
   'documents:read',
   'documents:write',
   'bookings:read',
@@ -48,7 +50,7 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const STAFF: readonly Permission[] = ['session', 'documents:read', 'bookings:read', 'bookings:write', 'unanswered:read', 'unanswered:write'];
+const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'unanswered:read', 'unanswered:write'];
 const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write'];
 const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
 

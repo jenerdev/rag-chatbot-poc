@@ -12,6 +12,7 @@ const ANY_MEMBER: Role[] = ['owner', 'admin', 'staff']; // app_is_staff()
 const OWNER_ONLY: Role[] = ['owner']; // memberships_owner_* policies
 const POSTGRES: Record<Permission, Role[]> = {
   session: ANY_MEMBER, // memberships_read_own: any member sees its own row
+  'dashboard:read': ANY_MEMBER, // tenant_dashboard() refuses unless app_is_staff(); money null unless app_is_admin() (schema-dashboard.sql)
   'documents:read': ANY_MEMBER, // documents_read: tenant match only
   'documents:write': ADMIN_ONLY, // documents_insert / documents_delete / chunks_insert
   'bookings:read': ANY_MEMBER, // bookings_read → app_is_staff() (schema-roles § 3)

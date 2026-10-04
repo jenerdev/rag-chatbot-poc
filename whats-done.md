@@ -7335,3 +7335,16 @@ only); villa's and harbor's open-unanswered and document counts each
 equal their own service-role truth (`310/310 · 8/8`, `16/16 · 1/1`) and
 differ from each other, both ways. The first run's "truth" query was
 mine to fix: a head-only count cannot filter on an embedded relation.
+
+## Dashboard, Phase 3: routes and permissions · done 2026-10-05, on `feat/dashboard`
+
+**What:** `dashboard:read` for every member (STAFF; the test's Postgres row
+says why: the function refuses a non-member itself and withholds money
+from a staff role); `GET /api/t/[tenant]/dashboard?days=` on
+`withTenantRoute()` + `requireAdmin(…, 'dashboard:read')`, no application
+required (a tenant without bookings gets `bookings: null`);
+`GET /api/platform/dashboard` on `withPlatformRoute()`.
+
+**Observed:** web tests 59/59 (+1 permission row); typecheck; on the dev
+server the tenant route is 401 without a session, the platform route 401,
+an unknown tenant 404.

@@ -92,7 +92,7 @@ with recommendations. No chatbot change.
 - [x] Phase 0 — baseline (2026-10-04): every suite green, baselines identical, battery 56/61 the known set; two runs died on transient errors (fetch failed, JWT expired) and the battery now reloads the tenant per case
 - [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). **Owed: re-run the file once** for the two `::date` casts on the chart buckets
 - [x] Phase 2 — `@rag/pipeline` (2026-10-05): `dashboard.ts` (typed shapes, the parser with date normalisation, the clamp, the two calls); tests 359/359; pipeline isolation 22–23 green both ways
-- [ ] Phase 3 — routes and permissions (`dashboard:read`)
+- [x] Phase 3 — routes and permissions (2026-10-05): `dashboard:read` (every member), `/api/t/[tenant]/dashboard?days=`, `/api/platform/dashboard`; web tests 59/59, typecheck; 401/401/404 on the dev server
 - [ ] Phase 4 — screens (`bar-chart.tsx`, the Dashboard, the Pulse strip)
 - [ ] Phase 5 — the walls and the walk
 - [ ] Phase 6 — the record (D-098)
@@ -1176,6 +1176,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 3 (routes and permissions), on `feat/dashboard`
+- **Did:** the permission, the two routes. Web 59/59; typecheck; the routes
+  401 without a session, an unknown tenant 404.
+- **Next:** Phase 4, the screens (`bar-chart.tsx` after the dataviz skill, the Dashboard, the Pulse strip).
 
 ### 2026-10-05 — dashboard Phase 2 (`@rag/pipeline`), on `feat/dashboard`
 - **Did:** `dashboard.ts` with its parser and clamp; tests 359/359;
