@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Dashboard (planned 2026-10-04, in progress on `feat/dashboard`; Phases 0–4 done):**
+**Dashboard (2026-10-05, Phases 0–6 DONE on `feat/dashboard`; the user's browser walk owed, then merge):**
 [`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
 from the rows the database already holds: needs-attention counts, today's
 check-ins, chat volume and refusals with the open unanswered count, the
@@ -96,7 +96,7 @@ with recommendations. No chatbot change.
 - [x] Phase 4 — screens (2026-10-05): `bar-chart.tsx` (inline SVG, the dataviz rules), `dashboard-screen.tsx` + the page (S-11), Dashboard first in the staff nav, the Pulse strip on `/platform`; web tests 59/59, typecheck; `plan/dashboard-phase4-walk.mjs` **14/14** over HTTP (staff sees no money, admin does, harbor has occupancy, villa none, northwind `bookings: null`, `?days` clamped, a harbor cookie refused on villa, three pages 200)
 - [x] Phase 5, the suites (2026-10-05): verify 117/118 (the known roles check), rooms 45/45, bookings isolation 31/31 both ways, pipeline isolation 23 (RLS) / 21 (filters), the three baselines byte-identical, battery **54/61** (`original 8/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 10/13 · book 4/5 · price 3/3`): the known set plus `rt-price` and `rt-standard`, 3 of 3 each, because the battery's free weekday is now 2026-10-20 and the user's two staff bookings #926/#927 (made 2026-09-27) occupy the Garden and Family Rooms that night; the replies are right (trap 24, the date kind)
 - [ ] Phase 5, the walk — **by the user:** harbor as staff (no Revenue card), as owner (Revenue), villa, northwind (three cards), the Pulse strip on `/platform`, 360 px
-- [ ] Phase 6 — the record (D-098)
+- [x] Phase 6 — the record (2026-10-05): D-098; CLAUDE.md (header, layout, 19 sql files, verify 118, isolation 23/21, rule 8's eleventh definer function); flow.md § 5; the plan marked done
 
 **Promos (2026-10-04, COMPLETE; walked by the user; merged into `master` at `263e9d7`):**
 [`plan/promos.md`](./plan/promos.md). Discounts a tenant defines (fixed or
@@ -1177,6 +1177,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 6, the record, on `feat/dashboard`
+- **Did:** D-098, CLAUDE.md, flow.md § 5, the plan's status.
+- **Next:** the user's walk (harbor as staff and as owner, villa,
+  northwind, the Pulse strip, 360 px), then merge `feat/dashboard` into
+  master. Owed: re-run `schema-dashboard.sql` once for the `::date` casts.
 
 ### 2026-10-05 — dashboard Phase 5, the suites, on `feat/dashboard`
 - **Did:** every suite; three baselines identical; battery 54/61, the two

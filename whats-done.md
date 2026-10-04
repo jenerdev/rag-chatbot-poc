@@ -7418,3 +7418,16 @@ branch touched the prompt, the tools or a query the chat makes, and the
 three baselines say so. Not deleted: they are the user's rows. The
 battery will pass those two cases again when today moves past them, or
 if the user clears those two bookings.
+
+## Dashboard, Phase 6: the record · done 2026-10-05, on `feat/dashboard`
+
+**What:** D-098 in decisions.md (the decision, the user's words, the two
+deviations from the plan's text, every measured value); CLAUDE.md's
+header paragraph, the layout lines (the page, the two components,
+`dashboard.ts`, the walk script, 19 sql files, verify 118, pipeline
+isolation 23/21), the commands, and rule 8, where `platform_dashboard`
+is the eleventh definer function and `tenant_dashboard` is named as the
+invoker one; flow.md § 5 gains the three routes and "every role the
+dashboard"; the plan's status line says Phases 0–6 done and the walk
+owed. Nothing in the chat, the prompts or the tools changed in this
+plan, and the three baselines were identical at Phase 0 and Phase 5.

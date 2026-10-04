@@ -3079,3 +3079,68 @@ promo code." to A's customer); pipeline isolation both ways; tests
 99/355/58; battery 56–57/61, the known set, in every phase. verify
 needed a D-095 catch-up first (its row builders now insert confirmed).
 The walk is the user's.
+
+## D-098 · A dashboard: one SQL function per page computes every figure in the tenant's day; the screen draws, and the charts are hand-drawn SVG · **Added 2026-10-05 (plan/dashboard.md)**
+
+**Decision:** `/t/<slug>/admin/dashboard` (S-11) for every member
+(`dashboard:read`, the STAFF set), drawn from ONE `jsonb` that
+`tenant_dashboard(p_tenant_id, p_days)` computes in SQL, in the tenant's
+timezone (`Asia/Manila` when it has no bookings config), from the rows
+the database already holds: needs-attention counts (requests waiting,
+staff bookings unconfirmed, requests that would clash on Confirm), today's
+check-ins and check-outs with the next 7 days' confirmed arrivals, chat
+volume and refusals with the open unanswered count and conversations per
+day, the knowledge base and the team, bookings by status and source as
+distinct STAYS (§ 2b.1, `promo_uses()`'s expression), confirmed stays per
+week by the night's date, occupancy over the next 30 days for a per_room
+tenant (active units NOW as the denominator, § 2b.4), promo uses, and
+revenue. The function is `security invoker` and refuses any caller that is
+not `app_is_staff()` of that tenant (`42501`), so a chat token gets a
+refusal rather than an empty page (trap 12), and it returns `money` as
+`null` unless `app_is_admin()` (q2): the one key withheld by role, decided
+in Postgres and never by the screen. The screen never adds, divides or
+re-buckets a figure (Rule 1); the refusal rate and the occupancy percent
+arrive computed. `?days=7|30|90`, clamped in the package (q5; the screen
+offers the three as buttons, not a date picker). The Dashboard is the
+FIRST staff link; `/admin` keeps its URL (q1). The charts are
+`bar-chart.tsx`, inline SVG with no library (Rule 3): one path per bar on
+a zero baseline, a rounded top, a 2 px gap, the value on the peak and the
+last bar only with every bar answering on hover, text in the ink tokens
+and the bars in the tenant's accent (D-030), and a `visually-hidden`
+table of the same rows. No pie (q4). `platform_dashboard()` is the
+eleventh `security definer` function (D-042's shape, `app_is_super()`
+first, `search_path = ''`) and returns counts and dates only (q6,
+§ 2b.6): the Pulse strip on `/platform` shows live tenants in one table
+and folds archived ones; it never shows money. Nothing new is collected:
+no table, no column, no row written. The chatbot is untouched (Rule 4).
+
+**Why:** the user: "create a plan for tenant dashboard page … which data
+are reasonable or make sense to put on dashboard page that the owner or
+staff or super admin would see … add simple chart if possible … like bar
+or pie chart." Staff opened five screens to learn five things. Every
+figure already existed as rows; the only new thing is the aggregate, and
+an aggregate computed in two places (SQL and a screen) would be the first
+number in this project with two sources. A chart library would be the
+first dependency doing a step someone would have to read elsewhere to
+understand (D-001).
+
+**Deviations from the plan's text:** Rule 3 said "the value above each
+bar"; the `dataviz` skill, which Rule 3 said to read first, says labels are
+selective, so the peak and the last bar carry theirs and the rest answer
+on hover and in the table. Cost per tenant stays out (q3): tokens are
+logged, never stored; a later plan.
+
+**Measured (Phases 0–5, two days, on `feat/dashboard`):** verify 117/118
+(117: a chat token refused with 42501, the staff probe's conversations and
+refusals equal to the service truth, `money` null for staff and present
+for the owner, another tenant's id refused; 118: the super strip's counts
+equal to the truth with no content column, a tenant token refused);
+pipeline isolation 23 on tokens and 21 on filters alone (22: a platform
+token asking for a tenant's page is 403; 23: villa's and harbor's open
+unanswered and documents each equal their own truth, `310/310 · 8/8`,
+`16/16 · 1/1`, and differ from each other); tests 359 and 59; the Phase 4
+HTTP walk 14/14 by role; the three baselines byte-identical in every
+phase; the battery 56/61 at Phase 0 and 54/61 at Phase 5, where the two
+new failures (`rt-price`, `rt-standard`, 3 of 3) are the user's two
+confirmed bookings on 2026-10-20, the battery's free weekday that day
+(trap 24, the date kind). The browser walk is the user's.

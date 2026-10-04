@@ -339,6 +339,8 @@ return 404, with no redirect.
 | `PATCH` / `DELETE` | `/api/t/<slug>/promos/:id` | edit or retire (`active: false`) / delete a never-used promo | `updatePromo` / `deletePromo` | admin |
 | `GET` | `/t/<slug>/admin/promos` | the Promos screen | `app/t/[tenant]/admin/promos/page.tsx` → `PromosScreen` | public page, admin data |
 | | | `book/quote` and `book/request` take `promoCode`; `bookings/quote` and `bookings` take `promoId`. The discount is the database's (`promo_discount()`), the code resolved by `promo_for_request()` | | |
+| `GET` | `/api/t/<slug>/dashboard` | ONE JSON from `tenant_dashboard()` (D-098): every card and chart, `?days=7\|30\|90` clamped; `money` null unless the role is admin or owner, decided in SQL | `tenantDashboard` (`@rag/pipeline` dashboard.ts) | admin (`dashboard:read`, every member) |
+| `GET` | `/t/<slug>/admin/dashboard` | the Dashboard screen (S-11), the first staff link | `app/t/[tenant]/admin/dashboard/page.tsx` → `DashboardScreen` | public page, admin data |
 | `GET` | `/t/<slug>/admin/members` | the Members screen (S-8) | `app/t/[tenant]/admin/members/page.tsx` → `MembersScreen` | public page, OWNER data |
 | `GET` / `POST` / `PATCH` / `DELETE` | `/api/t/<slug>/members` | list with emails / add an existing account / change a role / remove | `listMembers` … `removeMember` (`@rag/pipeline` members.ts) | owner (`members:manage`) |
 | `GET` | `/platform`, `/platform/reset` | the platform screen; where a super user's invite lands | `app/platform/…` → `PlatformScreen`, `ResetPassword` | public page, PLATFORM data |
@@ -349,6 +351,7 @@ return 404, with no redirect.
 | `POST` / `DELETE` | `/api/platform/tenants/:id/archive` | archive (a 404 everywhere) / unarchive | `archiveTenant` | platform |
 | `PUT` / `DELETE` | `/api/platform/tenants/:id/applications/:key` | switch on with a config, or replace it / switch off (409 while a booking is live) | `setApplication` / `removeApplication` | platform |
 | `GET` / `POST` / `PATCH` / `DELETE` | `/api/platform/tenants/:id/members` | any tenant's members, the same four verbs; `POST { userId }` is "Make me an owner" | members.ts, on the platform token | platform |
+| `GET` | `/api/platform/dashboard` | the Pulse strip: one row of counts per tenant from `platform_dashboard()` (definer, `app_is_super()` first); no content, no money (D-098) | `platformDashboard` (dashboard.ts) | platform |
 
 **The booking page** (plan/customer-booking.md) is the one place a stranger
 WRITES. The page's Server Component reads `bookingPage()` on the chat token
@@ -367,7 +370,7 @@ decline the whole group; `bookings_no_overlap` decides a clash at confirm.
   request) must hold the permission, from the one table in
   `lib/permissions.ts`: owner everything; admin the knowledge base, rooms,
   holidays and bookings; staff bookings and unanswered, the knowledge base
-  read-only. Otherwise a 403 that names both.
+  read-only; every role the dashboard. Otherwise a 403 that names both.
 - The handler then runs on a **staff** token, so Postgres reads the same
   row again on every write (`app_role()` under `app_is_admin()` and
   `app_is_staff()`).

@@ -148,6 +148,19 @@
 > lock on both doors. Owners and admins manage them at
 > `/t/<slug>/admin/promos`; the booking page takes a code, the staff form a
 > picker. The chatbot is untouched: no prompt text, no tool text.
+>
+> **Every member has a dashboard** since 2026-10-05 (D-098,
+> [`plan/dashboard.md`](./plan/dashboard.md), Phases 0–6; the walk owed).
+> `/t/<slug>/admin/dashboard` (S-11, the FIRST staff link) draws ONE
+> `jsonb` that `tenant_dashboard()` computes in SQL in the tenant's day
+> (`sql/schema-dashboard.sql`, the 19th file): attention counts, today's
+> arrivals, chat volume and refusals, the knowledge base, stays by status
+> and source, occupancy (per_room), promo uses, and `money` for owners and
+> admins only, withheld as `null` by the function itself. The screen never
+> adds a figure; the charts are `bar-chart.tsx`, inline SVG, no library.
+> `platform_dashboard()` (the eleventh definer function) gives `/platform`
+> a counts-only Pulse strip. `?days=7|30|90`, clamped. The chatbot is
+> untouched: the three baselines are byte-identical.
 
 ## What this is
 
@@ -196,13 +209,14 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/members/page.tsx   S-8 the tenant's members — for OWNERS (members:manage); others see one sentence
   app/t/[tenant]/admin/slots/page.tsx     S-9 slots — owners and admins (slots:read/write); 404 unless the tenant has the application
   app/t/[tenant]/admin/promos/page.tsx    S-10 promos (D-097) — owners and admins (promos:read/write); 404 unless the tenant has the application
-  app/platform/page.tsx          the platform: login → tenant list → the tenant form (super users only; not linked from /)
+  app/t/[tenant]/admin/dashboard/page.tsx S-11 the dashboard (D-098) — every member (dashboard:read); every tenant; the route is /api/t/[tenant]/dashboard?days=
+  app/platform/page.tsx          the platform: login → tenant list (with the Pulse strip, D-098) → the tenant form (super users only; not linked from /)
   app/platform/reset/page.tsx    where a super user's invite or reset email lands
-  app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members — every one on withPlatformRoute() but the three session/password ones
+  app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members, dashboard — every one on withPlatformRoute() but the three session/password ones
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, promos-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -223,11 +237,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (18 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (19 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     116 checks (111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     118 checks (117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -253,7 +267,8 @@ packages/
     src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
     src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
     src/members.ts         list (with emails), add an existing account, change a role, remove — shared by owners and the platform
-    tools/isolation.mjs    21 cross-tenant checks through the pipeline (the 21st, RLS only: a platform token reads nothing)
+    src/dashboard.ts       the dashboard's typed shapes over tenant_dashboard() and platform_dashboard(), the parser, the days clamp (D-098)
+    tools/isolation.mjs    23 cross-tenant checks through the pipeline (21 and 22, RLS only: a platform token reads nothing, and gets 403 from a tenant's dashboard; 23: each tenant's dashboard counts equal its own truth)
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -265,6 +280,7 @@ plan/customer-booking-villa-rates.mjs  villa's unit, rates and nightly slots; id
 plan/customer-booking-phase5-docs.mjs  re-ingests the "how to book" documents when they differ from the files
 plan/customer-booking-phase3-walk.mjs  10 HTTP checks of the booking and holiday routes, against pnpm dev
 plan/tenant-management-phase4-walk.mjs 12 HTTP checks of the platform and members routes, against pnpm dev
+plan/dashboard-phase4-walk.mjs 14 HTTP checks of the dashboard route by role (staff no money, admin money, the clamp), against pnpm dev
 plan/tenant-management-phase0-shapes.mjs  the constraints of schema-roles.sql, dry-run against every live row
 scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/service under apps/ or packages/*/src
 ```
@@ -274,11 +290,12 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 116 checks, no API key needed
+pnpm --filter @rag/db verify    # 118 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 21 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
-pnpm --filter @rag/pipeline isolation -- --filters-only   # 20 of them, code filters alone (RLS bypassed)
+pnpm --filter @rag/pipeline isolation   # 23 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # 21 of them, code filters alone (RLS bypassed)
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
 pnpm --filter @rag/bookings isolation   # 31 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
 pnpm --filter @rag/bookings rooms       # 45 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots; no API key
@@ -430,13 +447,15 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    in the same file, mints `{ sub, app_super }` with NO tenant, still
    `authenticated`, still five minutes, still no role parameter; with no
    tenant claim every tenant policy is false for it, and `app_is_super()`
-   demands a `platform_admins` row. Ten functions are `security definer`
+   demands a `platform_admins` row. Eleven functions are `security definer`
    (`tenant_public`, `check_availability`, `check_room_availability`,
    `request_booking`, `app_role`, `tenant_applications_validate`,
    `tenant_applications_no_delete_live`, `memberships_keep_an_owner`,
-   `member_emails`, `user_id_by_email`; D-042 as amended by D-054, D-071
-   and D-076), each with `search_path = ''` and each checking its caller
-   itself. `request_booking` is still the only one that writes for a
+   `member_emails`, `user_id_by_email`, `platform_dashboard`; D-042 as
+   amended by D-054, D-071, D-076 and D-098), each with `search_path = ''`
+   and each checking its caller itself. `tenant_dashboard()` is NOT one: it
+   is `security invoker`, so it reads under the token's own RLS, and it
+   refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a
    stranger, and it can write `pending` rows only.
 
 ## Traps that will actually cost you time

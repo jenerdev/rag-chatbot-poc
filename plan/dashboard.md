@@ -15,9 +15,12 @@
 > per page in the tenant's timezone, under RLS, and gated on the caller's
 > role inside the function.
 >
-> Written 2026-10-04, against `003ef8b` on `master`. **Status: in progress,
-> Phase 0 started 2026-10-04** on `feat/dashboard`. § 7's six questions were
-> answered 2026-10-04: every recommendation taken, by the user's instruction.
+> Written 2026-10-04, against `003ef8b` on `master`. **Status: Phases 0–6
+> done 2026-10-05** on `feat/dashboard`; the browser walk (Phase 5) is the
+> user's and is owed. § 7's six questions were answered 2026-10-04: every
+> recommendation taken, by the user's instruction. The record is D-098;
+> the two deviations from this text (selective bar labels, per the
+> `dataviz` skill; three window buttons, not a fixed 30) are named there.
 >
 > Read [§ 0](#0-the-four-rules) first, then § 2, which lists what the
 > database can and cannot say.
