@@ -1063,6 +1063,7 @@ async function seedHarborFixture() {
       guestName: b.guestName,
       guestPhone: b.guestPhone,
       notes: harborFixture.marker,
+      status: 'confirmed', // D-095: a fixture booking must take its night; a staff booking is born pending
     });
   }
   console.log(`fixture: ${harborFixture.bookings.length} harbor booking(s) seeded; booked ${H_BOOKED}, free ${H_FREE}, weekday ${H_WEEKDAY}`);
@@ -1085,6 +1086,7 @@ async function seedFixture() {
       guestPhone: b.guestPhone,
       guestCount: b.guestCount,
       notes: fixture.marker,
+      status: 'confirmed', // D-095: the same
     });
   }
   console.log(`fixture: ${fixture.bookings.length} villa booking(s) seeded; today ${TODAY}, booked ${BOOKED}, next ${NEXT}, free ${FREE}`);

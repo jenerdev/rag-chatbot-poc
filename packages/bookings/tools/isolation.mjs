@@ -191,12 +191,14 @@ try {
     date: probeDate,
     guestName: 'Isolation Probe',
     guestPhone: '0917-000-0000',
+    status: 'confirmed', // D-095: a seeded booking must take the span
   });
   villaBookingId = booked.id;
   check(booked.status === 'confirmed' && booked.slot === 'Overnight', 'villa: booking created', `#${booked.id} ${booked.date} ${booked.slot}`);
 
   const again = await thrown(() =>
-    createBooking(villa, { unitId: villaUnits[0].id, slotId: overnight.id, date: probeDate, guestName: 'Second' }),
+    // D-095: only a CONFIRMED booking can clash; a pending one would be allowed and left behind.
+    createBooking(villa, { unitId: villaUnits[0].id, slotId: overnight.id, date: probeDate, guestName: 'Second', status: 'confirmed' }),
   );
   check(
     again instanceof BookingConflictError && again.status === 409,
@@ -289,7 +291,7 @@ try {
   await setRates(a, aRoom.id, [{ slotId: aNight.id, weekdayPrice: 100000, weekendPrice: 100000 }]);
   await setRates(b, bRoom.id, [{ slotId: bNight.id, weekdayPrice: 200000, weekendPrice: 200000 }]);
   const bPhoto = await addImage(b, bRoom.id, PNG);
-  const bBooked = await createBookings(b, { unitId: bRoom.id, guestCount: 1, slotId: bNight.id, date: probeDate, guestName: 'B Guest' });
+  const bBooked = await createBookings(b, { unitId: bRoom.id, guestCount: 1, slotId: bNight.id, date: probeDate, guestName: 'B Guest', status: 'confirmed' });
   const bState = async () => {
     const { data: unit } = await supabase.from('units').select('name, capacity, standard_capacity, extra_person_rate, active').eq('id', bRoom.id).single();
     const { data: rate } = await supabase.from('unit_rates').select('weekday_price').eq('unit_id', bRoom.id).single();

@@ -436,7 +436,11 @@ export async function createBookings(tenant: BookingTenant, input: NewBooking): 
   const guestName = requireText(input.guestName, 'Guest name', MAX_GUEST_NAME);
   const guestPhone = optionalText(input.guestPhone, 'Guest phone', MAX_GUEST_PHONE);
   const notes = optionalText(input.notes, 'Notes', MAX_NOTES);
-  const status = input.status === undefined ? 'confirmed' : bookableStatus(input.status);
+  // D-095: a booking is born PENDING unless the caller says otherwise. The
+  // staff route never says (its schema has no status), so a staff booking
+  // holds nothing until someone presses Confirm, exactly like a customer's
+  // request (D-070). The tools that seed test bookings pass 'confirmed'.
+  const status = input.status === undefined ? 'pending' : bookableStatus(input.status);
   const groupId = rooms.length > 1 ? randomUUID() : null;
 
   const { data, error } = await tenant.db
@@ -604,6 +608,43 @@ export async function cancelBooking(tenant: BookingTenant, id: unknown): Promise
   if (error) throw new Error(`Could not cancel the booking: ${error.message}`);
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} cancelled #${bookingId}`);
+  return data.length > 0;
+}
+
+/**
+ * Confirm a staff booking (D-095): pending → confirmed, and for a group
+ * booking (several rooms, one group_id) the WHOLE group in one statement,
+ * so a stay can never end up half confirmed, the same rule as a request
+ * (plan/customer-booking.md § 2.6). Confirming is the moment the span is
+ * taken: if another confirmed booking holds it, bookings_no_overlap refuses
+ * the statement (23P01) and nothing changes; a closed date is refused in
+ * words. Confirming a confirmed booking is `true`; a cancelled one, or a
+ * booking that is not this tenant's, is `false`, one answer on purpose.
+ */
+export async function confirmBooking(tenant: BookingTenant, id: unknown): Promise<boolean> {
+  await requireConfig(tenant);
+  const bookingId = positiveInt(id, 'Booking id');
+
+  const { data: row, error: readError } = await tenant.db
+    .from('bookings')
+    .select('id, group_id, status')
+    .eq('tenant_id', tenant.id)
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (readError) throw new Error(`Could not read the booking: ${readError.message}`);
+  if (!row || row.status === 'cancelled') return false;
+
+  let update = tenant.db.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', tenant.id).in('status', ['pending', 'confirmed']);
+  update = row.group_id ? update.eq('group_id', row.group_id) : update.eq('id', bookingId);
+  const { data, error } = await update.select('id');
+  if (error?.code === '23P01') {
+    throw new BookingConflictError('That span is already confirmed for another booking. Cancel the other booking first, or cancel this one.');
+  }
+  const closedNight = error ? closedError(error) : null;
+  if (closedNight) throw new BookingInputError(`${closedNight.message.replace(' Choose another date.', '')} Cancel this booking, or reopen the date first.`);
+  if (error) throw new Error(`Could not confirm the booking: ${error.message}`);
+
+  if (data.length > 0) console.log(`[bookings] ${tenant.slug} confirmed #${bookingId}${row.group_id ? ` (group ${row.group_id}, ${data.length} row(s))` : ''}`);
   return data.length > 0;
 }
 

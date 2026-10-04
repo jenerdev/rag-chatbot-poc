@@ -1143,6 +1143,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-04 — a staff booking is born pending (D-095)
+- **Did:** pending by default in `createBookings()`, no `status` in the route's
+  schema, `confirmBooking()` + `PATCH /bookings/[id]`, a Confirm button on
+  a pending row, `sql/schema-pending-default.sql`; the seeding tools pass
+  confirmed. Rooms 40/40; isolation 30/30 both ways; battery 57/61.
+- **Owed to the user:** run `packages/db/sql/schema-pending-default.sql`;
+  walk the Bookings screen (create → pending → Confirm; a clash is a 409).
+- **Next:** commit; the three open items.
+
 ### 2026-10-04 — room cards with photos (D-094)
 - **Did:** `roomPhotos()` (bookings), `meta.roomCards` / `Answer.roomCards`
   on a room-list turn, `room-cards.tsx` (cards + lightbox), CSS. Tests

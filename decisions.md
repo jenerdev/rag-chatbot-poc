@@ -2964,3 +2964,41 @@ cards already made. Measured: web tests 56 (a column-view case), typecheck;
 the dev server: "Room rates please" and a dated room question at harbor
 `column` with 4 rooms, the room list `cards`, villa nothing; battery 57/61,
 the known set.
+
+## D-095 · A booking is born pending; staff confirm it, and confirming is what takes the span · **Added 2026-10-04. Extends D-070 to staff bookings**
+
+**Decision:** `createBookings()` (and `createBooking()`, which calls it)
+inserts `pending` unless the caller names a status; the staff route's
+schema has no `status` key (zod strips one), so a booking made on the
+Bookings screen is pending. `confirmBooking(tenant, id)` (`@rag/bookings`)
+moves pending → confirmed, the WHOLE group in one statement for a
+several-rooms booking; `PATCH /api/t/<slug>/bookings/[id]` with
+`{ action: 'confirm' }` calls it, and the screen's row shows **Confirm**
+beside Cancel while pending. `sql/schema-pending-default.sql` (the 16th
+file, run by the user) sets the column default to `pending`, the second
+wall: a raw insert naming no status is pending too. A pending row holds
+nothing (D-070), so confirmation is the moment the span is taken, and a
+clash is the 409 `bookings_no_overlap` raises there, in the server's own
+words; a closed date is refused in words. The tools that seed test
+bookings (the battery's two fixtures, isolation, rooms) pass
+`status: 'confirmed'` explicitly, because a seeded booking must take its
+night. Existing rows do not change.
+
+**Why:** the user: "Booking created by a staff should not be
+automatically confirmed." The same rule a customer's request already
+had, now for staff: nothing is held until someone says so.
+
+**Cost, stated:** until confirmed, a staff booking leaves the date OPEN to
+the chatbot, the booking page and other staff, exactly as a request does.
+Confirm promptly, or the span can be taken by another confirmed booking,
+and Confirm then answers 409.
+
+**Measured:** tests 99/355/56; typecheck; rooms **40/40** (4b new: born
+pending, a second pending allowed on the same night, Confirm takes the
+whole group → `confirmed,confirmed`, the second's Confirm is a
+`BookingConflictError`, a chat token cannot confirm); bookings isolation
+30/30 both ways (the "same slot again is a 409" check had to seed
+confirmed: with no status it quietly created a pending row, twice, and
+both were deleted by id); battery **57/61**, the known set, `tool 9/9`,
+both fixtures seeded confirmed. Owed to the user: run the SQL file, and
+the screen walk (create → "pending" with Confirm → confirmed).

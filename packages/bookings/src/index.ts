@@ -60,6 +60,7 @@ export {
 export {
   bookingsConfig,
   cancelBooking,
+  confirmBooking,
   checkAvailability,
   checkPricedAvailability,
   checkRoomAvailability,

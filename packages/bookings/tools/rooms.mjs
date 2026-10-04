@@ -40,6 +40,7 @@ import {
   setCalendarDay,
   checkRoomAvailability,
   createAccommodation,
+  confirmBooking,
   createBookings,
   createSlot,
   deleteSlot,
@@ -176,6 +177,7 @@ try {
     date: MONDAY,
     guestName: 'Rooms Probe',
     price: 1,
+    status: 'confirmed', // D-095: a seeded booking must take the span
   });
   check(
     group.bookings.length === 2 && group.groupId !== null && group.bookings.every((b) => b.groupId === group.groupId) && group.total === monday.total,
@@ -183,17 +185,44 @@ try {
     `group ${group.groupId} · ${group.bookings.map((b) => `#${b.id} ${b.unit} ${b.price}`).join(', ')} · total ${group.total}`,
   );
 
+  // 4b. D-095: a booking with no status named is PENDING, and holds nothing:
+  //     a second pending one on the same room and night is allowed. Confirming
+  //     the first takes the night (the whole group, one statement); confirming
+  //     the second is then the 409 bookings_no_overlap raises; a chat token
+  //     cannot confirm anything. The date is a week after MONDAY, used nowhere else.
+  {
+    const weekLater = (() => {
+      const d = new Date(`${MONDAY}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 7);
+      return d.toISOString().slice(0, 10);
+    })();
+    const chatProbe = { id: probe.id, slug: probe.slug, db: scopedClient(mintTenantToken({ tenantId: probe.id })) };
+    const first = await createBookings(probe, { rooms: [{ unitId: garden.id, guestCount: 1 }, { unitId: family.id, guestCount: 2 }], slotId: night.id, date: weekLater, guestName: 'Pending A' });
+    const second = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: weekLater, guestName: 'Pending B' });
+    const bothPending = first.bookings.every((b) => b.status === 'pending') && second.bookings[0].status === 'pending';
+    const confirmedFirst = await confirmBooking(probe, first.bookings[0].id);
+    const afterFirst = (await listBookings(probe, { from: weekLater, to: weekLater })).filter((b) => b.groupId === first.groupId).map((b) => b.status).join(',');
+    const confirmSecond = await thrown(() => confirmBooking(probe, second.bookings[0].id));
+    const chatConfirm = await thrown(() => confirmBooking(chatProbe, first.bookings[1].id));
+    check(
+      bothPending && confirmedFirst === true && afterFirst === 'confirmed,confirmed' && confirmSecond instanceof BookingConflictError && chatConfirm !== undefined,
+      'D-095: born pending, holding nothing; Confirm takes the whole group; the clash is a 409 at confirm; a chat token cannot confirm',
+      `pending ${bothPending} · first ${confirmedFirst} → ${afterFirst} · second ${confirmSecond?.constructor?.name} · chat ${chatConfirm?.constructor?.name ?? chatConfirm}`,
+    );
+  }
+
   // 5. The same room again is a 409. Then a group that clashes on ONE room:
   //    Garden is booked alone on Tuesday first, so Family + Garden on Tuesday
   //    must fail, and must leave no Family row behind (one statement, D-053).
-  const again = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: MONDAY, guestName: 'Second' }));
-  const blocker = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: TUESDAY, guestName: 'Blocker' });
+  const again = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: MONDAY, guestName: 'Second', status: 'confirmed' }));
+  const blocker = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: TUESDAY, guestName: 'Blocker', status: 'confirmed' });
   const clash = await thrown(() =>
     createBookings(probe, {
       rooms: [{ unitId: family.id, guestCount: 1 }, { unitId: garden.id, guestCount: 1 }],
       slotId: night.id,
       date: TUESDAY,
       guestName: 'Clash',
+      status: 'confirmed', // D-095: only a confirmed booking can clash
     }),
   );
   const tuesday = await listBookings(probe, { from: TUESDAY });
@@ -218,7 +247,7 @@ try {
   const noRateRoom = await createAccommodation(probe, { name: 'Unpriced', capacity: 2 });
   const unpriced = await thrown(() => createBookings(probe, { unitId: noRateRoom.id, guestCount: 1, slotId: night.id, date: FRIDAY, guestName: 'x' }));
   const tooMany = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 3, slotId: night.id, date: FRIDAY, guestName: 'x' }));
-  const fits = await createBookings(probe, { unitId: garden.id, guestCount: 2, slotId: night.id, date: FRIDAY, guestName: 'Fits' });
+  const fits = await createBookings(probe, { unitId: garden.id, guestCount: 2, slotId: night.id, date: FRIDAY, guestName: 'Fits', status: 'confirmed' });
   check(
     unpriced instanceof BookingInputError && /no price/.test(unpriced.message)
       && tooMany instanceof BookingInputError && /more guests/.test(tooMany.message)
@@ -331,7 +360,7 @@ try {
     );
   }
   {
-    const booked = await createBookings(probe, { unitId: quad.id, guestCount: 3, slotId: night.id, date: MONDAY, guestName: 'Three' });
+    const booked = await createBookings(probe, { unitId: quad.id, guestCount: 3, slotId: night.id, date: MONDAY, guestName: 'Three', status: 'confirmed' });
     const [row] = booked.bookings;
     const listed = (await listBookings(probe, { from: MONDAY })).find((b) => b.id === row?.id);
     check(
@@ -613,7 +642,7 @@ try {
     //     counts them); an empty date can, with no surcharge; a closed date
     //     with a surcharge is refused by the table too.
     {
-      await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: BUSY, guestName: 'Busy' });
+      await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: BUSY, guestName: 'Busy', status: 'confirmed' });
       const busy = await thrown(() => setCalendarDay(probe, { day: BUSY, kind: 'closed', label: 'Probe closed' }));
       const closed = await setCalendarDay(probe, { day: CLOSED, kind: 'closed', label: 'Probe maintenance' });
       const pricey = await thrown(() => setCalendarDay(probe, { day: CLOSED, kind: 'closed', label: 'x', surcharge: 100 }));
@@ -638,7 +667,7 @@ try {
       const row = { tenant_id: probe.id, unit_id: garden.id, slot_id: night.id, booked_date: CLOSED, status: 'confirmed', guest_name: 'Raw', guest_count: 1 };
       const rawStaff = await code(() => probe.db.from('bookings').insert(row));
       const rawService = await code(() => supabase.from('bookings').insert(row));
-      const dayAfter = await createBookings(probe, { unitId: family.id, guestCount: 2, slotId: night.id, date: next(CLOSED, 2), guestName: 'Twin' });
+      const dayAfter = await createBookings(probe, { unitId: family.id, guestCount: 2, slotId: night.id, date: next(CLOSED, 2), guestName: 'Twin', status: 'confirmed' });
       check(
         staff instanceof BookingInputError && staff.message === `Closed on ${CLOSED} (Probe maintenance). Choose another date.`
           && rawStaff.startsWith('23514 closed on') && rawService.startsWith('23514 closed on') && dayAfter.bookings.length === 1,
@@ -684,7 +713,7 @@ try {
       const still = (await find()).status;
       const declined = await declineRequest(probe, listed.groupId);
       const reopened = await removeCalendarDay(probe, CLOSED);
-      const afterReopen = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: CLOSED, guestName: 'Reopened' });
+      const afterReopen = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: CLOSED, guestName: 'Reopened', status: 'confirmed' });
       check(
         listed.closed && !listed.clash && confirm instanceof BookingInputError && /Decline this request, or reopen the date/.test(confirm.message)
           && still === 'pending' && declined && reopened && afterReopen.bookings.length === 1,
@@ -720,7 +749,7 @@ try {
     // 35. An upcoming booking fixes its times: refused in words, and raw on the
     //     admin token AND on service_role (the trigger alone). The name changes.
     await setRates(probe, garden.id, [{ slotId: created.id, weekdayPrice: 200000, weekendPrice: 250000 }]);
-    const booked = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: created.id, date: FAR, guestName: 'Slot probe' });
+    const booked = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: created.id, date: FAR, guestName: 'Slot probe', status: 'confirmed' });
     const moveWords = await thrown(() => updateSlot(probe, created.id, { startTime: '09:00' }));
     const rawStaff = await probe.db.from('slots').update({ duration: '10 hours' }).eq('id', created.id);
     const rawService = await supabase.from('slots').update({ start_time: '07:00' }).eq('id', created.id);

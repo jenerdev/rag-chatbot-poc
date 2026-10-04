@@ -7065,3 +7065,16 @@ cards, the lightbox, the phone), yours.
 button opens the shared lightbox. **Observed:** web 56; typecheck; the
 rate card, a dated table and the room list at harbor each flagged as
 designed over HTTP, villa untouched; battery 57/61, the known set.
+
+## A staff booking is born pending · done 2026-10-04 (D-095)
+
+**What:** `createBookings()` defaults to pending; the route's schema drops
+`status`; `confirmBooking()` + `PATCH /bookings/[id]`; a Confirm button on
+a pending row; `sql/schema-pending-default.sql` for the column default
+(the user runs it); every seeding tool passes `status: 'confirmed'`.
+**Observed:** rooms 40/40 (check 4b), isolation 30/30 both ways, battery
+57/61 the known set, tests and typecheck green. **Trap met:** the
+isolation "same slot again is a 409" check, seeding with no status, made
+a pending row instead of a 409 and left it in villa's real calendar,
+twice; both deleted by id (#4031, #4040), and the check now seeds
+confirmed. **Owed:** the SQL file, and the screen walk.

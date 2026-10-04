@@ -120,7 +120,8 @@ export const createBookingSchema = z.object({
   guestPhone: z.string({ invalid_type_error: 'Guest phone must be text.' }).nullish(),
   guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
   notes: z.string({ invalid_type_error: 'Notes must be text.' }).nullish(),
-  status: z.enum(['pending', 'confirmed'], { invalid_type_error: 'Status must be "pending" or "confirmed".' }).optional(),
+  // No `status` since D-095: a staff booking is born pending (zod strips the
+  // key if a client sends one), and PATCH /bookings/[id] confirms it.
 });
 
 /** A price preview for one unit or several rooms (per_room only). */

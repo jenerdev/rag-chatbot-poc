@@ -103,11 +103,14 @@ function durationLabel(duration: string): string {
 function BookingRow({
   booking,
   onCancel,
+  onConfirm,
   busy,
   perRoom,
 }: {
   booking: BookingSummary;
   onCancel: (booking: BookingSummary) => void;
+  /** D-095: a staff booking is born pending; this is the button that takes the span. */
+  onConfirm: (booking: BookingSummary) => void;
   busy: boolean;
   /** per_room: show the room and the stored price. Null for whole_resort, so villa's row is unchanged. */
   perRoom: { currency: string } | null;
@@ -133,6 +136,11 @@ function BookingRow({
             .filter(Boolean)
             .join(' · ')}
         </span>
+        {booking.status === 'pending' && (
+          <button type="button" className="primary" disabled={busy} onClick={() => onConfirm(booking)}>
+            Confirm
+          </button>
+        )}
         {!cancelled && (
           <button type="button" disabled={busy} onClick={() => onCancel(booking)}>
             Cancel
@@ -425,6 +433,33 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         void load();
       } catch (error) {
         setNotice({ message: `Could not cancel: ${await describeFailure(error as Error, response)}`, kind: 'error' });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [api, load, unauthorized],
+  );
+
+  // D-095: confirm a pending staff booking. The server's 409 (another
+  // confirmed booking holds the span) arrives with its own sentence.
+  const confirmOne = useCallback(
+    async (booking: BookingSummary) => {
+      setNotice(null);
+      setBusy(true);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${api}/bookings/${booking.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'confirm' }),
+        });
+        if (response.status === 401) return unauthorized();
+        if (!response.ok) throw new Error('failed');
+        setNotice({ message: `Confirmed ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. The slot is now taken.`, kind: 'ok' });
+        void load();
+      } catch (error) {
+        setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
+        void load();
       } finally {
         setBusy(false);
       }
@@ -794,7 +829,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   </span>
                 </div>
                 {dayBookings.map((b) => (
-                  <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} perRoom={perRoom ? { currency: setup.currency } : null} />
+                  <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} onConfirm={confirmOne} perRoom={perRoom ? { currency: setup.currency } : null} />
                 ))}
               </div>
             ))
