@@ -1143,6 +1143,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-04 — the rate card only for the stay (D-093)
+- **Did:** `asksUndatedPrice()` narrowed: a stay word or a bare question;
+  "How much is parking/coke zero/videoke" now the friendly refusal. Tests
+  355/355; battery 57/61, the known set.
+- **Next:** commit; the three open items.
+
 ### 2026-10-04 — emoji where one fits; **bold** drawn (D-092; D-091 amended)
 - **Did:** the base-prompt paragraph (northwind's baseline is now
   `northwind-prompt-post-emoji.txt`), fixed emoji on the code-written

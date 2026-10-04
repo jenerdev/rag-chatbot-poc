@@ -1,0 +1,24 @@
+=== villa · How much is parking?
+refused: true · rate card: false
+Sorry, we don't have any information about that yet. You can message us on Viber or SMS at 0917-845-2290 so we can assist you.
+
+=== villa · How much is coke zero
+refused: true · rate card: false
+Sorry, we don't have any information about that yet. You can message us on Viber or SMS at 0917-845-2290 so we can assist you.
+
+=== villa · how much is videoke
+refused: true · rate card: false
+Sorry, we don't have any information about that yet. You can message us on Viber or SMS at 0917-845-2290 so we can assist you.
+
+=== villa · Magkano po?
+refused: false · rate card: true
+💰 Ito po ang rates namin:
+
+=== harbor · How much?
+refused: false · rate card: true
+💰 Here are our rates:
+
+=== villa · How much is the security deposit?
+refused: false · rate card: false
+The refundable security deposit is ₱2,000, which is collected in cash together with the balance on arrival. 💰
+

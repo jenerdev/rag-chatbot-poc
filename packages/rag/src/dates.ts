@@ -447,10 +447,35 @@ const PRICE = /\b(?:how\s+much|magkano|price|prices|pricing|rate|rates|cost|cost
  *
  * answer.ts uses this only on a reply that is ALREADY the refusal, so a price
  * the documents do answer ("Magkano po ang security deposit?") is untouched.
+ *
+ * NARROWED 2026-10-04 (D-093): the question must be about the STAY. "How much
+ * is parking?", "How much is coke zero?", "how much is videoke" at villa got
+ * the rate card and a request for a date, because any price word with no
+ * figure in the reply qualified. Now it needs a stay word (a rate, room,
+ * slot, night, booking) OR no object at all ("How much?", "Magkano po?").
+ * Anything else is the documents' to answer, or the friendly refusal.
  */
 export function asksUndatedPrice(message: string, today: string): boolean {
   const text = message.toLowerCase();
-  return PRICE.test(text) && !NAMED_FEE.test(text) && !asksExtraGuest(message, today) && resolveDates(message, today).length === 0;
+  if (!PRICE.test(text) || NAMED_FEE.test(text) || asksExtraGuest(message, today)) return false;
+  if (resolveDates(message, today).length > 0) return false;
+  return STAY.test(text) || bareQuestion(text);
+}
+
+/** The stay itself, in the words a visitor uses for it. "prices"/"rates" plural is the price list. */
+const STAY =
+  /\b(?:rates?|prices|pricing|price\s+list|rooms?|kwarto|kuwarto|slots?|overnight|day\s+tour|whole\s+day|nights?|gabi|stay|staying|book|booking|accommodations?|tuluyan)\b/;
+
+/**
+ * "How much?", "Magkano po?", "what's the cost?": a price question with no
+ * object, once the price words, politeness and filler are gone. What is left
+ * must hold no word of three letters or more.
+ */
+const PRICE_FILLER =
+  /\b(?:how\s+much|magkano|price|prices|pricing|rate|rates|cost|costs|presyo|po|ba|naman|your|the|is|are|it|ang|ng|what|whats|please|kayo|niyo|ninyo|lang|sa|dito|there|do|you|charge|for|a|an|mo|yung|ung|ano|lahat|everything|all|total)\b/g;
+function bareQuestion(text: string): boolean {
+  const rest = text.replace(/[^\p{L}\s]/gu, ' ').replace(PRICE_FILLER, ' ');
+  return !/\p{L}{3,}/u.test(rest);
 }
 
 /**

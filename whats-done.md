@@ -7035,3 +7035,12 @@ flips); `tool 9/9 · price 3/3 · book 5/5`. Emoji in 19 of 61 replies
 (💰 4, ✅ 4, 😊 2, 📅 2, 👋 📞 🐾 🐶), none in a cell. Six probes: one
 model-added emoji in four model replies; the code-written ones carry
 theirs (`probes-emoji.txt`).
+
+## A price question about something else is not the rate card · done 2026-10-04 (D-093)
+
+**What:** `asksUndatedPrice()` needs a stay word or no object at all; the
+rest is the documents' question. **Why it matters:** "How much is coke
+zero" was answered with the resort's rate card and a request for a date.
+**Observed:** tests 355/355; the three reported questions are the
+friendly refusal, the bare ones the card, the deposit its figure; battery
+57/61, the known set; no prompt text changed.

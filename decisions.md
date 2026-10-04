@@ -2885,3 +2885,28 @@ splits it out (both markers on one line, something between, no `*`
 inside; anything else is text) and `reply-text.tsx` puts a bold run in
 `<strong>` as a child, in prose and in a cell. The user: "I'm seeing text
 like **test**"; the model writes it on its own (recorded at Phase 0).
+
+## D-093 · The rate card answers a price question about the STAY, never about something else · **Added 2026-10-04. Narrows D-081 (as amended by D-091)**
+
+**Decision:** `asksUndatedPrice()` fires only when the message has a price
+word AND is about the stay: a STAY word (`rate(s)`, `prices`, `pricing`,
+`price list`, `room(s)`, `kwarto`, `slot(s)`, the slot words `overnight`,
+`day tour`, `whole day`, `night(s)`, `gabi`, `stay`, `book(ing)`,
+`accommodation(s)`, `tuluyan`), or no object at all once the price words,
+politeness and filler are gone ("How much?", "Magkano po?"). The D-088
+named-fee and D-085 extra-guest exclusions stand. Everything else ("How
+much is parking?", "How much is coke zero", "how much is videoke") is left
+to the documents, and when they say nothing, to the tenant's friendly
+refusal.
+
+**Why:** the user: "bot wrong response … I notice asking anything with
+the word 'how much' getting this response". D-081 recorded this cost
+("how much is parking?" got the rates sentence) and the rate card made it
+worse: a price list and a request for a date, for a soft drink.
+
+**Measured:** tests 355/355 (15 new cases both ways); typecheck; the six
+probes (`probes-price-gate.txt`): parking, coke zero and videoke at villa
+are the friendly refusal, "Magkano po?" and "How much?" the rate card, the
+deposit its ₱2,000. Battery **57/61**, the known set; the card fired on
+the same two `lang-pin-window` setup turns as before. No prompt text
+changed.

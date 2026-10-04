@@ -334,6 +334,20 @@ describe('asksUndatedPrice (D-081)', () => {
       expect(asksUndatedPrice(m, WEDNESDAY)).toBe(false);
     }
   });
+
+  // D-093: the price of something that is not the stay is the documents'
+  // question, never the rate card.
+  it('a price word about something else is not the stay (D-093)', () => {
+    for (const m of ['How much is parking?', 'How much is coke zero', 'how much is videoke', 'Magkano ang kayak rental?', 'how much does the boat tour cost?', 'what is the price of a massage']) {
+      expect(asksUndatedPrice(m, WEDNESDAY), m).toBe(false);
+    }
+  });
+
+  it('a stay word, or no object at all, still is', () => {
+    for (const m of ['How much?', 'Magkano po?', 'how much po ba?', 'what are your prices?', 'how much per night', 'How much is a room?', 'magkano ang isang gabi', 'how much to stay?', 'how much is the Day Tour']) {
+      expect(asksUndatedPrice(m, WEDNESDAY), m).toBe(true);
+    }
+  });
 });
 
 describe('asksHorizon (D-086)', () => {
