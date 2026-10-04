@@ -7,7 +7,7 @@
 // secret and decides nothing the routes do not decide again.
 
 import { useCallback, useEffect, useState } from 'react';
-import type { TenantDetail, TenantSummary } from '@rag/pipeline';
+import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { TenantForm } from '@/components/tenant-form';
 
@@ -18,6 +18,7 @@ export function PlatformScreen() {
   const [auth, setAuth] = useState<Auth>('checking');
   const [userId, setUserId] = useState<string | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[] | null>(null);
+  const [pulse, setPulse] = useState<PlatformPulse[] | null>(null);
   const [listMessage, setListMessage] = useState('Loading tenants…');
   /** null = the list; 'new' = the create form; a number = that tenant's form. */
   const [selected, setSelected] = useState<number | 'new' | null>(null);
@@ -58,6 +59,14 @@ export function PlatformScreen() {
     } catch (error) {
       setTenants(null);
       setListMessage(await describeFailure(error as Error, response));
+    }
+    // The Pulse strip (D-098): counts only, from platform_dashboard(). A
+    // failure here leaves the strip out and the list intact.
+    try {
+      const pulse = await fetch(`${API}/dashboard`);
+      setPulse(pulse.ok ? await pulse.json() : null);
+    } catch {
+      setPulse(null);
     }
   }, [unauthorized]);
 
@@ -192,6 +201,58 @@ export function PlatformScreen() {
     <>
       {header}
       <main>
+        {/* The Pulse strip (D-098): every live tenant's counts in one table; archived ones folded. Counts only, no content, no money (plan § 2.4). */}
+        {pulse && pulse.length > 0 && (
+          <section className="card">
+            <h2>Pulse, last 30 days</h2>
+            <div className="reply-table pulse">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tenant</th>
+                    <th className="amount">Members</th>
+                    <th className="amount">Documents</th>
+                    <th className="amount">Conversations</th>
+                    <th className="amount">Refusals</th>
+                    <th className="amount">Open unanswered</th>
+                    <th className="amount">Requests waiting</th>
+                    <th className="amount">Confirmed stays</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pulse
+                    .filter((p) => p.archivedAt === null)
+                    .map((p) => (
+                      <tr key={p.tenantId}>
+                        <td data-label="Tenant">{p.businessName}</td>
+                        <td data-label="Members" className="amount">{p.members}</td>
+                        <td data-label="Documents" className="amount">{p.documents}</td>
+                        <td data-label="Conversations" className="amount">{p.conversations30d}</td>
+                        <td data-label="Refusals" className="amount">{p.refusals30d}</td>
+                        <td data-label="Open unanswered" className="amount">{p.openUnanswered}</td>
+                        <td data-label="Requests waiting" className="amount">{p.pendingRequests}</td>
+                        <td data-label="Confirmed stays" className="amount">{p.confirmedStays30d}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            {pulse.some((p) => p.archivedAt !== null) && (
+              <details className="small muted">
+                <summary>{pulse.filter((p) => p.archivedAt !== null).length} archived</summary>
+                <ul>
+                  {pulse
+                    .filter((p) => p.archivedAt !== null)
+                    .map((p) => (
+                      <li key={p.tenantId}>
+                        {p.businessName} · archived {p.archivedAt?.slice(0, 10)}
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            )}
+          </section>
+        )}
         <section className="card">
           <div className="form-footer">
             <h2>Tenants{tenants ? ` (${tenants.length})` : ''}</h2>

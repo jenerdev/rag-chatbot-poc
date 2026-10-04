@@ -7348,3 +7348,41 @@ required (a tenant without bookings gets `bookings: null`);
 **Observed:** web tests 59/59 (+1 permission row); typecheck; on the dev
 server the tenant route is 401 without a session, the platform route 401,
 an unknown tenant 404.
+
+## Dashboard, Phase 4: the screens · done 2026-10-05, on `feat/dashboard`
+
+**What:** `bar-chart.tsx`, one `BarChart` (inline SVG: one `<path>` per
+bar flat on a zero baseline with a rounded top, a 2 px gap, the value on
+the peak and the last bar only, every bar answering on hover through a
+`<title>`, text in the ink tokens and the bars in the tenant's accent, a
+`visually-hidden` table of the same rows) and a `SplitBar` for web-vs-staff;
+no library, and nothing in it computes a figure. `dashboard-screen.tsx`
+draws the ONE JSON: Needs attention (four counts, each a link to the screen
+that clears it), Today with the next 7 days' confirmed check-ins, Chat with
+conversations per day, Knowledge base + Team, Bookings with the split bar and
+stays per week, Occupancy (per_room only), Promos, Revenue (only when the
+function sent `money`). A 7 / 30 / 90 toggle re-asks the route. The page
+(S-11) is the slots page's shape; Dashboard is the FIRST staff link
+(§ 7 q1), `/admin` keeps its URL; the Pulse strip on `/platform` is a
+counts-only table of live tenants with archived ones folded, drawn in the
+reply table's CSS so names sit left and counts right.
+
+**Observed:** web tests **59/59** (the nav expectations gained Dashboard
+first for staff, admin and owner on every tenant); typecheck clean;
+`plan/dashboard-phase4-walk.mjs` **14/14** against `pnpm dev`, with two
+throwaway users it deletes: harbor as STAFF 200 with `money: null`, 30
+`perDay` rows by default, calendar-date buckets (`2026-09-06`,
+`2026-09-01`), occupancy present (2.5 %, 4 active rooms); `?days=7` → 7
+rows; `?days=500` → 90 (the clamp, plan § 4.2; the walk's first version
+expected a 400 and was wrong, not the route); a harbor cookie on villa's
+route 401; harbor as ADMIN with `money` (confirmed 0 in the window, 5
+weekly buckets) and 2 promos listed; villa 200 with `occupancy: null`;
+northwind 200 with `bookings: null`, 1 document, 0 owners; the three pages
+200. Without a session the pages render the login form and the routes
+401; an unknown slug 404.
+
+**What it avoided:** every number on the page is the function's; the
+screen never divides (the refusal rate and the occupancy percent arrive
+computed) and never adds (the window's counts are separate keys). The
+stray `components_placeholder_do_not_use.txt` a mis-aimed write left at
+the repo root was deleted before anything was staged.

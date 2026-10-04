@@ -22,7 +22,7 @@ export interface NavFeatures {
   book: boolean;
 }
 
-export type NavPage = 'chat' | 'book' | 'documents' | 'unanswered' | 'bookings' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'dashboard' | 'documents' | 'unanswered' | 'bookings' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
 
 export interface NavItem {
   page: NavPage;
@@ -44,6 +44,8 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
 
   // Each staff page with the permission its screen's first read needs.
   const staff: [NavPage, string, string, boolean][] = [
+    // First (plan/dashboard.md § 7 q1): the page to land on; /admin keeps its URL.
+    ['dashboard', 'Dashboard', '/admin/dashboard', can(role, 'dashboard:read')],
     ['documents', 'Knowledge base', '/admin', can(role, 'documents:read')],
     ['unanswered', 'Unanswered', '/admin/unanswered', can(role, 'unanswered:read')],
     ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],

@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Dashboard (planned 2026-10-04, not started):**
+**Dashboard (planned 2026-10-04, in progress on `feat/dashboard`; Phases 0–4 done):**
 [`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
 from the rows the database already holds: needs-attention counts, today's
 check-ins, chat volume and refusals with the open unanswered count, the
@@ -93,7 +93,7 @@ with recommendations. No chatbot change.
 - [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). **Owed: re-run the file once** for the two `::date` casts on the chart buckets
 - [x] Phase 2 — `@rag/pipeline` (2026-10-05): `dashboard.ts` (typed shapes, the parser with date normalisation, the clamp, the two calls); tests 359/359; pipeline isolation 22–23 green both ways
 - [x] Phase 3 — routes and permissions (2026-10-05): `dashboard:read` (every member), `/api/t/[tenant]/dashboard?days=`, `/api/platform/dashboard`; web tests 59/59, typecheck; 401/401/404 on the dev server
-- [ ] Phase 4 — screens (`bar-chart.tsx`, the Dashboard, the Pulse strip)
+- [x] Phase 4 — screens (2026-10-05): `bar-chart.tsx` (inline SVG, the dataviz rules), `dashboard-screen.tsx` + the page (S-11), Dashboard first in the staff nav, the Pulse strip on `/platform`; web tests 59/59, typecheck; `plan/dashboard-phase4-walk.mjs` **14/14** over HTTP (staff sees no money, admin does, harbor has occupancy, villa none, northwind `bookings: null`, `?days` clamped, a harbor cookie refused on villa, three pages 200)
 - [ ] Phase 5 — the walls and the walk
 - [ ] Phase 6 — the record (D-098)
 
@@ -1176,6 +1176,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 4 (screens), on `feat/dashboard`
+- **Did:** the chart component, the Dashboard screen and page, the nav link
+  first, the Pulse strip. Web 59/59; typecheck; the HTTP walk 14/14.
+- **Next:** Phase 5, the suites (verify, both isolations both ways, rooms,
+  the three baselines, the battery once) and the user's browser walk.
 
 ### 2026-10-05 — dashboard Phase 3 (routes and permissions), on `feat/dashboard`
 - **Did:** the permission, the two routes. Web 59/59; typecheck; the routes
