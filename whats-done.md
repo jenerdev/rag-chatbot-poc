@@ -6732,3 +6732,52 @@ familiar "someone is typing".
 
 **Observed:** typecheck; screen readers get role="status" "Thinking";
 reduced-motion keeps the dots still. The animation itself is for a browser.
+
+## Tables, Phase 0: the baseline · done 2026-10-04, on `feat/tables`
+
+**What:** every suite run on `89dfd49` with no code changed, and the six
+probe replies of plan/tables.md saved verbatim, so Phase 3's tables can
+be compared with today's lines, reply for reply.
+
+**Why it matters:** the plan edits prompt text (the tool instruction lines
+and the per-turn lines in `dates.ts`) and the chat screen's rendering.
+"Nothing else moved" can only be shown against numbers and text taken
+before the first edit.
+
+**Observed, all in `plan/baseline/*-tables-phase0*`:**
+- tests 13 + 14 + 99 + 5 + 346 + 27, typecheck clean; verify **109/110**:
+  the one failure is status.md's open item (villa has a `staff` member,
+  which "an owner changes a role in its tenant only" assumes it has not;
+  the cross-tenant update touched 0 rows), not this plan's;
+- Northwind's prompt byte-identical to `northwind-prompt-pre-bookings.txt`;
+  villa's tool definitions byte-identical to
+  `villa-tools-post-villa-prices.txt`; **harbor's differ from
+  `harbor-tools-pre-customer-booking.txt` in the slot list only:** harbor
+  now has a "Day Tour (from 08:00, 7 hours)" slot beside Night, added on
+  the Slots screen (D-090; no script or fixture creates it), and the
+  description and the `slot` enum are built from `listSlots()`. Data, not
+  code. `harbor-tools-tables-phase0.txt` is this plan's harbor baseline,
+  and CLAUDE.md rule 1 now names it;
+- battery **56/61** (`original 9/10 · tool 9/9 · lang 8/10 · date 11/11 ·
+  rooms 12/13 · book 4/5 · price 3/3`): `antecedent` and `lang-followup`
+  (the known two); `lang-tagalog-2` (its 1-in-7 flip: passed 2 of 2 on
+  repeat); `rt-leak-2` and `book-for-me-harbor` failed **3 of 3** with the
+  run on 18 October 2026, a Sunday, the date-driven flips trap 24 records
+  (villa calls a "Garden Room" free "as part of the whole property";
+  harbor checks availability and asks to confirm instead of naming the
+  page). So the count to hold in Phase 3 is **57/61** with these four, on
+  this date;
+- the six probes (`probes-tables-phase0.txt`): every list is lines today.
+  Harbor's room list is `- Room (up to N guests): details`; its dated list
+  is `- Room (up to N guests): ₱price (weekend rate)` then `Taken: None.`;
+  villa's day is a sentence, then `Open:` with three `- Slot ₱price` lines,
+  then `Taken: None.`; "Room rates please" is D-081's sentence; the Taglish
+  extra-guest answer is two sentences with the fee. **Villa's room list
+  came back with `**Dalisay**`**, markdown bold the model wrote on its own,
+  which the screen shows as asterisks: out of this plan's scope (Rule 1,
+  one block syntax), recorded for the walk.
+
+**Trap avoided:** the harbor diff could have been read as "the baseline
+is wrong, overwrite it" or as "code changed". Reading the diff showed one
+slot, and `listSlots()` is where it comes from; the file is replaced with
+its reason written down.

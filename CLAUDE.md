@@ -298,7 +298,9 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    villa's tool definitions must match
    `plan/baseline/villa-tools-post-villa-prices.txt` (D-074; before it, the
    pre-booking-types file), and harbor's
-   `plan/baseline/harbor-tools-pre-customer-booking.txt`. The three `price-*`
+   `plan/baseline/harbor-tools-tables-phase0.txt` (since 2026-10-04: harbor
+   gained a Day Tour slot on the Slots screen, and the slot list is in the
+   tool text; before it, the pre-customer-booking file). The three `price-*`
    cases compare the reply with the TOOL's row, never a typed number; the
    `lang-*` cases ask facts that are still in the documents (the deposit,
    the extension, the cook), because the rates are not.

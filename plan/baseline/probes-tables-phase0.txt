@@ -1,0 +1,56 @@
+today 2026-10-04 · FREE 2026-10-18
+
+=== harbor · What rooms do you have?
+refused: false · sources: 4 · tools: none
+Here are the rooms available at Harbor Inn:
+
+- Garden Room (up to 2 guests): It has one queen bed and opens onto the garden, suited for couples.
+- Family Room (up to 6 guests): The largest room with two queen beds and a bunk bed, suitable for a family of five or six.
+- Loft (up to 3 guests): Located on the top floor under the roof beams, it has one queen bed and a daybed, with steep stairs not suitable for small children.
+- Sea View Suite (up to 2 guests): Facing the harbour, it has a king bed, a sitting area, and a private balcony.
+
+For which rooms are free and their rates, you can tell me a date.
+
+=== villa · What rooms do you have?
+refused: false · sources: 5 · tools: none
+Here are the rooms available at Villa Amihan:
+
+- **Dalisay**: The largest bedroom with one queen bed and one double-deck bunk, sleeping five. It has its own toilet and bath.
+- **Marikit**: Contains one queen bed and sleeps two.
+- **Liwayway**: Features two double-deck bunks and sleeps four.
+- **Tala**: Has one double bed and one single bed, sleeping three.
+
+The four bedrooms sleep 14 people in actual beds. The remaining guests sleep on the floor of the function area, where Villa Amihan provides eight foam mattresses and sixteen pillows. Bedsheets and blankets are provided for the beds but not for the floor mattresses.
+
+The whole property is booked together, and for availability and rates, you can tell me a date.
+
+=== harbor · What rooms are open on 18 October 2026?
+refused: false · sources: 4 · tools: check_availability{"date_from":"2026-10-18"}
+On 18 October 2026, the following rooms are open:
+
+- Garden Room (up to 2 guests): ₱4,500.00 (weekend rate)
+- Family Room (up to 6 guests): ₱7,500.00 (weekend rate)
+- Loft (up to 3 guests): ₱5,800.00 (weekend rate)
+- Sea View Suite (up to 2 guests): ₱9,500.00 (weekend rate)
+
+Taken: None.
+
+=== villa · What's open on 18 October 2026?
+refused: false · sources: 5 · tools: check_availability{"date_from":"2026-10-18"}
+Yes, the 22-Hour Whole Day, Day Tour, and Overnight slots are open on 18 October 2026. 
+
+Open:
+- 22-Hour Whole Day ₱27,000.00 (weekend rate)
+- Day Tour ₱12,000.00 (weekend rate)
+- Overnight ₱20,000.00 (weekend rate) 
+
+Taken: None.
+
+=== villa · Room rates please
+refused: false · sources: 5 · tools: none
+Our rates vary depending on whether your visit falls on a weekday, weekend, or holiday. Please provide your preferred date so I can check and share the correct rate with you.
+
+=== harbor · Magkano ang extra guest?
+refused: false · sources: 4 · tools: none
+Ang extra guest po natin is ₱250.00 per guest for the Family Room at Loft. Ang Garden Room at Sea View Suite po ay hindi nag-aallow ng extra guests dahil ang rate nila covers 2 guests, which is the maximum capacity nila.
+

@@ -56,23 +56,43 @@
 
 ## ▶ Next up (do this next)
 
-**Closed dates (done 2026-09-30, D-080, browser walk owed):** a
-`closed` kind on the Holidays screen. `schema-closed-days.sql` was run by
-the user. Owed: a walk as admin. Close a date and see it on the booking
-page, a stay touching it flagged, the Bookings screen's chips struck
-through, and a pending request on it with Confirm disabled; then reopen
-it. Also owed: `verify` check "roles: an owner changes a role in its
-tenant only" fails because villa now has a STAFF member (added
-2026-09-26). The check assumes villa has none, and it has not leaked
-(across tenants: 0 rows). Either change that member's role or relax the
-check.
+**Open items (2026-09-30).** Everything below is merged into `master`
+(`71f27c5`) and not pushed. Tick each one here when it is done.
 
-**Header nav (done 2026-09-30, browser walk owed):** every tenant page's
-header is now `components/tenant-nav.tsx`: Chat, Book, then every staff page
-the ROLE may open and the TENANT has (`lib/nav-items.ts`, from
-`lib/permissions.ts`), then Log out. Owed: a walk as owner, admin, staff and
-logged out, on villa, harbor and northwind, to see that each header matches
-`lib/nav-items.test.ts`.
+- [ ] **Closed dates: browser walk as an admin** (D-080). Close a date on
+  the Holidays screen. Check that the booking page lists it, and that a
+  stay touching it says "Closed on … Choose other dates.". Check that the
+  Bookings screen strikes its chips through, and that a pending request
+  on it shows the note with Confirm disabled. Then reopen it and see
+  every page go back to open. Also try to close a date that has a
+  confirmed booking: it must be refused with the count.
+- [ ] **`verify`: 1 failing check, "roles: an owner changes a role in its
+  tenant only".** It assumes villa has no STAFF member, and villa has
+  one (`vi…@yopmail.com`, member since 2026-09-26). Not a leak: the
+  cross-tenant update touched 0 rows. To decide: change that member's
+  role (`member:role -- villa <email> admin`) or relax the check to
+  compare villa's roles before and after. Then `verify` should be
+  109/109 again.
+- [ ] **Header nav: browser walk** as owner, admin, staff and logged
+  out, on villa, harbor and northwind. Each header must match
+  `lib/nav-items.test.ts`: staff see Knowledge base, Unanswered and
+  Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
+  Members; logged out sees Chat, Book (villa, harbor) and Staff login.
+
+**Tables in the reply (planned 2026-10-04, not started):**
+[`plan/tables.md`](./plan/tables.md). Room lists, room details, rates and
+prices as a table: a hand-written pipe-table parser in the browser (one
+block syntax, elements never HTML), the code-written room list as a table,
+then the model's room, availability and price answers, measured by the
+battery. § 7 has four questions with recommendations; q1 (a rate card with
+no date, amending D-081) decides Phase 2's second half.
+- [x] § 7 answered (2026-10-04: every recommendation taken)
+- [x] Phase 0 — baseline (2026-10-04): tests 13+14+99+5+346+27, typecheck, verify 109/110 (the open item); northwind and villa byte-identical, harbor differs by its new Day Tour slot (data; `harbor-tools-tables-phase0.txt` is the new baseline); battery 56/61, 57 with `lang-tagalog-2`'s repeat, the two flips 3 of 3 on 18 Oct (trap 24); six probes saved
+- [ ] Phase 1 — the renderer (`lib/tables.ts`, `reply-text.tsx`, CSS)
+- [ ] Phase 2 — the code-written tables (D-087; the rate card if q1)
+- [ ] Phase 3 — the model's tables (tool lines, dates.ts lines, `tableOk` in the battery)
+- [ ] Phase 4 — the browser walk (desktop and 360px, three tenants)
+- [ ] Phase 5 — the record (D-091, CLAUDE.md, flow.md)
 
 **Tenant management and roles (planned and decided 2026-09-29, not started):**
 [`plan/tenant-management.md`](./plan/tenant-management.md). A `/platform`
@@ -1122,6 +1142,114 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — tables Phase 0 (baseline), on `feat/tables`
+- **Did:** § 7 answered, every recommendation taken. Every suite on `89dfd49`:
+  tests green, typecheck clean, verify 109/110 (the known open item).
+  Northwind's prompt and villa's tools byte-identical; harbor's tools differ
+  in the slot list only (a Day Tour slot added on the Slots screen):
+  `harbor-tools-tables-phase0.txt` is the plan's harbor baseline. Battery
+  56/61; `lang-tagalog-2` passed 2 of 2 on repeat; `rt-leak-2` and
+  `book-for-me-harbor` failed 3 of 3 on 18 October (trap 24's date flips,
+  unchanged code). Six probes saved (`probes-tables-phase0.txt`): every
+  list is lines; villa wrote `**bold**` on its own.
+- **Next:** Phase 1, the renderer.
+
+### 2026-10-04 — tables plan written
+
+- `plan/tables.md`: rooms, room details, rates and prices as a table in the
+  reply. Four rules (one block syntax parsed by hand into elements; every
+  cell is the data's; no tool definition and no base prompt changes; tables
+  only for list answers), six traps, the parser's contract, the text shape
+  the code and the model share, five phases, four questions. Not started.
+
+### 2026-09-30 — a thinking animation while the bot answers
+- **Did:** three pulsing dots replace "Searching the knowledge base…", also
+  while the answer bubble is empty. `components/chat-screen.tsx`,
+  `app/globals.css`.
+
+### 2026-09-30 — slot management (D-090)
+- **Did:** `sql/schema-slots.sql` (run by the user); the Slots screen for
+  owners and admins: create, edit (times fixed while booked), retire,
+  delete (never-booked only).
+- **Measured:** rooms 39/39, verify 109/110 (known), isolation all four,
+  tool baselines match, battery 56/61 (known failures).
+- **Browser:** walked by the user.
+
+### 2026-09-30 — suggested questions (D-089)
+- **Did:** `sql/schema-suggested-questions.sql` (run by the user); up to six
+  per tenant, set on the platform form, buttons on a new chat that send at
+  once. Harbor has four sample questions. Not committed yet.
+- **Measured:** verify 102b passes (110 checks, only the known roles
+  failure); web tests 25/25; pipeline 346/346; isolation both ways.
+- **Owed:** a browser click and the platform form editor in a browser; the
+  platform walk, blocked by the leftover `probe-tm` tenant (2026-09-29).
+
+### 2026-09-30 — a named fee is not the nightly rate (D-088)
+- **Did:** "how much is the reservation fee?" is answered from the
+  documents (alteza: half of the total), no longer "rates vary by date".
+  Commit `0dba77d`.
+- **Measured:** tests 346/346, battery 56/61 (known failures only).
+- **Open:** harbor's documents have no reservation fee (content, not code).
+
+### 2026-09-30 — the room list, guaranteed (D-087)
+- **Did:** "What rooms are available?" lists the rooms on harbor, alteza
+  (written in code when the model does not) and villa (its bedrooms).
+  Commit `fee6d14`.
+- **Measured:** tests 344/344, battery 55/61 (nothing on this path;
+  `lang-tagalog-2` 2/4 on repeat, its known flip).
+
+### 2026-09-30 — the chatbot knows the booking horizon (D-086)
+- **Did:** "how far in advance can I book?" answered from the config; a
+  date past the horizon is "not yet bookable", no price (was "Yes, open"
+  with prices). `lastBookingDate()` is the one definition. Not committed yet.
+- **Measured:** tests 343 + 99, rooms 35/35, isolation both suites, battery
+  55/61 (nothing on this path; `date-docs` 4/4 on repeat).
+
+### 2026-09-30 — the extra-guest fee without a date (D-085)
+- **Did:** "how much is per extra guest?" answers from the database (each
+  unit's included guests, fee, maximum) with no date; D-081 had asked for
+  one. Not committed yet.
+- **Measured:** tests 340/340, snapshot matches, battery 56/61 (the rule
+  fired on no battery turn; failures dated or northwind).
+
+### 2026-09-30 — the room list, no prices (D-084)
+- **Did:** "what rooms do you have?" at harbor lists the rooms with details
+  and no price; yes/no availability questions still ask for a date (the
+  user's choice, `rt-ask`). Not committed yet.
+- **Measured:** tests 338/338, snapshot matches, battery 57/61 (the rule
+  fired on no battery turn; failures unrelated).
+
+### 2026-09-30 — the holiday surcharge in the chatbot's price (D-083)
+- **Did:** `sql/schema-day-price.sql` (run by the user): `day_price` from
+  unit_quote(); the chatbot quotes 24 Dec ₱24,000.00 (holiday rate), was
+  ₱20,000.00. Fixed the pipeline isolation check D-082 had broken.
+  Commit `f9a3885`.
+- **Measured:** rooms 35/35, isolation both suites both ways, tests
+  334 + 99, battery 58/61 (known failures only).
+
+### 2026-09-30 — rate kinds on every price (D-082)
+- **Did:** `sql/schema-rate-kind.sql` (run by the user): `rate_kind()` is the
+  one branch, `unit_price()` asks it; the chatbot writes "₱20,000.00
+  (weekend rate)". Commit `f8f8df6`.
+- **Measured:** rooms 35/35, isolation both suites both ways, tests
+  333 + 99, tool definitions = baselines, battery 58/61
+  (`book-for-me-harbor` 1 of 4 without the label too, trap 24).
+- **Next:** the holiday surcharge in the chatbot's price (24 Dec quoted
+  ₱20,000.00, really ₱24,000.00): needs a price-with-surcharge column from
+  `check_room_availability()`, a SQL file for the user to run.
+
+### 2026-09-30 — a price with no date (D-081)
+- **Did:** "room rates please" (villa, harbor) now answers with fixed text,
+  "Our rates vary depending on whether your visit falls on a weekday,
+  weekend, or holiday. Please provide your preferred date…", in the reply
+  language, instead of the refusal (harbor, 2 of 3) or a model-worded
+  question (villa, 4 of 4). Commits `17f754f`, `335bd73`.
+- **Measured:** tests 332/332; northwind's prompt snapshot matches; battery
+  56/61, the text fired on 2 setup turns of a passing case, and none of the
+  five failures (`antecedent`, `lang-followup`, `leak-2`, `tool-leak`,
+  `rt-leak-2`) reaches the new code.
+- **Owed:** the Taglish and Tagalog wording read by a native speaker.
 
 ### 2026-09-30 — closed dates (D-080)
 - **Asked:** dates the resort is not operating. The user chose whole
