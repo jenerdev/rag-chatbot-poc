@@ -79,6 +79,8 @@ export {
 } from './platform.js';
 export type { NewTenant, PlatformContext, TenantDetail, TenantPatch, TenantSummary } from './platform.js';
 export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
+export { DASHBOARD_DAYS, dashboardDays, platformDashboard, tenantDashboard } from './dashboard.js';
+export type { PlatformPulse, TenantDashboard } from './dashboard.js';
 export type { Member } from './members.js';
 export type { PromptTools, TenantTools, ToolExecution } from './tools.js';
 export type { ApplicationKey } from './applications.js';

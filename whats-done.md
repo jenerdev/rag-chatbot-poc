@@ -7315,3 +7315,23 @@ block now sits after the super row exists and before any role changes.
 an interval); the file now casts both to `date`. verify did not assert
 the format, so it passed either way; Phase 2's parser normalises to
 `YYYY-MM-DD` and will not care, but the database should match the file.
+
+## Dashboard, Phase 2: `@rag/pipeline` · done 2026-10-05, on `feat/dashboard`
+
+**What:** `dashboard.ts`: `TenantDashboard` and `PlatformPulse` as typed
+shapes over the two functions; `parseTenantDashboard()` names every key,
+keeps the function's nulls (no bookings, no occupancy, no money for
+staff), normalises the bucket dates to `YYYY-MM-DD` whether the database
+sends dates or timestamps, and never throws on a shape it does not
+expect; `dashboardDays()` clamps 7–90, default 30; `tenantDashboard()` and
+`platformDashboard()` call the rpcs and map a refusal through
+`fromPostgrest()` (42501 → 403). Exported from the package.
+
+**Observed:** pipeline tests **359/359** (+4: the parse against verify
+117's shape with timestamp buckets, the nulls, an empty object, the
+clamp); typecheck. Pipeline isolation gains 22 and 23: a platform token
+asking for villa's page gets the function's own refusal as a 403 (RLS
+only); villa's and harbor's open-unanswered and document counts each
+equal their own service-role truth (`310/310 · 8/8`, `16/16 · 1/1`) and
+differ from each other, both ways. The first run's "truth" query was
+mine to fix: a head-only count cannot filter on an embedded relation.

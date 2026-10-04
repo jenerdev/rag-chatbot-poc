@@ -91,7 +91,7 @@ with recommendations. No chatbot change.
 - [ ] § 7 answered
 - [x] Phase 0 — baseline (2026-10-04): every suite green, baselines identical, battery 56/61 the known set; two runs died on transient errors (fetch failed, JWT expired) and the battery now reloads the tenant per case
 - [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). **Owed: re-run the file once** for the two `::date` casts on the chart buckets
-- [ ] Phase 2 — `@rag/pipeline` (`dashboard.ts`)
+- [x] Phase 2 — `@rag/pipeline` (2026-10-05): `dashboard.ts` (typed shapes, the parser with date normalisation, the clamp, the two calls); tests 359/359; pipeline isolation 22–23 green both ways
 - [ ] Phase 3 — routes and permissions (`dashboard:read`)
 - [ ] Phase 4 — screens (`bar-chart.tsx`, the Dashboard, the Pulse strip)
 - [ ] Phase 5 — the walls and the walk
@@ -1176,6 +1176,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 2 (`@rag/pipeline`), on `feat/dashboard`
+- **Did:** `dashboard.ts` with its parser and clamp; tests 359/359;
+  pipeline isolation 22 (a platform token 403) and 23 (each tenant's own
+  counts, the positive twin) green both ways.
+- **Next:** Phase 3, routes and permissions (`dashboard:read`).
 
 ### 2026-10-05 — dashboard Phase 1 (SQL), on `feat/dashboard`
 - **Did:** the file run by the user; verify 117/118 with both dashboard

@@ -24,7 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import { mintPlatformToken, scopedClient } from '@rag/db';
 import { asOperator, supabase as service } from '@rag/db/service';
-import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, NO_ANSWER } from '../dist/index.js';
+import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, tenantDashboard, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
 const filtersOnly = process.argv.includes('--filters-only');
@@ -127,5 +127,36 @@ if (!filtersOnly) {
   const platformVilla = { ...villa, db: scopedClient(mintPlatformToken({ userId: randomUUID() })) };
   const pDocs = await listDocuments(platformVilla), pChunks = await getChunks(platformVilla, vdoc), pDoc = await getDocument(platformVilla, vdoc), pMsgs = await getMessages(platformVilla, aV.conversationId);
   check(pDocs.length === 0 && pChunks.length === 0 && pDoc === null && pMsgs === null, 'a platform token reads no tenant content through the pipeline', `villa as platform: ${pDocs.length} documents, ${pChunks.length} chunks, document ${pDoc}, transcript ${pMsgs}`);
+
+  // 22. The dashboard (D-098): a platform token asking for villa's page is
+  //     refused by the function itself (it is not a member), through the
+  //     pipeline, as a 403. RLS only, like 21.
+  let refused = null;
+  try {
+    await tenantDashboard(platformVilla, 30);
+  } catch (error) {
+    refused = error;
+  }
+  check(refused?.status === 403, "a platform token gets no tenant's dashboard (403)", refused ? `${refused.name}: ${refused.message.slice(0, 80)}` : 'ANSWERED');
+}
+
+// 23. The dashboard counts THIS tenant's rows only: villa's and harbor's open
+//     unanswered counts and document counts each equal the service-role
+//     truth for that tenant alone (the positive twin, trap 12), on the
+//     operator's staff token (RLS) or the service client (filters only).
+{
+  const harborAdmin = filtersOnly ? harbor : await asOperator(harbor);
+  const truth = async (t) => {
+    // The embedded relation needs the rows (a head-only count cannot filter on it): listUnanswered's own query shape.
+    const open = await service.from('messages').select('id, unanswered_resolutions(message_id)').eq('tenant_id', t.id).eq('role', 'assistant').eq('content', NO_ANSWER).is('unanswered_resolutions', null).limit(5000);
+    const docs = await service.from('documents').select('id', { count: 'exact', head: true }).eq('tenant_id', t.id);
+    return { open: open.error ? -1 : open.data.length, docs: docs.count ?? -1 };
+  };
+  const [dv, dh, tv, th] = await Promise.all([tenantDashboard(villaAdmin, 30), tenantDashboard(harborAdmin, 30), truth(villa), truth(harbor)]);
+  check(
+    dv.chat.openUnanswered === tv.open && dv.knowledge.documents === tv.docs && dh.chat.openUnanswered === th.open && dh.knowledge.documents === th.docs && (tv.docs !== th.docs || tv.open !== th.open),
+    "the dashboard counts each tenant's own rows: villa's and harbor's figures equal their own truth and differ from each other",
+    `villa open ${dv.chat.openUnanswered}/${tv.open} docs ${dv.knowledge.documents}/${tv.docs} · harbor open ${dh.chat.openUnanswered}/${th.open} docs ${dh.knowledge.documents}/${th.docs}`,
+  );
 }
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');
