@@ -204,3 +204,22 @@ export async function setImageOrder(tenant: BookingTenant, unitId: unknown, imag
   if (error) throw new Error(`Could not reorder the photo: ${error.message}`);
   return data.length > 0;
 }
+
+/**
+ * Every active room's photos, by room NAME, for the chat's room cards
+ * (D-094). Read on the CHAT token: `unit_images` is readable by any token of
+ * the tenant (schema-booking-types.sql, `unit_images_read`), and the URLs
+ * are the bucket's public ones, the same a staff screen shows. Nothing more
+ * than the Rooms screen's gallery leaves here: no path, no id. A room with
+ * no photo is still listed, with `[]`, so the caller can draw its card
+ * without one. Filtered on tenant_id (wall 1) under RLS (wall 2).
+ */
+export async function roomPhotos(tenant: BookingTenant): Promise<{ name: string; photos: string[] }[]> {
+  await requirePerRoom(tenant);
+  const [{ data: units, error }, images] = await Promise.all([
+    tenant.db.from('units').select('id, name').eq('tenant_id', tenant.id).eq('active', true).order('sort_order').order('name'),
+    listImagesFor(tenant, null),
+  ]);
+  if (error) throw new Error(`Could not load rooms: ${error.message}`);
+  return units.map((u) => ({ name: u.name, photos: images.filter((i) => i.unitId === u.id).map((i) => i.url) }));
+}

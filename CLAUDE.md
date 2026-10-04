@@ -181,7 +181,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (+ Requests), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)

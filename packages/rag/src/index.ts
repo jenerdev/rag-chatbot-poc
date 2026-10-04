@@ -93,6 +93,7 @@ export type {
   HistoryMessage,
   IngestResult,
   RetrievedChunk,
+  RoomCard,
   Source,
   StreamMeta,
   TenantContext,

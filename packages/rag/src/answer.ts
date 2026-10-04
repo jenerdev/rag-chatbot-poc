@@ -2,6 +2,7 @@
 
 import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
+import { roomPhotos } from '@rag/bookings';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES, roomListReply, WHOLE_PROPERTY_ROOM_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
@@ -501,8 +502,9 @@ export async function answerQuestion({
     precheck,
   );
   const undatedPrice = asksPriceWithoutDate(tools, message);
+  const listRooms = roomListRooms(tools, message);
   const reply = explainRooms(
-    roomListRooms(tools, message),
+    listRooms,
     records,
     explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn, undatedPrice ? await rateCardReply(tenant, replyIn) : null),
     replyIn,
@@ -515,6 +517,8 @@ export async function answerQuestion({
     sources,
     searchQuery,
     toolCalls: records,
+    // D-094: the room cards' photos, on a room-list turn only.
+    ...(listRooms !== null ? { roomCards: await roomPhotos(tenant) } : {}),
   };
 }
 
@@ -568,7 +572,11 @@ export async function answerQuestionStream({
   // The marker is what is saved; the friendly text is what is streamed (D-047).
   const friendly = refusalText(tenant, replyIn);
 
-  onMeta({ conversationId: id, searchQuery, sources });
+  // D-094: a room-list turn at a per_room tenant carries the rooms' photos in
+  // `meta`, so the cards can be drawn around the table the reply will hold.
+  // Known before the model is called, from the message alone.
+  const roomCards = roomListRooms(tools, message) !== null ? await roomPhotos(tenant) : undefined;
+  onMeta({ conversationId: id, searchQuery, sources, ...(roomCards ? { roomCards } : {}) });
   // The thanks goes out first, ahead of whatever the answer turns out to be.
   if (prefix) onDelta(prefix);
 

@@ -12,7 +12,9 @@
 // with no table in it renders exactly as it did before this component
 // existed (lib/tables.test.ts: one segment, byte for byte).
 
+import type { RoomCard } from '@rag/pipeline';
 import { parseInline, parseSegments } from '@/lib/tables';
+import { RoomCards, tableIsRooms } from '@/components/room-cards';
 
 /** A cell that is an amount: "₱3,500.00". A leading emoji the model added does not change that. */
 function isAmount(cell: string): boolean {
@@ -42,7 +44,12 @@ function amountColumns(rows: string[][]): boolean[] {
   });
 }
 
-export function ReplyText({ text }: { text: string }) {
+/**
+ * `cards`: on a room-list turn (D-094), the rooms' photos. A table whose
+ * first column names those rooms is then drawn as cards instead of a table;
+ * any other table in the same reply is still a table.
+ */
+export function ReplyText({ text, cards }: { text: string; cards?: RoomCard[] }) {
   return (
     <>
       {parseSegments(text).map((segment, i) =>
@@ -50,6 +57,8 @@ export function ReplyText({ text }: { text: string }) {
           <span className="reply-text" key={i}>
             {inline(segment.text)}
           </span>
+        ) : cards && cards.length > 0 && tableIsRooms(segment.rows, cards) ? (
+          <RoomCards key={i} header={segment.header} rows={segment.rows} cards={cards} />
         ) : (
           <div className="reply-table" key={i}>
             <table>

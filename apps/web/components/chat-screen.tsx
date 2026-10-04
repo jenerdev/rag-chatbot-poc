@@ -22,7 +22,7 @@
 
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type { Source, ToolCallRecord } from '@rag/pipeline';
+import type { RoomCard, Source, ToolCallRecord } from '@rag/pipeline';
 import { SourcesPanel } from '@/components/sources-panel';
 import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
@@ -67,6 +67,8 @@ type Turn =
       sources: Source[];
       /** Filled in by `tool` events, one per call, before the answer that uses them (plan/bookings.md Phase 7). */
       toolCalls: ToolCallRecord[];
+      /** From `meta` on a room-list turn (D-094): the rooms' photos, drawn as cards around the reply's table. */
+      roomCards?: RoomCard[];
       searchQuery: string;
       question: string;
       error?: string;
@@ -198,6 +200,7 @@ export function ChatScreen({
                       text: '',
                       sources: data.sources,
                       toolCalls: [],
+                      roomCards: data.roomCards,
                       searchQuery: data.searchQuery,
                       question: text,
                     }
@@ -382,7 +385,7 @@ export function ChatScreen({
                     <Thinking />
                   ) : (
                     <div className="bubble">
-                      <ReplyText text={turn.text} />
+                      <ReplyText text={turn.text} cards={turn.roomCards} />
                     </div>
                   )}
                   <SourcesPanel

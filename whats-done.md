@@ -7044,3 +7044,16 @@ zero" was answered with the resort's rate card and a request for a date.
 **Observed:** tests 355/355; the three reported questions are the
 friendly refusal, the bare ones the card, the deposit its figure; battery
 57/61, the known set; no prompt text changed.
+
+## Room cards with photos in the chat · done 2026-10-04 (D-094)
+
+**What:** a room-list reply at a per_room tenant is one card per room
+with its first photo, a labelled line per column, and a lightbox (dark
+overlay, arrows, count, Escape). `roomPhotos()` in `@rag/bookings` joins
+active units to their public photo URLs by name; `meta.roomCards` and the
+JSON `roomCards` carry them; `room-cards.tsx` draws the reply's table as
+cards. **Why it matters:** a visitor asking about rooms sees them.
+**Observed:** tests 355 + 55; typecheck; isolation 30/30 both ways; the
+dev server's meta with harbor's and alteza's photos; battery 56/61 with
+`lang-taglish` a 2-of-2-on-repeat flip. **Owed:** the browser look (the
+cards, the lightbox, the phone), yours.

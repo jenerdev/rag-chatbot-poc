@@ -1143,6 +1143,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-04 — room cards with photos (D-094)
+- **Did:** `roomPhotos()` (bookings), `meta.roomCards` / `Answer.roomCards`
+  on a room-list turn, `room-cards.tsx` (cards + lightbox), CSS. Tests
+  355 + 55; typecheck; isolation 30/30 both ways; battery 56/61
+  (`lang-taglish` 2 of 2 on repeat). The browser look is owed to the user.
+- **Next:** the user walks the cards; commit; the three open items.
+
 ### 2026-10-04 — the rate card only for the stay (D-093)
 - **Did:** `asksUndatedPrice()` narrowed: a stay word or a bare question;
   "How much is parking/coke zero/videoke" now the friendly refusal. Tests

@@ -46,6 +46,33 @@ describe('ReplyText', () => {
     expect(render('**<b>x</b>**')).toBe('<span class="reply-text"><strong>&lt;b&gt;x&lt;/b&gt;</strong></span>');
   });
 
+  // D-094: with the rooms' photos, a room table is cards; a table that names
+  // none of the rooms stays a table.
+  it('draws a room table as cards with photos when the cards are given', () => {
+    const cards = [
+      { name: 'Garden Room', photos: ['https://x/garden-1.webp', 'https://x/garden-2.webp'] },
+      { name: 'Loft', photos: [] },
+    ];
+    const text = 'Here are our rooms:\n\n| Room | Guests | Details |\n|---|---|---|\n| **Garden Room** | up to 2 | Opens onto the garden. |\n| Loft | up to 3 |  |\n\nTell me a date.';
+    const html = renderToStaticMarkup(createElement(ReplyText, { text, cards }));
+    expect(html).toContain('<div class="room-cards">');
+    expect(html).toContain('<img src="https://x/garden-1.webp" alt="Garden Room" loading="lazy"/>');
+    expect(html).toContain('<span class="room-card-count">2 photos</span>');
+    expect(html).toContain('<div class="room-card-title"><strong>Garden Room</strong></div>');
+    expect(html).toContain('<span class="room-card-label">Guests</span><span class="room-card-value">up to 2</span>');
+    // The Loft has no photo: a card with no <img>, and its empty Details cell is left out.
+    expect(html).not.toContain('alt="Loft"');
+    expect(html).not.toContain('<table');
+    expect(html).toContain('<span class="reply-text">Tell me a date.</span>');
+  });
+
+  it('a table that names none of the rooms is still a table, cards or not', () => {
+    const cards = [{ name: 'Garden Room', photos: ['https://x/g.webp'] }];
+    const html = renderToStaticMarkup(createElement(ReplyText, { text: '| Slot | Price |\n|---|---|\n| Overnight | ₱20,000.00 |', cards }));
+    expect(html).toContain('<table');
+    expect(html).not.toContain('room-cards');
+  });
+
   it('a price with an emoji in front is still an amount column', () => {
     const html = render('| Slot | Price |\n|---|---|\n| Overnight | 💰 ₱20,000.00 |');
     expect(html).toContain('<th>Slot</th><th class="amount">Price</th>');

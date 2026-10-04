@@ -43,6 +43,7 @@ import {
   listBookings,
   listCalendar,
   listImages,
+  roomPhotos,
   listRequests,
   listSlots,
   listUnits,
@@ -339,6 +340,19 @@ try {
   {
     const after = await bState();
     check(after === before, "rooms B: untouched by everything A tried", after);
+  }
+
+  // 16b. The chat's room cards (D-094): A's photos by room name hold none of
+  // B's rooms and none of B's photo URLs, on A's own token.
+  {
+    const cards = await roomPhotos(a);
+    const names = cards.map((c) => c.name);
+    const urls = cards.flatMap((c) => c.photos);
+    check(
+      !names.includes(bRoom.name) && !urls.some((u) => u.includes(bPhoto.path)),
+      "rooms A: roomPhotos() lists A's rooms only, none of B's photos",
+      `rooms ${names.join(', ')} · urls ${urls.length}`,
+    );
   }
 
   // 17. A cannot quote or book B's room: the message is the one a missing room

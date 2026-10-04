@@ -117,6 +117,8 @@ export interface Answer {
   sources: Source[];
   /** Empty for a tenant with no tools, and for any turn where the model called none. */
   toolCalls: ToolCallRecord[];
+  /** Present on a room-list turn at a per_room tenant (D-094); absent otherwise. */
+  roomCards?: RoomCard[];
   /**
    * What retrieval actually searched for, which is not always what was typed
    * (D-016). Returned so the UI can show it — a retriever silently searching
@@ -125,11 +127,23 @@ export interface Answer {
   searchQuery: string;
 }
 
+/**
+ * One room's photos, for the chat's room cards (D-094): on a room-list turn
+ * at a per_room tenant, the reply's table is drawn as one card per room,
+ * and the card whose title matches `name` shows these. Public URLs only.
+ */
+export interface RoomCard {
+  name: string;
+  photos: string[];
+}
+
 /** The `meta` event, sent once as soon as retrieval is done and before any answer exists. */
 export interface StreamMeta {
   conversationId: string;
   searchQuery: string;
   sources: Source[];
+  /** Present on a room-list turn at a per_room tenant (D-094); absent otherwise. */
+  roomCards?: RoomCard[];
 }
 
 /** One document in the admin list. `chunkCount` of 0 is the R-7 orphan the UI flags. */

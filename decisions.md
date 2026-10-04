@@ -2910,3 +2910,41 @@ are the friendly refusal, "Magkano po?" and "How much?" the rate card, the
 deposit its ₱2,000. Battery **57/61**, the known set; the card fired on
 the same two `lang-pin-window` setup turns as before. No prompt text
 changed.
+
+## D-094 · A room-list reply is drawn as cards with the rooms' photos; the words stay the model's · **Added 2026-10-04**
+
+**Decision:** on a room-list turn (D-084's `asksRoomList()`) at a per_room
+tenant, the pipeline sends the rooms' photos with `meta` (`roomCards`:
+`{ name, photos: string[] }[]`, from `roomPhotos()` in `@rag/bookings`,
+the bucket's public URLs on the chat token, filtered on `tenant_id` under
+RLS) and the JSON reply carries the same field. The reply's TEXT is
+unchanged: the model's `| Room | Guests | Details |` table (or D-087's
+code-written one). The browser (`components/room-cards.tsx`) draws that
+table as one card per room when its first column names the cards' rooms:
+the first photo on top (a button), the title, every other column a
+labelled line, empty cells left out; a click opens a lightbox on a dark
+overlay with arrows and a count when a room has more than one, closed by
+the ×, the overlay or Escape, the arrow keys stepping. Any other table in
+the reply is still a table; a room the table names but the database does
+not gets a card with no photo; a room the table omits is not drawn. A
+whole-resort tenant (villa) is unchanged: its bedrooms are in documents,
+not `units`.
+
+**Why:** the user: "when user prompt is asking for room informations and
+not availability or price or rate, instead of table format it should
+display it like a card, 1 card per room, display 1 photo of room if
+available, clicking it will popout … arrow if images is more than one …
+the background overlay should be dark." No room anywhere has a
+`description`, so the card's words come from the documents through the
+model's table, as the room list always has; the database adds only what
+it alone knows, the photos. Joined by NAME because the model never sees
+an id (plan/bookings.md Rule 2).
+
+**Measured:** tests 355 + 55 (two card cases: cards with photos, a bold
+title, an empty cell left out, a photo-less room; a slot table stays a
+table); typecheck; bookings isolation **30/30 both ways** (16b: A's
+`roomPhotos()` lists A's rooms only, none of B's URLs). The dev server's
+`meta` carried harbor's Garden Room with 2 photos and the other three
+with 0, and every alteza room with 1–2; the reply still held the table.
+Battery 56/61: the known set plus `lang-taglish`, a Tagalog lean (tl 19,
+en 4) that passed 2 of 2 on repeat; villa never reaches this code.

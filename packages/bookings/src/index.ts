@@ -79,7 +79,7 @@ export {
   setRates,
   updateAccommodation,
 } from './accommodations.js';
-export { addImage, listImages, moveImage, removeImage, setImageOrder } from './images.js';
+export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder } from './images.js';
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { closedDays } from './closed.js';
