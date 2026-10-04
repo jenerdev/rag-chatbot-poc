@@ -7289,3 +7289,29 @@ is minted every case and the run cannot depend on the answer.
 money for admins only, every bucket in the tenant's day;
 `platform_dashboard()`, the eleventh definer, counts only), the typed
 `Functions`, verify 117–118.
+
+## Dashboard, Phase 1: SQL · done 2026-10-05, on `feat/dashboard`
+
+**What:** `packages/db/sql/schema-dashboard.sql` (the 19th file, run by the
+user): `tenant_dashboard(p_tenant_id, p_days)`, security invoker, refusing
+a caller that is not a member, `money` null unless admin, every bucket in
+the tenant's day, a stay counted as one request; `platform_dashboard()`,
+the eleventh definer, counts only. The typed `Functions`; verify 117–118.
+
+**Observed:** verify **117/118** (the known roles item). 117: a chat token
+`42501`; the staff member's counts equal the rows just seeded
+(`1/1/1/1`, 30 buckets, one member per role); money `null` for staff, an
+object with `pending: 0` and `perWeek` for the owner; another tenant's id
+`42501`. 118: the super user's strip lists 6 tenants with exactly the
+eleven count columns, this probe `members 3 · conversations 1 · refusals
+1 · open 1 · pending 0`; a tenant token `42501`. Two things were mine to
+fix first: the block sat after checks 107–108 (which promote and delete
+members), so the role counts and the money gate could not hold, and the
+probe already had the bookings application (23505, now tolerated). The
+block now sits after the super row exists and before any role changes.
+
+**One SQL nit, fixed in the file and OWED a re-run:** `perDay[].day` and
+`stays.perWeek[].weekOf` came back as timestamps (`generate_series` over
+an interval); the file now casts both to `date`. verify did not assert
+the format, so it passed either way; Phase 2's parser normalises to
+`YYYY-MM-DD` and will not care, but the database should match the file.

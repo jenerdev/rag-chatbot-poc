@@ -71,7 +71,7 @@ begin
                           left join public.unanswered_resolutions r on r.message_id = m.id and r.tenant_id = m.tenant_id
                           where m.tenant_id = p_tenant_id and m.role = 'assistant'
                             and m.content = 'I don''t know based on the documents I have.' and r.message_id is null),
-    'perDay', (select coalesce(jsonb_agg(jsonb_build_object('day', d.day, 'conversations', coalesce(c.n, 0)) order by d.day), '[]'::jsonb)
+    'perDay', (select coalesce(jsonb_agg(jsonb_build_object('day', d.day::date, 'conversations', coalesce(c.n, 0)) order by d.day), '[]'::jsonb)
                from generate_series(v_today - v_days + 1, v_today, interval '1 day') as d(day)
                left join (
                  select (c.created_at at time zone v_timezone)::date as day, count(*) as n
@@ -139,7 +139,7 @@ begin
       -- Confirmed stays per week, by the night's DATE, the last ceil(days/7) weeks ending today.
       'stays', (select jsonb_build_object('weeks', w.weeks, 'perWeek', w.rows) from (
           select count(*) as weeks,
-                 coalesce(jsonb_agg(jsonb_build_object('weekOf', g.week_of, 'stays', coalesce(x.n, 0)) order by g.week_of), '[]'::jsonb) as rows
+                 coalesce(jsonb_agg(jsonb_build_object('weekOf', g.week_of::date, 'stays', coalesce(x.n, 0)) order by g.week_of), '[]'::jsonb) as rows
           from generate_series(v_today - 7 * ceil(v_days / 7.0)::int + 1, v_today, interval '7 days') as g(week_of)
           left join (
             select v_today - 7 * ceil(v_days / 7.0)::int + 1 + 7 * ((b.booked_date - (v_today - 7 * ceil(v_days / 7.0)::int + 1)) / 7) as week_of,

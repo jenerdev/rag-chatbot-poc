@@ -89,8 +89,8 @@ SVG bar charts, no library; one SQL function per page, gated on the caller's
 role inside; a counts-only Pulse strip on `/platform`. § 7 has six questions
 with recommendations. No chatbot change.
 - [ ] § 7 answered
-- [ ] Phase 0 — baseline
-- [ ] Phase 1 — SQL (`schema-dashboard.sql`, the 19th file; two functions)
+- [x] Phase 0 — baseline (2026-10-04): every suite green, baselines identical, battery 56/61 the known set; two runs died on transient errors (fetch failed, JWT expired) and the battery now reloads the tenant per case
+- [x] Phase 1 — SQL (2026-10-05): `schema-dashboard.sql` run by the user; verify **117/118** (117–118 green: a chat token refused, the staff counts the truth, money gated by role, another tenant refused; the super strip counts only, a tenant token refused). **Owed: re-run the file once** for the two `::date` casts on the chart buckets
 - [ ] Phase 2 — `@rag/pipeline` (`dashboard.ts`)
 - [ ] Phase 3 — routes and permissions (`dashboard:read`)
 - [ ] Phase 4 — screens (`bar-chart.tsx`, the Dashboard, the Pulse strip)
@@ -1176,6 +1176,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-05 — dashboard Phase 1 (SQL), on `feat/dashboard`
+- **Did:** the file run by the user; verify 117/118 with both dashboard
+  checks green, after moving the block before the role changes and
+  tolerating the probe's existing application. The chart buckets now cast
+  to `date` in the file; a re-run is owed.
+- **Next:** Phase 2, `@rag/pipeline` (`dashboard.ts`).
 
 ### 2026-10-04 — dashboard Phase 0 (baseline) and Phase 1 written, on `feat/dashboard`
 - **Did:** § 7 answered, every recommendation taken. Every suite green;
