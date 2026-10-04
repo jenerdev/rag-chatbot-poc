@@ -432,6 +432,14 @@ create trigger memberships_keep_an_owner
 --    the old numbers as the defaults. Nothing else in the body changed; it is
 --    the schema-customer-booking.sql text with two constants turned into two
 --    reads (plan § 2.4). validate (step 6) bounds what the config may say.
+--    GUARDED (promos Phase 1, 2026-10-04): schema-promos.sql replaces this
+--    with an 11-parameter function and DROPS this one. Once that file has run
+--    (promos exists), re-running THIS file must not put the 10-parameter
+--    overload back (PostgREST could not choose between them), so it is skipped.
+do $guard$
+begin
+  if to_regclass('public.promos') is null then
+    execute $ddl$
 create or replace function request_booking (
   p_tenant_id bigint,
   p_slot_id   bigint,
@@ -638,6 +646,12 @@ begin
     order by b.booked_date, un.sort_order, un.name;
 end;
 $$;
+    $ddl$;
+    execute 'revoke all on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) from public, anon, authenticated';
+    execute 'grant execute on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) to authenticated, service_role';
+  end if;
+end
+$guard$;
 
 -- 9. Two lookups into auth.users, which no token reads (plan § 2.9). Both
 --    SECURITY DEFINER with search_path = '', and each checks the caller
@@ -707,7 +721,7 @@ revoke all on function app_is_super()                from public, anon, authenti
 revoke all on function tenant_public(text)           from public, anon, authenticated;
 revoke all on function member_emails(bigint)         from public, anon, authenticated;
 revoke all on function user_id_by_email(text)        from public, anon, authenticated;
-revoke all on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) from public, anon, authenticated;
+-- request_booking's grants are inside its guard above (promos Phase 1).
 
 grant execute on function app_role()                 to authenticated, service_role;
 grant execute on function app_is_admin()             to authenticated, service_role;
@@ -716,7 +730,6 @@ grant execute on function app_is_super()             to authenticated, service_r
 grant execute on function tenant_public(text)        to anon, authenticated, service_role;
 grant execute on function member_emails(bigint)      to authenticated, service_role;
 grant execute on function user_id_by_email(text)     to authenticated, service_role;
-grant execute on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) to authenticated, service_role;
 
 -- PostgREST caches the schema: without this, platform_admins, the new column
 -- and the two lookups stay invisible to .from() and .rpc().

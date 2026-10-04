@@ -7112,3 +7112,35 @@ questions answered with every recommendation.
 - battery **57/61** (`antecedent`, `rt-leak-2`, the `leak-2` control and
   `lang-tagalog-2` flips), `tool 9/9 · price 3/3 · book 5/5`. The counts
   Phase 5 must hold.
+
+## Promos, Phase 1: the schema · done 2026-10-04, on `feat/promos`
+
+**What:** `packages/db/sql/schema-promos.sql` (the 18th file, run by the
+user): `promos` with its constraints, the per-tenant case-insensitive code
+index and RLS (members read, admins write, a chat token nothing);
+`bookings.promo_id` and `bookings.discount`; `promo_uses()` (distinct
+pending or confirmed requests, computed), `promo_discount()` (the only
+arithmetic: fixed on the first row of a stay, percent rounded half up,
+capped at the night), `promo_for_request()` (the customer's one door,
+definer, a reason when it does not apply, nothing for a wrong or foreign
+code); the trigger with the discount in the price, the promo checked for
+tenant, activity, dates and the limit under the request lock, a stored
+discount kept on an unchanged booking; `request_booking()` with
+`p_promo_code`, the stay priced for the automatic choice, rows inserted in
+date order, `discount` returned; the 10-parameter form dropped and
+schema-roles.sql and schema-customer-booking.sql guarded on `promos`.
+The typed schema; verify 111–116 (§ 5's shapes script folded into 112).
+
+**Observed:** verify **115/116** (the known roles item): a chat token sees
+0 promos and inserts none (42501); the code is unique per tenant (23505)
+and free at another; a wrong code and villa's code are nothing, the right
+code in any case is the promo, outside its dates `'dates'`, no code gives
+the automatic one; a coded request stores 10 % off every night
+(`1600000 − 160000 = 1440000`, twice) with promo_id and discount; a fixed
+promo lands on the first night only (`50000, 0`), its `max_uses 1` refuses
+the 2nd request (23514, "has reached its limit"), a cancelled one frees it
+and `promo_uses` counts 1; the trigger refuses another tenant's promo
+(23503), overwrites a forged discount to null, and an edited promo leaves
+the stored `160000` alone. Rooms 41/41; bookings isolation 30/30 both
+ways; typecheck clean. Every existing booking: `promo_id null`, `discount
+null`, `price` as it was.

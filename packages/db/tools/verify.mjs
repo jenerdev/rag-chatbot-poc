@@ -1434,6 +1434,112 @@ async function customerBookingChecks() {
           (rates?.length === 3 ? '' : ' — run plan/customer-booking-villa-rates.mjs'),
       );
     }
+
+    // --- promos (plan/promos.md Phase 1, D-097) ---------------------------------
+    // The same probe tenant (bookId: rates, an Overnight slot, a staff member),
+    // its chat token and its staff token. Every RLS check has its positive twin.
+    {
+      // 111. The schema is applied: the table, the two columns, promo_uses().
+      const table = await supabase.from('promos').select('id').limit(0);
+      const cols = await supabase.from('bookings').select('promo_id, discount').limit(0);
+      const uses0 = await supabase.rpc('promo_uses', { p_tenant_id: bookId, p_promo_id: 0 });
+      const applied = !table.error && !cols.error && !uses0.error && uses0.data === 0;
+      check(applied, 'promos: the schema is applied (table, columns, promo_uses)', applied ? 'ok' : `${table.error?.message ?? cols.error?.message ?? uses0.error?.message ?? uses0.data} — run packages/db/sql/schema-promos.sql`);
+
+      if (applied) {
+        const from = addDays(thursday, 14);
+        const to = addDays(thursday, 60);
+        const { data: ov } = await supabase.from('slots').select('nightly').eq('id', slot.Overnight).single();
+        const nights = ov?.nightly ? 2 : 1;
+        const subtotal = (r) => (r.base_price ?? 0) + (r.extra_guest_price ?? 0) + (r.surcharge ?? 0);
+        const request = (checkIn, n, code) =>
+          chat.rpc('request_booking', {
+            p_tenant_id: bookId, p_slot_id: slot.Overnight, p_unit_ids: [unit.id], p_guests: [2], p_check_in: checkIn, p_nights: nights,
+            p_name: 'Promo Guest', p_phone: `0917000010${n}`, p_email: `promo${n}@example.com`, p_notes: null, p_promo_code: code,
+          });
+
+        // 112. An admin creates two promos (a coded percent, an automatic fixed);
+        //      a chat token sees none and inserts none (42501); the code is
+        //      unique per tenant ignoring case (23505) and free at another.
+        const pct = await staff.from('promos').insert({ tenant_id: bookId, name: 'Ten percent', kind: 'percent', value: 1000, valid_from: from, valid_to: to, code: 'TEN-10' }).select('id').single();
+        const auto = await staff.from('promos').insert({ tenant_id: bookId, name: 'Off season', kind: 'fixed', value: 50000, valid_from: from, valid_to: to }).select('id').single();
+        const chatSees = await chat.from('promos').select('id');
+        const chatInsert = await chat.from('promos').insert({ tenant_id: bookId, name: 'x', kind: 'fixed', value: 1, valid_from: from, valid_to: to });
+        const dup = await supabase.from('promos').insert({ tenant_id: bookId, name: 'dup', kind: 'fixed', value: 1, valid_from: from, valid_to: to, code: 'ten-10' });
+        const elsewhere = await supabase.from('promos').insert([
+          { tenant_id: villa ?? -1, name: 'villa ten', kind: 'percent', value: 1000, valid_from: from, valid_to: to, code: 'TEN-10' },
+          { tenant_id: villa ?? -1, name: 'villa only', kind: 'fixed', value: 100, valid_from: from, valid_to: to, code: 'VILLA-ONLY' },
+        ]).select('id, code');
+        check(
+          !pct.error && !auto.error && chatSees.data?.length === 0 && chatInsert.error?.code === '42501' && dup.error?.code === '23505' && elsewhere.data?.length === 2,
+          'promos: an admin creates; a chat token sees none and inserts none; a code is unique per tenant, free at another',
+          `create ${pct.error?.message ?? 'ok'}/${auto.error?.message ?? 'ok'} · chat sees ${chatSees.error?.message ?? chatSees.data?.length} · chat insert ${chatInsert.error?.code ?? 'INSERTED'} · dup ${dup.error?.code ?? 'INSERTED'} · villa ${elsewhere.error?.message ?? elsewhere.data?.length}`,
+        );
+
+        // 113. promo_for_request on the chat token: a wrong code and villa's code
+        //      are nothing; the right code (any case) is the promo; outside its
+        //      dates the reason says so; with no code the automatic one comes.
+        const look = (code, f = from, t = addDays(from, 1)) => chat.rpc('promo_for_request', { p_tenant_id: bookId, p_code: code, p_from: f, p_to: t, p_subtotal: 1000000 });
+        const wrong = await look('NOPE-1');
+        const foreign = await look('VILLA-ONLY');
+        const right = await look('ten-10');
+        const outside = await look('TEN-10', addDays(to, 1), addDays(to, 1));
+        const automatic = await look(null);
+        check(
+          wrong.data?.length === 0 && foreign.data?.length === 0 && right.data?.[0]?.id === pct.data?.id && right.data?.[0]?.reason === null
+            && outside.data?.[0]?.reason === 'dates' && automatic.data?.[0]?.id === auto.data?.id,
+          "promo_for_request: a wrong code and another tenant's code are nothing; the code is the promo; outside its dates 'dates'; no code gives the automatic one",
+          `wrong ${wrong.error?.message ?? wrong.data?.length} · villa's ${foreign.error?.message ?? foreign.data?.length} · right ${right.error?.message ?? right.data?.[0]?.id} (${right.data?.[0]?.reason}) · outside ${outside.data?.[0]?.reason} · automatic ${automatic.error?.message ?? automatic.data?.[0]?.id}`,
+        );
+
+        // 114. request_booking with the code: 10 % off every night, rounded half
+        //      up, the price net of it, the discount returned and stored.
+        const req = await request(addDays(thursday, 20), 1, 'ten-10');
+        const rows = req.data ?? [];
+        const pctOk = rows.length === nights && rows.every((r) => r.discount === Math.round(subtotal(r) * 0.1) && r.price === subtotal(r) - r.discount);
+        const { data: stored } = await supabase.from('bookings').select('promo_id, discount').eq('tenant_id', bookId).eq('reference', rows[0]?.reference ?? '');
+        check(
+          pctOk && stored?.length === nights && stored.every((b) => b.promo_id === pct.data?.id && b.discount === rows[0].discount),
+          'request_booking with a code: 10 % off every night, the price net, promo_id and discount stored',
+          req.error ? `${req.error.code} ${req.error.message}` : `${rows.map((r) => `${subtotal(r)} − ${r.discount} = ${r.price}`).join(', ')} · stored ${stored?.map((b) => `${b.promo_id}/${b.discount}`).join(', ')}`,
+        );
+
+        // 115. A fixed promo with max_uses 1: the amount on the FIRST night only;
+        //      the 2nd request is refused in words (23514); a cancelled one gives
+        //      the use back, so a 3rd is accepted; the count is 1.
+        const fix = await staff.from('promos').insert({ tenant_id: bookId, name: 'Five hundred off', kind: 'fixed', value: 50000, valid_from: from, valid_to: to, code: 'FIX-500', max_uses: 1 }).select('id').single();
+        const first = await request(addDays(thursday, 30), 2, 'FIX-500');
+        const firstRows = first.data ?? [];
+        const fixedOk = firstRows.length === nights && firstRows[0].discount === Math.min(50000, subtotal(firstRows[0])) && firstRows.slice(1).every((r) => r.discount === 0);
+        const second = await request(addDays(thursday, 37), 3, 'FIX-500');
+        const refused = second.error?.code === '23514' && /limit/.test(second.error.message);
+        await supabase.from('bookings').update({ status: 'cancelled' }).eq('tenant_id', bookId).eq('reference', firstRows[0]?.reference ?? '');
+        const third = await request(addDays(thursday, 37), 4, 'FIX-500');
+        const usesNow = await supabase.rpc('promo_uses', { p_tenant_id: bookId, p_promo_id: fix.data?.id ?? 0 });
+        check(
+          !fix.error && fixedOk && refused && !third.error && usesNow.data === 1,
+          'a fixed promo: on the first night only; max_uses 1 refuses the 2nd request; a cancelled one frees it; promo_uses counts 1',
+          `first ${first.error?.message ?? firstRows.map((r) => r.discount).join(',')} · second ${second.error?.code ?? 'ACCEPTED'} · third ${third.error?.message ?? 'ok'} · uses ${usesNow.error?.message ?? usesNow.data}`,
+        );
+
+        // 116. The trigger, for staff: villa's promo on this tenant's booking is
+        //      refused (23503); a forged discount with no promo is overwritten to
+        //      null; editing a promo leaves a stored discount alone (Rule 4).
+        const villaPromo = elsewhere.data?.find((p) => p.code === 'VILLA-ONLY')?.id ?? -1;
+        const foreignInsert = await staff.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: addDays(thursday, 44), guest_name: 'Foreign promo', guest_count: 2, status: 'pending', promo_id: villaPromo }).select('id');
+        const forged = await staff.from('bookings').insert({ tenant_id: bookId, unit_id: unit.id, slot_id: slot.Overnight, booked_date: addDays(thursday, 45), guest_name: 'Forged', guest_count: 2, status: 'pending', discount: 999 }).select('id, discount, promo_id').single();
+        await supabase.from('promos').update({ value: 9999 }).eq('id', pct.data?.id ?? -1);
+        const { data: kept } = await supabase.from('bookings').select('discount').eq('tenant_id', bookId).eq('reference', rows[0]?.reference ?? '');
+        check(
+          foreignInsert.error?.code === '23503' && !forged.error && forged.data?.discount === null && forged.data?.promo_id === null && kept?.every((b) => b.discount === rows[0]?.discount),
+          "the trigger: another tenant's promo is refused; a forged discount is overwritten; an edited promo leaves a stored discount alone",
+          `foreign ${foreignInsert.error?.code ?? 'INSERTED'} · forged ${forged.error?.message ?? forged.data?.discount} · kept ${kept?.map((b) => b.discount).join(',')} vs ${rows[0]?.discount}`,
+        );
+
+        // Villa's two probe promos go; the probe tenant's own cascade with it.
+        await supabase.from('promos').delete().eq('tenant_id', villa ?? -1).in('code', ['TEN-10', 'VILLA-ONLY']);
+      }
+    }
   } finally {
     if (userId) {
       const { error } = await supabase.auth.admin.deleteUser(userId);

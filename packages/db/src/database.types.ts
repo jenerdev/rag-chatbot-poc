@@ -379,6 +379,61 @@ export interface Database {
         Relationships: [];
       };
       /** sql/schema-booking-types.sql § 3 — one price per (unit, slot), in CENTAVOS. */
+      /** schema-promos.sql (D-097): a discount the tenant defines. Members read, admins write, a chat token reads nothing. */
+      promos: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          name: string;
+          /** `check (kind in ('fixed','percent'))` */
+          kind: 'fixed' | 'percent';
+          /** centavos for fixed; hundredths of a percent for percent (1250 = 12.50 %), at most 10000 */
+          value: number;
+          /** the STAY dates it covers, inclusive, "YYYY-MM-DD" */
+          valid_from: string;
+          valid_to: string;
+          /** null = automatic; else `^[A-Za-z0-9_-]{3,32}$`, unique per tenant ignoring case */
+          code: string | null;
+          /** null = unlimited; counted by promo_uses(), never stored */
+          max_uses: number | null;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: never;
+          tenant_id: number;
+          name: string;
+          kind: 'fixed' | 'percent';
+          value: number;
+          valid_from: string;
+          valid_to: string;
+          code?: string | null;
+          max_uses?: number | null;
+          active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: never;
+          tenant_id?: number;
+          name?: string;
+          kind?: 'fixed' | 'percent';
+          value?: number;
+          valid_from?: string;
+          valid_to?: string;
+          code?: string | null;
+          max_uses?: number | null;
+          active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'promos_tenant_id_fkey';
+            columns: ['tenant_id'];
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       unit_rates: {
         Row: {
           tenant_id: number;
@@ -514,6 +569,10 @@ export interface Database {
           notes: string | null;
           /** schema-decision-note.sql (D-096): what staff wrote when they confirmed, cancelled or declined; at most 500 characters */
           decision_note: string | null;
+          /** schema-promos.sql (D-097): the promo this booking got, if any */
+          promo_id: number | null;
+          /** centavos, part of `price` (price = the quote − discount), set by the trigger; null without a promo and for old rows */
+          discount: number | null;
           /** centavos, the TOTAL, set by the insert trigger from unit_quote(); null for whole_resort and for old rows */
           price: number | null;
           /** the rate part and the extra-guest part of `price` (schema-extra-guests.sql); null likewise */
@@ -545,6 +604,9 @@ export interface Database {
           notes?: string | null;
           /** written by the decision, never at creation */
           decision_note?: never;
+          promo_id?: number | null;
+          /** computed by the trigger from promo_discount(), which overwrites anything supplied */
+          discount?: never;
           /** computed by the trigger, which overwrites anything supplied (plan Rule 2) */
           price?: never;
           base_price?: never;
@@ -570,6 +632,8 @@ export interface Database {
           guest_count?: number | null;
           notes?: string | null;
           decision_note?: string | null;
+          promo_id?: number | null;
+          discount?: never;
           price?: never;
           base_price?: never;
           extra_guest_price?: never;
@@ -647,6 +711,30 @@ export interface Database {
     };
     Views: Record<never, never>;
     Functions: {
+      /** schema-promos.sql (D-097): distinct pending or confirmed requests that used the promo */
+      promo_uses: {
+        Args: { p_tenant_id: number; p_promo_id: number; p_except_group?: string | null; p_except_id?: number | null };
+        Returns: number;
+      };
+      /** ONE night's discount in centavos: fixed on the first row of a stay, percent rounded half up; null for another tenant's promo */
+      promo_discount: {
+        Args: { p_tenant_id: number; p_promo_id: number; p_price: number; p_first: boolean };
+        Returns: number | null;
+      };
+      /** the customer's one door: the promo for a code (with a reason when it does not apply), or the automatic one; no rows for a wrong code */
+      promo_for_request: {
+        Args: { p_tenant_id: number; p_code: string | null; p_from: string; p_to: string; p_subtotal: number | null };
+        Returns: {
+          id: number;
+          name: string;
+          kind: 'fixed' | 'percent';
+          value: number;
+          valid_from: string;
+          valid_to: string;
+          /** null = applies; 'dates' = the stay is outside its range; 'exhausted' = no uses left */
+          reason: 'dates' | 'exhausted' | null;
+        }[];
+      };
       /** sql/schema-auth.sql § 2 — the token's tenant_id claim, or null. */
       app_tenant_id: {
         Args: Record<never, never>;
@@ -788,6 +876,8 @@ export interface Database {
           p_phone: string;
           p_email: string;
           p_notes: string | null;
+          /** schema-promos.sql (D-097): a code, or null for the automatic promo if any */
+          p_promo_code?: string | null;
         };
         Returns: {
           reference: string;
@@ -798,6 +888,8 @@ export interface Database {
           ends_at: string;
           guests: number;
           base_price: number;
+          /** schema-promos.sql (D-097): this night's discount, part of `price`; 0 or more */
+          discount: number | null;
           extra_guest_price: number;
           surcharge: number;
           price: number;

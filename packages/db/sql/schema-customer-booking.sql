@@ -759,8 +759,16 @@ create policy rate_calendar_delete on rate_calendar for delete to authenticated
 --     token, minted by the server).
 revoke all on function unit_quote(bigint, bigint, bigint, date, int) from public, anon, authenticated;
 grant execute on function unit_quote(bigint, bigint, bigint, date, int) to authenticated, service_role;
-revoke all on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) from public, anon, authenticated;
-grant execute on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) to authenticated, service_role;
+-- request_booking's grants: guarded like its definition (schema-roles.sql
+-- replaced it, then schema-promos.sql dropped the 10-parameter form).
+do $guard$
+begin
+  if to_regclass('public.promos') is null then
+    execute 'revoke all on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) from public, anon, authenticated';
+    execute 'grant execute on function request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text) to authenticated, service_role';
+  end if;
+end
+$guard$;
 
 notify pgrst, 'reload schema';
 
