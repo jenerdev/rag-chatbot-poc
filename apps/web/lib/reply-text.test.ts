@@ -35,4 +35,19 @@ describe('ReplyText', () => {
   it('renders nothing for an empty reply', () => {
     expect(render('')).toBe('');
   });
+
+  it('renders **bold** as <strong> with a text child, in prose and in a cell', () => {
+    expect(render('Our **Garden Room** sleeps 2.')).toBe('<span class="reply-text">Our <strong>Garden Room</strong> sleeps 2.</span>');
+    const html = render('| Room | Guests |\n|---|---|\n| **Loft** | up to 3 |');
+    expect(html).toContain('<td data-label="Room"><strong>Loft</strong></td>');
+  });
+
+  it('a bold run is still text, never markup', () => {
+    expect(render('**<b>x</b>**')).toBe('<span class="reply-text"><strong>&lt;b&gt;x&lt;/b&gt;</strong></span>');
+  });
+
+  it('a price with an emoji in front is still an amount column', () => {
+    const html = render('| Slot | Price |\n|---|---|\n| Overnight | 💰 ₱20,000.00 |');
+    expect(html).toContain('<th>Slot</th><th class="amount">Price</th>');
+  });
 });

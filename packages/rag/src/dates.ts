@@ -585,25 +585,26 @@ export function roomListReply(rooms: { name: string; capacity: number | null }[]
   };
   const header = language === 'tagalog' ? ['Kwarto', 'Bisita'] : ['Room', 'Guests'];
   const table = pipeTable(header, rooms.map((r) => [r.name, holds(r.capacity)]));
+  // D-092: one emoji, in front of the sentence, never in a cell.
   if (language === 'taglish') {
-    return `Ito po ang mga kwarto namin:\n\n${table}\n\nPakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.`;
+    return `🛏️ Ito po ang mga kwarto namin:\n\n${table}\n\nPakisabi po ang date niyo para ma-check ko kung alin ang bakante at ang rates.`;
   }
   if (language === 'tagalog') {
-    return `Narito po ang aming mga kuwarto:\n\n${table}\n\nPakisabi po ang petsa upang masuri ko kung alin ang bakante at ang presyo.`;
+    return `🛏️ Narito po ang aming mga kuwarto:\n\n${table}\n\nPakisabi po ang petsa upang masuri ko kung alin ang bakante at ang presyo.`;
   }
-  return `Here are our rooms:\n\n${table}\n\nTell me your dates and I can check which rooms are free and their rates.`;
+  return `🛏️ Here are our rooms:\n\n${table}\n\nTell me your dates and I can check which rooms are free and their rates.`;
 }
 
 export const PRICE_NEEDS_DATE: Record<LanguagePreference, string> = {
   english:
     'Our rates vary depending on whether your visit falls on a weekday, weekend, or holiday. ' +
-    'Please provide your preferred date so I can check and share the correct rate with you.',
+    'Please provide your preferred date so I can check and share the correct rate with you. 📅',
   taglish:
     'Nag-iiba po ang rates namin depende kung weekday, weekend, o holiday ang visit niyo. ' +
-    'Pakisabi po ang preferred date niyo para ma-check ko at maibigay ang tamang rate.',
+    'Pakisabi po ang preferred date niyo para ma-check ko at maibigay ang tamang rate. 📅',
   tagalog:
     'Nag-iiba po ang aming presyo depende kung karaniwang araw, Sabado at Linggo, o pista opisyal ang inyong pagbisita. ' +
-    'Pakisabi po ang nais ninyong petsa upang masuri ko at maibigay ang tamang presyo.',
+    'Pakisabi po ang nais ninyong petsa upang masuri ko at maibigay ang tamang presyo. 📅',
 };
 
 /** Words a follow-up wraps around a date: "How about bukas?", "Paano kung sa Friday naman po?" */

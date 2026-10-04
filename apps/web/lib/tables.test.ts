@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { parseSegments } from './tables';
+import { parseInline, parseSegments } from './tables';
+
+describe('parseInline', () => {
+  it('splits **bold** out of a line', () => {
+    expect(parseInline('Our **Garden Room** sleeps 2.')).toEqual([
+      { kind: 'text', text: 'Our ' },
+      { kind: 'bold', text: 'Garden Room' },
+      { kind: 'text', text: ' sleeps 2.' },
+    ]);
+  });
+
+  it('returns plain text as one run, and nothing for an empty string', () => {
+    expect(parseInline('no markers here')).toEqual([{ kind: 'text', text: 'no markers here' }]);
+    expect(parseInline('')).toEqual([]);
+  });
+
+  it('leaves an unmatched, empty or multi-line ** as text', () => {
+    expect(parseInline('a ** b')).toEqual([{ kind: 'text', text: 'a ** b' }]);
+    expect(parseInline('a **** b')).toEqual([{ kind: 'text', text: 'a **** b' }]);
+    expect(parseInline('a **b\nc** d')).toEqual([{ kind: 'text', text: 'a **b\nc** d' }]);
+  });
+
+  it('handles two bold runs and one at the very start', () => {
+    expect(parseInline('**Dalisay**: queen bed; **Tala**: double bed')).toEqual([
+      { kind: 'bold', text: 'Dalisay' },
+      { kind: 'text', text: ': queen bed; ' },
+      { kind: 'bold', text: 'Tala' },
+      { kind: 'text', text: ': double bed' },
+    ]);
+  });
+});
 
 const TABLE = ['| Room | Guests | Price |', '|---|---|---|', '| Garden Room | up to 2 | ₱3,500.00 (weekend rate) |', '| Loft | up to 3 | ₱4,800.00 (weekend rate) |'].join('\n');
 

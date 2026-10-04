@@ -42,7 +42,24 @@ export function refusalText(tenant: Pick<TenantContext, 'fallbackMessages'>, lan
 
 /** Is this reply the refusal marker? Exact, after trimming: a partial answer that mentions it is an answer. */
 export function isRefusal(reply: string): boolean {
-  return reply.trim() === NO_ANSWER;
+  return bare(reply) === NO_ANSWER;
+}
+
+/**
+ * Whitespace and emoji at either end, gone. Since the prompt asks for an
+ * emoji where one fits (D-092), the model sometimes decorates the marker
+ * too ("I don't know based on the documents I have. 😔"), and that is still
+ * the refusal: it must be swapped for the friendly text and SAVED as the
+ * exact marker, or the unanswered list (D-045) would miss it.
+ */
+const EDGE = /^[\s\p{Extended_Pictographic}️‍]+|[\s\p{Extended_Pictographic}️‍]+$/gu;
+function bare(reply: string): string {
+  return reply.replace(EDGE, '');
+}
+
+/** What is SAVED: a refusal, however decorated, is the exact marker; anything else is itself. */
+export function storedReply(reply: string): string {
+  return isRefusal(reply) ? NO_ANSWER : reply;
 }
 
 /** The reply as the visitor should see it: the marker becomes the friendly text, anything else is untouched. */
@@ -69,8 +86,16 @@ export function refusalFilter(onDelta: (text: string) => void, friendly: string)
     push(delta: string): void {
       if (passing) return onDelta(delta);
       held += delta;
-      // Leading whitespace is allowed, as isRefusal() trims.
-      if (!NO_ANSWER.startsWith(held.trimStart())) {
+      // Leading whitespace and a leading emoji are allowed, as isRefusal()
+      // strips them. A lone high surrogate at the end is an emoji whose
+      // second half has not arrived, so it is not judged yet.
+      const probe = held.replace(/^[\s\p{Extended_Pictographic}️‍]+/u, '').replace(/[\uD800-\uDBFF]$/, '');
+      // Still the marker: a prefix of it, or the whole of it followed by
+      // nothing but whitespace or emoji (a trailing "😔"). A WORD after the
+      // marker ends the hold, as it always did: that reply is an answer.
+      const tail = probe.startsWith(NO_ANSWER) ? probe.slice(NO_ANSWER.length) : null;
+      const stillMarker = NO_ANSWER.startsWith(probe) || (tail !== null && /^[\s\p{Extended_Pictographic}️‍]*$/u.test(tail));
+      if (!stillMarker) {
         passing = true;
         onDelta(held);
         held = '';

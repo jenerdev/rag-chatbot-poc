@@ -715,7 +715,7 @@ export async function rateCardReply(tenant: TenantContext, language: LanguagePre
 /** The rate card's words, in the reply language (D-043). The English outro is D-081's sentence, with the card above it. */
 const RATE_CARD: Record<LanguagePreference, { intro: string; outro: string; room: string; slot: string; weekday: string; weekend: string; holiday: string }> = {
   english: {
-    intro: 'Here are our rates:',
+    intro: '💰 Here are our rates:',
     outro:
       'The rate depends on whether your date falls on a weekday, a weekend or a holiday, and a holiday can carry a surcharge. ' +
       'Tell me your preferred date and I can give you the exact rate.',
@@ -726,7 +726,7 @@ const RATE_CARD: Record<LanguagePreference, { intro: string; outro: string; room
     holiday: 'Holiday',
   },
   taglish: {
-    intro: 'Ito po ang rates namin:',
+    intro: '💰 Ito po ang rates namin:',
     outro:
       'Depende po ang rate kung weekday, weekend, o holiday ang date niyo, at pwedeng may surcharge sa holiday. ' +
       'Pakisabi po ang preferred date niyo para maibigay ko ang exact rate.',
@@ -737,7 +737,7 @@ const RATE_CARD: Record<LanguagePreference, { intro: string; outro: string; room
     holiday: 'Holiday',
   },
   tagalog: {
-    intro: 'Narito po ang aming mga presyo:',
+    intro: '💰 Narito po ang aming mga presyo:',
     outro:
       'Nakadepende po ang presyo kung karaniwang araw, Sabado at Linggo, o pista opisyal ang inyong petsa, at maaaring may dagdag-bayad sa pista opisyal. ' +
       'Pakisabi po ang nais ninyong petsa upang maibigay ko ang eksaktong presyo.',

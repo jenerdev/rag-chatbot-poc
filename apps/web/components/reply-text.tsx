@@ -12,11 +12,19 @@
 // with no table in it renders exactly as it did before this component
 // existed (lib/tables.test.ts: one segment, byte for byte).
 
-import { parseSegments } from '@/lib/tables';
+import { parseInline, parseSegments } from '@/lib/tables';
 
-/** A cell that is an amount: "₱3,500.00". */
+/** A cell that is an amount: "₱3,500.00". A leading emoji the model added does not change that. */
 function isAmount(cell: string): boolean {
-  return /^[₱$€£¥]/.test(cell);
+  return /^(?:[\p{Extended_Pictographic}️‍]+\s*)?[₱$€£¥]/u.test(cell);
+}
+
+/**
+ * A line's runs as children: a string for text, <strong> with a string
+ * child for bold. Still no markup from a string anywhere (D-091 Rule 1).
+ */
+function inline(text: string) {
+  return parseInline(text).map((run, i) => (run.kind === 'bold' ? <strong key={i}>{run.text}</strong> : run.text));
 }
 
 /**
@@ -40,7 +48,7 @@ export function ReplyText({ text }: { text: string }) {
       {parseSegments(text).map((segment, i) =>
         segment.kind === 'text' ? (
           <span className="reply-text" key={i}>
-            {segment.text}
+            {inline(segment.text)}
           </span>
         ) : (
           <div className="reply-table" key={i}>
@@ -62,7 +70,7 @@ export function ReplyText({ text }: { text: string }) {
                       // prints in front of the value (globals.css, 560px). An
                       // attribute, so React escapes it like a child.
                       <td key={k} data-label={segment.header[k] ?? ''} className={amountColumns(segment.rows)[k] ? 'amount' : undefined}>
-                        {cell}
+                        {inline(cell)}
                       </td>
                     ))}
                   </tr>

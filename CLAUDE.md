@@ -122,6 +122,12 @@
 > named once in the sentence, not in every cell (D-082 amended). No tool
 > definition and no base prompt changed; the battery judges `tableOk` on
 > the list answers and its absence on a one-slot price (Rule 4).
+>
+> **Replies carry an emoji where one fits** since 2026-10-04 (D-092): one
+> paragraph in `buildPrompt()`, so northwind's snapshot baseline is now
+> `northwind-prompt-post-emoji.txt`; `isRefusal()` tolerates a decorated
+> marker and `storedReply()` saves it exact. `**bold**` is drawn too
+> (D-091 amended), still as elements, never HTML.
 
 ## What this is
 
@@ -307,7 +313,9 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    with `fixtures/harbor-bookings.json` in harbor. Their price checks compare
    the reply with the TOOL's price for that row, never with a typed number. Tools also mean a second prompt
    check: `pnpm --silent --filter @rag/pipeline prompt-snapshot` must match
-   `plan/baseline/northwind-prompt-pre-bookings.txt` (`diff --strip-trailing-cr`),
+   `plan/baseline/northwind-prompt-post-emoji.txt` (`diff --strip-trailing-cr`;
+   before D-092 it was the pre-bookings file, which differs by the emoji
+   paragraph alone),
    villa's tool definitions must match
    `plan/baseline/villa-tools-post-villa-prices.txt` (D-074; before it, the
    pre-booking-types file), and harbor's
@@ -570,9 +578,10 @@ All are expanded in `risks.md`.
   goes to a Client Component: pages pass named props.
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
-  markdown rendering is what would take it away. The ONE exception is a pipe
-  table (D-091): `lib/tables.ts` parses that block shape alone, and
-  `reply-text.tsx` renders every cell as a child, so the rule still holds.
+  markdown rendering is what would take it away. The two exceptions are a
+  pipe table and `**bold**` (D-091, as amended): `lib/tables.ts` parses
+  those two shapes alone, and `reply-text.tsx` renders every cell and every
+  bold run as a child, so the rule still holds.
   Tenant branding follows the
   same rule: theme colours reach the page as CSS custom properties through the
   `style` prop, from the allowlist in `lib/branding.ts` (D-030).

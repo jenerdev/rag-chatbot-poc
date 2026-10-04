@@ -8,7 +8,7 @@ import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } fr
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
 import type { LanguagePreference } from './language.js';
 import { buildPrompt } from './prompt.js';
-import { displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
+import { displayReply, isRefusal, refusalFilter, refusalText, storedReply } from './refusal.js';
 import { retrieve, rewriteQuestion } from './retrieve.js';
 import { executeTool, extraGuestLines, horizonLines, rateCardReply, toolsFor } from './tools.js';
 import type { PromptTools, TenantTools } from './tools.js';
@@ -481,7 +481,7 @@ export async function answerQuestion({
     }
 
     const reply = await chat(buildPrompt(tenant, matches, history, message, null, language));
-    await saveMessages(tenant, id, message, reply);
+    await saveMessages(tenant, id, message, storedReply(reply));
 
     // searchQuery is returned so the UI can show what was actually searched for
     // when it differs from what the user typed. Retrieval silently searching for
@@ -507,7 +507,7 @@ export async function answerQuestion({
     explainPrice(undatedPrice, records, acceptReply(matches, records, text), replyIn, undatedPrice ? await rateCardReply(tenant, replyIn) : null),
     replyIn,
   );
-  await saveMessages(tenant, id, message, reply);
+  await saveMessages(tenant, id, message, storedReply(reply));
   return {
     conversationId: id,
     reply: prefix + displayReply(reply, friendly),
@@ -589,7 +589,7 @@ export async function answerQuestionStream({
     if (tools.definitions.length === 0) {
       const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), filter.push);
       filter.finish();
-      await saveMessages(tenant, id, message, reply);
+      await saveMessages(tenant, id, message, storedReply(reply));
       return prefix + displayReply(reply, friendly);
     }
 
@@ -621,7 +621,7 @@ export async function answerQuestionStream({
     // Held text was never streamed, so it goes out whole, already swapped.
     if (hold) onDelta(displayReply(reply, friendly));
     else filter.finish();
-    await saveMessages(tenant, id, message, reply);
+    await saveMessages(tenant, id, message, storedReply(reply));
     return prefix + displayReply(reply, friendly);
   } catch (error) {
     // The client was handed this conversationId in `meta` and will send it

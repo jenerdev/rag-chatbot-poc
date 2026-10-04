@@ -7008,3 +7008,30 @@ rule 1 the `table:` verdicts, and the Frontend convention its one
 exception; flow.md's diagram line and a step 11d; plan/tables.md marked
 complete. The plan is done: five phases and a walk in one day, on
 `feat/tables`, five commits so far.
+
+## Emoji where one fits, and **bold** drawn · done 2026-10-04 (D-092; D-091 amended)
+
+**What:** one paragraph in the base prompt asks for an emoji where it fits
+(examples, at most two, never in a cell, none in the refusal); the
+code-written room list, rate card and rates-need-a-date sentence carry a
+fixed one. `isRefusal()` strips emoji at the edges, `refusalFilter` holds
+through a leading or trailing one, `storedReply()` saves a decorated
+refusal as the exact marker. `parseInline()` draws `**bold**` as
+`<strong>` with a text child, in prose and in cells; `isAmount()`
+tolerates a leading emoji.
+
+**Why it matters:** the user asked for expressive replies and had seen
+`**test**` on screen. Both without a markdown library: two shapes, parsed
+by hand into elements. The refusal path had to be made tolerant FIRST, or
+"I don't know… 😔" would have reached the screen as the marker and left
+the unanswered list blind.
+
+**Observed:** tests 353/353 (+2 refusal, +4 parser, +3 component);
+typecheck; villa's and harbor's tool definitions byte-identical;
+northwind's prompt differs by the paragraph alone, saved as the new
+baseline `northwind-prompt-post-emoji.txt`. Battery **57/61**: the known
+set (`antecedent`, `rt-leak-2`, the `leak-2` control and `lang-tagalog-2`
+flips); `tool 9/9 · price 3/3 · book 5/5`. Emoji in 19 of 61 replies
+(💰 4, ✅ 4, 😊 2, 📅 2, 👋 📞 🐾 🐶), none in a cell. Six probes: one
+model-added emoji in four model replies; the code-written ones carry
+theirs (`probes-emoji.txt`).

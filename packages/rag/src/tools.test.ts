@@ -308,7 +308,7 @@ describe('rateCardReply (plan/tables.md Phase 2, § 7 q1)', () => {
       units: [unit('Villa', [{ slot: 'Overnight', weekdayPrice: 1600000, weekendPrice: 2000000, holidayPrice: null }, { slot: 'Day Tour', weekdayPrice: 950000, weekendPrice: 1200000, holidayPrice: 1400000 }])],
     } as never);
     expect(await rateCardReply(TENANT, 'english')).toBe(
-      'Here are our rates:\n\n' +
+      '💰 Here are our rates:\n\n' +
         '| Slot | Weekday | Weekend | Holiday |\n|---|---|---|---|\n' +
         '| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |\n' +
         '| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱14,000.00 |\n\n' +
@@ -330,7 +330,7 @@ describe('rateCardReply (plan/tables.md Phase 2, § 7 q1)', () => {
     expect(reply).toContain('| Garden Room | Night | ₱3,500.00 | ₱4,500.00 | ₱4,500.00 |\n');
     // A pipe in a tenant-typed room name cannot split the row.
     expect(reply).toContain('| Sea View | Night | ₱8,000.00 | ₱9,500.00 | ₱11,000.00 |');
-    expect(reply).toMatch(/^Narito po ang aming mga presyo:/);
+    expect(reply).toMatch(/^💰 Narito po ang aming mga presyo:/);
   });
 
   it('null when there is no page to read, so the caller falls back to PRICE_NEEDS_DATE', async () => {

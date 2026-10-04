@@ -383,7 +383,7 @@ describe('roomListReply (D-087)', () => {
 
   it('names every room with its maximum, no price, as a table, in the reply language', () => {
     expect(roomListReply(ROOMS, 'english')).toBe(
-      'Here are our rooms:\n\n| Room | Guests |\n|---|---|\n| Garden Room | up to 2 guests |\n| Cottage |  |\n\nTell me your dates and I can check which rooms are free and their rates.',
+      '🛏️ Here are our rooms:\n\n| Room | Guests |\n|---|---|\n| Garden Room | up to 2 guests |\n| Cottage |  |\n\nTell me your dates and I can check which rooms are free and their rates.',
     );
     expect(roomListReply(ROOMS, 'taglish')).toContain('| Room | Guests |\n|---|---|\n| Garden Room | up to 2 guests |');
     expect(roomListReply(ROOMS, 'tagalog')).toContain('| Kwarto | Bisita |\n|---|---|\n| Garden Room | hanggang 2 bisita |');

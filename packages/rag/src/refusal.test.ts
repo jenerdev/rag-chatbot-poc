@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { NO_ANSWER } from './constants.js';
-import { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
+import { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText, storedReply } from './refusal.js';
 
 const FRIENDLY = 'Sorry po, wala pa kaming info diyan. Message us on Facebook: Villa Amihan.';
 
@@ -62,6 +62,19 @@ describe('isRefusal and displayReply', () => {
     expect(displayReply(NO_ANSWER, FRIENDLY)).toBe(FRIENDLY);
   });
 
+  // D-092: the prompt asks for an emoji where one fits, and the model may
+  // decorate the marker too. Still a refusal, still swapped, SAVED exact.
+  it('the marker with an emoji at either end is a refusal, and is stored as the exact marker', () => {
+    expect(isRefusal(`${NO_ANSWER} 😔`)).toBe(true);
+    expect(isRefusal(`🙏 ${NO_ANSWER}`)).toBe(true);
+    expect(isRefusal(`❌ ${NO_ANSWER} 🙏`)).toBe(true);
+    expect(displayReply(`${NO_ANSWER} 😔`, FRIENDLY)).toBe(FRIENDLY);
+    expect(storedReply(`${NO_ANSWER} 😔`)).toBe(NO_ANSWER);
+    expect(storedReply('The deposit is ₱2,000 ✅')).toBe('The deposit is ₱2,000 ✅');
+    // An emoji with WORDS after the marker is an answer, as before.
+    expect(isRefusal(`${NO_ANSWER} But the deposit is ₱2,000.`)).toBe(false);
+  });
+
   it('a partial answer that contains the marker is an answer, and is left alone', () => {
     const partial = `The Day Tour is ₱9,500. ${NO_ANSWER}`;
     expect(isRefusal(partial)).toBe(false);
@@ -80,6 +93,11 @@ describe('refusalFilter: what a streaming visitor sees', () => {
 
   it('leading whitespace before the marker is still a refusal', () => {
     expect(stream(['\n', ...deltas(NO_ANSWER, 5)])).toBe(FRIENDLY);
+  });
+
+  it('a leading emoji, even split across two deltas, and a trailing one, are still the refusal (D-092)', () => {
+    expect(stream(['😔 ', ...deltas(NO_ANSWER, 5)])).toBe(FRIENDLY);
+    expect(stream(['\uD83D', '\uDE14 ', ...deltas(NO_ANSWER, 3), ' 🙏'])).toBe(FRIENDLY);
   });
 
   it.each([1, 4, 50])('an answer streams through unchanged (deltas of %i)', (n) => {

@@ -2845,3 +2845,43 @@ every cell cost two more wordings, each 3 of 3 (`rt-tagalog` had copied
 the example in English; `price-villa` had lost its price to a table), and
 a full run at 56/61. Six probe questions, lines in the morning, tables by
 night; a table document in northwind came back as a table end to end.
+
+## D-092 · An emoji where one fits, asked for once in the base prompt; a refusal stays a refusal however decorated · **Added 2026-10-04**
+
+**Decision:** one paragraph in `buildPrompt()`, after the refusal
+instruction and before the context: "Add an emoji where it fits the
+sentence, for example 👋 in a greeting, ✅ when something is open or
+allowed, ❌ when it is taken or not allowed, 📅 beside a date, 💰 beside a
+price; one or two per reply at most. Never inside a table cell, and none
+in the exact reply above." The replies code writes carry a fixed one (🛏️
+the room list, 💰 the rate card, 📅 the rates-need-a-date sentence; the
+small talk already had 👋 and 😊). Because the model may decorate the
+marker anyway, `isRefusal()` strips whitespace and emoji at both ends
+before comparing, `refusalFilter` keeps holding through a leading emoji
+(even split across two deltas) and a trailing one, and `storedReply()`
+saves a decorated refusal as the EXACT marker, so the unanswered list
+(D-045) still finds it. This changes northwind's prompt by design: the
+baseline is now `plan/baseline/northwind-prompt-post-emoji.txt`. Villa's
+and harbor's tool definitions are byte-identical.
+
+**Why:** the user: "add emoji to bot response to make it more expressive.
+add only emoji when applicable". In the base block, because a documents
+answer at northwind should get one too, and in D-017's shape: what to
+write, with examples, and the two places it must not go (a cell, whose
+first character finds the amount column; the refusal).
+
+**Measured:** tests 353/353 (two refusal cases new); typecheck; battery
+**57/61** (`antecedent`, `rt-leak-2` on 18 October, and the `leak-2`
+control and `lang-tagalog-2` flips), `tool 9/9`, `price 3/3`, `book 5/5`:
+no answer lost to the new paragraph (trap 10). Emoji in 19 of 61 replies:
+💰 4, ✅ 4, 😊 2, 📅 2, 👋 📞 🐾 🐶 once each; none in a table cell. The
+six probes: the model added one to one of its four replies (😊 on the
+Taglish extra-guest answer) and none to the dated tables, which is the
+sparing use asked for.
+
+**Also, D-091 amended (the same change):** `**bold**` is the SECOND and
+last inline shape the chat draws. `parseInline()` in `lib/tables.ts`
+splits it out (both markers on one line, something between, no `*`
+inside; anything else is text) and `reply-text.tsx` puts a bold run in
+`<strong>` as a child, in prose and in a cell. The user: "I'm seeing text
+like **test**"; the model writes it on its own (recorded at Phase 0).

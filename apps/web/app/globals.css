@@ -140,7 +140,7 @@ main { max-width: 820px; margin: 0 auto; padding: 20px; }
    (Phase 4 walk): a tinted header and alternating row stripes, no cell
    borders. Both tints are theme variables, so a tenant's accent colours
    the header (lib/theme.ts) and the stripes follow its background. */
-.reply-table { overflow-x: auto; margin: 8px 0; white-space: normal; }
+.reply-table { overflow-x: auto; margin: 8px 0 14px; white-space: normal; }
 .reply-table table { border-collapse: collapse; font-size: 14px; width: 100%; }
 .reply-table th, .reply-table td { padding: 6px 10px; text-align: left; vertical-align: top; border-left: 1px solid var(--line); }
 .reply-table th:first-child, .reply-table td:first-child { border-left: 0; }

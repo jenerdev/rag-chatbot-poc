@@ -28,6 +28,31 @@ export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'table'; header: string[]; rows: string[][] };
 
+/** A run of a line: plain text, or the inside of `**bold**`. */
+export type Run = { kind: 'text' | 'bold'; text: string };
+
+/**
+ * `**bold**` inside a line (D-091 as amended, the user's choice): the model
+ * writes it on its own, and the asterisks showed as typed. The SECOND and
+ * last inline shape this file knows. The match is strict so prose keeps
+ * its asterisks: both markers on one line, something between them, no `*`
+ * inside. An unmatched `**` is text. The output is runs of STRINGS; the
+ * component puts a bold run in <strong> as a child, never as markup.
+ */
+export function parseInline(text: string): Run[] {
+  const runs: Run[] = [];
+  const bold = /\*\*([^*\n]+?)\*\*/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = bold.exec(text)) !== null) {
+    if (match.index > last) runs.push({ kind: 'text', text: text.slice(last, match.index) });
+    runs.push({ kind: 'bold', text: match[1]! });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) runs.push({ kind: 'text', text: text.slice(last) });
+  return runs;
+}
+
 /** Does this line look like a table row: `| a | b |`, whitespace allowed around it? */
 function isRowLine(line: string): boolean {
   const t = line.trim();

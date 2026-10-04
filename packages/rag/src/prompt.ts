@@ -121,6 +121,16 @@ export function buildPrompt(
         'If the context does not answer the question at all, reply exactly:',
         `"${NO_ANSWER}"`,
         '',
+        // D-092: an emoji where one fits, as an example of what to write
+        // (D-017), with the two places it must not go: a table cell (the
+        // amount column is found by its first character) and the exact
+        // refusal (isRefusal() tolerates one anyway). Changes northwind's
+        // snapshot by design: the baseline is northwind-prompt-post-emoji.txt.
+        'Add an emoji where it fits the sentence, for example 👋 in a greeting,',
+        '✅ when something is open or allowed, ❌ when it is taken or not',
+        'allowed, 📅 beside a date, 💰 beside a price; one or two per reply at',
+        'most. Never inside a table cell, and none in the exact reply above.',
+        '',
         '--- CONTEXT ---',
         context,
         '--- END CONTEXT ---',

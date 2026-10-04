@@ -1143,10 +1143,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-04 — emoji where one fits; **bold** drawn (D-092; D-091 amended)
+- **Did:** the base-prompt paragraph (northwind's baseline is now
+  `northwind-prompt-post-emoji.txt`), fixed emoji on the code-written
+  replies, a refusal tolerant of decoration and saved exact, `**bold**` as
+  `<strong>`. Tests 353/353; battery 57/61, the known set; emoji in 19 of
+  61 replies, none in a cell.
+- **Next:** commit; the three open items.
+
 ### 2026-10-04 — tables Phase 5 (the record)
 - **Did:** D-091; CLAUDE.md (header, layout, rule 1, the convention); flow.md
   11d; plan/tables.md complete. The plan is done on `feat/tables`.
-- **Next:** merge `feat/tables` into `master` when you are ready; the three
+- **Next:** merged into `master` at `6e91499` (fast-forward); the three
   open items above (closed-dates walk, the verify roles check, the nav walk).
 
 ### 2026-10-04 — tables Phase 4: the walk done; request 1, no "(weekend rate)" on every row
