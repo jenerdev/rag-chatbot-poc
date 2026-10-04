@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff clash (2026-10-05, COMPLETE on `feat/staff-clash`, walked by the user; branched from `feat/dashboard`'s head, so merging it brings the dashboard too):**
+**Staff clash (2026-10-05, COMPLETE; walked by the user; merged into `master` at `ccb0eba`, a fast-forward that brought the dashboard with it):**
 [`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
 be born on a night already confirmed for that unit (a trigger, `23P01`,
 words, every door), and the staff list carries `clash` with the Requests
@@ -93,7 +93,7 @@ section's warning and disabled Confirm. Amends D-095's cost line. Four
 - [x] Phase 3, the walk — by the user, 2026-10-05 ("done testing"): a staff booking on a confirmed night refused in words; two pendings on one night, one confirmed, the other warned with Confirm disabled, then cancelled
 - [x] Phase 4 — the record (2026-10-05): D-099, D-095's cost line amended, CLAUDE.md (header, 20 sql files, `taken.ts`, rooms 48), flow.md § 5's bookings row, the plan marked done
 
-**Dashboard (2026-10-05, Phases 0–6 DONE on `feat/dashboard`; the user's browser walk owed, then merge):**
+**Dashboard (2026-10-05, COMPLETE; the user's testing on 2026-10-05 was its walk; merged into `master` at `ccb0eba`, inside the staff-clash fast-forward):**
 [`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
 from the rows the database already holds: needs-attention counts, today's
 check-ins, chat volume and refusals with the open unanswered count, the
@@ -1197,9 +1197,8 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   user); `taken.ts`, `clash` on the list, the screen's warning; every
   suite green, rooms 48, battery 55/61 the known set; the user's walk;
   D-099.
-- **Next:** merge. `feat/staff-clash` contains `feat/dashboard`, so one
-  merge into master brings both (the dashboard's own walk was the user's
-  testing on 2026-10-05).
+- **Merged** into `master` at `ccb0eba` (fast-forward), the dashboard
+  with it, by the user's instruction.
 
 ### 2026-10-05 — dashboard Phase 6, the record, on `feat/dashboard`
 - **Did:** D-098, CLAUDE.md, flow.md § 5, the plan's status.
