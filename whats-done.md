@@ -7260,3 +7260,10 @@ page, the screen, `promos.ts` and the new counts (verify 116, isolation
 31, rooms 45), the commands their counts; flow.md § 5 the promo routes;
 plan/promos.md marked complete with the walk owed. Seven phases in one
 day on `feat/promos`, five commits before this one.
+
+## Promos: the walk, and the merge · 2026-10-04
+
+**What:** the user walked Phase 5's five steps on the dev server ("done
+testing") and asked for the merge. `feat/promos` fast-forwarded into
+`master` at `263e9d7`: seven commits, one per phase, plus the plan's.
+Nothing pushed.

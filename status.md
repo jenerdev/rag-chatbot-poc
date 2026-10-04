@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Promos (2026-10-04, COMPLETE on `feat/promos`, not merged; the walk owed):**
+**Promos (2026-10-04, COMPLETE; walked by the user; merged into `master` at `263e9d7`):**
 [`plan/promos.md`](./plan/promos.md). Discounts a tenant defines (fixed or
 percent, a validity range over the stay dates, an optional code, an optional
 usage limit), applied by the database in the one place every price is made,
@@ -92,7 +92,7 @@ one. § 7 has five questions with recommendations. No chatbot change.
 - [x] Phase 2 — `@rag/bookings` (2026-10-04): `promos.ts` (list with uses, create, update, retire, delete-unused), `quoteRequest`/`requestBooking` take a code, `quote`/`createBookings` a promo id, `listBookings` the promo; rooms **45/45** (21a–21d), isolation 30/30 both ways, tests and typecheck green
 - [x] Phase 3 — routes and permissions (2026-10-04): `promos:read/write` (ADMIN), `/api/t/[tenant]/promos` + `/[id]`, the quote and request schemas take `promoCode` / `promoId`; web tests 58/58, typecheck; the public quote smoke-tested over HTTP
 - [x] Phase 4 — screens (2026-10-04, code): the Promos screen and page, the nav link, the booking page's code field with the discount line and the server's words, the staff picker with the automatic promo pre-selected and the row naming the promo; typecheck, web tests 58/58, pages 200/200/404 on the dev server. The walk is Phase 5's
-- [ ] Phase 5 — the walls (2026-10-04, DONE): isolation 16c, 31/31 both ways; verify 115/116; rooms 45/45; pipeline isolation both ways; three baselines byte-identical; battery 56/61, the known set. **The walk is owed to the user** (the questions are in whats-done.md under "Promos, Phase 5")
+- [x] Phase 5 — the walls and the walk (2026-10-04): isolation 16c, 31/31 both ways; verify 115/116; rooms 45/45; pipeline isolation both ways; three baselines byte-identical; battery 56/61, the known set; the walk done by the user ("done testing")
 - [x] Phase 6 — the record (2026-10-04): D-097; CLAUDE.md (header, layout, counts); flow.md § 5; the plan marked complete, the walk owed
 
 **Tables in the reply (2026-10-04, COMPLETE; merged into `master` at `6e91499`):**
