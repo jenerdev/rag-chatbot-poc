@@ -1105,8 +1105,17 @@ console.log = (...args) => {
   realLog(...args);
 };
 
-/** Ask a sequence of turns in one conversation; return the last answer. */
+/**
+ * Ask a sequence of turns in one conversation; return the last answer.
+ *
+ * The tenant is RELOADED per case: a tenant token lives five minutes
+ * (D-039) and a full run takes ten, and the contexts minted at start-up
+ * carried the whole run only while this machine's clock ran ahead of the
+ * server's. A run died at case 57 with "JWT expired" (dashboard Phase 0,
+ * 2026-10-04); a fresh token per case cannot.
+ */
 async function ask(tenant, turns) {
+  tenant = await loadTenant(tenant.slug);
   let conversationId = null;
   let last = null;
   for (const turn of turns) {

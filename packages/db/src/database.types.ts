@@ -711,6 +711,28 @@ export interface Database {
     };
     Views: Record<never, never>;
     Functions: {
+      /** schema-dashboard.sql (D-098): the tenant's page in one JSON; refuses a non-member; `bookings.money` null unless admin */
+      tenant_dashboard: {
+        Args: { p_tenant_id: number; p_days?: number };
+        Returns: Json;
+      };
+      /** schema-dashboard.sql (D-098): one row per tenant, counts only, super users only */
+      platform_dashboard: {
+        Args: Record<string, never>;
+        Returns: {
+          tenant_id: number;
+          slug: string;
+          business_name: string;
+          archived_at: string | null;
+          members: number;
+          documents: number;
+          conversations_30d: number;
+          refusals_30d: number;
+          open_unanswered: number;
+          pending_requests: number;
+          confirmed_stays_30d: number;
+        }[];
+      };
       /** schema-promos.sql (D-097): distinct pending or confirmed requests that used the promo */
       promo_uses: {
         Args: { p_tenant_id: number; p_promo_id: number; p_except_group?: string | null; p_except_id?: number | null };

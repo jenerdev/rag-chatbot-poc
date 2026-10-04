@@ -1891,6 +1891,57 @@ async function rolesChecks() {
         `delete ${selfDelete.error?.code ?? 'DELETED'} · demote ${selfDemote.error?.code ?? 'DEMOTED'} · second owner ${second.data?.length ?? second.error?.code} · then delete ${now.data?.length ?? now.error?.code}`,
       );
     }
+
+    // --- dashboard (plan/dashboard.md Phase 1, D-098) ---------------------------
+    // The roles probe has an owner, an admin, a staff member and a super user
+    // already. It gets the bookings application (so `bookings` is an object
+    // and the money gate can be seen), one conversation and one refusal.
+    {
+      const app = await supabase.from('tenant_applications').insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+      const { data: conv } = await supabase.from('conversations').insert({ tenant_id: probe.id }).select('id').single();
+      await supabase.from('messages').insert([
+        { tenant_id: probe.id, conversation_id: conv?.id, role: 'user', content: 'verify.mjs: a question' },
+        { tenant_id: probe.id, conversation_id: conv?.id, role: 'assistant', content: "I don't know based on the documents I have." },
+      ]);
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+
+      // 117. tenant_dashboard: a chat token is refused (42501); the staff
+      //      member's counts equal the truth just seeded (1 conversation, 1
+      //      visitor message, 1 refusal, 1 open, 30 days of buckets, 3 members
+      //      by role); its money is null; the owner's money is an object;
+      //      another tenant's id on the staff token is refused.
+      const chatCall = await asToken(chatToken(probe.id)).rpc('tenant_dashboard', { p_tenant_id: probe.id, p_days: 30 });
+      const staffCall = await as.staff.rpc('tenant_dashboard', { p_tenant_id: probe.id, p_days: 30 });
+      const ownerCall = await as.owner.rpc('tenant_dashboard', { p_tenant_id: probe.id, p_days: 30 });
+      const foreign = await as.staff.rpc('tenant_dashboard', { p_tenant_id: villaRow?.id ?? -1, p_days: 30 });
+      const d = staffCall.data;
+      check(
+        !app.error && chatCall.error?.code === '42501' && !staffCall.error
+          && d?.chat?.conversations === 1 && d?.chat?.visitorMessages === 1 && d?.chat?.refusals === 1 && d?.chat?.openUnanswered === 1
+          && d?.chat?.perDay?.length === 30 && d?.team?.owners === 1 && d?.team?.admins === 1 && d?.team?.staff === 1
+          && d?.bookings !== null && d?.bookings?.money === null && d?.bookings?.window?.days === 30
+          && ownerCall.data?.bookings?.money?.confirmed === 0 && Array.isArray(ownerCall.data?.bookings?.money?.perWeek)
+          && foreign.error?.code === '42501',
+        'dashboard: a chat token refused; the staff counts equal the truth; money null for staff, present for the owner; another tenant refused',
+        `app ${app.error?.message ?? 'ok'} · chat ${chatCall.error?.code ?? 'ANSWERED'} · staff ${staffCall.error?.message ?? JSON.stringify(d?.chat)} team ${JSON.stringify(d?.team)} money ${JSON.stringify(d?.bookings?.money)} · owner money ${JSON.stringify(ownerCall.data?.bookings?.money)?.slice(0, 60)} · foreign ${foreign.error?.code ?? 'ANSWERED'}`,
+      );
+
+      // 118. platform_dashboard: the super user gets every tenant with counts
+      //      and no content column; this probe's row says 3 members, 1
+      //      conversation, 1 refusal, 1 open; a tenant token is refused.
+      const superClient = asToken(platformToken(ids.super));
+      const strip = await superClient.rpc('platform_dashboard');
+      const mine = strip.data?.find((r) => r.tenant_id === probe.id);
+      const keys = mine ? Object.keys(mine).sort().join(',') : '';
+      const ownerStrip = await as.owner.rpc('platform_dashboard');
+      check(
+        !strip.error && mine?.members === 3 && mine?.conversations_30d === 1 && mine?.refusals_30d === 1 && mine?.open_unanswered === 1 && mine?.pending_requests === 0
+          && keys === 'archived_at,business_name,confirmed_stays_30d,conversations_30d,documents,members,open_unanswered,pending_requests,refusals_30d,slug,tenant_id'
+          && ownerStrip.error?.code === '42501',
+        'platform_dashboard: the super user gets counts only, this tenant 3 members / 1 conversation / 1 refusal; a tenant token refused',
+        `${strip.error?.message ?? `${strip.data?.length} tenants`} · mine ${JSON.stringify(mine)} · owner ${ownerStrip.error?.code ?? 'ANSWERED'}`,
+      );
+    }
   } catch (error) {
     check(false, 'roles: probe setup', error.message);
   } finally {

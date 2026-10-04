@@ -7267,3 +7267,25 @@ day on `feat/promos`, five commits before this one.
 testing") and asked for the merge. `feat/promos` fast-forwarded into
 `master` at `263e9d7`: seven commits, one per phase, plus the plan's.
 Nothing pushed.
+
+## Dashboard, Phase 0: the baseline · done 2026-10-04, on `feat/dashboard`
+
+**What:** every suite on `003ef8b`, § 7's six questions answered with every
+recommendation. verify 115/116 (the known item); rooms 45/45; both
+isolation suites both ways; tests 13/14/5/99/355/58; typecheck; the
+three prompt baselines byte-identical; battery **56/61**, the known set.
+
+**Two battery runs died before the third passed**, on different transient
+errors at cases 60 and 57: "fetch failed" reaching the database, then
+"JWT expired" inside `bookingsConfig()`. The battery minted each tenant
+ONCE at start and a token lives five minutes (D-039), so a slow run could
+cross the line; this machine's clock is 1 s from the server's, so drift
+is not the reason the earlier ten-minute runs passed, and that question
+is left open. `ask()` now reloads the tenant per case, so a fresh token
+is minted every case and the run cannot depend on the answer.
+
+**Also written, awaiting the user's SQL run:** `schema-dashboard.sql` (the
+19th file: `tenant_dashboard()`, security invoker, refusing a non-member,
+money for admins only, every bucket in the tenant's day;
+`platform_dashboard()`, the eleventh definer, counts only), the typed
+`Functions`, verify 117–118.

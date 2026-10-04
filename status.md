@@ -79,6 +79,24 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
+**Dashboard (planned 2026-10-04, not started):**
+[`plan/dashboard.md`](./plan/dashboard.md). One page, `/t/<slug>/admin/dashboard`,
+from the rows the database already holds: needs-attention counts, today's
+check-ins, chat volume and refusals with the open unanswered count, the
+knowledge base, bookings by status and source, stays per week, occupancy
+(per_room), promo uses, and revenue for owners and admins; three hand-drawn
+SVG bar charts, no library; one SQL function per page, gated on the caller's
+role inside; a counts-only Pulse strip on `/platform`. § 7 has six questions
+with recommendations. No chatbot change.
+- [ ] § 7 answered
+- [ ] Phase 0 — baseline
+- [ ] Phase 1 — SQL (`schema-dashboard.sql`, the 19th file; two functions)
+- [ ] Phase 2 — `@rag/pipeline` (`dashboard.ts`)
+- [ ] Phase 3 — routes and permissions (`dashboard:read`)
+- [ ] Phase 4 — screens (`bar-chart.tsx`, the Dashboard, the Pulse strip)
+- [ ] Phase 5 — the walls and the walk
+- [ ] Phase 6 — the record (D-098)
+
 **Promos (2026-10-04, COMPLETE; walked by the user; merged into `master` at `263e9d7`):**
 [`plan/promos.md`](./plan/promos.md). Discounts a tenant defines (fixed or
 percent, a validity range over the stay dates, an optional code, an optional
@@ -1158,6 +1176,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — dashboard Phase 0 (baseline) and Phase 1 written, on `feat/dashboard`
+- **Did:** § 7 answered, every recommendation taken. Every suite green;
+  baselines identical; battery 56/61 (the known set) on the third run, the
+  first two dying on transient errors; `ask()` now reloads the tenant per
+  case. `schema-dashboard.sql`, the typed functions and verify 117–118 are
+  written.
+- **Owed to the user:** run `packages/db/sql/schema-dashboard.sql`; then
+  verify measures Phase 1.
 
 ### 2026-10-04 — promos Phase 6 (the record)
 - **Did:** D-097; CLAUDE.md (header paragraph, layout lines, the counts);
