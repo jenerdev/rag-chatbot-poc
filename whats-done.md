@@ -7222,3 +7222,32 @@ the dev server `/t/harbor/admin/promos` and `/t/villa/admin/promos` are
 200, `/t/northwind/admin/promos` the 404 (no bookings application),
 `/t/harbor/book` 200, the setup route 401 without a session. The walk,
 Phase 5, is the user's.
+
+## Promos, Phase 5: the walls · done 2026-10-04; the walk is owed to the user
+
+**What:** bookings isolation 16c: B's promo is unlisted to A's `listPromos`,
+null to A's `updatePromo`, false to A's `retirePromo` and `deletePromo`,
+"No such promo code." to A's customer quoting with B's code, "No such
+promo." to A's staff booking with B's promo id, and B's promo is as it
+was; **31/31 both ways**. verify 115/116 (the known roles item; 111–116
+green). Rooms 45/45. Pipeline isolation both ways. Northwind's prompt
+(post-emoji baseline), villa's and harbor's tool definitions byte-identical
+(plan Rule 5: no prompt text, no tool text). Battery **56/61**: the known
+set (`antecedent`, `rt-leak-2` and `book-for-me-harbor` on this date, the
+`leak-2` control and `lang-tagalog-2` flips), `tool 9/9 · price 3/3`.
+
+**Owed to the user, with `pnpm dev` running:** as an owner on
+`/t/harbor/admin/promos`, add "Off season" (percent 10, stays from today
+for 60 days, no code) and "SUMMER500" (fixed 500, a code, limit 1); see the
+"automatic" badge and 0 uses. On `/t/harbor/book`, quote a stay in range:
+the Off season line and the lower total appear without a code; type
+SUMMER500: the ₱500 line replaces it on the first night; type NOPE: the
+server's words, the price unchanged; send a request with SUMMER500: the
+receipt shows the discount; a second request with SUMMER500: "has reached
+its limit" (the quote says so as you type). On the Bookings screen: the
+request row names the promo; the staff form's picker has Off season
+pre-selected and shows "0/1 used" for SUMMER500; book a room with it: the
+preview's discount line, then the row. Back on Promos: uses 1 of 1; Retire
+SUMMER500; Delete is offered only for an unused promo. On
+`/t/villa/admin/promos` the page is there; on `/t/northwind/admin/promos`
+it is the 404.

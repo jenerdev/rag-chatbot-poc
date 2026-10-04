@@ -92,7 +92,7 @@ one. § 7 has five questions with recommendations. No chatbot change.
 - [x] Phase 2 — `@rag/bookings` (2026-10-04): `promos.ts` (list with uses, create, update, retire, delete-unused), `quoteRequest`/`requestBooking` take a code, `quote`/`createBookings` a promo id, `listBookings` the promo; rooms **45/45** (21a–21d), isolation 30/30 both ways, tests and typecheck green
 - [x] Phase 3 — routes and permissions (2026-10-04): `promos:read/write` (ADMIN), `/api/t/[tenant]/promos` + `/[id]`, the quote and request schemas take `promoCode` / `promoId`; web tests 58/58, typecheck; the public quote smoke-tested over HTTP
 - [x] Phase 4 — screens (2026-10-04, code): the Promos screen and page, the nav link, the booking page's code field with the discount line and the server's words, the staff picker with the automatic promo pre-selected and the row naming the promo; typecheck, web tests 58/58, pages 200/200/404 on the dev server. The walk is Phase 5's
-- [ ] Phase 5 — the walls and the walk
+- [ ] Phase 5 — the walls (2026-10-04, DONE): isolation 16c, 31/31 both ways; verify 115/116; rooms 45/45; pipeline isolation both ways; three baselines byte-identical; battery 56/61, the known set. **The walk is owed to the user** (the questions are in whats-done.md under "Promos, Phase 5")
 - [ ] Phase 6 — the record (D-097)
 
 **Tables in the reply (2026-10-04, COMPLETE; merged into `master` at `6e91499`):**
@@ -1158,6 +1158,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — promos Phase 5 (the walls), on `feat/promos`
+- **Did:** isolation 16c (B's promo unlisted, untouchable, its code unknown
+  to A), 31/31 both ways; verify 115/116; rooms 45/45; pipeline isolation
+  both ways; baselines byte-identical; battery 56/61, the known set.
+- **Owed to the user:** the walk (whats-done.md, "Promos, Phase 5").
+- **Next:** Phase 6, the record (D-097, CLAUDE.md, flow.md).
 
 ### 2026-10-04 — promos Phase 4 (the screens), on `feat/promos`
 - **Did:** `promos-screen.tsx` + page, the nav link, the booking page's code

@@ -44,6 +44,11 @@ import {
   listCalendar,
   listImages,
   roomPhotos,
+  createPromo,
+  deletePromo,
+  listPromos,
+  retirePromo,
+  updatePromo,
   listRequests,
   listSlots,
   listUnits,
@@ -354,6 +359,34 @@ try {
       !names.includes(bRoom.name) && !urls.some((u) => u.includes(bPhoto.path)),
       "rooms A: roomPhotos() lists A's rooms only, none of B's photos",
       `rooms ${names.join(', ')} · urls ${urls.length}`,
+    );
+  }
+
+  // 16c. Promos (D-097): B's promo is invisible to A's list, untouchable by
+  //      A's edit, retire and delete, "No such promo code" to A's customer
+  //      quoting with B's code, and "No such promo." to A's staff booking
+  //      with B's promo id. B's promo is as it was.
+  {
+    const bPromo = await createPromo(b, { name: 'B only', kind: 'percent', value: 1000, validFrom: probeDate, validTo: probeDate, code: 'B-ONLY' });
+    const aList = await listPromos(a, { all: true });
+    const edited = await updatePromo(a, bPromo.id, { name: 'hijacked' });
+    const retired = await retirePromo(a, bPromo.id);
+    const deleted = await deletePromo(a, bPromo.id);
+    const quoted = await quoteRequest(chat(a), { slotId: aNight.id, rooms: [{ unitId: aRoom.id, guests: 1 }], checkIn: probeDate, nights: 1, promoCode: 'B-ONLY' });
+    let booked = null;
+    try {
+      await createBookings(a, { unitId: aRoom.id, guestCount: 1, slotId: aNight.id, date: probeDate, guestName: 'A with B promo', promoId: bPromo.id });
+    } catch (error) {
+      booked = error;
+    }
+    const { data: still } = await supabase.from('promos').select('name, active').eq('id', bPromo.id).single();
+    check(
+      aList.every((p) => p.id !== bPromo.id) && edited === null && retired === false && deleted === false
+        && quoted.promo === null && quoted.discount === 0 && quoted.promoMessage === 'No such promo code.'
+        && booked instanceof BookingInputError && booked.message === 'No such promo.'
+        && still?.name === 'B only' && still?.active === true,
+      "promos A: B's promo is unlisted, unedited, unretired, undeleted; B's code is no code to A's customer; B's id no promo to A's staff",
+      `list ${aList.length} · edit ${edited} · retire ${retired} · delete ${deleted} · quote "${quoted.promoMessage}" · book ${booked?.message ?? 'BOOKED'} · B still "${still?.name}" active ${still?.active}`,
     );
   }
 
