@@ -79,6 +79,19 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
+**Staff requests (planned 2026-10-05, not started):**
+[`plan/staff-requests.md`](./plan/staff-requests.md). Every booking gets
+a group and a reference from ONE SQL function (`booking_reference()`,
+called by `request_booking()` and by a fill trigger; a counted backfill),
+and the Requests section lists every pending stay, web or staff, decided
+with the same buttons. Four § 7 questions with recommendations.
+- [ ] § 7 answered
+- [ ] Phase 0 — baseline
+- [ ] Phase 1 — SQL (`schema-staff-requests.sql`, the 21st file; the backfill; rooms +4)
+- [ ] Phase 2 — the package and the screen
+- [ ] Phase 3 — the walls and the walk
+- [ ] Phase 4 — the record (D-100)
+
 **Staff clash (2026-10-05, COMPLETE; walked by the user; merged into `master` at `ccb0eba`, a fast-forward that brought the dashboard with it):**
 [`plan/staff-clash.md`](./plan/staff-clash.md). A pending booking cannot
 be born on a night already confirmed for that unit (a trigger, `23P01`,
