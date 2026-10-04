@@ -79,7 +79,7 @@
   Bookings; admin adds Rooms (harbor only) and Holidays; owner adds
   Members; logged out sees Chat, Book (villa, harbor) and Staff login.
 
-**Staff requests (2026-10-05, COMPLETE on `feat/staff-requests`, walked by the user; merge owed):**
+**Staff requests (2026-10-05, COMPLETE; walked by the user; merged into `master` at `2fd830b`, fast-forward):**
 [`plan/staff-requests.md`](./plan/staff-requests.md). Every booking gets
 a group and a reference from ONE SQL function (`booking_reference()`,
 called by `request_booking()` and by a fill trigger; a counted backfill),
@@ -1213,7 +1213,8 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   first rolled back on my caller check, the repaired version fixed the
   one split group); staff stays in Requests; every suite green, rooms 50,
   battery 53/61 the known set; the user's walk; D-100.
-- **Next:** merge `feat/staff-requests` into master.
+- **Merged** into `master` at `2fd830b` (fast-forward), by the user's
+  instruction.
 
 ### 2026-10-05 — staff clash, Phases 0–4, on `feat/staff-clash`
 - **Did:** the plan; the trigger (`schema-taken-span.sql`, run by the
