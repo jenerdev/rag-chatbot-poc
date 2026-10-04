@@ -149,6 +149,12 @@ function BookingRow({
       </div>
       {/* Notes are a React child, so whatever staff typed is escaped (CLAUDE.md § Conventions). */}
       {booking.notes && <div className="booking-notes">{booking.notes}</div>}
+      {/* D-096: what staff wrote when they confirmed or cancelled it. */}
+      {booking.decisionNote && (
+        <div className="booking-notes decision-note">
+          {booking.status === 'cancelled' ? 'Cancelled' : 'Confirmed'}: {booking.decisionNote}
+        </div>
+      )}
     </div>
   );
 }
@@ -203,6 +209,12 @@ function RequestRow({
       )}
       {/* Customer-typed notes are a React child, so they are escaped. */}
       {request.notes && <div className="booking-notes">{request.notes}</div>}
+      {/* D-096: what staff wrote when they decided it. */}
+      {request.decisionNote && (
+        <div className="booking-notes decision-note">
+          {request.status === 'cancelled' ? 'Declined' : 'Confirmed'}: {request.decisionNote}
+        </div>
+      )}
     </div>
   );
 }
@@ -421,12 +433,19 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   const cancel = useCallback(
     async (booking: BookingSummary) => {
-      if (!window.confirm(`Cancel ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}?`)) return;
+      // D-096: the prompt is both the confirmation and the note. Esc or
+      // Cancel on it aborts; OK with nothing typed cancels with no note.
+      const note = window.prompt(`Cancel ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}?\n\nReason (optional):`, '');
+      if (note === null) return;
       setNotice(null);
       setBusy(true);
       let response: Response | null = null;
       try {
-        response = await fetch(`${api}/bookings/${booking.id}`, { method: 'DELETE' });
+        response = await fetch(`${api}/bookings/${booking.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'cancel', note }),
+        });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
         setNotice({ message: `Cancelled ${booking.slot} on ${dayLabel(booking.date)}. The slot is free again.`, kind: 'ok' });
@@ -444,6 +463,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // confirmed booking holds the span) arrives with its own sentence.
   const confirmOne = useCallback(
     async (booking: BookingSummary) => {
+      const note = window.prompt(`Confirm ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}?\n\nNote (optional):`, '');
+      if (note === null) return;
       setNotice(null);
       setBusy(true);
       let response: Response | null = null;
@@ -451,7 +472,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         response = await fetch(`${api}/bookings/${booking.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'confirm' }),
+          body: JSON.stringify({ action: 'confirm', note }),
         });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
@@ -470,7 +491,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const decide = useCallback(
     async (req: BookingRequest, action: 'confirm' | 'decline') => {
       const what = `${req.reference} for ${req.guestName}`;
-      if (action === 'decline' && !window.confirm(`Decline ${what}?`)) return;
+      // D-096: the prompt is both the confirmation and the note.
+      const note = window.prompt(`${action === 'confirm' ? 'Confirm' : 'Decline'} ${what}?\n\n${action === 'confirm' ? 'Note' : 'Reason'} (optional):`, '');
+      if (note === null) return;
       setNotice(null);
       setBusy(true);
       let response: Response | null = null;
@@ -478,7 +501,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         response = await fetch(`${api}/bookings/requests/${req.groupId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, note }),
         });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');

@@ -1143,6 +1143,16 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-04 — a note on every decision (D-096), code done
+- **Did:** `decision_note` (sql file 17), the three decisions take a note,
+  `PATCH /bookings/[id]` confirms or cancels with one, the screen prompts
+  for it and shows it. Tests and typecheck green.
+- **Owed to the user, in this order:** run `schema-pending-default.sql`
+  and `schema-decision-note.sql`; say so, and the rooms (4c), isolation
+  and battery suites run. Do not open the Bookings screen before the
+  second file: its list selects the new column.
+- **Next:** the suites after the migration; commit; the three open items.
+
 ### 2026-10-04 — a staff booking is born pending (D-095)
 - **Did:** pending by default in `createBookings()`, no `status` in the route's
   schema, `confirmBooking()` + `PATCH /bookings/[id]`, a Confirm button on

@@ -343,7 +343,7 @@ export async function listBookings(
   let query = tenant.db
     .from('bookings')
     .select(
-      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
+      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, decision_note, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
     )
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
@@ -370,6 +370,7 @@ export async function listBookings(
     guestPhone: b.guest_phone,
     guestCount: b.guest_count,
     notes: b.notes,
+    decisionNote: b.decision_note,
     price: b.price,
     basePrice: b.base_price,
     extraGuestPrice: b.extra_guest_price,
@@ -595,13 +596,13 @@ function writeError(error: { code?: string; message: string }, date: string): Er
  * (plan.md Phase 3, step 6). Cancelling an already-cancelled booking is `true`:
  * the outcome the caller asked for is true.
  */
-export async function cancelBooking(tenant: BookingTenant, id: unknown): Promise<boolean> {
+export async function cancelBooking(tenant: BookingTenant, id: unknown, note?: unknown): Promise<boolean> {
   await requireConfig(tenant);
   const bookingId = positiveInt(id, 'Booking id');
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .update({ status: 'cancelled' })
+    .update({ status: 'cancelled', decision_note: decisionNote(note) })
     .eq('tenant_id', tenant.id)
     .eq('id', bookingId)
     .select('id');
@@ -621,9 +622,10 @@ export async function cancelBooking(tenant: BookingTenant, id: unknown): Promise
  * words. Confirming a confirmed booking is `true`; a cancelled one, or a
  * booking that is not this tenant's, is `false`, one answer on purpose.
  */
-export async function confirmBooking(tenant: BookingTenant, id: unknown): Promise<boolean> {
+export async function confirmBooking(tenant: BookingTenant, id: unknown, note?: unknown): Promise<boolean> {
   await requireConfig(tenant);
   const bookingId = positiveInt(id, 'Booking id');
+  const decision = decisionNote(note);
 
   const { data: row, error: readError } = await tenant.db
     .from('bookings')
@@ -634,7 +636,7 @@ export async function confirmBooking(tenant: BookingTenant, id: unknown): Promis
   if (readError) throw new Error(`Could not read the booking: ${readError.message}`);
   if (!row || row.status === 'cancelled') return false;
 
-  let update = tenant.db.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', tenant.id).in('status', ['pending', 'confirmed']);
+  let update = tenant.db.from('bookings').update({ status: 'confirmed', decision_note: decision }).eq('tenant_id', tenant.id).in('status', ['pending', 'confirmed']);
   update = row.group_id ? update.eq('group_id', row.group_id) : update.eq('id', bookingId);
   const { data, error } = await update.select('id');
   if (error?.code === '23P01') {
@@ -646,6 +648,20 @@ export async function confirmBooking(tenant: BookingTenant, id: unknown): Promis
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} confirmed #${bookingId}${row.group_id ? ` (group ${row.group_id}, ${data.length} row(s))` : ''}`);
   return data.length > 0;
+}
+
+/**
+ * The note staff may leave when they confirm, cancel or decline (D-096):
+ * trimmed, at most 500 characters, empty means none. Bounded here AND by
+ * `bookings_decision_note_length` in Postgres.
+ */
+export function decisionNote(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new BookingInputError('The note must be text.');
+  const text = value.trim();
+  if (text === '') return null;
+  if (text.length > 500) throw new BookingInputError('The note is too long (500 characters at most).');
+  return text;
 }
 
 /** 'cancelled' is not a status you create a booking in. */

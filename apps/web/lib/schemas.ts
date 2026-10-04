@@ -214,11 +214,23 @@ export const bookRequestSchema = bookQuoteSchema.extend({
   website: z.string().optional(),
 });
 
-/** Staff decide a request: the whole group, one action. */
+/** The optional note on a decision (D-096): the package bounds it too. */
+const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish();
+
+/** Staff decide a request: the whole group, one action, an optional note. */
 export const decideRequestSchema = z.object({
   action: z.enum(['confirm', 'decline'], {
     errorMap: () => ({ message: 'action is "confirm" or "decline"' }),
   }),
+  note: decisionNote,
+});
+
+/** Staff confirm or cancel ONE booking (D-095, D-096): PATCH /bookings/[id]. */
+export const bookingActionSchema = z.object({
+  action: z.enum(['confirm', 'cancel'], {
+    errorMap: () => ({ message: 'action is "confirm" or "cancel"' }),
+  }),
+  note: decisionNote,
 });
 
 /** A holiday, peak or closed day (D-080). Surcharge in CENTAVOS; a closed day has none. */

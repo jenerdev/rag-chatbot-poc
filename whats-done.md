@@ -7078,3 +7078,14 @@ isolation "same slot again is a 409" check, seeding with no status, made
 a pending row instead of a 409 and left it in villa's real calendar,
 twice; both deleted by id (#4031, #4040), and the check now seeds
 confirmed. **Owed:** the SQL file, and the screen walk.
+
+## A note on every decision · code done 2026-10-04 (D-096); the migration is owed
+
+**What:** `decision_note` on bookings; `confirmBooking`, `cancelBooking`
+and the request decision take a note; `PATCH /bookings/[id]` gains
+`action: 'cancel'` and `note`; the screen's three prompts ask for one and
+the rows show it. **Observed:** tests 99/355/56, typecheck clean.
+**Owed:** `sql/schema-decision-note.sql` (and `schema-pending-default.sql`
+from D-095) run by the user; THEN rooms (check 4c), isolation and the
+battery. Until the column exists every bookings list selects a missing
+column, so run it before opening the Bookings screen.

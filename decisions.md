@@ -3002,3 +3002,31 @@ confirmed: with no status it quietly created a pending row, twice, and
 both were deleted by id); battery **57/61**, the known set, `tool 9/9`,
 both fixtures seeded confirmed. Owed to the user: run the SQL file, and
 the screen walk (create → "pending" with Confirm → confirmed).
+
+## D-096 · A note on the decision: what staff wrote when they confirmed, cancelled or declined · **Added 2026-10-04**
+
+**Decision:** one nullable column, `bookings.decision_note` (at most 500
+characters, `sql/schema-decision-note.sql`, the 17th file, run by the
+user), written by the staff update that changes the status and by
+nothing else: `cancelBooking()`, `confirmBooking()` and the request
+decision (`confirmRequest` / `declineRequest`, every row of the group)
+take an optional `note`, trimmed, empty means none, bounded in code
+(`decisionNote()`) and in Postgres. `PATCH /bookings/[id]` takes
+`{ action: 'confirm' | 'cancel', note? }` (DELETE still cancels, with no
+note); `PATCH /bookings/requests/[groupId]` takes `note` too. On the
+screen the prompt IS the confirmation: Confirm, Cancel and Decline each
+open `window.prompt` with "Note" or "Reason (optional)"; Esc aborts, OK
+with nothing typed decides with no note. The row shows it under its
+notes as "Confirmed: …", "Cancelled: …" or "Declined: …". A customer
+cannot write it: `request_booking()` does not name it and a chat token
+has no update on `bookings`.
+
+**Why:** the user: "add notes field when cancelling, confirming,
+declining booking". A separate column, not appended to `notes`: the
+booking's own notes are what the guest or staff said when it was made,
+and the decision is a different moment, shown with its status.
+
+**Measured:** tests 99/355/56; typecheck (`database.types.ts` gained the
+column; `Insert` never, `Update` text). The rooms suite's check 4c
+(the note stored trimmed on the whole group, shown on a cancel, 501
+characters refused) and the live suites run once the SQL file is in.

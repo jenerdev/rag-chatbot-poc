@@ -40,6 +40,7 @@ import {
   setCalendarDay,
   checkRoomAvailability,
   createAccommodation,
+  cancelBooking,
   confirmBooking,
   createBookings,
   createSlot,
@@ -200,14 +201,26 @@ try {
     const first = await createBookings(probe, { rooms: [{ unitId: garden.id, guestCount: 1 }, { unitId: family.id, guestCount: 2 }], slotId: night.id, date: weekLater, guestName: 'Pending A' });
     const second = await createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: weekLater, guestName: 'Pending B' });
     const bothPending = first.bookings.every((b) => b.status === 'pending') && second.bookings[0].status === 'pending';
-    const confirmedFirst = await confirmBooking(probe, first.bookings[0].id);
-    const afterFirst = (await listBookings(probe, { from: weekLater, to: weekLater })).filter((b) => b.groupId === first.groupId).map((b) => b.status).join(',');
+    const confirmedFirst = await confirmBooking(probe, first.bookings[0].id, '  Paid in full  ');
+    const firstRows = (await listBookings(probe, { from: weekLater, to: weekLater })).filter((b) => b.groupId === first.groupId);
+    const afterFirst = firstRows.map((b) => b.status).join(',');
     const confirmSecond = await thrown(() => confirmBooking(probe, second.bookings[0].id));
     const chatConfirm = await thrown(() => confirmBooking(chatProbe, first.bookings[1].id));
     check(
       bothPending && confirmedFirst === true && afterFirst === 'confirmed,confirmed' && confirmSecond instanceof BookingConflictError && chatConfirm !== undefined,
       'D-095: born pending, holding nothing; Confirm takes the whole group; the clash is a 409 at confirm; a chat token cannot confirm',
       `pending ${bothPending} · first ${confirmedFirst} → ${afterFirst} · second ${confirmSecond?.constructor?.name} · chat ${chatConfirm?.constructor?.name ?? chatConfirm}`,
+    );
+    // 4c. D-096: the note on the decision, trimmed, on every row of the group;
+    //     a cancel with a reason keeps it; too long is refused in words.
+    const noteOnBoth = firstRows.map((b) => b.decisionNote).join('|');
+    const cancelledSecond = await cancelBooking(probe, second.bookings[0].id, 'Guest changed plans');
+    const secondRow = (await listBookings(probe, { from: weekLater, to: weekLater })).find((b) => b.id === second.bookings[0].id);
+    const tooLong = await thrown(() => cancelBooking(probe, first.bookings[0].id, 'x'.repeat(501)));
+    check(
+      noteOnBoth === 'Paid in full|Paid in full' && cancelledSecond === true && secondRow?.status === 'cancelled' && secondRow?.decisionNote === 'Guest changed plans' && tooLong instanceof BookingInputError,
+      'D-096: the decision note is stored trimmed on the whole group, shown on a cancel, and bounded',
+      `confirm "${noteOnBoth}" · cancel ${secondRow?.status} "${secondRow?.decisionNote}" · 501 chars: ${tooLong?.constructor?.name}`,
     );
   }
 

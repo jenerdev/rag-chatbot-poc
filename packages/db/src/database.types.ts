@@ -512,6 +512,8 @@ export interface Database {
           guest_phone: string | null;
           guest_count: number | null;
           notes: string | null;
+          /** schema-decision-note.sql (D-096): what staff wrote when they confirmed, cancelled or declined; at most 500 characters */
+          decision_note: string | null;
           /** centavos, the TOTAL, set by the insert trigger from unit_quote(); null for whole_resort and for old rows */
           price: number | null;
           /** the rate part and the extra-guest part of `price` (schema-extra-guests.sql); null likewise */
@@ -541,6 +543,8 @@ export interface Database {
           guest_phone?: string | null;
           guest_count?: number | null;
           notes?: string | null;
+          /** written by the decision, never at creation */
+          decision_note?: never;
           /** computed by the trigger, which overwrites anything supplied (plan Rule 2) */
           price?: never;
           base_price?: never;
@@ -565,6 +569,7 @@ export interface Database {
           guest_phone?: string | null;
           guest_count?: number | null;
           notes?: string | null;
+          decision_note?: string | null;
           price?: never;
           base_price?: never;
           extra_guest_price?: never;

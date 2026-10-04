@@ -28,7 +28,9 @@ export const PATCH = withTenantRoute<{ groupId: string }>(async (request, { tena
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
   const done =
-    parsed.data.action === 'confirm' ? await confirmRequest(tenant, params.groupId) : await declineRequest(tenant, params.groupId);
+    parsed.data.action === 'confirm'
+      ? await confirmRequest(tenant, params.groupId, parsed.data.note)
+      : await declineRequest(tenant, params.groupId, parsed.data.note);
   if (!done) return NextResponse.json({ error: 'No such request' }, { status: 404 });
   return NextResponse.json({ status: parsed.data.action === 'confirm' ? 'confirmed' : 'cancelled' });
 });

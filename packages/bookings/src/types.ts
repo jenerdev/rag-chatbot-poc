@@ -60,6 +60,8 @@ export interface BookingSummary {
   guestPhone: string | null;
   guestCount: number | null;
   notes: string | null;
+  /** what staff wrote when they confirmed or cancelled it (D-096); null until then */
+  decisionNote: string | null;
   /** centavos, the TOTAL, set by the database; null for whole_resort and for bookings made before prices existed */
   price: number | null;
   /** its parts (extra-guests D-068): the rate, the extra-guest fee, and the holiday surcharge. Null likewise */
@@ -354,6 +356,8 @@ export interface BookingRequest {
   guestPhone: string | null;
   guestEmail: string | null;
   notes: string | null;
+  /** what staff wrote when they confirmed or declined it (D-096); null while pending */
+  decisionNote: string | null;
   createdAt: string;
   slotId: number;
   slot: string;

@@ -22,7 +22,7 @@
 // model: the chatbot has no tool that reaches this file (D-037).
 
 import { MAX_STAY_NIGHTS } from './constants.js';
-import { bookingsConfig, requireConfig, listSlots, RETIRED } from './bookings.js';
+import { bookingsConfig, decisionNote, requireConfig, listSlots, RETIRED } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
 import type {
@@ -352,7 +352,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .select('id, group_id, reference, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_email, guest_count, notes, price, created_at')
+    .select('id, group_id, reference, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
     .eq('tenant_id', tenant.id)
     .eq('source', 'web')
     // A stay that began up to MAX_STAY_NIGHTS before `from` still has rows
@@ -410,6 +410,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
         guestPhone: first.guest_phone,
         guestEmail: first.guest_email,
         notes: first.notes,
+        decisionNote: first.decision_note,
         createdAt: first.created_at,
         slotId: first.slot_id,
         slot,
@@ -439,22 +440,24 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
  * `false` means "not yours, not there, or already declined", deliberately one
  * answer. Confirming a confirmed request is `true`: the outcome asked for holds.
  */
-export async function confirmRequest(tenant: BookingTenant, groupId: unknown): Promise<boolean> {
-  return decide(tenant, groupId, 'confirmed');
+export async function confirmRequest(tenant: BookingTenant, groupId: unknown, note?: unknown): Promise<boolean> {
+  return decide(tenant, groupId, 'confirmed', note);
 }
 
 /** Decline a request: pending → cancelled, the whole group. Same answers as confirmRequest. */
-export async function declineRequest(tenant: BookingTenant, groupId: unknown): Promise<boolean> {
-  return decide(tenant, groupId, 'cancelled');
+export async function declineRequest(tenant: BookingTenant, groupId: unknown, note?: unknown): Promise<boolean> {
+  return decide(tenant, groupId, 'cancelled', note);
 }
 
-async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' | 'cancelled'): Promise<boolean> {
+/** `note` (D-096): what staff wrote with the decision, on every row of the group. */
+async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' | 'cancelled', note?: unknown): Promise<boolean> {
   await requireConfig(tenant);
   if (typeof groupId !== 'string' || !UUID.test(groupId)) throw new BookingInputError('That is not a request id.');
+  const decision = decisionNote(note);
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .update({ status: to })
+    .update({ status: to, decision_note: decision })
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
     .eq('source', 'web')
