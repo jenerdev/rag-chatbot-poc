@@ -7179,3 +7179,22 @@ both ways; tests 99/355/56; typecheck. Three of the four checks first
 failed on MY comparisons (every row against the first night's discount; an
 out-of-range quote against the in-range total): the printed data was right
 each time, and the comparisons were fixed, not the code.
+
+## Promos, Phase 3: routes and permissions · done 2026-10-04, on `feat/promos`
+
+**What:** `promos:read` / `promos:write` in `lib/permissions.ts` (ADMIN; the
+test's Postgres table has the two rows: the read is admin-only because the
+screen is, though `promos_select` lets any member read for the staff
+form); `app/api/t/[tenant]/promos/route.ts` (GET with `?all=1`, POST) and
+`/[id]/route.ts` (PATCH, DELETE), each on `withTenantRoute()` +
+`requireAdmin()` + `requireApplication()`, the slots routes' shape;
+`bookQuoteSchema` (and so `bookRequestSchema`) take `promoCode`,
+`quoteSchema` and `createBookingSchema` take `promoId`;
+`createPromoSchema` / `updatePromoSchema`. The three quote and request
+routes needed no change: they pass the parsed body through.
+
+**Observed:** web tests 58/58 (+2 permission rows); typecheck clean; on the
+dev server `/api/t/harbor/promos` is a 401 without a session, and the
+public quote for harbor's first room answers `350000` with no code, the
+same `350000, discount 0, "No such promo code."` with a wrong code and
+with a malformed one, no 500 and no hint which of the two it was.

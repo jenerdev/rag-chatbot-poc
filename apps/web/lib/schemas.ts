@@ -122,6 +122,8 @@ export const createBookingSchema = z.object({
   notes: z.string({ invalid_type_error: 'Notes must be text.' }).nullish(),
   // No `status` since D-095: a staff booking is born pending (zod strips the
   // key if a client sends one), and PATCH /bookings/[id] confirms it.
+  /** D-097: a promo the staff member picked; the trigger checks it and stores the discount */
+  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
 });
 
 /** A price preview for one unit or several rooms (per_room only). */
@@ -129,6 +131,8 @@ export const quoteSchema = z.object({
   unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
   // One unit's guests; with `rooms`, each room carries its own.
   guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
+  /** D-097: preview with a promo the staff member picked */
+  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
   rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
   slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
   date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
@@ -200,6 +204,12 @@ export const bookQuoteSchema = z.object({
   rooms: z.array(requestRoom, { required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
   checkIn: z.string({ required_error: 'Choose a date', invalid_type_error: 'Choose a date' }),
   nights: z.number({ invalid_type_error: 'Nights must be a number' }).optional(),
+  /**
+   * D-097: a promo code the customer typed. Shape only (the database's
+   * code shape); whether it exists, covers the dates or has uses left is
+   * promo_for_request()'s answer, in words, on the quote.
+   */
+  promoCode: z.string({ invalid_type_error: 'The promo code must be text' }).max(32, 'That is not a promo code').nullish(),
 });
 
 /**
@@ -216,6 +226,27 @@ export const bookRequestSchema = bookQuoteSchema.extend({
 
 /** The optional note on a decision (D-096): the package bounds it too. */
 const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish();
+
+/**
+ * A promo (D-097). `value` is an INTEGER: centavos for a fixed amount,
+ * hundredths of a percent for a percentage (1250 = 12.50 %); the screen
+ * turns what was typed into it by string (plan § 2.1). @rag/bookings
+ * validates the rest in words (the range, the code shape, the limit).
+ */
+export const createPromoSchema = z.object({
+  name: z.string({ required_error: 'A name is required', invalid_type_error: 'A name is required' }),
+  kind: z.enum(['fixed', 'percent'], { errorMap: () => ({ message: 'Kind is "fixed" or "percent"' }) }),
+  value: z.number({ required_error: 'A value is required', invalid_type_error: 'The value must be a number' }),
+  validFrom: z.string({ required_error: '"Valid from" is required', invalid_type_error: '"Valid from" must be a date' }),
+  validTo: z.string({ required_error: '"Valid to" is required', invalid_type_error: '"Valid to" must be a date' }),
+  code: z.string({ invalid_type_error: 'The code must be text' }).nullish(),
+  maxUses: z.number({ invalid_type_error: 'The usage limit must be a number' }).nullish(),
+});
+
+/** A change to a promo: any subset, including `active: false` to retire it. */
+export const updatePromoSchema = createPromoSchema.partial().extend({
+  active: z.boolean({ invalid_type_error: 'Active must be true or false' }).optional(),
+});
 
 /** Staff decide a request: the whole group, one action, an optional note. */
 export const decideRequestSchema = z.object({

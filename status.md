@@ -90,7 +90,7 @@ one. § 7 has five questions with recommendations. No chatbot change.
 - [x] Phase 0 — baseline (2026-10-04): both SQL files confirmed in; verify 109/110 after its row builders learned `status: 'confirmed'` (a D-095 catch-up); rooms 41/41; both isolation suites both ways; tests, typecheck, three baselines identical; battery 57/61, the known set
 - [x] Phase 1 — schema (2026-10-04): `schema-promos.sql` run by the user (the table and its RLS, the two booking columns, the three functions, the trigger with the discount, `request_booking()` with `p_promo_code`, the 10-parameter form dropped, the two older files guarded); the typed schema; verify 111–116 all green, **115/116**; rooms 41/41; bookings isolation 30/30 both ways
 - [x] Phase 2 — `@rag/bookings` (2026-10-04): `promos.ts` (list with uses, create, update, retire, delete-unused), `quoteRequest`/`requestBooking` take a code, `quote`/`createBookings` a promo id, `listBookings` the promo; rooms **45/45** (21a–21d), isolation 30/30 both ways, tests and typecheck green
-- [ ] Phase 3 — routes and permissions (`promos:read/write`)
+- [x] Phase 3 — routes and permissions (2026-10-04): `promos:read/write` (ADMIN), `/api/t/[tenant]/promos` + `/[id]`, the quote and request schemas take `promoCode` / `promoId`; web tests 58/58, typecheck; the public quote smoke-tested over HTTP
 - [ ] Phase 4 — screens (Promos; the page's code field; the staff picker)
 - [ ] Phase 5 — the walls and the walk
 - [ ] Phase 6 — the record (D-097)
@@ -1158,6 +1158,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — promos Phase 3 (routes and permissions), on `feat/promos`
+- **Did:** the two permissions, the two promo routes, the schemas. Web tests
+  58/58; typecheck; the promos list 401 without a session; the public
+  quote with no code, a wrong code and a bad shape all answer in words.
+- **Next:** Phase 4, the screens (Promos; the page's code field; the staff picker).
 
 ### 2026-10-04 — promos Phase 2 (`@rag/bookings`), on `feat/promos`
 - **Did:** `promos.ts`; the quotes and writers take a promo; the list names

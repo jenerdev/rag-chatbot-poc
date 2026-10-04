@@ -37,6 +37,9 @@ export const PERMISSIONS = [
   /** the Slots screen (D-090): create, edit, retire and delete booking slots */
   'slots:read',
   'slots:write',
+  /** the Promos screen (D-097): discounts, their codes and limits; the read is admin-only because the screen is */
+  'promos:read',
+  'promos:write',
   'unanswered:read',
   /** resolve and reopen */
   'unanswered:write',
@@ -46,7 +49,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 const STAFF: readonly Permission[] = ['session', 'documents:read', 'bookings:read', 'bookings:write', 'unanswered:read', 'unanswered:write'];
-const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write'];
+const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write'];
 const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
 
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {

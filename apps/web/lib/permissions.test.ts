@@ -22,6 +22,8 @@ const POSTGRES: Record<Permission, Role[]> = {
   'holidays:write': ADMIN_ONLY, // rate_calendar_insert/update/delete
   'slots:read': ADMIN_ONLY, // slots_read is any token; the screen is admin-only (it counts bookings)
   'slots:write': ADMIN_ONLY, // slots_insert/update/delete (schema-slots.sql)
+  'promos:read': ADMIN_ONLY, // promos_select is any MEMBER (the staff form lists them); the SCREEN is admin-only, so the route is too
+  'promos:write': ADMIN_ONLY, // promos_insert/update/delete → app_is_admin() (schema-promos.sql)
   'unanswered:read': ANY_MEMBER, // unanswered_resolutions_read → app_is_staff()
   'unanswered:write': ANY_MEMBER, // unanswered_resolutions_insert/delete → app_is_staff()
   'members:manage': OWNER_ONLY, // memberships_owner_insert/update/delete
