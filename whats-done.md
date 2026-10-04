@@ -7488,3 +7488,31 @@ wall 2. Recorded in the plan under Rule 2. Before the SQL ran, rooms was
 45/45; after it, still 45/45 with no check changed: no existing check
 inserts a pending row on a confirmed night, and the fixtures seed
 `confirmed`, which the trigger ignores (§ 2.4).
+
+## Staff clash, Phase 2: the package, the route, the screen · done 2026-10-05, on `feat/staff-clash`
+
+**What:** `packages/bookings/src/taken.ts`, the ONE place the trigger's
+`23P01` is told apart from the constraint's: `takenError()` passes
+"taken on <date>: <unit> is already confirmed for that slot" through as a
+`BookingConflictError` (409) with the words kept, and returns null for the
+constraint's own text, which still gets `writeError()`'s sentence. The
+route needed nothing: `BookingConflictError → 409` was already the map.
+`listBookings()` adds `clash` per row, the Requests section's definition
+over the rows already loaded (a pending row whose date, unit and slot are
+confirmed for another row), with the comment that it names the rows born
+before the trigger or in its one-statement window, and is a warning, not
+the guard. `BookingSummary.clash`. The Bookings screen: the Requests
+section's sentence under such a row, Confirm disabled, Cancel enabled.
+
+**Observed:** bookings tests **102/102** (+3 in `taken.test.ts`: the words
+kept with a 409, a unit name with spaces and brackets whole, null for the
+constraint's text and for other codes); web tests **59/59**; `pnpm
+typecheck` with the service-import check OK. rooms **48/48**, 4e: through
+`createBookings()` the message is `"taken on 2026-11-24: Garden Room is
+already confirmed for that slot"`; the confirmed insert's is `"That slot
+on 2026-11-24 overlaps an existing booking."`; the second pending row's
+`clash` is `true`, the confirmed row's `false`. Over HTTP, a throwaway
+staff member of harbor posting a booking on the confirmed 2026-10-20
+Garden Room night got `409 {"error":"taken on 2026-10-20: Garden Room is
+already confirmed for that slot"}`, and the list for that day showed the
+two confirmed rows with `clash=false` and no new row.

@@ -142,7 +142,8 @@ function BookingRow({
             .join(' · ')}
         </span>
         {booking.status === 'pending' && (
-          <button type="button" className="primary" disabled={busy} onClick={() => onConfirm(booking)}>
+          // D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21).
+          <button type="button" className="primary" disabled={busy || booking.clash} onClick={() => onConfirm(booking)}>
             Confirm
           </button>
         )}
@@ -152,6 +153,10 @@ function BookingRow({
           </button>
         )}
       </div>
+      {/* D-099: the Requests section's warning, on a pending staff booking whose night is already confirmed. Cancel is what staff do with it. */}
+      {booking.status === 'pending' && booking.clash && (
+        <div className="booking-notes request-clash">A night of this booking is already confirmed for another booking.</div>
+      )}
       {/* Notes are a React child, so whatever staff typed is escaped (CLAUDE.md § Conventions). */}
       {booking.notes && <div className="booking-notes">{booking.notes}</div>}
       {/* D-096: what staff wrote when they confirmed or cancelled it. */}
@@ -433,7 +438,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         void load();
       } catch (error) {
         // A 409 lands here with the server's own sentence: "That slot on …
-        // overlaps an existing booking." It is not rephrased.
+        // overlaps an existing booking.", or since D-099 the trigger's
+        // "taken on <date>: <unit> is already confirmed for that slot". It
+        // is not rephrased.
         setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
       } finally {
         setBusy(false);

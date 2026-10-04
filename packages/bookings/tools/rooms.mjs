@@ -257,12 +257,24 @@ try {
       const group8 = await thrown(() => createBookings(probe, { rooms: [{ unitId: family.id, guestCount: 1 }, { unitId: garden.id, guestCount: 1 }], slotId: night.id, date: d8, guestName: 'Group X' }));
       const family8After = (await listBookings(probe, { from: d8, to: d8 })).filter((b) => b.unit === 'Family Room').length;
       const confirmedInsert = await thrown(() => createBookings(probe, { unitId: garden.id, guestCount: 1, slotId: night.id, date: d8, guestName: 'Pending G', status: 'confirmed' }));
-      const p2Still = (await listBookings(probe, { from: d8, to: d8 })).find((b) => b.id === p2.bookings[0].id)?.status;
+      const rows8 = await listBookings(probe, { from: d8, to: d8 });
+      const p2Row = rows8.find((b) => b.id === p2.bookings[0].id);
+      const p1Row = rows8.find((b) => b.id === p1.bookings[0].id);
       check(
         twoPending && confirmedP1 === true && raw.error?.code === '23P01' && words && viaPackage instanceof BookingConflictError
-          && group8 instanceof BookingConflictError && family8After === family8Before && confirmedInsert instanceof BookingConflictError && p2Still === 'pending',
+          && group8 instanceof BookingConflictError && family8After === family8Before && confirmedInsert instanceof BookingConflictError && p2Row?.status === 'pending',
         'D-099: two pendings may share a night; once one is confirmed, a pending insert is refused in words (23P01), a group with one clashing room writes no row, a confirmed insert is still the constraint\'s, the other pending stays',
-        `pending ${twoPending} · confirm ${confirmedP1} · raw ${raw.error?.code} "${raw.error?.message}" · package ${viaPackage?.constructor?.name} · group ${group8?.constructor?.name}, Family rows ${family8Before} → ${family8After} · confirmed ${confirmedInsert?.constructor?.name} · P2 ${p2Still}`,
+        `pending ${twoPending} · confirm ${confirmedP1} · raw ${raw.error?.code} "${raw.error?.message}" · package ${viaPackage?.constructor?.name} · group ${group8?.constructor?.name}, Family rows ${family8Before} → ${family8After} · confirmed ${confirmedInsert?.constructor?.name} · P2 ${p2Row?.status}`,
+      );
+      // 4e. D-099, the package (Phase 2): the trigger's words pass through
+      //     createBookings() unchanged, the constraint's own refusal keeps the
+      //     generic sentence, and the staff list says `clash` on the pending
+      //     row that shares the confirmed night, false on the confirmed one.
+      check(
+        /^taken on \d{4}-\d{2}-\d{2}: Garden Room is already confirmed for that slot$/.test(viaPackage?.message ?? '')
+          && /overlaps an existing booking/.test(confirmedInsert?.message ?? '') && p2Row?.clash === true && p1Row?.clash === false,
+        'D-099: the trigger\'s words reach the caller; the constraint\'s refusal keeps the sentence; the list flags the clashing pending row',
+        `package "${viaPackage?.message}" · constraint "${confirmedInsert?.message}" · P2 clash ${p2Row?.clash} · P1 clash ${p1Row?.clash}`,
       );
     }
   }

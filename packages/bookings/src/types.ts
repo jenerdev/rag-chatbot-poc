@@ -56,6 +56,8 @@ export interface BookingSummary {
   slotId: number;
   slot: string;
   status: BookingStatus;
+  /** D-099: pending, and its night is already CONFIRMED for another booking of the same unit and slot, so Confirm would be a 409. False for any other status */
+  clash: boolean;
   guestName: string;
   guestPhone: string | null;
   guestCount: number | null;

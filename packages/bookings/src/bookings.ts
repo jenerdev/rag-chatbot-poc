@@ -24,6 +24,7 @@ import {
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { discountLines } from './promos.js';
 import { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
+import { takenError } from './taken.js';
 import type {
   BookingGroup,
   BookingStatus,
@@ -367,6 +368,15 @@ export async function listBookings(
   const slotName = new Map(slots.map((s) => [s.id, s.name]));
   const promoName = new Map(promos.data.map((p) => [p.id, p.name]));
 
+  // D-099: a pending row whose (date, unit, slot) is CONFIRMED for another
+  // booking would be the 409 at Confirm. The Requests section's definition
+  // (requests.ts), over the rows already loaded: the window and the room
+  // filter are the same for both sides of the comparison. The trigger
+  // stops such a row being born; this names the ones that were born before
+  // it, or in the one-statement window it leaves (plan Rule 4). A warning,
+  // never the guard (trap 21): the server still answers at Confirm.
+  const taken = new Set(data.filter((b) => b.status === 'confirmed').map((b) => `${b.booked_date}|${b.unit_id}|${b.slot_id}`));
+
   return data.map((b) => ({
     id: b.id,
     date: b.booked_date,
@@ -375,6 +385,7 @@ export async function listBookings(
     slotId: b.slot_id,
     slot: slotName.get(b.slot_id) ?? '(unknown slot)',
     status: b.status,
+    clash: b.status === 'pending' && taken.has(`${b.booked_date}|${b.unit_id}|${b.slot_id}`),
     guestName: b.guest_name,
     guestPhone: b.guest_phone,
     guestCount: b.guest_count,
@@ -621,6 +632,10 @@ function writeError(error: { code?: string; message: string }, date: string): Er
   const closed = closedError(error);
   if (closed) return closed;
   if (error.code === '23514' && /slot retired/.test(error.message)) return new BookingInputError(RETIRED);
+  // D-099: the trigger's words ("taken on <date>: <unit> is already confirmed
+  // for that slot") pass through; the constraint's own 23P01 gets the sentence.
+  const taken = takenError(error);
+  if (taken) return taken;
   if (error.code === '23P01') return new BookingConflictError(`That slot on ${date} overlaps an existing booking.`);
   // D-097: a promo's limit is a conflict (someone else took the last use); an
   // ended, retired or wrong-dated promo is bad input, in the trigger's words.
