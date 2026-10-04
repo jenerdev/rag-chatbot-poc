@@ -91,7 +91,7 @@ one. § 7 has five questions with recommendations. No chatbot change.
 - [x] Phase 1 — schema (2026-10-04): `schema-promos.sql` run by the user (the table and its RLS, the two booking columns, the three functions, the trigger with the discount, `request_booking()` with `p_promo_code`, the 10-parameter form dropped, the two older files guarded); the typed schema; verify 111–116 all green, **115/116**; rooms 41/41; bookings isolation 30/30 both ways
 - [x] Phase 2 — `@rag/bookings` (2026-10-04): `promos.ts` (list with uses, create, update, retire, delete-unused), `quoteRequest`/`requestBooking` take a code, `quote`/`createBookings` a promo id, `listBookings` the promo; rooms **45/45** (21a–21d), isolation 30/30 both ways, tests and typecheck green
 - [x] Phase 3 — routes and permissions (2026-10-04): `promos:read/write` (ADMIN), `/api/t/[tenant]/promos` + `/[id]`, the quote and request schemas take `promoCode` / `promoId`; web tests 58/58, typecheck; the public quote smoke-tested over HTTP
-- [ ] Phase 4 — screens (Promos; the page's code field; the staff picker)
+- [x] Phase 4 — screens (2026-10-04, code): the Promos screen and page, the nav link, the booking page's code field with the discount line and the server's words, the staff picker with the automatic promo pre-selected and the row naming the promo; typecheck, web tests 58/58, pages 200/200/404 on the dev server. The walk is Phase 5's
 - [ ] Phase 5 — the walls and the walk
 - [ ] Phase 6 — the record (D-097)
 
@@ -1158,6 +1158,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-04 — promos Phase 4 (the screens), on `feat/promos`
+- **Did:** `promos-screen.tsx` + page, the nav link, the booking page's code
+  field and discount lines, the staff picker and row. Typecheck; web 58/58;
+  pages 200 on harbor and villa, 404 on northwind; the booking page 200.
+- **Next:** Phase 5, the walls and the walk (isolation, verify, the battery once; the user walks).
 
 ### 2026-10-04 — promos Phase 3 (routes and permissions), on `feat/promos`
 - **Did:** the two permissions, the two promo routes, the schemas. Web tests

@@ -32,6 +32,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   Accommodation,
   BookingGroup,
+  Promo,
   BookingRequest,
   BookingSummary,
   BookingType,
@@ -65,6 +66,8 @@ interface Setup {
   /** inactive ones included, so the list can still name a retired room */
   units: UnitSummary[];
   slots: SlotSummary[];
+  /** the active promos (D-097), for the form's picker; the automatic one is pre-selected */
+  promos: Promo[];
 }
 
 type Auth = 'checking' | 'out' | 'in';
@@ -131,6 +134,8 @@ function BookingRow({
                 : formatMoney(booking.price, perRoom.currency)
               : null,
             booking.source === 'web' ? `request ${booking.reference}` : perRoom && booking.groupId ? 'group booking' : null,
+            // D-097: the promo it got, and this night's share of the discount (part of the price shown).
+            booking.promoName ? `promo ${booking.promoName}${perRoom && booking.discount ? ` −${formatMoney(booking.discount, perRoom.currency)}` : ''}` : null,
             booking.status === 'confirmed' ? null : booking.status,
           ]
             .filter(Boolean)
@@ -241,6 +246,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const [guestPhone, setGuestPhone] = useState('');
   const [guestCount, setGuestCount] = useState('');
   const [notes, setNotes] = useState('');
+  // D-097: the promo picked for this booking; '' = none. The automatic promo
+  // covering today is pre-selected once the setup arrives (plan § 2.5).
+  const [promoId, setPromoId] = useState<string>('');
 
   // per_room only. The ticked rooms, each with its own guest count (capacity
   // is checked per room, plan/booking-types.md Phase 2), the server's quote
@@ -290,6 +298,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setDate(body.today);
         setUnitId(body.units.find((u) => u.active)?.id ?? null);
         setSlotId(body.slots[0]?.id ?? null);
+        // D-097: the automatic promo covering today is pre-selected, "None" one click away (plan § 2.5).
+        const automatic = (body as Setup).promos?.find((p) => p.code === null && p.validFrom <= body.today && p.validTo >= body.today);
+        setPromoId(automatic ? String(automatic.id) : '');
         if (body.bookingType === 'per_room') {
           // Capacities for the room list. Staff-only, like everything here.
           const r = await fetch(`${api}/accommodations`);
@@ -361,7 +372,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           // The guests go too: the extra-guest fee is part of the price, and
           // the server refuses a party above a room's maximum here, before
           // anyone presses Book.
-          body: JSON.stringify({ rooms: chosenRooms, slotId, date }),
+          body: JSON.stringify({ rooms: chosenRooms, slotId, date, promoId: promoId === '' ? null : Number(promoId) }),
         });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
@@ -375,7 +386,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     return () => {
       stale = true;
     };
-  }, [api, chosenRooms, date, perRoom, slotId, unauthorized]);
+  }, [api, chosenRooms, date, perRoom, promoId, slotId, unauthorized]);
 
   const logout = useCallback(async () => {
     await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
@@ -389,7 +400,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       setBusy(true);
       let response: Response | null = null;
       try {
-        const who = { slotId, date, guestName, guestPhone: guestPhone || null, notes: notes || null };
+        const who = { slotId, date, guestName, guestPhone: guestPhone || null, notes: notes || null, promoId: promoId === '' ? null : Number(promoId) };
         response = await fetch(`${api}/bookings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -707,6 +718,24 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                 <label htmlFor="date">Date</label>
                 <input type="date" id="date" required min={setup.today} value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
+              {setup.promos.length > 0 && (
+                <div className="field">
+                  <label htmlFor="promo">
+                    Promo <span className="muted">(optional)</span>
+                  </label>
+                  {/* The discount is the database's; the quote below previews it (D-097). */}
+                  <select id="promo" value={promoId} onChange={(e) => setPromoId(e.target.value)}>
+                    <option value="">None</option>
+                    {setup.promos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                        {p.code ? ` (${p.code})` : ' (automatic)'}
+                        {p.maxUses !== null ? ` · ${p.uses}/${p.maxUses} used` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="field-row">
@@ -762,6 +791,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                         </span>
                       </div>
                     ))}
+                    {quote.quote.discount > 0 && (
+                      <div className="quote-line quote-discount">
+                        <span>Promo: {quote.quote.promo?.name}</span>
+                        <span>−{formatMoney(quote.quote.discount, quote.quote.currency)}</span>
+                      </div>
+                    )}
                     <div className="quote-line quote-total">
                       <strong>Total</strong>
                       <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>

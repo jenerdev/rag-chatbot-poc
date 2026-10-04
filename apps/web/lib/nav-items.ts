@@ -22,7 +22,7 @@ export interface NavFeatures {
   book: boolean;
 }
 
-export type NavPage = 'chat' | 'book' | 'documents' | 'unanswered' | 'bookings' | 'rooms' | 'holidays' | 'slots' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'documents' | 'unanswered' | 'bookings' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
 
 export interface NavItem {
   page: NavPage;
@@ -50,6 +50,7 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
     ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read')],
     ['holidays', 'Holidays', '/admin/holidays', features.bookings && can(role, 'holidays:read')],
     ['slots', 'Slots', '/admin/slots', features.bookings && can(role, 'slots:read')],
+    ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read')],
     ['members', 'Members', '/admin/members', can(role, 'members:manage')],
   ];
   for (const [page, label, path, allowed] of staff) {

@@ -555,3 +555,6 @@ a.button.primary:hover { background: #1d4ed8; }
 .holiday-day { flex: 0 0 150px; font-variant-numeric: tabular-nums; }
 .holiday-label { flex: 1; }
 .holiday-surcharge { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* The promo's line on a quote and a receipt (D-097): what came off, before the total. */
+.quote-line.quote-discount { color: var(--ok); }

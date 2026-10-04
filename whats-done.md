@@ -7198,3 +7198,27 @@ dev server `/api/t/harbor/promos` is a 401 without a session, and the
 public quote for harbor's first room answers `350000` with no code, the
 same `350000, discount 0, "No such promo code."` with a wrong code and
 with a malformed one, no 500 and no hint which of the two it was.
+
+## Promos, Phase 4: the screens · code done 2026-10-04, on `feat/promos`
+
+**What:** `/t/<slug>/admin/promos` (`promos-screen.tsx`, the slots screen's
+shape): the list with range, code or "automatic", value, uses of limit, an
+"overlaps another automatic promo" badge (§ 2.5); a form that types pesos
+or a percentage and sends an integer (centavos, or hundredths of a
+percent, parsed by string); Edit, Retire when used, Delete when not,
+"Offer again" for a retired one, "Show retired". The header gains Promos
+for `promos:read` (nav test updated). The booking page: a Promo code field
+beside Notes; the quote re-asks as it is typed and shows "Promo: <name>
+−₱X" before the total, each night's share on its line, or the server's
+words when the code does not apply; the receipt shows the stored
+discount. The staff form: a Promo picker from the setup payload (active
+promos, with "n/limit used"), the automatic promo covering today
+pre-selected, the preview showing the discount line, the booking row
+naming the promo and its night's share.
+
+**Observed:** typecheck clean (the service-import check too); web tests
+58/58 (nav: Promos after Slots for admins and owners, on villa too); on
+the dev server `/t/harbor/admin/promos` and `/t/villa/admin/promos` are
+200, `/t/northwind/admin/promos` the 404 (no bookings application),
+`/t/harbor/book` 200, the setup route 401 without a session. The walk,
+Phase 5, is the user's.

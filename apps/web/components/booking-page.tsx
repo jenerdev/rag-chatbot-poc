@@ -106,6 +106,9 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   const [notes, setNotes] = useState('');
   // The honeypot (plan § 2.1): hidden from people, so only a bot fills it.
   const [website, setWebsite] = useState('');
+  // D-097: a promo code, sent with the quote (which says whether it applies,
+  // in words) and with the request (which resolves it again under the lock).
+  const [promoCode, setPromoCode] = useState('');
 
   const [quote, setQuote] = useState<{ quote: RequestQuote | null; message: string | null }>({ quote: null, message: null });
   const [sending, setSending] = useState(false);
@@ -149,7 +152,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
         const response = await fetch(`${api}/book/quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount }),
+          body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, promoCode: promoCode.trim() || null }),
         });
         const body = await response.json().catch(() => null);
         if (stale) return;
@@ -163,7 +166,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
       stale = true;
       clearTimeout(timer);
     };
-  }, [api, checkIn, nightCount, nightsValid, rooms, roomsComplete, slotId]);
+  }, [api, checkIn, nightCount, nightsValid, promoCode, rooms, roomsComplete, slotId]);
 
   const end = slotEnd(slot.startTime, slot.duration);
   const checkOut = checkIn && end && nightsValid ? addDays(checkIn, nightCount - 1 + end.days) : null;
@@ -176,7 +179,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
       const response = await fetch(`${api}/book/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, name, phone, email, notes: notes || null, website }),
+        body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, name, phone, email, notes: notes || null, website, promoCode: promoCode.trim() || null }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -234,7 +237,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 From {instantLabel(r.startsAt, page.timezone)} to {instantLabel(r.endsAt, page.timezone)}
               </div>
             </div>
-            <Lines lines={r.lines} currency={r.currency} total={r.total} />
+            <Lines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
             {r.instructions && (
               <>
                 <h3>What happens next</h3>
@@ -416,7 +419,15 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                         A night in this stay is already booked. Please choose other dates.
                       </div>
                     )}
-                    <Lines lines={quote.quote.lines} currency={quote.quote.currency} total={quote.quote.total} />
+                    <Lines
+                      lines={quote.quote.lines}
+                      currency={quote.quote.currency}
+                      total={quote.quote.total}
+                      discount={quote.quote.discount}
+                      promoName={quote.quote.promo?.name ?? null}
+                    />
+                    {/* A typed code that did not apply: the server's words, the price unchanged (D-097). */}
+                    {quote.quote.promoMessage && <div className="quote-warning">{quote.quote.promoMessage}</div>}
                   </>
                 ) : (
                   quote.message
@@ -447,11 +458,20 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 <input type="email" id="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
             </div>
-            <div className="field">
-              <label htmlFor="notes">
-                Notes <span className="muted">(optional)</span>
-              </label>
-              <input type="text" id="notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <div className="field-row">
+              <div className="field grow">
+                <label htmlFor="notes">
+                  Notes <span className="muted">(optional)</span>
+                </label>
+                <input type="text" id="notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="promo-code">
+                  Promo code <span className="muted">(optional)</span>
+                </label>
+                {/* The quote above answers it as you type: the discount line, or why it does not apply. */}
+                <input type="text" id="promo-code" maxLength={32} autoComplete="off" placeholder="SUMMER10" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} />
+              </div>
             </div>
             {/* The honeypot: off-screen, not tabbable, not announced. */}
             <div className="honeypot" aria-hidden="true">
@@ -478,8 +498,25 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   );
 }
 
-/** A stay, night by night: each unit's rate, extra guests and holiday surcharge, then the total. */
-function Lines({ lines, currency, total }: { lines: RequestQuote['lines']; currency: string; total: number }) {
+/**
+ * A stay, night by night: each unit's rate, extra guests and holiday
+ * surcharge, then the promo's discount (D-097) and the total. The lines'
+ * prices are net of the discount already; the discount line says what came
+ * off, so the figures add up as the server added them.
+ */
+function Lines({
+  lines,
+  currency,
+  total,
+  discount,
+  promoName,
+}: {
+  lines: RequestQuote['lines'];
+  currency: string;
+  total: number;
+  discount: number;
+  promoName: string | null;
+}) {
   const dates = [...new Set(lines.map((l) => l.date))];
   const multipleUnits = new Set(lines.map((l) => l.unitId)).size > 1;
   return (
@@ -498,10 +535,17 @@ function Lines({ lines, currency, total }: { lines: RequestQuote['lines']; curre
                 {formatMoney(l.basePrice, currency)}
                 {l.extraGuestPrice > 0 && ` + ${formatMoney(l.extraGuestPrice, currency)} extra guests`}
                 {l.surcharge > 0 && ` + ${formatMoney(l.surcharge, currency)} surcharge`}
-                {l.extraGuestPrice > 0 || l.surcharge > 0 ? ` = ${formatMoney(l.price, currency)}` : ''}
+                {l.discount > 0 && ` − ${formatMoney(l.discount, currency)} promo`}
+                {l.extraGuestPrice > 0 || l.surcharge > 0 || l.discount > 0 ? ` = ${formatMoney(l.price, currency)}` : ''}
               </span>
             </div>
           )),
+      )}
+      {discount > 0 && (
+        <div className="quote-line quote-discount">
+          <span>{promoName ? `Promo: ${promoName}` : 'Promo discount'}</span>
+          <span>−{formatMoney(discount, currency)}</span>
+        </div>
       )}
       <div className="quote-line quote-total">
         <strong>Total</strong>

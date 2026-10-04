@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { bookingsConfig, listSlots, listUnits, localDate } from '@rag/bookings';
+import { bookingsConfig, listPromos, listSlots, listUnits, localDate } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { withTenantRoute } from '@/lib/tenant';
@@ -22,7 +22,10 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
-  const [config, units, slots] = await Promise.all([bookingsConfig(tenant), listUnits(tenant), listSlots(tenant)]);
+  // The active promos too (D-097), for the form's picker: any member may
+  // read them (promos_select), and a staff member applying one on the phone
+  // is a customer availing it (plan § 7 q2).
+  const [config, units, slots, promos] = await Promise.all([bookingsConfig(tenant), listUnits(tenant), listSlots(tenant), listPromos(tenant)]);
   // requireApplication passed, so config exists. The null check keeps the type honest.
   if (!config) throw new Error(`"${tenant.slug}" lost its bookings configuration mid-request`);
 
@@ -33,5 +36,6 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
     currency: config.currency,
     units,
     slots,
+    promos,
   });
 });
