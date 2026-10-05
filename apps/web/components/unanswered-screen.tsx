@@ -10,12 +10,17 @@
 // Two tabs, Open and Resolved (D-045). "Mark resolved" is what staff click once
 // the answer is in the knowledge base. It adds a resolution row; the visitor's
 // transcript is never touched, and Reopen undoes it.
+//
+// The look (plan/ui-refresh.md Phase 8): the two tabs are a segmented
+// control; each question is a row with when it was asked under it; an empty
+// Open tab reads as the good news it is.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
+import { Icon } from '@/components/icons';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -137,19 +142,15 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
       <StaffFrame {...frame}>
         <section className="card">
           <div className="range-head">
-            <div className="range-nav">
-              <button type="button" className={tab === 'open' ? 'primary' : undefined} onClick={() => setTab('open')}>
+            <div className="segmented" role="group" aria-label="Show">
+              <button type="button" aria-pressed={tab === 'open'} onClick={() => setTab('open')}>
                 Open
               </button>
-              <button
-                type="button"
-                className={tab === 'resolved' ? 'primary' : undefined}
-                onClick={() => setTab('resolved')}
-              >
+              <button type="button" aria-pressed={tab === 'resolved'} onClick={() => setTab('resolved')}>
                 Resolved
               </button>
             </div>
-            <button type="button" onClick={() => void load()}>
+            <button type="button" className="ghost sm" onClick={() => void load()}>
               Refresh
             </button>
           </div>
@@ -158,21 +159,28 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
               ? 'Questions the assistant could not answer from the documents (the visitor saw your “no answer” message). Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
               : 'Questions marked resolved. Reopen one if the assistant still cannot answer it.'}
           </p>
-          {error && <div className="notice error">{error}</div>}
+          {error && (
+            <div className="notice error" role="alert">
+              {error}
+            </div>
+          )}
 
           {questions === null ? (
             <div className="small">{loadMessage}</div>
           ) : questions.length === 0 ? (
-            <div className="empty-state">
+            <div className="empty-list">
               {tab === 'open' ? (
                 <>
+                  <span className="auth-done">
+                    <Icon name="check" size={22} />
+                  </span>
                   <strong>Nothing unanswered</strong>
-                  Every open question has been answered or resolved.
+                  <span>Every open question has been answered or resolved.</span>
                 </>
               ) : (
                 <>
                   <strong>Nothing resolved yet</strong>
-                  Questions you mark resolved appear here.
+                  <span>Questions you mark resolved appear here.</span>
                 </>
               )}
             </div>
@@ -180,13 +188,21 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
             questions.map((q) => (
               // The question is a React child, so a visitor's text is escaped (CLAUDE.md § Conventions).
               <div key={q.id} className="unanswered">
-                <span className="unanswered-question">{q.question}</span>
-                <span className="unanswered-when">
-                  {askedLabel(q.askedAt)}
-                  {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
-                </span>
-                <button type="button" disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
-                  {busyId === q.id ? '…' : tab === 'open' ? 'Mark resolved' : 'Reopen'}
+                <div className="unanswered-text">
+                  <span className="unanswered-question">{q.question}</span>
+                  <span className="unanswered-when">
+                    Asked {askedLabel(q.askedAt)}
+                    {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
+                  </span>
+                </div>
+                <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
+                  {tab === 'open' ? (
+                    <>
+                      <Icon name="check" size={14} /> Mark resolved
+                    </>
+                  ) : (
+                    'Reopen'
+                  )}
                 </button>
               </div>
             ))

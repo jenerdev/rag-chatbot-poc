@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–7 done
-> 2026-10-06 (the looks at 0–6 included, no action items; Phase 7's look
-> owed); Phases 8–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–8 done
+> 2026-10-06 (the looks at 0–7 included, no action items; Phase 8's look
+> owed); Phases 9–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -415,6 +415,15 @@ files: the dialog and the drawer, the reusable parts, were.
 - Deleting asks in a `<dialog>` that names the document.
 - Unanswered: each question as a row with its date and a Resolve button; an
   empty state that reads as good news ("Nothing unanswered").
+
+**Done 2026-10-06:** `plan/ui-refresh-phase8-walk.mjs`, 17/17; 4 writes
+caught in the browser, so document 37 and harbor's open questions are
+unchanged and no "Walk Eight" document exists. The editor is in the
+reading face (monospace dropped; nothing in § 7 asked to keep it), and so
+are the chunks. The document title is now a button, so the keyboard opens
+its chunks. The last `style={{}}` that was a style (the over-limit count)
+is a class; the two left are computed widths (the split bar, the chart's
+readout position).
 
 ### Phase 9 — Rooms, holidays, slots, promos, members, the platform
 

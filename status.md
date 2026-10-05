@@ -74,8 +74,10 @@
 - [x] Phase 6, the dashboard: walk 13/13, tests 68/68.
 - [x] The user's look at Phase 6: no action items.
 - [x] Phase 7, the bookings screen: walk 15/15, tests 68/68.
-- [ ] The user's look at Phase 7: `plan/ui-refresh/phase7/{walk,walk-dark}/`.
-- [ ] Phase 8, knowledge base and unanswered. Then Phases 9–10.
+- [x] The user's look at Phase 7: no action items.
+- [x] Phase 8, knowledge base and unanswered: walk 17/17, tests 68/68.
+- [ ] The user's look at Phase 8: `plan/ui-refresh/phase8/{walk,walk-dark}/`.
+- [ ] Phase 9, the remaining staff screens and the platform. Then Phase 10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

@@ -7910,3 +7910,33 @@ browser: HAR-4YXGRU still pending, 0 "Walk Seven" rows. The first run's
 three failures: two were the walk's (harbor's Day Tour has no rate; the
 drawer said so in the server's words), one was real: the range controls
 did not wrap and made the phone page 569 px; they wrap now (375 px).
+
+## UI refresh, Phase 8: knowledge base and unanswered · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** the knowledge base's form moved into the Phase 7 `Drawer`,
+opened by "Add a document" beside the page title or by a row's Edit;
+closing it abandons an edit but keeps a new document's draft. The editor
+is tall and in the reading face; its count reads "55 / 100,000 characters"
+and turns red (and the field `aria-invalid`) past the limit. A document's
+title is a button with a turning chevron (`aria-expanded`), so the keyboard
+opens its chunks; ✎ and 🗑 are labelled icons; Delete asks in the dialog,
+naming the document and its chunks. Unanswered: Open and Resolved are a
+segmented control; each question says when it was asked; "Mark resolved"
+has an icon and a busy state; an empty Open tab is a check and "Nothing
+unanswered".
+
+**Why it matters:** the knowledge base is what the assistant knows; its
+title row could not be opened from a keyboard, and its buttons were emoji
+with no name for a screen reader.
+
+**Observed:** `plan/ui-refresh-phase8-walk.mjs`, 17/17 as a northwind
+admin, a northwind staff member and a harbor admin: 100,001 characters
+turned the count red; Add sent one POST and closed the drawer; Edit loaded
+the handbook and closing it freed the row; "Keep it" sent nothing, Delete
+one DELETE (`/documents/37`); staff got no Add, Edit or Delete; Mark
+resolved sent one PUT and the row count went 16 → 15. All 4 writes were
+caught in the browser: afterwards document 37 exists, no "Walk Eight
+Policy", no resolution in the last 30 minutes. A translucent drawer in one
+screenshot was measured, not guessed at: opacity 0 → 0.94 at 100 ms → 1
+at 400 ms, the fade-in caught mid-way; the probe also showed the drawer's
+footer wrapping its main button alone onto a line, now fixed.

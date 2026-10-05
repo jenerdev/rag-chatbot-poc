@@ -3,9 +3,14 @@
    (S-6), requests and holidays (S-3, S-7), the dashboard (S-11). Phases 5–9
    of plan/ui-refresh.md reshape these; Phase 0 only moved them onto tokens. */
 
-/* --- admin (S-2) -------------------------------------------------------- */
+/* --- admin (S-2; plan/ui-refresh.md Phase 8) ------------------------------ */
 
-#content { min-height: 190px; resize: vertical; font-family: var(--font-mono); font-size: var(--text-sm); }
+/* The editor, in the drawer: tall, in the reading face. */
+.doc-form #content { min-height: 48vh; resize: vertical; font-size: var(--text-sm); line-height: 1.6; }
+.estimate.over { color: var(--danger); font-weight: 600; }
+/* In the drawer: the count on its own line, Cancel and the action together on the right. */
+.doc-form .form-footer { justify-content: flex-end; }
+.doc-form .form-footer .estimate { flex-basis: 100%; margin-right: 0; }
 
 .doc {
   border: 1px solid var(--line);
@@ -16,28 +21,46 @@
 .doc-head {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
 }
-.doc-title { flex: 1; font-weight: 600; cursor: pointer; }
-.doc-title:hover { color: var(--accent-text); }
-.doc-meta { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
-.doc-meta .warn { color: var(--danger); font-weight: 600; }
+/* The title is a button (it opens the chunks), drawn as text with a chevron. */
+.doc-title { flex: 1; min-width: 0; font-weight: 600; }
+button.doc-title {
+  justify-content: flex-start;
+  gap: var(--space-2);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 var(--space-2);
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: left;
+  white-space: normal;
+}
+.doc-title:is(button):hover:not(:disabled) { background: var(--surface-2); }
+.doc-chevron { color: var(--faint); transition: transform var(--dur-fast) var(--ease); }
+.doc-title[aria-expanded="true"] .doc-chevron { transform: rotate(90deg); }
+.doc-meta { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .doc-chunks { border-top: 1px solid var(--line); padding: var(--space-3) var(--space-4); }
+@media (max-width: 560px) { .doc-head { flex-wrap: wrap; } .doc-meta { order: 3; flex-basis: 100%; padding-left: var(--space-8); } }
 
 .chunk { margin-bottom: var(--space-3); }
-.chunk-label { font-size: var(--text-xs); color: var(--muted); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.chunk-label { font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--space-1); font-variant-numeric: tabular-nums; }
 .chunk-text {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading);
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: var(--space-2) 10px;
+  padding: var(--space-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   margin: 0;
 }
+/* A tool result the chat cannot draw, shown raw (sources-panel.tsx): code, so a code face. */
+.tool-call pre.chunk-text { font-family: var(--font-mono); font-size: var(--text-xs); }
 
 /* --- tenancy (Phase 7) -------------------------------------------------- */
 
@@ -100,12 +123,18 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
   .booking { margin-left: 0; }
 }
 
-/* --- unanswered questions (S-4) ----------------------------------------- */
+/* --- unanswered questions (S-4; plan/ui-refresh.md Phase 8) ---------------- */
 
-.unanswered { display: flex; gap: var(--space-3); align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); }
+.unanswered { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
 .unanswered:first-of-type { border-top: 0; }
-.unanswered-question { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
-.unanswered-when { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
+.unanswered-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.unanswered-question { white-space: pre-wrap; overflow-wrap: anywhere; }
+.unanswered-when { font-size: var(--text-xs); color: var(--muted); }
+
+/* An empty list that is good news: a check, a sentence. */
+.empty-list { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-8) var(--space-4); text-align: center; color: var(--muted); }
+.empty-list strong { color: var(--ink); font-size: var(--text-lg); }
+.empty-list .auth-done { margin-bottom: var(--space-2); }
 
 /* --- booking types: rooms (plan/booking-types.md Phase 4) ---------------- */
 

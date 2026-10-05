@@ -9,6 +9,11 @@
 // so it starts by asking whether this browser holds a session for THIS tenant.
 // If not, it shows a login form. A 401 at any later point, such as an expired
 // session, drops back to that form instead of showing an error per row.
+//
+// The look (plan/ui-refresh.md Phase 8): "Add a document" is the page's
+// action and opens the form in a side drawer; Edit opens the same drawer
+// with the document loaded. Closing the drawer abandons an edit but keeps a
+// new document's draft. Delete asks in a dialog that names the document.
 
 import { useCallback, useEffect, useState } from 'react';
 // The chunker the SERVER uses, imported straight into the browser.
@@ -33,6 +38,8 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
+import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
 export interface AdminScreenProps {
@@ -64,6 +71,7 @@ function DocumentRow({
   onEdit,
   editing,
   readOnly,
+  ask,
 }: {
   api: string;
   doc: DocumentSummary;
@@ -77,6 +85,8 @@ function DocumentRow({
   onUnauthorized: () => void;
   onError: (message: string) => void;
   onClearNotice: () => void;
+  /** The screen's confirmation dialog (components/dialogs.tsx). */
+  ask: (question: Question) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(false);
   const [chunks, setChunks] = useState<ChunkSummary[] | null>(null);
@@ -100,7 +110,14 @@ function DocumentRow({
   }, [api, chunks, doc.id, onUnauthorized, open]);
 
   const remove = useCallback(async () => {
-    if (!confirm(`Delete "${doc.title}" and all ${doc.chunkCount} of its chunks?`)) return;
+    const sure = await ask({
+      title: `Delete “${doc.title}”?`,
+      body: `Its ${doc.chunkCount} chunk${doc.chunkCount === 1 ? '' : 's'} go with it, and the assistant stops answering from it. This cannot be undone.`,
+      actionLabel: 'Delete',
+      backLabel: 'Keep it',
+      danger: true,
+    });
+    if (sure === null) return;
     setDeleting(true);
     let response: Response | null = null;
     try {
@@ -113,20 +130,24 @@ function DocumentRow({
       setDeleting(false);
       onError(`Could not delete: ${await describeFailure(error as Error, response)}`);
     }
-  }, [api, doc.chunkCount, doc.id, doc.title, onChanged, onClearNotice, onError, onUnauthorized]);
+  }, [api, ask, doc.chunkCount, doc.id, doc.title, onChanged, onClearNotice, onError, onUnauthorized]);
 
   return (
     <div className="doc">
       <div className="doc-head">
-        <span className="doc-title" title="Click to show the chunks" onClick={toggle}>
-          {doc.title}
-        </span>
+        {/* A button, so the keyboard opens the chunks too. */}
+        <button type="button" className="doc-title" aria-expanded={open} onClick={toggle}>
+          <Icon name="chevron-right" size={16} className="doc-chevron" />
+          <span>{doc.title}</span>
+        </button>
         <span className="doc-meta">
           {doc.chunkCount === 0 ? (
             // The R-7 orphan: a document that exists but can never be
             // retrieved. Ingest cleans up after itself now, so this should
             // never appear — but a symptom you can see beats one you cannot.
-            <span className="warn">⚠ 0 chunks</span>
+            <span className="badge danger">
+              <Icon name="alert" size={12} /> 0 chunks
+            </span>
           ) : (
             `${doc.chunkCount} chunk${doc.chunkCount === 1 ? '' : 's'}`
           )}
@@ -134,11 +155,11 @@ function DocumentRow({
         </span>
         {!readOnly && (
           <>
-            <button type="button" title="Edit this document" disabled={deleting || editing} onClick={() => onEdit(doc)}>
-              ✎
+            <button type="button" className="ghost sm" aria-label={`Edit ${doc.title}`} title="Edit" disabled={deleting || editing} onClick={() => onEdit(doc)}>
+              <Icon name="edit" size={16} />
             </button>
-            <button type="button" title="Delete this document" disabled={deleting || editing} onClick={remove}>
-              🗑
+            <button type="button" className="ghost sm danger" aria-label={`Delete ${doc.title}`} title="Delete" disabled={deleting || editing} onClick={remove}>
+              <Icon name="trash" size={16} />
             </button>
           </>
         )}
@@ -195,6 +216,8 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   const [submitting, setSubmitting] = useState(false);
   // The document the form is editing, or null when it is adding a new one.
   const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const { ask, dialog } = useConfirmDialog();
 
   // Any 401 means the session is gone (expired, logged out elsewhere, or the
   // secret was rotated). Back to the login form, with nothing left on screen.
@@ -262,7 +285,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
         setTitle(detail.title);
         setSource(detail.source ?? '');
         setContent(detail.content);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setFormOpen(true);
       } catch (error) {
         setNotice({ message: `Could not open: ${await describeFailure(error as Error, response)}`, kind: 'error' });
       }
@@ -313,6 +336,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
           kind: 'ok',
         });
         clearForm();
+        setFormOpen(false);
         void loadDocuments();
       } catch (error) {
         setNotice({
@@ -330,6 +354,25 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   const chunkCount = estimateChunkCount(length);
 
   const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'documents' as const, title: 'Knowledge base', session: { auth, role, onLogout: logout } };
+  // Closing abandons an edit (the row must not stay "being edited"), but a
+  // new document's draft is kept for when the drawer opens again.
+  const closeForm = () => {
+    setFormOpen(false);
+    if (editing) clearForm();
+  };
+  const addDocument = canWrite ? (
+    <button
+      type="button"
+      className="primary"
+      onClick={() => {
+        if (editing) clearForm();
+        setNotice(null);
+        setFormOpen(true);
+      }}
+    >
+      <Icon name="plus" size={16} /> Add a document
+    </button>
+  ) : undefined;
 
   if (auth !== 'in') {
     return (
@@ -355,8 +398,11 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
 
   return (
     <>
-      <StaffFrame {...frame}>
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <StaffFrame {...frame} actions={addDocument}>
+        {dialog}
+        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+          {notice?.message}
+        </div>
 
         {!canWrite && role && (
           <section className="card">
@@ -368,9 +414,8 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
         )}
 
         {canWrite && (
-        <section className="card">
-          <h2>{editing ? `Edit “${editing.title}”` : 'Add a document'}</h2>
-          <form onSubmit={submit}>
+        <Drawer open={formOpen} title={editing ? `Edit “${editing.title}”` : 'Add a document'} onClose={closeForm}>
+          <form onSubmit={submit} className="doc-form">
             <div className="field">
               <label htmlFor="title">Title</label>
               <input
@@ -403,6 +448,8 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
                 required
                 placeholder="Paste the document text here…"
                 value={content}
+                aria-describedby="content-estimate"
+                aria-invalid={length > MAX_CONTENT_LENGTH || undefined}
                 onChange={(event) => setContent(event.target.value)}
               />
             </div>
@@ -410,19 +457,14 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
             <div className="form-footer">
               {/* Updated live using the SAME chunker the server runs, so you can
                   see how your text will be split before committing. */}
-              <span
-                className="estimate"
-                style={length > MAX_CONTENT_LENGTH ? { color: 'var(--danger)' } : undefined}
-              >
-                {length.toLocaleString()} characters · ≈ {chunkCount} chunk
+              <span id="content-estimate" className={length > MAX_CONTENT_LENGTH ? 'estimate over' : 'estimate'}>
+                {length.toLocaleString()} / {MAX_CONTENT_LENGTH.toLocaleString()} characters · ≈ {chunkCount} chunk
                 {chunkCount === 1 ? '' : 's'} ({CHUNK_SIZE} chars, {CHUNK_OVERLAP} overlap)
               </span>
-              {editing && (
-                <button type="button" disabled={submitting} onClick={clearForm}>
-                  Cancel
-                </button>
-              )}
-              <button type="submit" className="primary" disabled={submitting}>
+              <button type="button" disabled={submitting} onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" aria-busy={submitting || undefined} disabled={submitting}>
                 {/* Genuinely slow for a long document: the OpenAI embeddings
                     call is synchronous and there is no background job (mvp.md). */}
                 {submitting
@@ -432,8 +474,14 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
                     : 'Add to knowledge base'}
               </button>
             </div>
+            {/* The page's notice is behind the drawer; a refusal is said here too. */}
+            {notice?.kind === 'error' && formOpen && (
+              <div className="notice error drawer-notice" role="alert">
+                {notice.message}
+              </div>
+            )}
           </form>
-        </section>
+        </Drawer>
         )}
 
         <section className="card">
@@ -443,7 +491,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
             <div className="small">{listMessage}</div>
           ) : documents.length === 0 ? (
             <div className="small muted">
-              {canWrite ? 'No documents yet. Paste something above to give the bot something to know.' : 'No documents yet.'}
+              {canWrite ? 'No documents yet. "Add a document" gives the bot something to know.' : 'No documents yet.'}
             </div>
           ) : (
             <div>
@@ -457,6 +505,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
                   onEdit={startEdit}
                   editing={editing?.id === doc.id}
                   readOnly={!canWrite}
+                  ask={ask}
                   onClearNotice={() => setNotice(null)}
                   onError={(message) => setNotice({ message, kind: 'error' })}
                 />
