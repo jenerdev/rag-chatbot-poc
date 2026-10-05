@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–8 done
-> 2026-10-06 (the looks at 0–7 included, no action items; Phase 8's look
-> owed); Phases 9–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–9 done
+> 2026-10-06 (the looks at 0–8 included, no action items; Phase 9's look
+> owed); Phase 10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -441,6 +441,19 @@ actions → drawer form → confirm dialog. `accommodations-screen`,
 - Members: avatar initial, email, role as a select for owners.
 - Platform: the tenant list as cards with the Pulse strip on top; the tenant
   form's theme preview shows the contrast check of Rule 5.
+
+**Done 2026-10-06:** `plan/ui-refresh-phase9-walk.mjs`, 24/24 as a harbor
+owner and a throwaway super user; every non-GET caught in the browser (one,
+the dropped photo's POST), so Garden Room still has 2 photos. No
+`window.confirm` or `window.prompt` is left in the app. `contrastProblems()`
+in `lib/theme.ts` (tested) checks four pairs against 4.5:1. Deviations: the
+room cards stay editable in place, not in a drawer (each holds details,
+rates and photos); members' add form stays inline (one field); "You" is
+marked only on the platform, which knows the viewer's id (the tenant
+session route returns none, Rule 3). Found: inputs written with no `type`
+were unstyled since Phase 0 (the selector listed types only); now
+`input:not([type])` is in the list. The theme preview had inherited
+`.tenant-root`'s full-screen height; it is contained now.
 
 ### Phase 10 — Polish, accessibility audit, the record
 

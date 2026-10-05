@@ -15,6 +15,10 @@
 //
 // A new slot has no price until rates are set for it (the Rooms screen, or
 // the whole property's rates), so it is not offered on the booking page yet.
+//
+// The look (plan/ui-refresh.md Phase 9): "Add a slot" and Edit open the form
+// in a drawer; Retire and Delete ask in the dialog; the retired slots are
+// folded away under "Retired (n)".
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SlotAdmin } from '@rag/bookings';
@@ -23,6 +27,8 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
+import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 
 export interface SlotsScreenProps {
   slug: string;
@@ -66,6 +72,8 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [formOpen, setFormOpen] = useState(false);
+  const { ask, dialog } = useConfirmDialog();
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -146,7 +154,16 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
       draft.id === null
         ? await write('POST', '/slots', fields, `Added "${fields.name}". Set its rates before it is offered on the booking page.`)
         : await write('PATCH', `/slots/${draft.id}`, fields, `Saved "${fields.name}".`);
-    if (ok) setDraft(EMPTY);
+    if (ok) {
+      setDraft(EMPTY);
+      setFormOpen(false);
+    }
+  }
+
+  // Closing abandons an edit; a new slot's draft is kept for next time.
+  function closeForm() {
+    setFormOpen(false);
+    if (draft.id !== null) setDraft(EMPTY);
   }
 
   function edit(slot: SlotAdmin) {
@@ -159,7 +176,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
       nightly: slot.nightly,
     });
     setNotice(null);
-    window.scrollTo({ top: 0 });
+    setFormOpen(true);
   }
 
   const editing = draft.id === null ? null : (slots?.find((s) => s.id === draft.id) ?? null);
@@ -193,13 +210,29 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   const active = slots?.filter((s) => s.active) ?? [];
   const retired = slots?.filter((s) => !s.active) ?? [];
 
+  const addSlot = (
+    <button
+      type="button"
+      className="primary"
+      onClick={() => {
+        if (draft.id !== null) setDraft(EMPTY);
+        setNotice(null);
+        setFormOpen(true);
+      }}
+    >
+      <Icon name="plus" size={16} /> Add a slot
+    </button>
+  );
+
   return (
     <>
-      <StaffFrame {...frame}>
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <StaffFrame {...frame} actions={addSlot}>
+        {dialog}
+        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+          {notice?.message}
+        </div>
 
-        <section className="card">
-          <h2>{draft.id === null ? 'Add a slot' : `Edit "${editing?.name ?? draft.name}"`}</h2>
+        <Drawer open={formOpen} title={draft.id === null ? 'Add a slot' : `Edit "${editing?.name ?? draft.name}"`} onClose={closeForm}>
           <p className="small muted">
             A slot is a period you sell, such as a Day Tour from 08:00 for 9 hours. It can run past midnight. Nightly means a
             stay can repeat it night after night. Times are in {slots?.[0]?.timezone ?? 'the business’s timezone'}.
@@ -264,89 +297,112 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
               <span className="small muted">
                 {draft.id === null ? 'A new slot has no price until its rates are set.' : 'Bookings already made keep the times they were made with.'}
               </span>
-              <span>
-                {draft.id !== null && (
-                  <button type="button" disabled={busy} onClick={() => setDraft(EMPTY)}>
-                    Cancel
-                  </button>
-                )}{' '}
-                <button type="submit" className="primary" disabled={busy}>
+              <span className="form-actions">
+                <button type="button" disabled={busy} onClick={closeForm}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                   {busy ? 'Saving…' : draft.id === null ? 'Add slot' : 'Save'}
                 </button>
               </span>
             </div>
+            {notice?.kind === 'error' && formOpen && (
+              <div className="notice error drawer-notice" role="alert">
+                {notice.message}
+              </div>
+            )}
           </form>
-        </section>
+        </Drawer>
 
         <section className="card">
           <h2>Slots offered</h2>
           {slots === null ? (
             <div className="small">{loadMessage}</div>
           ) : active.length === 0 ? (
-            <div className="small muted">No slots offered. Add one above; nothing can be booked without one.</div>
+            <div className="small muted">No slots offered. "Add a slot" makes one; nothing can be booked without one.</div>
           ) : (
             active.map((s) => (
-              <div key={s.id} className="holiday">
-                <span className="holiday-day">{s.startTime}</span>
-                <span className="holiday-label">
-                  {s.name}
-                  {s.nightly && <span className="holiday-badge">nightly</span>}
+              <div key={s.id} className="list-row">
+                <span className="list-row-lead">{s.startTime}</span>
+                <span className="list-row-main">
+                  <span className="list-row-title">{s.name}</span>
+                  {s.nightly && <span className="badge accent">Nightly</span>}
                 </span>
-                <span className="holiday-surcharge">
+                <span className="list-row-meta">
                   {lengthLabel(s.minutes)}
                   {s.upcoming > 0 ? ` · ${s.upcoming} upcoming` : ''}
                 </span>
-                <button type="button" className="link" disabled={busy} onClick={() => edit(s)}>
-                  Edit
-                </button>
-                {s.booked ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Retire "${s.name}"? It will no longer be offered on the booking page, in the chat, or for new bookings. Its bookings stay.`)) {
-                        void write('PATCH', `/slots/${s.id}`, { active: false }, `Retired "${s.name}".`);
-                      }
-                    }}
-                  >
-                    Retire
+                <span className="list-row-actions">
+                  <button type="button" className="ghost sm" aria-label={`Edit ${s.name}`} title="Edit" disabled={busy} onClick={() => edit(s)}>
+                    <Icon name="edit" size={16} />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Delete "${s.name}"? It was never booked; its room rates are deleted with it.`)) {
-                        void write('DELETE', `/slots/${s.id}`, undefined, `Deleted "${s.name}".`);
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                )}
+                  {s.booked ? (
+                    <button
+                      type="button"
+                      className="sm"
+                      disabled={busy}
+                      onClick={async () => {
+                        const sure = await ask({
+                          title: `Retire "${s.name}"?`,
+                          body: 'It will no longer be offered on the booking page, in the chat, or for new bookings. Its bookings stay.',
+                          actionLabel: 'Retire',
+                          backLabel: 'Keep offering it',
+                        });
+                        if (sure !== null) void write('PATCH', `/slots/${s.id}`, { active: false }, `Retired "${s.name}".`);
+                      }}
+                    >
+                      Retire
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ghost sm danger"
+                      aria-label={`Delete ${s.name}`}
+                      title="Delete"
+                      disabled={busy}
+                      onClick={async () => {
+                        const sure = await ask({
+                          title: `Delete "${s.name}"?`,
+                          body: 'It was never booked; its room rates are deleted with it. This cannot be undone.',
+                          actionLabel: 'Delete',
+                          backLabel: 'Keep it',
+                          danger: true,
+                        });
+                        if (sure !== null) void write('DELETE', `/slots/${s.id}`, undefined, `Deleted "${s.name}".`);
+                      }}
+                    >
+                      <Icon name="trash" size={16} />
+                    </button>
+                  )}
+                </span>
               </div>
             ))
           )}
         </section>
 
         {retired.length > 0 && (
-          <section className="card">
-            <h2>Retired</h2>
+          <details className="card folded">
+            <summary>
+              <Icon name="chevron-right" size={16} className="folded-chevron" />
+              Retired ({retired.length})
+            </summary>
             <p className="small muted">Not offered anywhere, and takes no new bookings. Their past bookings keep them.</p>
             {retired.map((s) => (
-              <div key={s.id} className="holiday">
-                <span className="holiday-day">{s.startTime}</span>
-                <span className="holiday-label">
-                  {s.name}
-                  <span className="holiday-badge closed">retired</span>
+              <div key={s.id} className="list-row">
+                <span className="list-row-lead">{s.startTime}</span>
+                <span className="list-row-main">
+                  <span className="list-row-title">{s.name}</span>
+                  <span className="badge">Retired</span>
                 </span>
-                <span className="holiday-surcharge">{lengthLabel(s.minutes)}</span>
-                <button type="button" disabled={busy} onClick={() => void write('PATCH', `/slots/${s.id}`, { active: true }, `"${s.name}" is offered again.`)}>
-                  Offer again
-                </button>
+                <span className="list-row-meta">{lengthLabel(s.minutes)}</span>
+                <span className="list-row-actions">
+                  <button type="button" className="sm" disabled={busy} onClick={() => void write('PATCH', `/slots/${s.id}`, { active: true }, `"${s.name}" is offered again.`)}>
+                    Offer again
+                  </button>
+                </span>
               </div>
             ))}
-          </section>
+          </details>
         )}
       </StaffFrame>
     </>

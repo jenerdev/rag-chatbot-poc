@@ -16,6 +16,10 @@
 // The value is typed as pesos ("500") or a percentage ("12.5") and sent as
 // an INTEGER: centavos, or hundredths of a percent (1250). Parsed by string,
 // never × 100 (plan § 2.1).
+//
+// The look (plan/ui-refresh.md Phase 9): "Add a promo" and Edit open the
+// form in a drawer; the value is a badge in words ("12.5 % off"); Retire and
+// Delete ask in the dialog.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Promo } from '@rag/bookings';
@@ -25,6 +29,8 @@ import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { centavosToInput, formatMoney, parseMoneyInput } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
+import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 
 export interface PromosScreenProps {
   slug: string;
@@ -88,6 +94,8 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [formOpen, setFormOpen] = useState(false);
+  const { ask, dialog } = useConfirmDialog();
   const [showRetired, setShowRetired] = useState(false);
 
   const unauthorized = useCallback(() => {
@@ -185,7 +193,16 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       draft.id === null
         ? await write('POST', '/promos', fields, `Added "${fields.name}".${fields.code ? ` Customers type ${fields.code} on the booking page.` : ' It applies by itself to every stay in its dates.'}`)
         : await write('PATCH', `/promos/${draft.id}`, fields, `Saved "${fields.name}". Bookings already made keep their discount.`);
-    if (ok) setDraft(EMPTY);
+    if (ok) {
+      setDraft(EMPTY);
+      setFormOpen(false);
+    }
+  }
+
+  // Closing abandons an edit; a new promo's draft is kept for next time.
+  function closeForm() {
+    setFormOpen(false);
+    if (draft.id !== null) setDraft(EMPTY);
   }
 
   function edit(p: Promo) {
@@ -200,7 +217,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       maxUses: p.maxUses === null ? '' : String(p.maxUses),
     });
     setNotice(null);
-    window.scrollTo({ top: 0 });
+    setFormOpen(true);
   }
 
   const editing = draft.id === null ? null : (promos?.find((p) => p.id === draft.id) ?? null);
@@ -235,67 +252,96 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   const overlapping = active.filter((p) => p.code === null && active.some((q) => q.id !== p.id && q.code === null && q.validFrom <= p.validTo && p.validFrom <= q.validTo));
 
   const row = (p: Promo) => (
-    <div key={p.id} className="holiday">
-      <span className="holiday-day">
+    <div key={p.id} className="list-row">
+      <span className="list-row-lead">
         {p.validFrom} → {p.validTo}
       </span>
-      <span className="holiday-label">
-        {p.name}
-        <span className="holiday-badge">{p.code ? `code ${p.code}` : 'automatic'}</span>
-        {overlapping.includes(p) && <span className="holiday-badge">overlaps another automatic promo</span>}
+      <span className="list-row-main">
+        <span className="list-row-title">{p.name}</span>
+        <span className="badge ok">{valueLabel(p, currency)} off</span>
+        <span className={p.code ? 'badge accent' : 'badge'}>{p.code ? `Code ${p.code}` : 'Automatic'}</span>
+        {!p.active && <span className="badge">Retired</span>}
+        {overlapping.includes(p) && (
+          <span className="badge warn">
+            <Icon name="alert" size={12} /> Overlaps another automatic promo
+          </span>
+        )}
       </span>
-      <span className="holiday-surcharge">
-        {valueLabel(p, currency)} off
-        {' · '}
+      <span className="list-row-meta">
         {p.uses} use{p.uses === 1 ? '' : 's'}
         {p.maxUses !== null ? ` of ${p.maxUses}` : ''}
       </span>
-      {p.active && (
-        <button type="button" className="link" disabled={busy} onClick={() => edit(p)}>
-          Edit
-        </button>
-      )}
-      {p.active && p.uses > 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            if (window.confirm(`Retire "${p.name}"? No new booking can use it. The ${p.uses} that did keep their discount.`)) {
-              void write('PATCH', `/promos/${p.id}`, { active: false }, `Retired "${p.name}".`);
-            }
-          }}
-        >
-          Retire
-        </button>
-      )}
-      {p.active && p.uses === 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            if (window.confirm(`Delete "${p.name}"? It was never used.`)) {
-              void write('DELETE', `/promos/${p.id}`, undefined, `Deleted "${p.name}".`);
-            }
-          }}
-        >
-          Delete
-        </button>
-      )}
-      {!p.active && (
-        <button type="button" className="link" disabled={busy} onClick={() => void write('PATCH', `/promos/${p.id}`, { active: true }, `"${p.name}" is offered again.`)}>
-          Offer again
-        </button>
-      )}
+      <span className="list-row-actions">
+        {p.active && (
+          <button type="button" className="ghost sm" aria-label={`Edit ${p.name}`} title="Edit" disabled={busy} onClick={() => edit(p)}>
+            <Icon name="edit" size={16} />
+          </button>
+        )}
+        {p.active && p.uses > 0 && (
+          <button
+            type="button"
+            className="sm"
+            disabled={busy}
+            onClick={async () => {
+              const sure = await ask({
+                title: `Retire "${p.name}"?`,
+                body: `No new booking can use it. The ${p.uses} that did keep their discount.`,
+                actionLabel: 'Retire',
+                backLabel: 'Keep offering it',
+              });
+              if (sure !== null) void write('PATCH', `/promos/${p.id}`, { active: false }, `Retired "${p.name}".`);
+            }}
+          >
+            Retire
+          </button>
+        )}
+        {p.active && p.uses === 0 && (
+          <button
+            type="button"
+            className="ghost sm danger"
+            aria-label={`Delete ${p.name}`}
+            title="Delete"
+            disabled={busy}
+            onClick={async () => {
+              const sure = await ask({ title: `Delete "${p.name}"?`, body: 'It was never used. This cannot be undone.', actionLabel: 'Delete', backLabel: 'Keep it', danger: true });
+              if (sure !== null) void write('DELETE', `/promos/${p.id}`, undefined, `Deleted "${p.name}".`);
+            }}
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        )}
+        {!p.active && (
+          <button type="button" className="sm" disabled={busy} onClick={() => void write('PATCH', `/promos/${p.id}`, { active: true }, `"${p.name}" is offered again.`)}>
+            Offer again
+          </button>
+        )}
+      </span>
     </div>
+  );
+
+  const addPromo = (
+    <button
+      type="button"
+      className="primary"
+      onClick={() => {
+        if (draft.id !== null) setDraft(EMPTY);
+        setNotice(null);
+        setFormOpen(true);
+      }}
+    >
+      <Icon name="plus" size={16} /> Add a promo
+    </button>
   );
 
   return (
     <>
-      <StaffFrame {...frame}>
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <StaffFrame {...frame} actions={addPromo}>
+        {dialog}
+        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+          {notice?.message}
+        </div>
 
-        <section className="card">
-          <h2>{draft.id === null ? 'Add a promo' : `Edit "${editing?.name ?? draft.name}"`}</h2>
+        <Drawer open={formOpen} title={draft.id === null ? 'Add a promo' : `Edit "${editing?.name ?? draft.name}"`} onClose={closeForm}>
           <p className="small muted">
             A promo takes its discount off every stay whose dates fall inside its range. With a code, the customer types it on
             the booking page; without one, it applies by itself. The database computes the discount when a booking is quoted or
@@ -360,26 +406,29 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
                   ? 'No code: this promo applies by itself to every eligible stay.'
                   : 'The limit counts bookings, pending or confirmed; a declined or cancelled one gives its use back.'}
               </span>
-              <span>
-                {draft.id !== null && (
-                  <button type="button" disabled={busy} onClick={() => setDraft(EMPTY)}>
-                    Cancel
-                  </button>
-                )}{' '}
-                <button type="submit" className="primary" disabled={busy}>
+              <span className="form-actions">
+                <button type="button" disabled={busy} onClick={closeForm}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                   {busy ? 'Saving…' : draft.id === null ? 'Add promo' : 'Save'}
                 </button>
               </span>
             </div>
+            {notice?.kind === 'error' && formOpen && (
+              <div className="notice error drawer-notice" role="alert">
+                {notice.message}
+              </div>
+            )}
           </form>
-        </section>
+        </Drawer>
 
         <section className="card">
           <h2>Promos offered</h2>
           {promos === null ? (
             <div className="small">{loadMessage}</div>
           ) : active.length === 0 ? (
-            <div className="small muted">No promos. Add one above.</div>
+            <div className="small muted">No promos. "Add a promo" makes one.</div>
           ) : (
             active.map(row)
           )}

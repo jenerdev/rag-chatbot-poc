@@ -13,13 +13,20 @@
 // refuses (a reserved slug, a live booking, the last owner), its sentence is
 // shown as it is. The preview is the SAME mechanism the real page uses:
 // custom properties through React's `style` prop (D-030), never a <style>.
+//
+// Since plan/ui-refresh.md Phase 9: under the preview, the colours' contrast
+// is checked as they are typed (contrastProblems, lib/theme.ts) and any pair
+// below WCAG AA is named; advice, not a refusal. Switching bookings off and
+// archiving ask in the dialog.
 
 import { useMemo, useState } from 'react';
 import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { MembersPanel } from '@/components/members-panel';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
-import { COLOUR, THEME_KEY_LIST, THEME_LABELS, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
+import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
+import { useConfirmDialog } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 
 type Notice = { message: string; kind: 'ok' | 'error' } | null;
 type Languages = 'english' | 'taglish' | 'tagalog';
@@ -124,6 +131,8 @@ export function TenantForm({
   const bookingsOn = tenant?.applications.includes('bookings') ?? false;
   const badColours = useMemo(() => THEME_KEY_LIST.filter((k) => theme[k] && !COLOUR.test(theme[k]!)), [theme]);
   const preview = useMemo(() => themeVars(theme), [theme]);
+  const contrast = useMemo(() => contrastProblems(theme), [theme]);
+  const { ask, dialog } = useConfirmDialog();
 
   /** One request; the tenant the route hands back becomes the form's tenant. */
   async function send(method: string, path: string, body: object | undefined, done: string, created = false) {
@@ -259,7 +268,7 @@ export function TenantForm({
             ))}
           </div>
           {/* The preview: the real page's mechanism, custom properties through `style`, and nothing else. */}
-          <div className="tenant-root" data-scheme={pinsLightScheme(preview) ? 'light' : undefined} style={preview}>
+          <div className="tenant-root tenant-preview" data-scheme={pinsLightScheme(preview) ? 'light' : undefined} style={preview}>
             <div className="card">
               <div className="turn user">
                 <div className="bubble">Is the pool open on Sundays?</div>
@@ -273,6 +282,20 @@ export function TenantForm({
               <button type="button">Sample</button>
             </div>
           </div>
+          {contrast.length > 0 ? (
+            <div className="notice warn" role="status">
+              <strong>Hard to read:</strong>
+              <ul className="contrast-list">
+                {contrast.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="hint met" role="status">
+              <Icon name="check" size={14} /> Every text colour passes the 4.5:1 contrast check.
+            </p>
+          )}
 
           <h3>When the documents cannot answer</h3>
           <p className="small muted">What the chat says instead, per reply language. Empty = the built-in default (D-047, D-048).</p>
@@ -372,10 +395,13 @@ export function TenantForm({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm('Switch bookings off? Refused while a booking has not ended. Rooms and bookings stay.')) {
-                      void send('DELETE', `/tenants/${id}/applications/bookings`, undefined, 'Bookings switched off.');
-                    }
+                  onClick={async () => {
+                    const sure = await ask({
+                      title: 'Switch bookings off?',
+                      body: 'Refused while a booking has not ended. Rooms and bookings stay, and switching it on again brings them back.',
+                      actionLabel: 'Switch off',
+                    });
+                    if (sure !== null) void send('DELETE', `/tenants/${id}/applications/bookings`, undefined, 'Bookings switched off.');
                   }}
                 >
                   Switch off
@@ -389,6 +415,7 @@ export function TenantForm({
         </form>
       </section>
 
+      {dialog}
       <MembersPanel api={`${api}/tenants/${id}/members`} selfUserId={selfUserId} onUnauthorized={onUnauthorized} />
 
       <section className="card">
@@ -408,10 +435,14 @@ export function TenantForm({
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm(`Archive ${tenant.businessName}? Its pages will answer 404 until unarchived.`)) {
-                  void send('POST', `/tenants/${id}/archive`, undefined, 'Archived: the tenant answers 404 everywhere.');
-                }
+              onClick={async () => {
+                const sure = await ask({
+                  title: `Archive ${tenant.businessName}?`,
+                  body: 'Its chat, admin and booking pages will answer 404 until it is unarchived. Nothing is deleted.',
+                  actionLabel: 'Archive',
+                  danger: true,
+                });
+                if (sure !== null) void send('POST', `/tenants/${id}/archive`, undefined, 'Archived: the tenant answers 404 everywhere.');
               }}
             >
               Archive

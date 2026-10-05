@@ -18,11 +18,18 @@
 // Everything a room carries (name, description) is tenant text, rendered as
 // React children, so it is escaped (CLAUDE.md § Conventions). Photo URLs come
 // from the server's getPublicUrl(), built from a path the server made.
+//
+// The look (plan/ui-refresh.md Phase 9): "Add a room" opens a drawer; each
+// room stays a card (its details, rates and photos are edited in place);
+// Retire and Remove photo ask in the dialog; a photo can be dropped on the
+// dashed tile as well as chosen.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Accommodation, BookingSummary, ImageSummary, SlotSummary } from '@rag/bookings';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
+import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -72,9 +79,13 @@ interface RoomCardProps {
   onNotice: (notice: Notice) => void;
   onChanged: () => void;
   limits: Pick<AccommodationsScreenProps, 'maxImageBytes' | 'maxImageEdge' | 'maxImagesPerUnit'>;
+  /** The screen's confirmation dialog (components/dialogs.tsx). */
+  ask: (question: Question) => Promise<string | null>;
 }
 
-function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits }: RoomCardProps) {
+function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits, ask }: RoomCardProps) {
+  // A photo dragged over the drop tile.
+  const [dragging, setDragging] = useState(false);
   const [name, setName] = useState(room.name);
   const [capacity, setCapacity] = useState(room.capacity === null ? '' : String(room.capacity));
   // plan/extra-guests.md: guests the rate covers, and the fee per guest above
@@ -159,10 +170,15 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
         // stay, so staff can decide to move or cancel them first.
         const response = await call(`/bookings?from=${setup.today}&to=${addDays(setup.today, LOOKAHEAD_DAYS - 1)}&unit=${room.id}`);
         const upcoming = ((await response.json()) as BookingSummary[]).filter((b) => b.status !== 'cancelled');
-        const warning = upcoming.length
-          ? `${room.name} has ${upcoming.length} booking(s) in the next ${LOOKAHEAD_DAYS} days. They stay valid and keep this room; it just will not be offered again. Retire it?`
-          : `Retire ${room.name}? It will not be offered for new bookings.`;
-        if (!window.confirm(warning)) return null;
+        const sure = await ask({
+          title: `Retire ${room.name}?`,
+          body: upcoming.length
+            ? `It has ${upcoming.length} booking(s) in the next ${LOOKAHEAD_DAYS} days. They stay valid and keep this room; it just will not be offered again.`
+            : 'It will not be offered for new bookings.',
+          actionLabel: 'Retire',
+          backLabel: 'Keep offering it',
+        });
+        if (sure === null) return null;
       }
       await call(`/accommodations/${room.id}`, { method: 'PATCH', body: JSON.stringify({ active }) });
       return active ? `${room.name} is offered again.` : `${room.name} is retired.`;
@@ -172,7 +188,15 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
   const upload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (file) uploadFile(file);
+  };
+
+  // A chosen OR dropped photo: the same resize and the same route.
+  const uploadFile = (file: File) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      onNotice({ message: 'A photo is a JPEG, PNG or WebP image.', kind: 'error' });
+      return;
+    }
     void run(async () => {
       const resized = await resizeImage(file, limits.maxImageEdge);
       if (resized.after > limits.maxImageBytes) {
@@ -186,8 +210,9 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
     });
   };
 
-  const removePhoto = (image: ImageSummary) => {
-    if (!window.confirm('Remove this photo?')) return;
+  const removePhoto = async (image: ImageSummary) => {
+    const sure = await ask({ title: 'Remove this photo?', body: `It leaves ${room.name}'s photos for good.`, actionLabel: 'Remove', backLabel: 'Keep it', danger: true });
+    if (sure === null) return;
     void run(async () => {
       await call(`/accommodations/${room.id}/images/${image.id}`, { method: 'DELETE' });
       return 'Photo removed.';
@@ -212,9 +237,14 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
       <div className="room-head">
         <h2>
           {room.name}
-          {!room.active && <span className="muted"> · retired</span>}
+          {!room.active && <span className="badge">Retired</span>}
+          {room.active && room.rates.length === 0 && (
+            <span className="badge warn">
+              <Icon name="alert" size={12} /> No rate yet
+            </span>
+          )}
         </h2>
-        <button type="button" disabled={busy} onClick={() => setActive(!room.active)}>
+        <button type="button" className="sm" disabled={busy} onClick={() => setActive(!room.active)}>
           {room.active ? 'Retire' : 'Offer again'}
         </button>
       </div>
@@ -303,30 +333,46 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             {/* eslint-disable-next-line @next/next/no-img-element -- a plain public URL; next/image would need remotePatterns for the bucket */}
             <img src={image.url} alt={`${room.name}, photo ${index + 1}`} />
             <figcaption>
-              <button type="button" className="link" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left">
-                ←
+              <button type="button" className="ghost sm" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left" title="Move left">
+                <Icon name="chevron-left" size={16} />
               </button>
-              <button type="button" className="link" disabled={busy} onClick={() => removePhoto(image)}>
-                Remove
+              <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void removePhoto(image)} aria-label={`Remove photo ${index + 1}`} title="Remove">
+                <Icon name="trash" size={16} />
               </button>
               <button
                 type="button"
-                className="link"
+                className="ghost sm"
                 disabled={busy || index === room.images.length - 1}
                 onClick={() => movePhoto(index, 1)}
                 aria-label="Move right"
+                title="Move right"
               >
-                →
+                <Icon name="chevron-right" size={16} />
               </button>
             </figcaption>
           </figure>
         ))}
         {room.images.length < limits.maxImagesPerUnit && (
-          <label className="photo-add">
-            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={upload} hidden />
-            <span className="button">+ Photo</span>
+          <label
+            className={dragging ? 'photo-add dragging' : 'photo-add'}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              const file = event.dataTransfer.files[0];
+              if (file && !busy) uploadFile(file);
+            }}
+          >
+            {/* Visually hidden, not display:none: the tile is its label, and the keyboard reaches it. */}
+            <input type="file" className="visually-hidden" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={upload} />
+            <Icon name="image" size={22} />
+            <span className="photo-add-text">Add a photo</span>
             <span className="small muted">
-              {room.images.length} of {limits.maxImagesPerUnit}
+              or drop one here · {room.images.length} of {limits.maxImagesPerUnit}
             </span>
           </label>
         )}
@@ -355,9 +401,11 @@ export function AccommodationsScreen({
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
 
-  // The new-room form.
+  // The new-room form, in a drawer.
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const { ask, dialog } = useConfirmDialog();
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -425,6 +473,7 @@ export function AccommodationsScreen({
       setNotice({ message: `Added ${name}. Give it a rate so it can be booked.`, kind: 'ok' });
       setName('');
       setCapacity('');
+      setFormOpen(false);
       void load();
     } catch (error) {
       setNotice({ message: (error as Error).message, kind: 'error' });
@@ -464,11 +513,27 @@ export function AccommodationsScreen({
 
   return (
     <>
-      <StaffFrame {...frame}>
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <StaffFrame
+        {...frame}
+        actions={
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              setNotice(null);
+              setFormOpen(true);
+            }}
+          >
+            <Icon name="plus" size={16} /> Add a room
+          </button>
+        }
+      >
+        {dialog}
+        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+          {notice?.message}
+        </div>
 
-        <section className="card">
-          <h2>New room</h2>
+        <Drawer open={formOpen} title="Add a room" onClose={() => setFormOpen(false)}>
           <form onSubmit={addRoom}>
             <div className="field-row">
               <div className="field grow">
@@ -484,14 +549,24 @@ export function AccommodationsScreen({
               <span className="small muted">
                 A new room covers 2 guests, takes up to 4, and charges ₱250 per extra guest until you change it. It is offered once it has a rate.
               </span>
-              <button type="submit" className="primary" disabled={busy}>
-                Add room
-              </button>
+              <span className="form-actions">
+                <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
+                  Add room
+                </button>
+              </span>
             </div>
+            {notice?.kind === 'error' && formOpen && (
+              <div className="notice error drawer-notice" role="alert">
+                {notice.message}
+              </div>
+            )}
           </form>
-        </section>
+        </Drawer>
 
-        {rooms.length === 0 && <div className="small muted">No rooms yet.</div>}
+        {rooms.length === 0 && <div className="small muted">No rooms yet. "Add a room" makes one.</div>}
         {rooms.map((room) => (
           // The key includes what the card's inputs were initialised from, so
           // after a save the card is rebuilt from the server's values rather
@@ -506,6 +581,7 @@ export function AccommodationsScreen({
             onNotice={setNotice}
             onChanged={() => void load()}
             limits={{ maxImageBytes, maxImageEdge, maxImagesPerUnit }}
+            ask={ask}
           />
         ))}
       </StaffFrame>

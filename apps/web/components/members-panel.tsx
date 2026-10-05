@@ -11,10 +11,15 @@
 // What it cannot do: invite a NEW account. That needs the service key, which
 // no request holds (CLAUDE.md rule 2). The route's 404 says the CLI command
 // to run, and this panel shows it as it is.
+//
+// The look (plan/ui-refresh.md Phase 9): each member a row with an initial,
+// the role a compact picker, Remove a labelled icon that asks in the dialog.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
+import { useConfirmDialog } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
 
 type Notice = { message: string; kind: 'ok' | 'error' } | null;
@@ -30,6 +35,7 @@ export function MembersPanel({
   selfUserId?: string | null;
   onUnauthorized: () => void;
 }) {
+  const { ask, dialog } = useConfirmDialog();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading members…');
   const [notice, setNotice] = useState<Notice>(null);
@@ -86,13 +92,16 @@ export function MembersPanel({
 
   return (
     <section className="card">
+      {dialog}
       <h2>Members{members ? ` (${members.length})` : ''}</h2>
       <p className="small muted">
         Owners manage members and everything below; admins manage the knowledge base, rooms, rates and holidays; staff
         handle bookings and the unanswered questions. A change takes effect on the person&apos;s next request. A tenant
         always keeps at least one owner.
       </p>
-      <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+        {notice?.message}
+      </div>
 
       {members === null ? (
         <div className="small">{loadMessage}</div>
@@ -101,14 +110,20 @@ export function MembersPanel({
       ) : (
         <div>
           {members.map((m) => (
-            <div key={m.userId} className="doc">
-              <div className="doc-head">
-                <span className="doc-title">
+            <div key={m.userId} className="member-row">
+              <span className="member-avatar" aria-hidden="true">
+                {m.email.charAt(0).toUpperCase()}
+              </span>
+              <span className="member-who">
+                <span className="member-email">
                   {m.email}
-                  {selfUserId === m.userId && <span className="muted"> (you)</span>}
+                  {selfUserId === m.userId && <span className="badge accent">You</span>}
                 </span>
-                <span className="doc-meta small muted">since {new Date(m.createdAt).toLocaleDateString()}</span>
+                <span className="member-since">Member since {new Date(m.createdAt).toLocaleDateString()}</span>
+              </span>
+              <span className="list-row-actions">
                 <select
+                  className="compact"
                   aria-label={`Role of ${m.email}`}
                   value={m.role}
                   disabled={busy}
@@ -122,15 +137,24 @@ export function MembersPanel({
                 </select>
                 <button
                   type="button"
-                  title="Remove this member"
+                  className="ghost sm danger"
+                  aria-label={`Remove ${m.email}`}
+                  title="Remove"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`Remove ${m.email}? Their next request is refused.`)) void write('DELETE', { userId: m.userId }, `Removed ${m.email}.`);
+                  onClick={async () => {
+                    const sure = await ask({
+                      title: `Remove ${m.email}?`,
+                      body: 'Their next request is refused. Their account stays; it can be added again.',
+                      actionLabel: 'Remove',
+                      backLabel: 'Keep them',
+                      danger: true,
+                    });
+                    if (sure !== null) void write('DELETE', { userId: m.userId }, `Removed ${m.email}.`);
                   }}
                 >
-                  🗑
+                  <Icon name="trash" size={16} />
                 </button>
-              </div>
+              </span>
             </div>
           ))}
         </div>

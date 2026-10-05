@@ -96,3 +96,54 @@ export function parseTheme(input: unknown): { theme: Theme; problems: string[] }
   }
   return { theme, problems };
 }
+
+// --- contrast (plan/ui-refresh.md Rule 5, Phase 9) ---------------------------
+//
+// A tenant chooses its colours; the platform form says when they would make
+// text hard to read, BEFORE they are saved. Advice, not a rule: Postgres
+// still accepts any valid colour, and the tenant may know its audience.
+
+/** The light defaults of app/styles/tokens.css: what an unset key falls back to. Keep in step with that file. */
+export const LIGHT_DEFAULTS: Readonly<Record<ThemeKey, string>> = {
+  accent: '#2563eb',
+  accentSoft: '#eef3ff',
+  bg: '#f7f7f8',
+  panel: '#ffffff',
+  ink: '#18181b',
+};
+
+/** WCAG 2 relative luminance of #rgb or #rrggbb. */
+function luminance(hex: string): number {
+  const h = hex.slice(1);
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(full.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** The WCAG contrast ratio of two colours, 1 to 21. */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+/**
+ * The pairs a page actually draws, each against WCAG AA for body text
+ * (4.5:1). One sentence per pair that falls short; [] when all pass. Unset
+ * or invalid keys are judged at their default, as the page would draw them.
+ */
+export function contrastProblems(theme: Theme): string[] {
+  const colour = (key: ThemeKey) => (isColour(theme[key]) ? theme[key]! : LIGHT_DEFAULTS[key]);
+  const pairs: [string, string, string][] = [
+    ['Text on the background', colour('ink'), colour('bg')],
+    ['Text on the panels', colour('ink'), colour('panel')],
+    ['White button text on the accent', '#ffffff', colour('accent')],
+    ['Text on the soft accent', colour('ink'), colour('accentSoft')],
+  ];
+  return pairs
+    .map(([what, a, b]) => ({ what, ratio: contrastRatio(a, b) }))
+    .filter(({ ratio }) => ratio < 4.5)
+    .map(({ what, ratio }) => `${what} is ${ratio.toFixed(1)}:1; 4.5:1 is the minimum for reading.`);
+}

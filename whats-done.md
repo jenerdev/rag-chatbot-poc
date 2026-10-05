@@ -7940,3 +7940,37 @@ Policy", no resolution in the last 30 minutes. A translucent drawer in one
 screenshot was measured, not guessed at: opacity 0 → 0.94 at 100 ms → 1
 at 400 ms, the fade-in caught mid-way; the probe also showed the drawer's
 footer wrapping its main button alone onto a line, now fixed.
+
+## UI refresh, Phase 9: rooms, holidays, slots, promos, members, the platform · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** the nine remaining browser confirms (two on Rooms, one on
+Holidays, two on Slots, two on Promos, one in the members panel, two in
+the tenant form) are the Phase 7 dialog; none is left in the app. Slots,
+promos, holidays and new rooms are added and edited in the drawer, opened
+from the page's action. One list row (`.list-row`) for slots, promos and
+holidays; a promo's value is a badge in words ("10 % off"); holidays are
+grouped by month with Holiday, Peak and Closed badges; retired slots fold
+under "Retired (n)". Rooms: Retired and "No rate yet" badges, photo
+controls as labelled icons, and a dashed tile that takes a dropped photo
+as well as a chosen one (same resize, same route). Members and the
+platform's tenants are rows with an initial. The tenant form checks the
+colours' contrast as they are typed (`contrastProblems()`, four pairs
+against WCAG AA 4.5:1, five new tests) and names any pair that fails.
+
+**Why it matters:** these are the screens owners use least often, which
+is where an unexplained browser prompt costs most.
+
+**Observed:** `plan/ui-refresh-phase9-walk.mjs`, 24/24: every drawer
+opens and closes; every destructive action asks, and Back sent nothing;
+a 64×48 PNG dropped on Garden Room's tile was resized and sent as one POST
+to `/accommodations/125/images` (caught; the room still has 2 photos);
+harbor's colours pass, and `#ffd400` typed as its accent produced "White
+button text on the accent is 1.x:1"; every screen 375 px on a phone.
+Tests 73/73; typecheck clean.
+
+**Found, not planned:** the platform form's fields were tiny unstyled
+boxes. They are `<input>`s with no `type`, and Phase 0's control selector
+listed types only, so every typeless input in the app (the slot name, the
+promo fields, the tenant form) had been unstyled since Phase 0; the Phase 0
+screenshots did not catch it. `input:not([type])` is in the selector now.
+The theme preview had also inherited `.tenant-root`'s `min-height: 100vh`.

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
+import { Icon } from '@/components/icons';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { TenantForm } from '@/components/tenant-form';
 
@@ -254,10 +255,10 @@ export function PlatformScreen() {
           </section>
         )}
         <section className="card">
-          <div className="form-footer">
+          <div className="range-head">
             <h2>Tenants{tenants ? ` (${tenants.length})` : ''}</h2>
             <button type="button" className="primary" onClick={() => setSelected('new')}>
-              New tenant
+              <Icon name="plus" size={16} /> New tenant
             </button>
           </div>
           <p className="small muted">
@@ -271,25 +272,34 @@ export function PlatformScreen() {
           ) : (
             <div>
               {tenants.map((t) => (
-                <div key={t.id} className="doc">
-                  <div className="doc-head">
-                    <span className="doc-title">
+                <div key={t.id} className="member-row">
+                  <span className="member-avatar" aria-hidden="true">
+                    {t.businessName.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="member-who">
+                    <span className="member-email">
                       {t.businessName}
-                      {t.archivedAt && <span className="muted"> · archived</span>}
+                      {t.archivedAt && <span className="badge">Archived</span>}
+                      {t.applications.map((a) => (
+                        <span key={a} className="badge accent">
+                          {a}
+                        </span>
+                      ))}
                     </span>
-                    <span className="doc-meta small muted">
-                      /t/{t.slug} · {t.assistantName} · {t.applications.length ? t.applications.join(', ') : 'no applications'} ·{' '}
-                      {t.members} member{t.members === 1 ? '' : 's'}
+                    <span className="member-since">
+                      /t/{t.slug} · {t.assistantName} · {t.members} member{t.members === 1 ? '' : 's'}
                     </span>
-                    <button type="button" onClick={() => setSelected(t.id)}>
-                      Edit
-                    </button>
+                  </span>
+                  <span className="list-row-actions">
                     {!t.archivedAt && (
-                      <a className="button" href={`/t/${t.slug}`} target="_blank" rel="noreferrer">
+                      <a className="button ghost sm" href={`/t/${t.slug}`} target="_blank" rel="noreferrer">
                         Open
                       </a>
                     )}
-                  </div>
+                    <button type="button" className="sm" onClick={() => setSelected(t.id)}>
+                      Edit
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>

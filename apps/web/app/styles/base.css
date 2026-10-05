@@ -224,7 +224,9 @@ button[aria-busy="true"]::before {
 
 label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--ink); margin-bottom: var(--space-1); }
 
-input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="url"],
+/* input:not([type]) too: an input with no type IS a text field, and the
+   tenant form writes several that way (the Phase 9 walk found them unstyled). */
+input:not([type]), input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="url"],
 input[type="search"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
   width: 100%;
   min-height: var(--control-h);
