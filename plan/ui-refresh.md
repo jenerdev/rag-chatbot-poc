@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–4 done
-> 2026-10-06 (the looks at 0–3 included, no action items; Phase 4's look
-> owed); Phases 5–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–5 done
+> 2026-10-06 (the looks at 0–4 included, no action items; Phase 5's look
+> owed); Phases 6–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -341,6 +341,16 @@ changed, so `reply-text.test.ts` is untouched.
 
 **Done when:** a request with a promo, a refused closed date and a receipt
 walk at both widths, and the figures equal the quote route's JSON.
+
+**Done 2026-10-06:** `plan/ui-refresh-phase5-walk.mjs`, 14/14 against the
+REAL quote route; the request was answered inside the browser with a
+receipt built from the real quote's lines, so nothing was stored (0 rows
+named "Walk Five" afterwards). Deviations: on a phone the summary follows
+the three sections in the page instead of a bottom bar that expands, so
+Send stays after the details and there is one Send button, not two; the
+promo code needs no Apply button, since the quote already answers it as
+it is typed; no tenant has a closed date in the walked window, so the
+closed-date words were not walked (unchanged code, D-080's own walk).
 
 ### Phase 6 — The dashboard
 

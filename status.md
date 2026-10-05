@@ -68,8 +68,10 @@
 - [x] Phase 3, the chat screen: walk 18/18, tests 68/68.
 - [x] The user's look at Phase 3: no action items.
 - [x] Phase 4, what a reply contains: walk 17/17, tests 68/68.
-- [ ] The user's look at Phase 4: `plan/ui-refresh/phase4/{walk,walk-dark}/`.
-- [ ] Phase 5, the customer booking page. Then Phases 6–10.
+- [x] The user's look at Phase 4: no action items.
+- [x] Phase 5, the customer booking page: walk 14/14, tests 68/68.
+- [ ] The user's look at Phase 5: `plan/ui-refresh/phase5/{walk,walk-dark,after}/`.
+- [ ] Phase 6, the dashboard. Then Phases 7–10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

@@ -103,9 +103,10 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 
 /* The bookings form's room list, per_room only. */
 .room-picks { display: flex; flex-direction: column; gap: 6px; }
-.room-pick { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.room-pick { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease); }
+.room-pick:hover { border-color: var(--line-strong); }
 .room-pick.picked { border-color: var(--accent); background: var(--accent-soft); }
-.room-pick label { flex: 1; margin: 0; color: var(--ink); font-size: var(--text-sm); font-weight: 400; }
+.room-pick > label { flex: 1; margin: 0; color: var(--ink); font-size: var(--text-sm); font-weight: 400; }
 .room-pick input[type="number"] { width: 90px; }
 .quote { margin: 0 0 var(--space-3); padding: 10px var(--space-3); border-radius: var(--radius-md); background: var(--accent-soft); font-size: var(--text-sm); }
 .quote.error { background: var(--danger-soft); color: var(--danger); }
@@ -140,6 +141,69 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 .stay-summary { margin: 10px 0; }
 /* The tenant's own instructions: plain text, line breaks kept, never HTML. */
 .instructions { white-space: pre-wrap; padding: 10px var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+
+/* S-6's layout (plan/ui-refresh.md Phase 5): three numbered sections and,
+   beside them on a desktop, a summary that stays in view. On a phone the
+   summary follows the sections, so Send comes after the details. */
+.book-main { max-width: 1040px; }
+.book-intro { margin: calc(-1 * var(--space-2)) 0 var(--space-6); color: var(--muted); max-width: 62ch; }
+.book-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-5); align-items: start; }
+.book-steps .card { margin-bottom: var(--space-4); }
+.book-step h2 { display: flex; align-items: center; gap: var(--space-3); }
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.step-hint { margin: calc(-1 * var(--space-2)) 0 var(--space-3); }
+.narrow-field { max-width: 160px; }
+.hint.field-error { color: var(--danger); font-weight: 500; }
+.promo-open { margin-top: var(--space-1); }
+.promo-field { margin-bottom: 0; max-width: 280px; }
+
+.book-summary { position: sticky; top: calc(var(--space-6) + 56px); margin-bottom: 0; }
+.book-summary h2 { font-size: var(--text-base); }
+.summary-stay { padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+.summary-stay-title { font-weight: 600; }
+.summary-empty { margin: 0 0 var(--space-4); color: var(--muted); font-size: var(--text-sm); }
+.book-summary .quote { background: none; padding: 0; margin-bottom: var(--space-4); }
+.book-summary .quote.error { background: var(--danger-soft); padding: 10px var(--space-3); }
+.book-summary .quote-total { font-size: var(--text-lg); padding-top: var(--space-2); margin-top: var(--space-2); }
+.book-send { width: 100%; min-height: 44px; font-size: var(--text-base); }
+.summary-note { margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--muted); text-align: center; }
+
+/* While a price is asked: three shimmering bars, never the last price. */
+.quote-skeleton { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
+.quote-skeleton span { height: 14px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.quote-skeleton span:nth-child(2) { width: 70%; }
+.quote-skeleton span:nth-child(3) { width: 45%; height: 20px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (max-width: 860px) {
+  .book-layout { grid-template-columns: minmax(0, 1fr); }
+  .book-summary { position: static; }
+}
+
+/* The room list on S-6 and the staff form: a checkbox card per room. */
+.room-pick label { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
+.room-pick label input[type="checkbox"] { margin-top: 3px; }
+.room-pick-text { display: flex; flex-direction: column; gap: 2px; }
+.room-pick-name { font-weight: 600; }
+.room-pick-meta { font-size: var(--text-xs); color: var(--muted); }
+
+/* The receipt: the reference first, copyable; then what happens next. */
+.receipt { max-width: 640px; margin: 0 auto; }
+.receipt-reference { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-4); margin-bottom: var(--space-4); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.receipt-reference .reference { font-size: var(--text-xl); letter-spacing: 0.06em; flex: 1; }
+.next-steps { margin: 0 0 var(--space-4); padding-left: var(--space-5); }
+.next-steps li { margin-bottom: var(--space-1); }
 
 /* S-3's requests, and S-7. */
 .booking.request { margin-left: 0; }

@@ -15,6 +15,13 @@
 //
 // Everything the server sends is a React child, so it is escaped, including
 // the tenant's own instructions text (CLAUDE.md § Conventions).
+//
+// The look (plan/ui-refresh.md Phase 5): three numbered sections (the stay,
+// the guests, the customer) and, beside them on a desktop, a summary that
+// stays in view with the server's price and the Send button. While a price
+// is being asked, the summary shows a placeholder, never the last price,
+// which may no longer be true. The promo field opens on request. The
+// receipt leads with the reference, copyable.
 
 import { useEffect, useMemo, useState } from 'react';
 import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
@@ -22,6 +29,7 @@ import { BrandHeader } from '@/components/brand-header';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
+import { Icon } from '@/components/icons';
 
 export interface BookingPageScreenProps {
   slug: string;
@@ -114,6 +122,11 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<Sent>(null);
+  // True between a choice changing and its price arriving: the summary shows
+  // a placeholder rather than a figure that may be stale.
+  const [quotePending, setQuotePending] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Only units priced for this slot are offered. Memoised: `rooms` below
   // depends on it, and the quote effect on `rooms`, so a new array every
@@ -144,9 +157,11 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   useEffect(() => {
     if (!checkIn || !roomsComplete || !nightsValid) {
       setQuote({ quote: null, message: null });
+      setQuotePending(false);
       return;
     }
     let stale = false;
+    setQuotePending(true);
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(`${api}/book/quote`, {
@@ -158,8 +173,12 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
         if (stale) return;
         if (!response.ok) setQuote({ quote: null, message: body?.error ?? 'Could not get a price.' });
         else setQuote({ quote: body as RequestQuote, message: null });
+        setQuotePending(false);
       } catch {
-        if (!stale) setQuote({ quote: null, message: 'Could not reach the server.' });
+        if (!stale) {
+          setQuote({ quote: null, message: 'Could not reach the server.' });
+          setQuotePending(false);
+        }
       }
     }, 300);
     return () => {
@@ -197,6 +216,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
 
   function startOver() {
     setSent(null);
+    setCopied(false);
     setCheckIn('');
     setNights('1');
     setGuests('');
@@ -217,19 +237,31 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     return (
       <>
         {header}
-        <main>
+        <main className="book-main">
           <section className="card receipt">
-            <h2>Request sent</h2>
-            <p>
-              Your reference is <strong className="reference">{r.reference}</strong>. Keep it: the resort will use it when they
-              contact you.
-            </p>
-            <p className="notice">
+            <div className="auth-done">
+              <Icon name="check" size={22} />
+            </div>
+            <h1 className="page-title">Request sent</h1>
+            <div className="receipt-reference">
+              <span className="small muted">Your reference</span>
+              <strong className="reference">{r.reference}</strong>
+              <button
+                type="button"
+                className="sm"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(r.reference).then(() => setCopied(true), () => undefined);
+                }}
+              >
+                <Icon name={copied ? 'check' : 'copy'} size={14} /> {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <p className="notice warn">
               <strong>This is a request, not a confirmation.</strong> The date is yours once {businessName} confirms it. Until
               then, someone else may book it.
             </p>
             <div className="stay-summary">
-              <div>
+              <div className="stay-summary-title">
                 {r.slot}
                 {r.nights > 1 ? ` · ${r.nights + 1} days, ${r.nights} nights` : ''}
               </div>
@@ -238,12 +270,13 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
               </div>
             </div>
             <Lines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
-            {r.instructions && (
-              <>
-                <h3>What happens next</h3>
-                <div className="instructions">{r.instructions}</div>
-              </>
-            )}
+            <h3>What happens next</h3>
+            <ol className="next-steps">
+              <li>{businessName} reviews your request.</li>
+              <li>They confirm it and contact you by phone or email, quoting your reference.</li>
+              <li>The date is yours once it is confirmed.</li>
+            </ol>
+            {r.instructions && <div className="instructions">{r.instructions}</div>}
             <div className="form-footer">
               <button type="button" onClick={startOver}>
                 Make another request
@@ -255,244 +288,298 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     );
   }
 
+  const canSend = !sending && !!quote.quote && quote.quote.available && !!name && !!phone && !!email;
+
   return (
     <>
       {header}
-      <main>
-        <section className="card">
-          <h2>Request a booking</h2>
-          <p className="small muted">
-            Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and
-            contacts you.
-          </p>
+      <main className="book-main">
+        <h1 className="page-title">Request a booking</h1>
+        <p className="book-intro">
+          Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and contacts you.
+        </p>
 
-          <form onSubmit={send}>
-            <div className="field-row">
-              {page.slots.length > 1 && (
+        <form className="book-layout" onSubmit={send}>
+          <div className="book-steps">
+            {/* 1 · the stay */}
+            <section className="card book-step" aria-labelledby="step-stay">
+              <h2 id="step-stay">
+                <span className="step-number">1</span> Your stay
+              </h2>
+              <div className="field-row">
+                {page.slots.length > 1 && (
+                  <div className="field">
+                    <label htmlFor="slot">What</label>
+                    <select id="slot" value={slotId} onChange={(e) => setSlotId(Number(e.target.value))}>
+                      {page.slots.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} — from {timeLabel(s.startTime)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="field">
-                  <label htmlFor="slot">What</label>
-                  <select id="slot" value={slotId} onChange={(e) => setSlotId(Number(e.target.value))}>
-                    {page.slots.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — from {timeLabel(s.startTime)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="field">
-                <label htmlFor="check-in">{slot.nightly ? 'Check-in date' : 'Date'}</label>
-                <input
-                  type="date"
-                  id="check-in"
-                  required
-                  min={page.today}
-                  max={page.lastDate}
-                  value={checkIn}
-                  onChange={(e) => setCheckIn(e.target.value)}
-                />
-                {/* The tenant's booking horizon, said up front, and again the moment it is passed. */}
-                <div className={`small${checkIn > page.lastDate ? ' field-error' : ' muted'}`}>
-                  {checkIn > page.lastDate ? 'Too far ahead: the latest is' : 'Up to'} {dateLabel(page.lastDate)}
-                </div>
-                {closedInStay && (
-                  <div className="small field-error">
-                    Closed on {dateLabel(closedInStay.day)} ({closedInStay.label}). Choose other dates.
-                  </div>
-                )}
-              </div>
-              {slot.nightly && (
-                <div className="field narrow">
-                  <label htmlFor="nights">Nights</label>
+                  <label htmlFor="check-in">{slot.nightly ? 'Check-in date' : 'Date'}</label>
                   <input
-                    type="number"
-                    id="nights"
-                    min={1}
-                    max={page.maxNights}
-                    step={1}
+                    type="date"
+                    id="check-in"
                     required
-                    value={nights}
-                    onChange={(e) => setNights(e.target.value)}
+                    min={page.today}
+                    max={page.lastDate}
+                    value={checkIn}
+                    aria-invalid={checkIn > page.lastDate || closedInStay !== null || undefined}
+                    onChange={(e) => setCheckIn(e.target.value)}
                   />
-                  {/* The tenant's max stay, said up front, and again the moment it is passed. */}
-                  <div className={`small${nightCount > page.maxNights ? ' field-error' : ' muted'}`}>
-                    {nightCount > page.maxNights ? 'At most' : 'Up to'} {page.maxNights} night{page.maxNights === 1 ? '' : 's'}
+                  {/* The tenant's booking horizon, said up front, and again the moment it is passed. */}
+                  <div className={`hint${checkIn > page.lastDate ? ' field-error' : ''}`}>
+                    {checkIn > page.lastDate ? 'Too far ahead: the latest is' : 'Up to'} {dateLabel(page.lastDate)}
                   </div>
+                  {closedInStay && (
+                    <div className="hint field-error" role="alert">
+                      <Icon name="alert" size={14} /> Closed on {dateLabel(closedInStay.day)} ({closedInStay.label}). Choose other dates.
+                    </div>
+                  )}
                 </div>
-              )}
-              {!perRoom && (
-                <div className="field narrow">
-                  <label htmlFor="guests">Guests</label>
-                  <input
-                    type="number"
-                    id="guests"
-                    min={1}
-                    max={units[0]?.capacity ?? undefined}
-                    step={1}
-                    required
-                    value={guests}
-                    onChange={(e) => setGuests(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-
-            {closedDays.length > 0 && (
-              <div className="small muted">
-                Closed on {closedDays.slice(0, 6).map((c) => dateLabel(c.day)).join(', ')}
-                {closedDays.length > 6 ? `, and ${closedDays.length - 6} more date${closedDays.length === 7 ? '' : 's'}` : ''}.
-              </div>
-            )}
-            {checkIn && end && nightsValid && (
-              <div className="small muted stay-line">
-                {slot.nightly && nightCount > 1 ? `${nightCount + 1} days, ${nightCount} nights · ` : ''}
-                {dateLabel(checkIn)}, {timeLabel(slot.startTime)} to {checkOut ? dateLabel(checkOut) : ''}, {timeLabel(end.time)}
-              </div>
-            )}
-            {!perRoom && units[0] && (
-              <div className="small muted">
-                {units[0].standardCapacity !== null && units[0].extraPersonRate
-                  ? `The rate covers ${units[0].standardCapacity} guests; each guest above that is ${formatMoney(units[0].extraPersonRate, page.currency)}. `
-                  : ''}
-                {units[0].capacity !== null ? `At most ${units[0].capacity} guests. ` : ''}
-                {page.guestHint ?? ''}
-              </div>
-            )}
-
-            {perRoom && (
-              <div className="field">
-                <label>Rooms</label>
-                {page.guestHint && <div className="small muted">{page.guestHint}</div>}
-                <div className="room-picks">
-                  {units.map((u) => {
-                    const picked = chosen[u.id] !== undefined;
-                    return (
-                      <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={picked}
-                            onChange={(e) =>
-                              setChosen((current) => {
-                                const next = { ...current };
-                                if (e.target.checked) next[u.id] = '';
-                                else delete next[u.id];
-                                return next;
-                              })
-                            }
-                          />{' '}
-                          {u.name}
-                          {u.capacity !== null && <span className="muted"> · up to {u.capacity}</span>}
-                          {u.standardCapacity !== null && u.extraPersonRate ? (
-                            <span className="muted">
-                              {' '}
-                              · {u.standardCapacity} included, +{formatMoney(u.extraPersonRate, page.currency)} each extra
-                            </span>
-                          ) : null}
-                          {u.description && <span className="room-description">{u.description}</span>}
-                        </label>
-                        {picked && (
-                          <input
-                            type="number"
-                            min={1}
-                            max={u.capacity ?? undefined}
-                            step={1}
-                            placeholder="guests"
-                            aria-label={`Guests in ${u.name}`}
-                            value={chosen[u.id]}
-                            onChange={(e) => setChosen((current) => ({ ...current, [u.id]: e.target.value }))}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {(quote.quote || quote.message) && (
-              <div className={`quote${quote.message || (quote.quote && !quote.quote.available) ? ' error' : ''}`}>
-                {quote.quote ? (
-                  <>
-                    {!quote.quote.available && (
-                      <div className="quote-warning">
-                        A night in this stay is already booked. Please choose other dates.
-                      </div>
-                    )}
-                    <Lines
-                      lines={quote.quote.lines}
-                      currency={quote.quote.currency}
-                      total={quote.quote.total}
-                      discount={quote.quote.discount}
-                      promoName={quote.quote.promo?.name ?? null}
+                {slot.nightly && (
+                  <div className="field narrow">
+                    <label htmlFor="nights">Nights</label>
+                    <input
+                      type="number"
+                      id="nights"
+                      min={1}
+                      max={page.maxNights}
+                      step={1}
+                      required
+                      value={nights}
+                      aria-invalid={nightCount > page.maxNights || undefined}
+                      onChange={(e) => setNights(e.target.value)}
                     />
-                    {/* A typed code that did not apply: the server's words, the price unchanged (D-097). */}
-                    {quote.quote.promoMessage && <div className="quote-warning">{quote.quote.promoMessage}</div>}
-                  </>
-                ) : (
-                  quote.message
+                    {/* The tenant's max stay, said up front, and again the moment it is passed. */}
+                    <div className={`hint${nightCount > page.maxNights ? ' field-error' : ''}`}>
+                      {nightCount > page.maxNights ? 'At most' : 'Up to'} {page.maxNights} night{page.maxNights === 1 ? '' : 's'}
+                    </div>
+                  </div>
                 )}
               </div>
-            )}
+              {closedDays.length > 0 && (
+                <div className="small muted">
+                  Closed on {closedDays.slice(0, 6).map((c) => dateLabel(c.day)).join(', ')}
+                  {closedDays.length > 6 ? `, and ${closedDays.length - 6} more date${closedDays.length === 7 ? '' : 's'}` : ''}.
+                </div>
+              )}
+            </section>
 
-            <h3>Your details</h3>
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="name">Name</label>
-                <input type="text" id="name" required autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+            {/* 2 · who and where */}
+            <section className="card book-step" aria-labelledby="step-guests">
+              <h2 id="step-guests">
+                <span className="step-number">2</span> {perRoom ? 'Rooms and guests' : 'Guests'}
+              </h2>
+              {!perRoom && (
+                <>
+                  <div className="field narrow-field">
+                    <label htmlFor="guests">Guests</label>
+                    <input
+                      type="number"
+                      id="guests"
+                      min={1}
+                      max={units[0]?.capacity ?? undefined}
+                      step={1}
+                      required
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                    />
+                  </div>
+                  {units[0] && (
+                    <div className="small muted">
+                      {units[0].standardCapacity !== null && units[0].extraPersonRate
+                        ? `The rate covers ${units[0].standardCapacity} guests; each guest above that is ${formatMoney(units[0].extraPersonRate, page.currency)}. `
+                        : ''}
+                      {units[0].capacity !== null ? `At most ${units[0].capacity} guests. ` : ''}
+                      {page.guestHint ?? ''}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {perRoom && (
+                <>
+                  {page.guestHint && <p className="small muted step-hint">{page.guestHint}</p>}
+                  <div className="room-picks" role="group" aria-label="Rooms">
+                    {units.map((u) => {
+                      const picked = chosen[u.id] !== undefined;
+                      return (
+                        <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={picked}
+                              onChange={(e) =>
+                                setChosen((current) => {
+                                  const next = { ...current };
+                                  if (e.target.checked) next[u.id] = '';
+                                  else delete next[u.id];
+                                  return next;
+                                })
+                              }
+                            />
+                            <span className="room-pick-text">
+                              <span className="room-pick-name">{u.name}</span>
+                              <span className="room-pick-meta">
+                                {u.capacity !== null && <>Up to {u.capacity}</>}
+                                {u.standardCapacity !== null && u.extraPersonRate ? (
+                                  <>
+                                    {' '}
+                                    · {u.standardCapacity} included, +{formatMoney(u.extraPersonRate, page.currency)} each extra
+                                  </>
+                                ) : null}
+                              </span>
+                              {u.description && <span className="room-description">{u.description}</span>}
+                            </span>
+                          </label>
+                          {picked && (
+                            <input
+                              type="number"
+                              min={1}
+                              max={u.capacity ?? undefined}
+                              step={1}
+                              placeholder="Guests"
+                              aria-label={`Guests in ${u.name}`}
+                              value={chosen[u.id]}
+                              onChange={(e) => setChosen((current) => ({ ...current, [u.id]: e.target.value }))}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* 3 · the customer */}
+            <section className="card book-step" aria-labelledby="step-details">
+              <h2 id="step-details">
+                <span className="step-number">3</span> Your details
+              </h2>
+              <div className="field-row">
+                <div className="field grow">
+                  <label htmlFor="name">Name</label>
+                  <input type="text" id="name" required autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="phone">Mobile number</label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    required
+                    autoComplete="tel"
+                    placeholder="0917 123 4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
               </div>
               <div className="field">
-                <label htmlFor="phone">Mobile number</label>
-                <input
-                  type="tel"
-                  id="phone"
-                  required
-                  autoComplete="tel"
-                  placeholder="0917 123 4567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-              <div className="field grow">
                 <label htmlFor="email">Email</label>
                 <input type="email" id="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
-            </div>
-            <div className="field-row">
-              <div className="field grow">
+              <div className="field">
                 <label htmlFor="notes">
                   Notes <span className="muted">(optional)</span>
                 </label>
                 <input type="text" id="notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              <div className="field">
-                <label htmlFor="promo-code">
-                  Promo code <span className="muted">(optional)</span>
-                </label>
-                {/* The quote above answers it as you type: the discount line, or why it does not apply. */}
-                <input type="text" id="promo-code" maxLength={32} autoComplete="off" placeholder="SUMMER10" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} />
+              {promoOpen ? (
+                <div className="field promo-field">
+                  <label htmlFor="promo-code">
+                    Promo code <span className="muted">(optional)</span>
+                  </label>
+                  {/* The quote answers it as you type: the discount line, or why it does not apply. */}
+                  <input
+                    type="text"
+                    id="promo-code"
+                    maxLength={32}
+                    autoComplete="off"
+                    autoFocus
+                    placeholder="SUMMER10"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                  />
+                  {quote.quote?.promo && (
+                    <div className="hint met">
+                      <Icon name="check" size={14} /> Applied: {quote.quote.promo.name}
+                    </div>
+                  )}
+                  {quote.quote?.promoMessage && <div className="hint field-error">{quote.quote.promoMessage}</div>}
+                </div>
+              ) : (
+                <button type="button" className="link promo-open" onClick={() => setPromoOpen(true)}>
+                  Have a promo code?
+                </button>
+              )}
+              {/* The honeypot: off-screen, not tabbable, not announced. */}
+              <div className="honeypot" aria-hidden="true">
+                <label htmlFor="website">Website</label>
+                <input type="text" id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
               </div>
-            </div>
-            {/* The honeypot: off-screen, not tabbable, not announced. */}
-            <div className="honeypot" aria-hidden="true">
-              <label htmlFor="website">Website</label>
-              <input type="text" id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            </section>
+          </div>
+
+          {/* The summary: what is asked for and the SERVER's price, beside the form on a desktop. */}
+          <aside className="card book-summary" aria-labelledby="summary-title">
+            <h2 id="summary-title">Your request</h2>
+            {checkIn && end && nightsValid ? (
+              <div className="summary-stay">
+                <div className="summary-stay-title">
+                  {slot.name}
+                  {slot.nightly && nightCount > 1 ? ` · ${nightCount} nights` : ''}
+                </div>
+                <div className="small muted">
+                  {dateLabel(checkIn)}, {timeLabel(slot.startTime)} to {checkOut ? dateLabel(checkOut) : ''}, {timeLabel(end.time)}
+                </div>
+              </div>
+            ) : null}
+
+            <div aria-live="polite">
+              {quotePending ? (
+                <div className="quote-skeleton" role="status" aria-label="Getting the price">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ) : quote.quote ? (
+                <div className={quote.quote.available ? 'quote' : 'quote error'}>
+                  {!quote.quote.available && (
+                    <div className="quote-warning">A night in this stay is already booked. Please choose other dates.</div>
+                  )}
+                  <Lines
+                    lines={quote.quote.lines}
+                    currency={quote.quote.currency}
+                    total={quote.quote.total}
+                    discount={quote.quote.discount}
+                    promoName={quote.quote.promo?.name ?? null}
+                  />
+                </div>
+              ) : quote.message ? (
+                <div className="quote error">{quote.message}</div>
+              ) : (
+                <p className="summary-empty">
+                  Choose a date{perRoom ? ', a room and its guests' : ' and the number of guests'} to see the price.
+                </p>
+              )}
             </div>
 
             {error && <div className="notice error">{error}</div>}
 
-            <div className="form-footer">
-              <span className="small muted">Times are in {page.timezone}.</span>
-              <button
-                type="submit"
-                className="primary"
-                disabled={sending || !quote.quote || !quote.quote.available || !name || !phone || !email}
-              >
-                {sending ? 'Sending…' : 'Send request'}
-              </button>
-            </div>
-          </form>
-        </section>
+            <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={!canSend}>
+              {sending ? 'Sending…' : 'Send request'}
+            </button>
+            <p className="summary-note">
+              A request holds nothing until {businessName} confirms it. Times are in {page.timezone}.
+            </p>
+          </aside>
+        </form>
       </main>
     </>
   );

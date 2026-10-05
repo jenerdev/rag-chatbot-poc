@@ -7823,3 +7823,29 @@ and not inside a `<details>`; ArrowRight gave "2 / 3", a 200 px drag left
 "3 / 3", Escape returned focus to the photo button; "searched for: rooms
 open saturday" still shows (D-016). Typecheck clean; tests 68/68, the
 exact-HTML reply tests unchanged.
+
+## UI refresh, Phase 5: the customer booking page · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** S-6 is three numbered sections (1 Your stay, 2 Guests or Rooms
+and guests, 3 Your details) and, beside them on a desktop, a summary card
+that stays in view: the stay in words, the server's price lines and total,
+and Send. While a price is being asked the summary shows a shimmering
+placeholder, never the previous figure (a new `quotePending` state; the
+quote request itself is unchanged). The promo field opens from "Have a
+promo code?" and says beside itself whether the code applied, in the
+server's words. Room picks are cards with the name and its terms on two
+lines. The receipt leads with the reference in a dashed box with Copy,
+then the not-a-confirmation warning, the lines, and "What happens next"
+as three numbered steps (the tenant's own instructions still follow).
+
+**Why it matters:** the page that takes a customer's request; its price
+used to appear and vanish between the fields.
+
+**Observed:** `plan/ui-refresh-phase5-walk.mjs`, 14/14: the placeholder
+appeared within 1 s of the date changing; the first open date for Garden
+Room was 2026-11-04 at ₱3,500.00, from the real quote; "NOPE-WALK" got
+"No such promo code." beside the field; the clipboard held HAR-WALK5Z
+after Copy; villa's section 2 reads "2 Guests" and priced 10 guests at
+₱16,000.00. The request was fulfilled inside the browser: 0 bookings
+named "Walk Five" afterwards. The staff Bookings form shares the room-pick
+cards and still renders (screenshot). Typecheck clean; tests 68/68.
