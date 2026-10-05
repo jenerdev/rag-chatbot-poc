@@ -7,6 +7,10 @@
 // cards; a staff member sees everything but Revenue, which the function
 // withholds (null) by role; every count that is a to-do links to the screen
 // that does it. The charts are inline SVG (bar-chart.tsx), no library.
+//
+// The look (plan/ui-refresh.md Phase 6): the to-dos first, as tiles that are
+// links (a count that needs eyes is red and says so with an icon, never by
+// colour alone); the window as a segmented control; the rest in cards.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -15,6 +19,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { BarChart, SplitBar } from '@/components/bar-chart';
+import { Icon } from '@/components/icons';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
@@ -41,6 +46,21 @@ function dayLabel(date: string): string {
 function dayWithWeekday(date: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/** A to-do count: a link to the screen that resolves it. */
+function Tile({ href, label, value, hint, warn }: { href: string; label: string; value: number; hint?: string; warn?: boolean }) {
+  return (
+    <Link href={href} className={warn ? 'stat-tile warn' : 'stat-tile'}>
+      <span className="stat-tile-label">
+        {warn && <Icon name="alert" size={14} />}
+        {label}
+      </span>
+      <strong className="stat-tile-value">{value}</strong>
+      {hint && <span className="stat-tile-hint">{hint}</span>}
+      <Icon name="chevron-right" size={16} className="stat-tile-go" />
+    </Link>
+  );
 }
 
 export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, currency }: DashboardScreenProps) {
@@ -136,38 +156,31 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           <span className="small muted">
             Today is {dayWithWeekday(data.today)} in {data.timezone}.
           </span>
-          <span className="dashboard-windows" role="group" aria-label="Window">
+          <div className="segmented" role="group" aria-label="Window">
             {WINDOWS.map((w) => (
-              <button key={w} type="button" className={w === days ? 'primary' : ''} onClick={() => setDays(w)}>
+              <button key={w} type="button" aria-pressed={w === days} onClick={() => setDays(w)}>
                 {w} days
               </button>
             ))}
-          </span>
+          </div>
         </div>
 
-        {b && (
-          <section className="card dashboard-attention">
-            <h2>Needs attention</h2>
-            <div className="stat-row">
-              <Link href={`${base}/bookings`} className="stat">
-                <strong>{b.attention.pendingRequests}</strong>
-                <span>request{b.attention.pendingRequests === 1 ? '' : 's'} waiting</span>
-              </Link>
-              <Link href={`${base}/bookings`} className="stat">
-                <strong>{b.attention.pendingStaff}</strong>
-                <span>staff booking{b.attention.pendingStaff === 1 ? '' : 's'} unconfirmed</span>
-              </Link>
-              <Link href={`${base}/bookings`} className={`stat${b.attention.clashing > 0 ? ' warn' : ''}`}>
-                <strong>{b.attention.clashing}</strong>
-                <span>would clash on Confirm (a night already confirmed, or wanted by another pending stay)</span>
-              </Link>
-              <Link href={`${base}/unanswered`} className={`stat${data.chat.openUnanswered > 0 ? ' warn' : ''}`}>
-                <strong>{data.chat.openUnanswered}</strong>
-                <span>unanswered question{data.chat.openUnanswered === 1 ? '' : 's'} open</span>
-              </Link>
-            </div>
-          </section>
-        )}
+        <section className="stat-tiles" aria-label="Needs attention">
+          {b && (
+            <>
+              <Tile href={`${base}/bookings`} label="Requests waiting" value={b.attention.pendingRequests} />
+              <Tile href={`${base}/bookings`} label="Staff bookings unconfirmed" value={b.attention.pendingStaff} />
+              <Tile
+                href={`${base}/bookings`}
+                label="Would clash on Confirm"
+                hint="A night already confirmed, or wanted by another pending stay"
+                value={b.attention.clashing}
+                warn={b.attention.clashing > 0}
+              />
+            </>
+          )}
+          <Tile href={`${base}/unanswered`} label="Unanswered questions" value={data.chat.openUnanswered} warn={data.chat.openUnanswered > 0} />
+        </section>
 
         {b && (
           <section className="card">
@@ -221,13 +234,6 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
               </div>
             </div>
             <BarChart title={`Conversations per day, ${windowLabel}`} bars={data.chat.perDay.map((d) => ({ label: dayLabel(d.day), value: d.conversations }))} />
-            {!b && (
-              <p className="small">
-                <Link href={`${base}/unanswered`}>
-                  {data.chat.openUnanswered} unanswered question{data.chat.openUnanswered === 1 ? '' : 's'} open
-                </Link>
-              </p>
-            )}
           </section>
 
           <section className="card">

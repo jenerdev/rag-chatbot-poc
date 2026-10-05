@@ -7849,3 +7849,34 @@ after Copy; villa's section 2 reads "2 Guests" and priced 10 guests at
 ₱16,000.00. The request was fulfilled inside the browser: 0 bookings
 named "Walk Five" afterwards. The staff Bookings form shares the room-pick
 cards and still renders (screenshot). Typecheck clean; tests 68/68.
+
+## UI refresh, Phase 6: the dashboard · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** the to-dos lead as tiles that are links (Requests waiting, Staff
+bookings unconfirmed, Would clash on Confirm with its reason underneath,
+Unanswered questions); a count that needs eyes is red WITH an alert icon.
+The window is a segmented control (`aria-pressed`), a reusable `.segmented`
+in base.css. The bar chart is drawn at its real pixel width (a
+ResizeObserver) instead of `preserveAspectRatio="none"`, which had stretched
+every label sideways; bars are at most 48 px; the hovered bar stays and the
+rest recede, with a readout, value first. The same readout works by
+keyboard: the chart is one tab stop, ← → Home End step, a live region says
+each bar. The split bar's two parts are 2 px apart.
+
+**Why it matters:** the dashboard is every member's first page; its
+charts' text was distorted at every width but one.
+
+**Observed:** `plan/ui-refresh-phase6-walk.mjs`, 13/13: the tiles read
+0, 1, 1 and 16 for harbor, each linking to bookings or unanswered; the
+four charts' SVG widths equal their containers (390, 846, 846, 846 px), no
+`preserveAspectRatio`; the keyboard read "6 Oct: 0", then "5 Oct: 66",
+then "7 Sept: 0"; staff see no Revenue; northwind gets one tile. The
+dataviz validator: #2563eb on #ffffff and #3b82f6 on #18181b pass every
+check; villa's #0f766e fails the chroma floor only (kept, see the plan).
+
+**Trap found:** the screenshots showed harbor's phone dashboard 453 px
+wide. A probe found the chart's hidden table: a `<table>` ignores
+`width: 1px` and sizes to its content (420 px), and once the chart became
+`position: relative` it stuck out of the card. Wrapped in a clipped
+`<div>`, the page is 375 px. The walk had checked the width on northwind
+only; it now checks every dashboard it opens.

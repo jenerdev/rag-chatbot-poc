@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–5 done
-> 2026-10-06 (the looks at 0–4 included, no action items; Phase 5's look
-> owed); Phases 6–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–6 done
+> 2026-10-06 (the looks at 0–5 included, no action items; Phase 6's look
+> owed); Phases 7–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -366,6 +366,16 @@ closed-date words were not walked (unchanged code, D-080's own walk).
 - Money (owners/admins only) is still `null` from the function for staff; the
   screen leaves the tile out rather than showing a dash.
 - Still no figure added in the browser (D-098).
+
+**Done 2026-10-06:** `plan/ui-refresh-phase6-walk.mjs`, 13/13 as a harbor
+owner, a harbor staff member and a northwind admin. The dataviz skill's
+validator passed the default series colour on both surfaces; villa's teal
+`#0f766e` fails its chroma floor ("reads gray"), a check for telling
+categorical series apart, which a one-series chart does not need; its
+contrast passes, and it is the tenant's colour, so it stays. A tenant with
+no bookings now gets the Unanswered tile too (it was a link inside the
+Chat card). The money tile is left out for staff as before: the function
+withholds it.
 
 ### Phase 7 — The bookings screen
 
