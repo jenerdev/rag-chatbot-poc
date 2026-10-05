@@ -11,46 +11,98 @@
    a phone's browser bars; vh is the fallback. */
 .chat-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
 #messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); }
-.messages-inner { max-width: 820px; margin: 0 auto; }
+/* A reading width: a reply line longer than ~70 characters is hard to follow. */
+.messages-inner { max-width: 760px; margin: 0 auto; }
 
-.empty-state {
-  text-align: center;
-  color: var(--muted);
-  padding: 60px var(--space-5);
-}
-.empty-state strong { color: var(--ink); display: block; margin-bottom: var(--space-2); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; }
-/* D-089: the suggested questions, as wrapping chips under the empty state. */
+/* The welcome (plan/ui-refresh.md Phase 3): the assistant's mark, one
+   sentence, one muted line, and the suggested questions (D-089) as quiet
+   cards, two across. */
+.empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 0 var(--space-6); }
+.empty-state .assistant-mark { width: 48px; height: 48px; font-size: var(--text-lg); margin-bottom: var(--space-4); }
+.empty-state h2 { margin: 0 0 var(--space-2); font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; max-width: 28ch; }
+.empty-state p { margin: 0; color: var(--muted); }
+.empty-state-action { margin-top: var(--space-5); }
 .suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-5);
+  width: 100%;
+  max-width: 600px;
+  margin-top: var(--space-8);
 }
 .suggestions button {
-  border-radius: var(--radius-full);
-  color: var(--accent-text);
-  border-color: var(--line-strong);
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border-color: var(--line);
   background: var(--panel);
+  box-shadow: none;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 400;
   text-align: left;
   white-space: normal;
 }
-.suggestions button:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.suggestions button .icon { color: var(--faint); transition: transform var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.suggestions button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
+.suggestions button:hover:not(:disabled) .icon { color: var(--accent-text); transform: translateX(2px); }
+@media (max-width: 560px) {
+  .empty-state { padding-top: var(--space-8); }
+  .suggestions { grid-template-columns: minmax(0, 1fr); margin-top: var(--space-6); }
+}
 
-.turn { margin-bottom: var(--space-5); }
+/* The assistant's mark: the tenant's logo, or its initial on the soft accent. */
+.assistant-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  object-fit: cover;
+}
+
+.turn { margin-bottom: var(--space-6); }
 .bubble {
-  padding: 10px 14px;
-  border-radius: var(--radius-lg);
   /* The model's output is plain text (no markdown rendering in the MVP), so
      newlines must be preserved by CSS rather than by parsing. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* The visitor: a filled bubble on the right. */
 .turn.user { display: flex; justify-content: flex-end; }
-.turn.user .bubble { background: var(--accent); color: var(--on-accent); max-width: 78%; border-bottom-right-radius: var(--radius-sm); }
-.turn.assistant .bubble { background: var(--panel); border: 1px solid var(--line); max-width: 90%; border-top-left-radius: var(--radius-sm); }
+.turn.user .bubble {
+  max-width: 80%;
+  padding: 10px var(--space-4);
+  border-radius: 18px 18px var(--radius-sm) 18px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+/* The assistant: text on the page beside its mark, no box. */
+.turn.assistant { display: flex; gap: var(--space-3); align-items: flex-start; }
+.assistant-body { flex: 1; min-width: 0; }
+.turn.assistant .bubble { padding: 2px 0 0; line-height: 1.65; }
 /* The assistant's name above each of its turns. */
-.speaker { font-size: var(--text-xs); font-weight: 600; color: var(--accent-text); margin: 0 0 var(--space-1) 2px; }
+.speaker { font-size: var(--text-sm); font-weight: 600; color: var(--ink); margin: 3px 0 var(--space-1); }
+
+/* A failure, under the turn it belongs to, with the way to try again. */
+.turn-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+.turn-error span { flex: 1 1 200px; }
 
 /* A pipe table in the reply (plan/tables.md, D-091): lib/tables.ts parses the
    block, reply-text.tsx draws it. The wrapper scrolls sideways on a phone
@@ -125,7 +177,7 @@
   display: inline-flex;
   gap: 5px;
   align-items: center;
-  padding: 14px var(--space-4);
+  padding: var(--space-2) 0;
 }
 .bubble.thinking span {
   width: 7px;
@@ -147,7 +199,7 @@
 
 /* --- sources panel (D-012: a feature, not a debug aid) ------------------- */
 
-.sources { margin-top: 6px; max-width: 90%; }
+.sources { margin-top: var(--space-2); }
 .sources > summary {
   cursor: pointer;
   color: var(--muted);
@@ -220,26 +272,54 @@
 
 /* --- composer ----------------------------------------------------------- */
 
-.composer {
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-  padding: var(--space-3) var(--space-5);
+/* One rounded field on the page, the send arrow inside it (Phase 3). The
+   focus ring goes round the whole field, not the textarea alone. */
+.composer { position: relative; padding: var(--space-2) var(--space-5) var(--space-3); background: linear-gradient(to bottom, transparent, var(--bg) 30%); }
+.composer-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: 6px 6px 6px var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: var(--field);
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
-.composer-inner { max-width: 820px; margin: 0 auto; display: flex; gap: var(--space-2); align-items: flex-end; }
+.composer-inner:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 .composer textarea {
   flex: 1;
+  min-height: 36px;
+  /* Six lines, then it scrolls. */
+  max-height: calc(6 * 1.55em + 16px);
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   resize: none;
-  min-height: 40px;
-  max-height: 160px;
 }
-.composer button { min-height: 40px; }
+.composer textarea:focus { box-shadow: none; }
+.composer-send { flex: none; width: 36px; min-height: 36px; padding: 0; border-radius: var(--radius-full); }
+.composer-hint { max-width: 760px; margin: 6px auto 0; text-align: center; font-size: var(--text-xs); color: var(--faint); }
+/* Scrolled up while an answer arrived: the way back down. */
+.jump-down { position: absolute; left: 50%; top: calc(-1 * var(--space-10)); transform: translateX(-50%); border-radius: var(--radius-full); box-shadow: var(--shadow-2); }
+@media (max-width: 560px) {
+  .composer { padding: var(--space-2) var(--space-3) var(--space-3); }
+  .composer-hint { display: none; }
+}
+@media (pointer: coarse) {
+  .composer-send { width: 40px; min-height: 40px; }
+}
 
 /* --- tool calls in the chat (plan/bookings.md Phase 7, D-037) ------------ */
 
 /* Shown open under the answer: for an availability answer, this IS what it
    was built from. The day rows reuse .day-head / .slot-chip from S-3, so
    the chat and the bookings screen show one slot the same way. */
-.checked { margin-top: 6px; max-width: 90%; }
+.checked { margin-top: var(--space-2); }
 .tool-call {
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);

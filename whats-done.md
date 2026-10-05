@@ -7765,3 +7765,34 @@ button BEFORE the render that lifts `inert` is refused, so focus now
 returns in an effect after close; and `inert` keeps focus out of the page
 but not out of what follows the drawer (the dev-tools button), so Tab now
 wraps inside it. Typecheck clean; tests 68/68.
+
+## UI refresh, Phase 3: the chat screen · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** the welcome is the assistant's mark (the tenant's logo, else its
+initial), one sentence and the suggested questions (D-089) as two columns
+of quiet cards with a chevron (one column on a phone). The visitor's turns
+are filled bubbles; the assistant's are text on the page beside its mark,
+with no box, at a ~70-character reading width. The composer is one rounded
+field with the send arrow inside, off while the field is empty or an answer
+is pending; the field itself stays enabled, so the next question can be
+typed while an answer streams. Scrolled up while an answer arrives, a "New
+messages" button appears instead of the view being pulled down. A failure
+is one inline line with an icon and Retry (`role="alert"`). The empty
+knowledge base's link lost its inline style (one of the two `style={{}}` in
+the app).
+
+**Why it matters:** the chat is the page every visitor sees; it read as a
+form with a box around every answer.
+
+**Observed:** `plan/ui-refresh-phase3-walk.mjs`, 18/18. The chat route was
+answered inside the browser in the server's own SSE format (meta, delta,
+done, error), so the walk is repeatable and free; a reply can be held,
+which is how "scrolled up during an answer" was reproduced (the view stayed
+at scrollTop 0 and the button appeared). Retry left the user-turn count
+unchanged; a broken stream kept "The pool opens at" with the error under
+it; ten lines showed 156 px of 247. `--real` sent one real question to
+northwind and drew the real stream (the tenant's refusal, as its documents
+have no returns policy). The first run's two failures were the walk's own:
+the last width's broken-stream reply answered the next width's first
+question; each width now starts from the plain answer. Typecheck clean;
+tests 68/68.

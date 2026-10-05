@@ -64,8 +64,10 @@
 - [x] The user's look at Phase 1: no action items.
 - [x] Phase 2, navigation: sidebar, phone drawer, slim public header, the
   chat's height. Walk 20/20, tests 68/68.
-- [ ] The user's look at Phase 2: `plan/ui-refresh/phase2/{walk,after,after-dark}/`.
-- [ ] Phase 3, the chat screen. Then Phases 4–10.
+- [x] The user's look at Phase 2: no action items.
+- [x] Phase 3, the chat screen: walk 18/18, tests 68/68.
+- [ ] The user's look at Phase 3: `plan/ui-refresh/phase3/{walk,walk-dark}/`.
+- [ ] Phase 4, what a reply contains. Then Phases 5–10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

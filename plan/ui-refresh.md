@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–2 done
-> 2026-10-06 (the looks at 0 and 1 included, no action items; Phase 2's look
-> owed); Phases 3–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–3 done
+> 2026-10-06 (the looks at 0–2 included, no action items; Phase 3's look
+> owed); Phases 4–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -275,6 +275,17 @@ dots.
 **Done when:** a greeting, a document answer, a refusal, a tool answer and a
 streamed table all look right at both widths, and the composer never hides
 under a phone keyboard.
+
+**Done 2026-10-06:** `plan/ui-refresh-phase3-walk.mjs`, 18/18, the chat
+route answered inside the browser with the server's own event format (one
+real question with `--real`). What already existed and was kept: Enter /
+Shift+Enter, the auto-grow, stick-to-bottom, Retry that drops the failed
+question before resending. New: the field stays enabled while an answer
+streams (only sending waits); the "New messages" button. Deviations: tool
+answers and streamed tables are walked in Phase 4, whose subject they are;
+"New chat" moved to the header in Phase 2 already; the phone keyboard is
+covered by `100dvh` (Phase 2), not walked, since headless Chrome has no
+on-screen keyboard.
 
 ### Phase 4 — What a reply contains: tables, room cards, lightbox, sources, tool evidence
 

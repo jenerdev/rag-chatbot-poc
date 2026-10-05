@@ -19,6 +19,14 @@
 //      lib/tables.ts, a hand-written parser that knows that one block shape
 //      and hands React strings, never markup. Everything else is still text:
 //      newlines are handled by CSS (white-space: pre-wrap), not by parsing.
+//
+// The look (plan/ui-refresh.md Phase 3): the visitor's turns are filled
+// bubbles on the right; the assistant's are text on the page beside a small
+// mark (the tenant's logo, else its initial), the way a reply reads in a
+// document. The composer is one rounded field with the send arrow inside it;
+// the visitor may type the next question while an answer streams, and only
+// sending waits. Scrolled up during an answer, a "New messages" button
+// offers the way back instead of yanking the view.
 
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
@@ -85,6 +93,18 @@ let nextId = 0;
  * empty (a tool answer is held, not streamed, so that gap can be seconds).
  * The label is for screen readers; the dots are decoration.
  */
+/** The assistant's mark beside each of its turns: the tenant's logo, else its initial. */
+function AssistantMark({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  return logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="assistant-mark" src={logoUrl} alt="" />
+  ) : (
+    <span className="assistant-mark" aria-hidden="true">
+      {name.trim().charAt(0).toUpperCase() || '?'}
+    </span>
+  );
+}
+
 function Thinking() {
   return (
     <div className="bubble thinking" role="status" aria-label="Thinking">
@@ -125,6 +145,8 @@ export function ChatScreen({
   // to re-read something: yanking the viewport while someone is reading is
   // worse than making them scroll.
   const stick = useRef(true);
+  // Something arrived while the reader was scrolled up: offer the way down.
+  const [unseen, setUnseen] = useState(false);
 
   const scrollToBottom = useCallback(() => {
     const el = messagesRef.current;
@@ -135,13 +157,21 @@ export function ChatScreen({
   // new text produces a visible jump on every delta.
   useLayoutEffect(() => {
     if (stick.current) scrollToBottom();
+    else if (turns.length > 0) setUnseen(true);
   }, [turns, scrollToBottom]);
 
   const onScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (stick.current) setUnseen(false);
   }, []);
+
+  const jumpDown = useCallback(() => {
+    stick.current = true;
+    setUnseen(false);
+    scrollToBottom();
+  }, [scrollToBottom]);
 
   const send = useCallback(
     async (text: string) => {
@@ -301,6 +331,7 @@ export function ChatScreen({
     // row on the next message. The old conversation stays in the database.
     conversationId.current = null;
     setTurns([]);
+    setUnseen(false);
     inputRef.current?.focus();
   }, []);
 
@@ -318,34 +349,29 @@ export function ChatScreen({
         <div className="messages-inner">
           {turns.length === 0 && (
             <div className="empty-state">
-              <strong>
+              <AssistantMark name={assistantName} logoUrl={logoUrl} />
+              <h2>
                 Ask {assistantName} a question about {businessName}.
-              </strong>
-              <span>
+              </h2>
+              <p>
                 {emptyKb
                   ? 'Your knowledge base is empty — add a document first.'
                   : 'The answer will show the chunks it came from.'}
-              </span>
+              </p>
               {!emptyKb && suggestedQuestions.length > 0 && (
                 <div className="suggestions" aria-label="Suggested questions">
                   {suggestedQuestions.map((question) => (
                     <button key={question} type="button" disabled={busy} onClick={() => void send(question)}>
-                      {question}
+                      <span>{question}</span>
+                      <Icon name="chevron-right" size={16} />
                     </button>
                   ))}
                 </div>
               )}
               {emptyKb && (
-                <>
-                  <br />
-                  <Link
-                    className="button"
-                    href={`/t/${slug}/admin`}
-                    style={{ marginTop: '12px', display: 'inline-block' }}
-                  >
-                    Go to the knowledge base
-                  </Link>
-                </>
+                <Link className="button empty-state-action" href={`/t/${slug}/admin`}>
+                  Go to the knowledge base
+                </Link>
               )}
             </div>
           )}
@@ -363,8 +389,11 @@ export function ChatScreen({
               if (turn.kind === 'pending') {
                 return (
                   <div className="turn assistant" key={turn.id}>
-                    <div className="speaker">{assistantName}</div>
-                    <Thinking />
+                    <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                    <div className="assistant-body">
+                      <div className="speaker">{assistantName}</div>
+                      <Thinking />
+                    </div>
                   </div>
                 );
               }
@@ -372,11 +401,16 @@ export function ChatScreen({
               if (turn.kind === 'failed') {
                 return (
                   <div className="turn assistant" key={turn.id}>
-                    <div className="notice error">
-                      {turn.message}
-                      <button type="button" onClick={() => retry(turn.id, turn.question)}>
-                        Retry
-                      </button>
+                    <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                    <div className="assistant-body">
+                      <div className="speaker">{assistantName}</div>
+                      <div className="turn-error" role="alert">
+                        <Icon name="alert" size={16} />
+                        <span>{turn.message}</span>
+                        <button type="button" className="sm" onClick={() => retry(turn.id, turn.question)}>
+                          Retry
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -384,21 +418,29 @@ export function ChatScreen({
 
               return (
                 <div className="turn assistant" key={turn.id}>
-                  <div className="speaker">{assistantName}</div>
-                  {turn.text === '' && !turn.error ? (
-                    <Thinking />
-                  ) : (
-                    <div className="bubble">
-                      <ReplyText text={turn.text} cards={turn.roomCards} view={turn.roomCardsView} />
-                    </div>
-                  )}
-                  <SourcesPanel
-                    sources={turn.sources}
-                    toolCalls={turn.toolCalls}
-                    searchQuery={turn.searchQuery}
-                    question={turn.question}
-                  />
-                  {turn.error && <div className="notice error">{turn.error}</div>}
+                  <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                  <div className="assistant-body">
+                    <div className="speaker">{assistantName}</div>
+                    {turn.text === '' && !turn.error ? (
+                      <Thinking />
+                    ) : (
+                      <div className="bubble">
+                        <ReplyText text={turn.text} cards={turn.roomCards} view={turn.roomCardsView} />
+                      </div>
+                    )}
+                    <SourcesPanel
+                      sources={turn.sources}
+                      toolCalls={turn.toolCalls}
+                      searchQuery={turn.searchQuery}
+                      question={turn.question}
+                    />
+                    {turn.error && (
+                      <div className="turn-error" role="alert">
+                        <Icon name="alert" size={16} />
+                        <span>{turn.error}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -407,16 +449,31 @@ export function ChatScreen({
       </div>
 
       <div className="composer">
-        <div className="composer-inner">
+        {unseen && (
+          <button type="button" className="sm jump-down" onClick={jumpDown}>
+            <Icon name="chevron-down" size={16} /> New messages
+          </button>
+        )}
+        <form
+          className="composer-inner"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <label htmlFor="input" className="visually-hidden">
+            Your question for {assistantName}
+          </label>
           {/* A textarea rather than an input so Shift+Enter can insert a
-              newline while Enter alone sends (screens.md § S-1). */}
+              newline while Enter alone sends (screens.md § S-1). It stays
+              enabled while an answer streams: the next question can be
+              typed, and submit() refuses to SEND while busy. */}
           <textarea
             id="input"
             ref={inputRef}
             rows={1}
             placeholder="Ask a question…"
             autoFocus
-            disabled={busy}
             value={input}
             onChange={(event) => {
               setInput(event.target.value);
@@ -433,10 +490,11 @@ export function ChatScreen({
               }
             }}
           />
-          <button className="primary" type="button" disabled={busy} onClick={submit}>
-            Send
+          <button className="primary composer-send" type="submit" aria-label="Send" disabled={busy || input.trim() === ''}>
+            <Icon name="arrow-up" size={18} />
           </button>
-        </div>
+        </form>
+        <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
       </div>
     </div>
   );
