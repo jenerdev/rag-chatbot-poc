@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–1 done
-> 2026-10-06 (Phase 0's look included, no action items; Phase 1's look owed);
-> Phases 2–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–2 done
+> 2026-10-06 (the looks at 0 and 1 included, no action items; Phase 2's look
+> owed); Phases 3–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -239,6 +239,15 @@ HOW they look.
 **Done when:** an owner on villa sees every page in the sidebar, a staff
 member sees only theirs (the role cases still differ), and the phone drawer
 walks by keyboard.
+
+**Done 2026-10-06:** `components/staff-frame.tsx` (signed in: sidebar +
+content; signed out: the old header and `<main>`, unchanged) replaces the
+header on all nine staff screens; `groupNavItems()` sections `navItems()`'s
+output, tested. `plan/ui-refresh-phase2-walk.mjs`, 20/20. Deviations: the
+sidebar footer shows the role but not the email (the session route returns
+no email, and Rule 3 keeps routes unchanged); each screen's primary action
+stays where it is, in its card, until that screen's own phase; the content
+column is 960 px, not 1100 (the forms read better narrower).
 
 ### Phase 3 — The chat screen
 

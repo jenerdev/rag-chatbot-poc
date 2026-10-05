@@ -13,9 +13,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -113,17 +113,12 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
     unauthorized();
   }, [api, unauthorized]);
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Unanswered questions">
-      <TenantNav slug={slug} features={nav} current="unanswered" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'unanswered' as const, title: 'Unanswered questions', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -132,15 +127,14 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
                 void fetchRole(api).then(setRole);
               }} />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
 
   return (
     <>
-      {header}
-      <main>
+      <StaffFrame {...frame}>
         <section className="card">
           <div className="range-head">
             <div className="range-nav">
@@ -198,7 +192,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
             ))
           )}
         </section>
-      </main>
+      </StaffFrame>
     </>
   );
 }

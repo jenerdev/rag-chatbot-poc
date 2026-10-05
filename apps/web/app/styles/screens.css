@@ -47,11 +47,13 @@
    <body> sits outside it and would keep the default --bg. */
 .tenant-root { min-height: 100vh; background: var(--bg); color: var(--ink); }
 
-h1.brand { display: flex; align-items: center; gap: 10px; }
+h1.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-subtitle { white-space: nowrap; }
 .brand-logo { height: 28px; width: auto; border-radius: var(--radius-sm); }
 .brand-subtitle { color: var(--muted); font-weight: 400; }
 .brand-subtitle::before { content: "·"; margin-right: 10px; }
-.brand-banner { display: block; width: 100%; max-height: 120px; object-fit: cover; }
+.brand-banner { display: block; width: 100%; max-height: 96px; object-fit: cover; }
 
 /* --- bookings (S-3, plan/bookings.md Phase 4) --------------------------- */
 

@@ -6,9 +6,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { LoginForm } from '@/components/admin-login';
-import { BrandHeader } from '@/components/brand-header';
 import { MembersPanel } from '@/components/members-panel';
-import { TenantNav } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 
@@ -56,23 +55,18 @@ export function MembersScreen({
     unauthorized();
   }, [api, unauthorized]);
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Members">
-      <TenantNav slug={slug} features={nav} current="members" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'members' as const, title: 'Members', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
             <LoginForm api={api} slug={slug} onLoggedIn={() => void askSession()} />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -80,24 +74,22 @@ export function MembersScreen({
   if (!role || !can(role, 'members:manage')) {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           <section className="card">
             <p className="small muted">
               Members are managed by an owner. You are {role ? ROLE_LABELS[role].toLowerCase() : 'a member'} here.
             </p>
           </section>
-        </main>
+        </StaffFrame>
       </>
     );
   }
 
   return (
     <>
-      {header}
-      <main>
+      <StaffFrame {...frame}>
         <MembersPanel api={`${api}/members`} onUnauthorized={unauthorized} />
-      </main>
+      </StaffFrame>
     </>
   );
 }

@@ -41,9 +41,9 @@ import type {
   SlotSummary,
   UnitSummary,
 } from '@rag/bookings';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
@@ -567,17 +567,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const activeUnits = setup?.units.filter((u) => u.active) ?? [];
   const multipleUnits = activeUnits.length > 1;
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Bookings">
-      <TenantNav slug={slug} features={nav} current="bookings" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'bookings' as const, title: 'Bookings', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -590,7 +585,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               }}
             />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -598,19 +593,16 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   if (!setup || !from || !to) {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           <div className="small">{loadMessage}</div>
-        </main>
+        </StaffFrame>
       </>
     );
   }
 
   return (
     <>
-      {header}
-
-      <main>
+      <StaffFrame {...frame}>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         {requests && requests.length > 0 && (
@@ -905,7 +897,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
             ))
           )}
         </section>
-      </main>
+      </StaffFrame>
     </>
   );
 }

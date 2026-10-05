@@ -18,9 +18,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SlotAdmin } from '@rag/bookings';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -167,17 +167,12 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   // so before the server has to (the server and Postgres still decide).
   const timesFixed = editing !== null && editing.upcoming > 0;
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Slots">
-      <TenantNav slug={slug} features={nav} current="slots" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'slots' as const, title: 'Slots', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -190,7 +185,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
               }}
             />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -200,8 +195,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
 
   return (
     <>
-      {header}
-      <main>
+      <StaffFrame {...frame}>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         <section className="card">
@@ -354,7 +348,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
             ))}
           </section>
         )}
-      </main>
+      </StaffFrame>
     </>
   );
 }

@@ -5,8 +5,12 @@
 
 /* --- chat (S-1) --------------------------------------------------------- */
 
-.chat-layout { display: flex; flex-direction: column; height: calc(100vh - 53px); }
-#messages { flex: 1; overflow-y: auto; padding: var(--space-5); }
+/* The header is INSIDE this column, so the column is the whole viewport, not
+   the viewport less a header height (the old calc(100vh - 53px) left a strip
+   under the composer, and a wrapped phone header pushed it off). dvh follows
+   a phone's browser bars; vh is the fallback. */
+.chat-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+#messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); }
 .messages-inner { max-width: 820px; margin: 0 auto; }
 
 .empty-state {

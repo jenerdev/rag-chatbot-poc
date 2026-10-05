@@ -8,9 +8,16 @@
 // public pages (chat, book, reset) pass nothing, and the nav asks for itself:
 // a visitor with no cookie gets `admin: false` and sees the public links and
 // "Staff login".
+//
+// Since plan/ui-refresh.md Phase 2 a SIGNED-IN staff page draws its links in
+// the sidebar (staff-frame.tsx), so this header is only ever the public one
+// or a signed-out staff page's. On a public page it is slim: the page's own
+// link is left out, and a signed-in member gets ONE way to the staff side
+// (their first staff page, the dashboard) instead of every staff link.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { Icon } from './icons';
 import { navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -57,9 +64,14 @@ export function TenantNav({
   // is offered only from the public pages.
   const publicPage = current === 'chat' || current === 'book' || current === 'reset';
 
+  const all = navItems(slug, features, role);
+  const isPublic = (page: NavPage) => page === 'chat' || page === 'book';
+  const shown = publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all;
+  const staffHome = publicPage ? all.find((item) => !isPublic(item.page)) : undefined;
+
   return (
     <>
-      {navItems(slug, features, role).map((item) => (
+      {shown.map((item) => (
         <Link
           key={item.page}
           className={item.primary ? 'button primary' : 'button'}
@@ -69,9 +81,16 @@ export function TenantNav({
           {item.label}
         </Link>
       ))}
+      {staffHome && (
+        <Link className="button" href={staffHome.href}>
+          <Icon name="chart" size={16} />
+          <span className="narrow-hidden">{staffHome.label}</span>
+        </Link>
+      )}
       {auth === 'out' && publicPage && (
         <Link className="button" href={`/t/${slug}/admin`}>
-          Staff login
+          <Icon name="user" size={16} />
+          <span className="narrow-hidden">Staff login</span>
         </Link>
       )}
       {auth === 'in' && (

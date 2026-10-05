@@ -26,6 +26,7 @@ import type { RoomCard, Source, ToolCallRecord } from '@rag/pipeline';
 import { SourcesPanel } from '@/components/sources-panel';
 import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
+import { Icon } from '@/components/icons';
 import { BrandHeader } from '@/components/brand-header';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -306,8 +307,9 @@ export function ChatScreen({
   return (
     <div className="chat-layout">
       <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl}>
-        <button className="link" type="button" onClick={newChat}>
-          New chat
+        <button className="ghost" type="button" onClick={newChat}>
+          <Icon name="plus" size={16} />
+          <span className="narrow-hidden">New chat</span>
         </button>
         <TenantNav slug={slug} features={nav} current="chat" />
       </BrandHeader>

@@ -19,9 +19,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Promo } from '@rag/bookings';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { centavosToInput, formatMoney, parseMoneyInput } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
@@ -205,17 +205,12 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
 
   const editing = draft.id === null ? null : (promos?.find((p) => p.id === draft.id) ?? null);
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Promos">
-      <TenantNav slug={slug} features={nav} current="promos" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'promos' as const, title: 'Promos', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -228,7 +223,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
               }}
             />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -296,8 +291,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
 
   return (
     <>
-      {header}
-      <main>
+      <StaffFrame {...frame}>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         <section className="card">
@@ -398,7 +392,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
           )}
           {showRetired && retired.map(row)}
         </section>
-      </main>
+      </StaffFrame>
     </>
   );
 }

@@ -7735,3 +7735,33 @@ screenshots.
 **Trap avoided:** a crashed run left headless Chrome holding the port, and
 on Windows killing the launcher does not stop its children; the helper now
 picks a fresh port and kills the whole tree (`taskkill /T`).
+
+## UI refresh, Phase 2: navigation · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** `components/staff-frame.tsx` is the frame of all nine staff
+screens. Signed in, it shows a sidebar with the business, the staff links
+in four sections (Overview, Content, Bookings, Team; `groupNavItems()` in
+`lib/nav-items.ts`, tested), a footer with Chat, Book, the role and Log
+out, and a page title row. Below 900 px the sidebar is a drawer behind a
+menu button: focus goes in, Tab wraps, Escape or the backdrop closes it,
+focus comes back, and the page behind is `inert`. Signed out, the frame is
+the old header and `<main>`, so the login card is unchanged. The screens
+changed mechanically (`{header}<main>` became `<StaffFrame>`); no state,
+fetch or permission moved. The public header is slim: a page's own link is
+left out, a signed-in member sees one "Dashboard" link instead of every
+staff link, and on a phone "New chat" and "Staff login" are icons whose
+words stay for screen readers, so the header is one row (53 px).
+
+**Why it matters:** an owner's header was up to 11 buttons that wrapped on
+a phone, and the chat's height was `calc(100vh - 53px)` with the header
+inside it, which left a strip under the composer.
+
+**Observed:** `plan/ui-refresh-phase2-walk.mjs`, 20/20 as a throwaway
+harbor owner and villa staff member (both deleted): the owner's four
+sections in order; the staff member gets Dashboard, Knowledge base,
+Unanswered, Bookings and no Team; the composer's bottom is 0 px from the
+window's. The first run failed 2 checks, both real bugs: focusing the menu
+button BEFORE the render that lifts `inert` is refused, so focus now
+returns in an effect after close; and `inert` keeps focus out of the page
+but not out of what follows the drawer (the dev-tools button), so Tab now
+wraps inside it. Typecheck clean; tests 68/68.

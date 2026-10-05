@@ -260,6 +260,7 @@ apps/web/              Next.js 15, App Router
   lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
+  components/staff-frame.tsx  every staff screen's frame (D-101): signed in, a sectioned sidebar (groupNavItems) that is a drawer below 900 px; signed out, the old header
   components/icons.tsx   the icons: hand-drawn inline SVG on a 20 px grid, currentColor, aria-hidden unless labelled (D-101)
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies

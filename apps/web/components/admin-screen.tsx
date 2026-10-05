@@ -28,9 +28,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { CHUNK_OVERLAP, CHUNK_SIZE, estimateChunkCount } from '@rag/chunker';
 import type { ChunkSummary, DocumentDetail, DocumentSummary } from '@rag/pipeline';
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 
@@ -329,22 +329,12 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   const length = content.trim().length;
   const chunkCount = estimateChunkCount(length);
 
-  const header = (
-    <BrandHeader
-      businessName={businessName}
-      logoUrl={logoUrl}
-      bannerUrl={bannerUrl}
-      subtitle="Knowledge base"
-    >
-      <TenantNav slug={slug} features={nav} current="documents" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'documents' as const, title: 'Knowledge base', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -358,16 +348,14 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
               }}
             />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
 
   return (
     <>
-      {header}
-
-      <main>
+      <StaffFrame {...frame}>
         <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
         {!canWrite && role && (
@@ -476,7 +464,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
             </div>
           )}
         </section>
-      </main>
+      </StaffFrame>
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { navItems, type NavFeatures } from './nav-items';
+import { groupNavItems, navItems, type NavFeatures } from './nav-items';
 
 // The header offers exactly the pages a role may open, and only the pages the
 // tenant has (so a button never leads to a 404).
@@ -46,5 +46,31 @@ describe('navItems', () => {
       '/t/harbor/admin/promos',
       '/t/harbor/admin/members',
     ]);
+  });
+});
+
+describe('groupNavItems', () => {
+  const sections = (features: NavFeatures, role: Parameters<typeof navItems>[2]) => {
+    const { groups, publicItems } = groupNavItems(navItems('t', features, role));
+    return { groups: groups.map((g) => `${g.group}: ${g.items.map((i) => i.label).join(', ')}`), publicItems: publicItems.map((i) => i.label) };
+  };
+
+  it("sections an owner's harbor links, Chat and Book apart", () => {
+    expect(sections(HARBOR, 'owner')).toEqual({
+      groups: ['Overview: Dashboard', 'Content: Knowledge base, Unanswered', 'Bookings: Bookings, Rooms, Holidays, Slots, Promos', 'Team: Members'],
+      publicItems: ['Chat', 'Book'],
+    });
+  });
+
+  it('leaves out an empty section: northwind has no bookings, a staff member no Team', () => {
+    expect(sections(NORTHWIND, 'staff').groups.map((g) => g.split(':')[0])).toEqual(['Overview', 'Content']);
+  });
+
+  it('keeps every link navItems gave, and only those', () => {
+    for (const role of ['owner', 'admin', 'staff', null] as const) {
+      const items = navItems('t', VILLA, role);
+      const { groups, publicItems } = groupNavItems(items);
+      expect([...publicItems, ...groups.flatMap((g) => g.items)].map((i) => i.page).sort()).toEqual(items.map((i) => i.page).sort());
+    }
   });
 });

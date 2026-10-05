@@ -60,3 +60,31 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
   }
   return items;
 }
+
+/** The sidebar's sections (plan/ui-refresh.md Phase 2), in order. */
+export type NavGroup = 'Overview' | 'Content' | 'Bookings' | 'Team';
+
+const GROUP_OF: Readonly<Partial<Record<NavPage, NavGroup>>> = {
+  dashboard: 'Overview',
+  documents: 'Content',
+  unanswered: 'Content',
+  bookings: 'Bookings',
+  rooms: 'Bookings',
+  holidays: 'Bookings',
+  slots: 'Bookings',
+  promos: 'Bookings',
+  members: 'Team',
+};
+const GROUP_ORDER: readonly NavGroup[] = ['Overview', 'Content', 'Bookings', 'Team'];
+
+/**
+ * navItems()'s staff links, sectioned for the sidebar; the public pages
+ * (Chat, Book) apart, for its footer. A presentation of the SAME list: which
+ * links exist is still navItems()'s decision alone, and an empty section is
+ * left out.
+ */
+export function groupNavItems(items: NavItem[]): { groups: { group: NavGroup; items: NavItem[] }[]; publicItems: NavItem[] } {
+  const publicItems = items.filter((item) => !GROUP_OF[item.page]);
+  const groups = GROUP_ORDER.map((group) => ({ group, items: items.filter((item) => GROUP_OF[item.page] === group) })).filter((g) => g.items.length > 0);
+  return { groups, publicItems };
+}

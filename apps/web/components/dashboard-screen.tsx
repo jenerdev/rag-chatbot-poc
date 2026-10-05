@@ -11,9 +11,9 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { TenantDashboard } from '@rag/pipeline';
-import { BrandHeader } from '@/components/brand-header';
 import { LoginForm, describeFailure } from '@/components/admin-login';
-import { TenantNav, fetchRole } from '@/components/tenant-nav';
+import { fetchRole } from '@/components/tenant-nav';
+import { StaffFrame } from '@/components/staff-frame';
 import { BarChart, SplitBar } from '@/components/bar-chart';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
@@ -91,17 +91,12 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
     unauthorized();
   }, [api, unauthorized]);
 
-  const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Dashboard">
-      <TenantNav slug={slug} features={nav} current="dashboard" session={{ auth, role, onLogout: logout }} />
-    </BrandHeader>
-  );
+  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'dashboard' as const, title: 'Dashboard', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
           ) : (
@@ -114,7 +109,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
               }}
             />
           )}
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -122,10 +117,9 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
   if (!data) {
     return (
       <>
-        {header}
-        <main>
+        <StaffFrame {...frame}>
           <div className="small">{message}</div>
-        </main>
+        </StaffFrame>
       </>
     );
   }
@@ -137,8 +131,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
 
   return (
     <>
-      {header}
-      <main className="dashboard">
+      <StaffFrame {...frame} mainClassName="dashboard">
         <div className="dashboard-toolbar">
           <span className="small muted">
             Today is {dayWithWeekday(data.today)} in {data.timezone}.
@@ -341,7 +334,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
             <p className="small muted">Every amount is the stored price of the nights in the window, net of discounts.</p>
           </section>
         )}
-      </main>
+      </StaffFrame>
     </>
   );
 }

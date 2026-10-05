@@ -61,8 +61,11 @@
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.
 - [x] The user's look at Phase 0 (2026-10-06): no action items.
 - [x] Phase 1, login / forgot / reset password: walk 18/18, tests 65/65.
-- [ ] The user's look at Phase 1: `plan/ui-refresh/phase1/{before,after,after-dark}/`.
-- [ ] Phase 2, navigation. Then Phases 3–10.
+- [x] The user's look at Phase 1: no action items.
+- [x] Phase 2, navigation: sidebar, phone drawer, slim public header, the
+  chat's height. Walk 20/20, tests 68/68.
+- [ ] The user's look at Phase 2: `plan/ui-refresh/phase2/{walk,after,after-dark}/`.
+- [ ] Phase 3, the chat screen. Then Phases 4–10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`
