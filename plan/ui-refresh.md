@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–3 done
-> 2026-10-06 (the looks at 0–2 included, no action items; Phase 3's look
-> owed); Phases 4–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–4 done
+> 2026-10-06 (the looks at 0–3 included, no action items; Phase 4's look
+> owed); Phases 5–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -309,6 +309,15 @@ on-screen keyboard.
 
 **Done when:** `reply-text.test.ts` passes unchanged and a priced harbor reply
 reads at 375 px with every price visible.
+
+**Done 2026-10-06:** `plan/ui-refresh-phase4-walk.mjs`, 17/17, replies
+answered inside the browser (photos as data: URIs). Deviations: the
+availability evidence stays OPEN, not collapsed like the sources, because
+CLAUDE.md rule 7 (D-037) says it is shown open; it shares the sources'
+card style instead, which is what "one footer style" needed. The table
+keeps its tinted header and row stripes, the user's choice in
+plan/tables.md's Phase 4 walk; only the vertical rules went. No class name
+changed, so `reply-text.test.ts` is untouched.
 
 ### Phase 5 — The customer booking page
 

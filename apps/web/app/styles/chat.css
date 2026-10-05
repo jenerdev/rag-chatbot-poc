@@ -111,37 +111,40 @@
    (Phase 4 walk): a tinted header and alternating row stripes, no cell
    borders. Both tints are theme variables, so a tenant's accent colours
    the header (lib/theme.ts) and the stripes follow its background. */
-.reply-table { overflow-x: auto; margin: var(--space-2) 0 14px; white-space: normal; }
+.reply-table { overflow-x: auto; margin: var(--space-3) 0 var(--space-4); white-space: normal; border: 1px solid var(--line); border-radius: var(--radius-md); }
 .reply-table table { border-collapse: collapse; font-size: var(--text-sm); width: 100%; }
-.reply-table th, .reply-table td { padding: 6px 10px; text-align: left; vertical-align: top; border-left: 1px solid var(--line); }
-.reply-table th:first-child, .reply-table td:first-child { border-left: 0; }
-.reply-table th { font-weight: 600; white-space: nowrap; background: var(--accent-soft); color: var(--ink); }
+/* No vertical rules (plan/ui-refresh.md Phase 4): the columns are spaced, not boxed. */
+.reply-table th, .reply-table td { padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; line-height: 1.45; }
+.reply-table th { font-weight: 600; white-space: nowrap; background: var(--accent-soft); color: var(--ink); border-bottom: 1px solid var(--line); }
 .reply-table tbody tr:nth-child(even) td { background: var(--surface-2); }
 .reply-table td.amount { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .reply-table th.amount { text-align: center; }
 /* The Photo column (D-094): a View button that opens the lightbox. */
 .reply-table th.photo, .reply-table td.photo { text-align: center; white-space: nowrap; }
-.photo-link { min-height: 0; box-shadow: none; border: 1px solid var(--accent); border-radius: var(--radius-full); background: transparent; color: var(--accent-text); padding: 2px 10px; font-size: var(--text-sm); cursor: pointer; }
+.photo-link { min-height: 0; box-shadow: none; border: 1px solid var(--line-strong); border-radius: var(--radius-full); background: var(--panel); color: var(--accent-text); padding: 2px 10px; font-size: var(--text-xs); cursor: pointer; }
 .photo-link:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
 /* Room cards (D-094, components/room-cards.tsx): a room-list reply as one
    card per room with its photo, in place of the table. Two across on a
    desktop, one on a phone. The lightbox is the photo large on a dark
    overlay, arrows when there is more than one. */
 .room-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-2) 0 14px; white-space: normal; }
-.room-card { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
+.room-card { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); overflow: hidden; display: flex; flex-direction: column; transition: border-color var(--dur-fast) var(--ease); }
+.room-card:hover { border-color: var(--line-strong); }
 .room-card-photo { display: block; position: relative; width: 100%; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--surface-2); cursor: zoom-in; aspect-ratio: 16 / 10; }
 .room-card-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .room-card-count { position: absolute; right: var(--space-2); bottom: var(--space-2); padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--overlay-control); color: var(--on-overlay); font-size: var(--text-xs); }
-.room-card-title { padding: var(--space-2) var(--space-3) var(--space-1); font-weight: 600; background: var(--accent-soft); color: var(--ink); }
-.room-card-line { display: flex; gap: 10px; padding: 5px var(--space-3); font-size: var(--text-sm); border-top: 1px solid var(--line); }
-.room-card-line:last-child { padding-bottom: 10px; }
-.room-card-label { flex: 0 0 30%; font-weight: 600; color: var(--muted); }
-.room-card-value { flex: 1; }
+.room-card-title { padding: var(--space-3) var(--space-4) var(--space-2); font-size: var(--text-base); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.room-card-line { display: flex; gap: var(--space-3); padding: 3px var(--space-4); font-size: var(--text-sm); }
+.room-card-line:last-child { padding-bottom: var(--space-4); }
+.room-card-label { flex: 0 0 34%; color: var(--muted); }
+.room-card-value { flex: 1; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) {
   .room-cards { grid-template-columns: minmax(0, 1fr); }
 }
-.lightbox { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: var(--overlay); padding: var(--space-5); cursor: zoom-out; }
-.lightbox-frame { position: relative; max-width: min(1100px, 100%); max-height: 100%; cursor: default; }
+.lightbox { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: var(--overlay); padding: var(--space-5); cursor: zoom-out; animation: fade-in var(--dur) var(--ease); }
+@keyframes fade-in { from { opacity: 0; } }
+.lightbox-frame { position: relative; max-width: min(1100px, 100%); max-height: 100%; cursor: default; touch-action: pan-y; }
+.lightbox-frame img { user-select: none; -webkit-user-drag: none; }
 .lightbox-frame img { display: block; max-width: 100%; max-height: calc(100vh - 40px); border-radius: var(--radius-sm); box-shadow: var(--shadow-2); }
 /* The buttons are flex boxes with an SVG icon inside (lightbox.tsx), so the
    icon is centred by geometry, not by a text baseline. */
@@ -160,6 +163,8 @@
    in front, taken from data-label (reply-text.tsx). An empty cell (a taken
    slot's price) is left out rather than shown as a bare label. */
 @media (max-width: 560px) {
+  /* Each row is its own card here, so the table's frame would be a second one. */
+  .reply-table { border: 0; border-radius: 0; }
   .reply-table table, .reply-table tbody, .reply-table tr, .reply-table td { display: block; width: 100%; }
   .reply-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .reply-table tbody tr { border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: var(--space-2); overflow: hidden; }
@@ -200,22 +205,27 @@
 /* --- sources panel (D-012: a feature, not a debug aid) ------------------- */
 
 .sources { margin-top: var(--space-2); }
-.sources > summary {
-  cursor: pointer;
+.sources > summary, .sources-none {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 0;
   color: var(--muted);
-  font-size: var(--text-sm);
-  padding: 3px 0;
-  list-style: none;
+  font-size: var(--text-xs);
 }
+.sources > summary { cursor: pointer; list-style: none; border-radius: var(--radius-sm); }
 .sources > summary::-webkit-details-marker { display: none; }
-.sources > summary::before { content: "\25B8 "; }
-.sources[open] > summary::before { content: "\25BE "; }
-.sources > summary:hover { color: var(--accent-text); }
+.sources > summary:hover { color: var(--ink); }
+.sources-chevron { transition: transform var(--dur-fast) var(--ease); }
+.sources[open] .sources-chevron { transform: rotate(180deg); }
 
-.source {
+/* One card style for everything an answer was built from: a chunk here, the
+   availability evidence below (.tool-call). */
+.source, .tool-call {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--panel);
+  background: var(--surface-2);
   padding: 10px var(--space-3);
   margin-top: var(--space-2);
 }
@@ -224,17 +234,16 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
-  font-size: var(--text-sm);
-  margin-bottom: 5px;
+  font-size: var(--text-xs);
+  margin-bottom: 6px;
 }
-.source-title { font-weight: 600; }
-.source-score {
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  padding: 0 6px;
-}
+.source-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); min-width: 0; }
+.source-score { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; color: var(--muted); }
+/* The score as a bar beside the number (a <meter>, styled the same in each engine). */
+.source-score meter { width: 44px; height: 4px; border: 0; border-radius: var(--radius-full); background: var(--surface-3); appearance: none; -webkit-appearance: none; }
+.source-score meter::-webkit-meter-bar { height: 4px; border: 0; border-radius: var(--radius-full); background: var(--surface-3); }
+.source-score meter::-webkit-meter-optimum-value, .source-score meter::-webkit-meter-suboptimum-value, .source-score meter::-webkit-meter-even-less-good-value { border-radius: var(--radius-full); background: var(--accent); }
+.source-score meter::-moz-meter-bar { border-radius: var(--radius-full); background: var(--accent); }
 /* Shown when query rewriting changed the words used to search (D-016). */
 .rewrite-note {
   font-size: var(--text-xs);
@@ -261,13 +270,14 @@
 
 .source-text {
   font-size: var(--text-sm);
-  color: var(--ink);
+  line-height: var(--leading);
+  color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   margin: 0;
-  font-family: var(--font-mono);
   cursor: pointer;
 }
+.source-text:hover { color: var(--ink); }
 .source-text.truncated { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* --- composer ----------------------------------------------------------- */
@@ -320,15 +330,8 @@
    was built from. The day rows reuse .day-head / .slot-chip from S-3, so
    the chat and the bookings screen show one slot the same way. */
 .checked { margin-top: var(--space-2); }
-.tool-call {
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  padding: 7px 10px;
-  margin-bottom: 6px;
-}
-.tool-head { font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); }
+.tool-call { margin-top: 0; margin-bottom: var(--space-2); }
+.tool-head { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 600; margin-bottom: 6px; }
 .tool-call .day-head { padding: 2px 0; }
 .tool-call .day-label { width: 86px; font-size: var(--text-sm); }
 .tool-error { font-size: var(--text-sm); color: var(--danger); }

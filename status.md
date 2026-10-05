@@ -66,8 +66,10 @@
   chat's height. Walk 20/20, tests 68/68.
 - [x] The user's look at Phase 2: no action items.
 - [x] Phase 3, the chat screen: walk 18/18, tests 68/68.
-- [ ] The user's look at Phase 3: `plan/ui-refresh/phase3/{walk,walk-dark}/`.
-- [ ] Phase 4, what a reply contains. Then Phases 5–10.
+- [x] The user's look at Phase 3: no action items.
+- [x] Phase 4, what a reply contains: walk 17/17, tests 68/68.
+- [ ] The user's look at Phase 4: `plan/ui-refresh/phase4/{walk,walk-dark}/`.
+- [ ] Phase 5, the customer booking page. Then Phases 6–10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

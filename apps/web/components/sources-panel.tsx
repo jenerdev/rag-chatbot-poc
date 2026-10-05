@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import type { Source, ToolCallRecord } from '@rag/pipeline';
+import { Icon } from './icons';
+
+// The look (plan/ui-refresh.md Phase 4): ONE footer style for "what this
+// answer was built from". The availability evidence stays OPEN (CLAUDE.md
+// rule 7, D-037: it is the answer's basis); the chunks are a quiet
+// "N sources" line that opens into cards, each with its score drawn as a
+// <meter> beside the number.
 
 const FOUND_BY_TITLE: Record<string, string> = {
   vector: 'Found by semantic similarity',
@@ -22,7 +29,10 @@ function SourceBox({ source }: { source: Source }) {
   return (
     <div className="source">
       <div className="source-head">
-        <span className="source-title">{source.documentTitle}</span>
+        <span className="source-title">
+          <Icon name="file" size={14} />
+          {source.documentTitle}
+        </span>
         {/* Which of the two searches found this chunk (D-015). Worth showing: a
             'keyword' badge on a chunk with a low similarity score is the hybrid
             search visibly doing the job vector search could not. */}
@@ -31,7 +41,11 @@ function SourceBox({ source }: { source: Source }) {
         </span>
         {/* Three decimals: the difference between 0.42 and 0.45 is the
             difference between a good match and a mediocre one. */}
-        <span className="source-score">{source.similarity.toFixed(3)}</span>
+        <span className="source-score">
+          {/* The bar is the number again, for the eye; the number is what is read. */}
+          <meter min={0} max={1} value={Math.max(0, Math.min(1, source.similarity))} aria-hidden="true" />
+          {source.similarity.toFixed(3)}
+        </span>
       </div>
       <p
         className={`source-text${truncated ? ' truncated' : ''}`}
@@ -98,6 +112,7 @@ function ToolCallBox({ call }: { call: ToolCallRecord }) {
   return (
     <div className="tool-call">
       <div className="tool-head">
+        <Icon name="calendar" size={14} />
         Checked availability
         <span className="muted">
           {' '}
@@ -164,9 +179,10 @@ export function SourcesPanel({
     return (
       <>
         {checked}
-        <details className="sources">
-          <summary>No matching chunks above the similarity threshold.</summary>
-        </details>
+        <p className="sources-none">
+          <Icon name="info" size={14} />
+          No matching chunks above the similarity threshold.
+        </p>
       </>
     );
   }
@@ -176,7 +192,9 @@ export function SourcesPanel({
       {checked}
       <details className="sources">
         <summary>
+          <Icon name="file" size={14} />
           {sources.length} source{sources.length === 1 ? '' : 's'}
+          <Icon name="chevron-down" size={14} className="sources-chevron" />
         </summary>
 
         {/* If the search used different words from the ones typed, say so.

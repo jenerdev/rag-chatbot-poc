@@ -7796,3 +7796,30 @@ have no returns policy). The first run's two failures were the walk's own:
 the last width's broken-stream reply answered the next width's first
 question; each width now starts from the plain answer. Typecheck clean;
 tests 68/68.
+
+## UI refresh, Phase 4: what a reply contains · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** tables lose their vertical rules and get a rounded frame and
+roomier rows, keeping the tinted header and stripes the user chose
+(plan/tables.md); on a phone the frame goes, since each row is already a
+card. Room cards: photo on top, the name as a title without a tinted bar,
+a quiet label/value list. The lightbox is a real modal: `aria-modal`,
+focus on Close when it opens and back on the photo when it closes, a fade
+(none with reduced motion), and a swipe on a phone with pointer events
+(40 px), no library; its icons are the shared ones. Sources: a quiet
+"N sources" line with an icon and a turning chevron, opening into cards
+whose score is a `<meter>` beside the three-decimal number, chunk text in
+the reading face, not monospace. "No matching chunks" is a plain line,
+not a `<details>` with nothing in it. The availability evidence shares the
+source cards' style and stays open (rule 7).
+
+**Why it matters:** these are what make an answer checkable (D-012,
+D-037); they looked like debug output.
+
+**Observed:** `plan/ui-refresh-phase4-walk.mjs`, 17/17 on the first run:
+the table's second column has `border-left-width: 0px`; at 375 px every
+price cell sits inside the screen; the evidence is visible without a click
+and not inside a `<details>`; ArrowRight gave "2 / 3", a 200 px drag left
+"3 / 3", Escape returned focus to the photo button; "searched for: rooms
+open saturday" still shows (D-016). Typecheck clean; tests 68/68, the
+exact-HTML reply tests unchanged.
