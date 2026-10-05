@@ -259,6 +259,8 @@ apps/web/              Next.js 15, App Router
   lib/money.ts           centavos ↔ pesos, by string, never × 100 — browser-safe
   lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
+  app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
+  components/icons.tsx   the icons: hand-drawn inline SVG on a 20 px grid, currentColor, aria-hidden unless labelled (D-101)
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
@@ -645,6 +647,12 @@ All are expanded in `risks.md`.
   service client still select `tenants` columns **explicitly**, never
   `select('*')`. A `TenantContext` carries `db`, a live token, so it never
   goes to a Client Component: pages pass named props.
+- Styles (D-101, plan/ui-refresh.md): no CSS framework, no component
+  library, no icon package. No file after `tokens.css` writes a colour or a
+  size as a literal; a new shade is a `color-mix()` of the five theme keys,
+  declared on `:root, .tenant-root, [data-scheme]` so a tenant's colours
+  reach it. A theme that sets a surface key stays light in dark mode
+  (`pinsLightScheme()`, `data-scheme="light"`).
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
   markdown rendering is what would take it away. The two exceptions are a

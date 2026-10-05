@@ -56,6 +56,13 @@
 
 ## ▶ Next up (do this next)
 
+**UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
+- [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
+  four style files. Typecheck clean, tests 65/65, prompt snapshot identical.
+- [x] The user's look at Phase 0 (2026-10-06): no action items.
+- [ ] Phase 1, login / forgot / reset password. Then Phases 2–10.
+
+
 **Open items (2026-09-30).** Everything below is merged into `master`
 (`71f27c5`) and not pushed. Tick each one here when it is done.
 

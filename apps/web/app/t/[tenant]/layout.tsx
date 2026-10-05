@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { loadBranding } from '@/lib/branding';
 import { getTenant } from '@/lib/tenant';
+import { pinsLightScheme } from '@/lib/theme';
 
 // The tenant's frame: its colours, and its name in the browser tab.
 //
@@ -27,8 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TenantLayout({ children, params }: Props) {
   const tenant = await getTenant((await params).tenant);
   const style = tenant ? (await loadBranding(tenant)).themeStyle : undefined;
+  // A theme that sets a surface colour stays light in dark mode (D-101).
   return (
-    <div className="tenant-root" style={style}>
+    <div className="tenant-root" data-scheme={pinsLightScheme(style) ? 'light' : undefined} style={style}>
       {children}
     </div>
   );

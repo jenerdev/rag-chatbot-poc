@@ -19,7 +19,7 @@ import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { MembersPanel } from '@/components/members-panel';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
-import { COLOUR, THEME_KEY_LIST, THEME_LABELS, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
+import { COLOUR, THEME_KEY_LIST, THEME_LABELS, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
 
 type Notice = { message: string; kind: 'ok' | 'error' } | null;
 type Languages = 'english' | 'taglish' | 'tagalog';
@@ -259,7 +259,7 @@ export function TenantForm({
             ))}
           </div>
           {/* The preview: the real page's mechanism, custom properties through `style`, and nothing else. */}
-          <div className="tenant-root" style={preview}>
+          <div className="tenant-root" data-scheme={pinsLightScheme(preview) ? 'light' : undefined} style={preview}>
             <div className="card">
               <div className="turn user">
                 <div className="bubble">Is the pool open on Sundays?</div>

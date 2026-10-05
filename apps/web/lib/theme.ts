@@ -17,8 +17,10 @@ import type { CSSProperties } from 'react';
 
 /**
  * The ONLY theme keys that exist. Each maps to a custom property that
- * globals.css already uses everywhere. That is why five keys are enough, and
- * why nothing here writes CSS rules, only variables.
+ * the stylesheets already use everywhere, and every other colour (hover,
+ * border, focus ring, the status tints) is MIXED from these in
+ * app/styles/tokens.css (plan/ui-refresh.md Rule 2). That is why five keys
+ * are enough, and why nothing here writes CSS rules, only variables.
  */
 export const THEME_KEYS = {
   accent: '--accent',
@@ -62,6 +64,20 @@ export function themeVars(theme: unknown): CSSProperties {
     if (isColour(value)) style[THEME_KEYS[key]] = value;
   }
   return style as CSSProperties;
+}
+
+/**
+ * The keys that paint a SURFACE. A theme that sets any of them was chosen for
+ * a light page, so that page stays light when the system is dark: half a dark
+ * palette under a light background would be unreadable (D-101). A theme that
+ * sets the accent alone follows the system.
+ */
+const SURFACE_PROPERTIES = [THEME_KEYS.bg, THEME_KEYS.panel, THEME_KEYS.ink, THEME_KEYS.accentSoft];
+
+/** True when themeVars()'s result must pin the light scheme (data-scheme="light"). */
+export function pinsLightScheme(style: CSSProperties | undefined): boolean {
+  if (!style) return false;
+  return SURFACE_PROPERTIES.some((property) => property in style);
 }
 
 /**

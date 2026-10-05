@@ -3273,3 +3273,42 @@ B's web requests by source, A's list 0); pipeline isolation 23/21; verify
 117/118; tests 59/102/359; the three baselines byte-identical; battery
 53/61, the known set; over HTTP harbor's requests route listed five
 stays, staff and web, each with a reference. The walk, by the user.
+
+## D-101 · The UI is designed now: tokens, derived colours, dark mode, hand-drawn icons, still no library · **Added 2026-10-06 (plan/ui-refresh.md)**
+
+**Decision:** the stylesheet's first line said "this is not a design
+exercise"; that is withdrawn. The look is now a system, in four
+hand-written files under `apps/web/app/styles/` imported by `globals.css`:
+`tokens.css` holds every colour, space (4 px scale), type size (five
+steps, 12/13/15/17/22), radius, shadow and duration; `base.css`,
+`chat.css` and `screens.css` read only tokens, and no hex remains outside
+`tokens.css`. The theme stays FIVE keys (D-030, `tenants_theme_shape`);
+every other shade (hover, border, ring, the status tints, muted text) is a
+`color-mix()` of them, declared on `:root, .tenant-root, [data-scheme]`
+because a custom property holding `var()` resolves where it is declared.
+Dark mode follows the system, except under a theme that sets a SURFACE
+key (bg, panel, ink, accentSoft): `pinsLightScheme()` in `lib/theme.ts`
+puts `data-scheme="light"` on that tenant's root and on the platform
+form's preview. Icons are `components/icons.tsx`, 31 hand-drawn strokes in
+`currentColor`. Still no CSS framework, component library or icon package
+(Rule 1); the server, the prompts and the tools are untouched (Rule 3).
+
+**Why:** the user asked for "more modern and minimalist" design, component
+by component, and took every recommendation of the plan's § 7. A tenant
+accent never reached hover (`#1d4ed8` was blue for every tenant), ten font
+sizes and 31 paddings were in use, and password, URL and time inputs had
+no styling at all; deriving from the five keys fixes the first without a
+schema change, the scales fix the second, one control rule the third.
+
+**Learned:** villa's theme sets `bg` and `accentSoft` but not `panel` or
+`ink`, so a dark mode applied under it would have put light text on its
+cream background: the reason the pin is on ANY surface key, not all of
+them. Two rules of equal specificity silently undid the header's
+current-page highlight; the second screenshot run showed it.
+
+**Measured (Phase 0, on `feat/ui-refresh`):** 74 screenshots before, 74
+after in light and 74 in dark (three tenants × 12 pages + the platform
+login, at 375 and 1280 px); villa stays light in dark mode, harbor and
+northwind go dark. Typecheck clean; web tests 65/65 (6 new:
+`theme.test.ts`, `icons.test.ts`); northwind's prompt snapshot identical to
+`northwind-prompt-post-emoji.txt`. The user looked: no action items.

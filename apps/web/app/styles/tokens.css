@@ -1,0 +1,143 @@
+/* tokens.css — every value the stylesheets use, in one place
+   (plan/ui-refresh.md Phase 0, D-101). No other file writes a colour, a size
+   or a radius as a literal; they read these.
+
+   Three kinds of token:
+
+   1. BASE colours. Five of them are the tenant theme's keys (lib/theme.ts,
+      Postgres's tenants_theme_shape): --accent, --accent-soft, --bg, --panel,
+      --ink. A tenant's theme sets them as inline custom properties on
+      .tenant-root. The status colours are base too, but not themable.
+
+   2. DERIVED colours, mixed from the base ones with color-mix(). This is how
+      a tenant's accent reaches every hover and focus ring without a sixth
+      theme key (Rule 2). They are declared on `:root, .tenant-root, …`, not
+      on :root alone, and that matters: a custom property holding var() is
+      resolved where it is DECLARED, and children inherit the result. Declared
+      on :root only, --line would be mixed from :root's --ink and never see the
+      tenant's colours set on .tenant-root.
+
+   3. SCALES: space, type, radius, shadow, motion. Not colours, not themable. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Base: the theme's five keys, with their defaults. */
+  --accent: #2563eb;
+  --accent-soft: #eef3ff;
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --ink: #18181b;
+
+  /* Base: status. Each gets its -soft and -line derived below. */
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+
+  /* Text on a filled accent, and on the photo overlay (dark in every theme). */
+  --on-accent: #ffffff;
+  --on-overlay: #ffffff;
+  --overlay: rgb(0 0 0 / 0.88);
+  --overlay-control: rgb(0 0 0 / 0.55);
+  --overlay-control-hover: rgb(0 0 0 / 0.8);
+
+  /* Space: a 4 px scale. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Type: five steps. (The bar chart's SVG labels are user units, not these.) */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --leading: 1.55;
+  --leading-tight: 1.25;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+
+  /* Radius. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* Shadow: for things that float (dialogs, drawers, popovers), not for cards. */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.05);
+  --shadow-2: 0 12px 32px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+
+  /* Motion. Everything that moves also obeys prefers-reduced-motion (base.css). */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+
+  /* Sizes of the controls. */
+  --control-h: 36px;
+  --control-h-sm: 30px;
+}
+
+/* Dark: the system's choice, for every page that did not pin light.
+   A tenant whose theme sets a SURFACE colour (bg, panel, ink or accentSoft)
+   gets data-scheme="light" on its .tenant-root (lib/theme.ts,
+   pinsLightScheme): its colours were chosen for a light page, and half a
+   dark palette under them would be unreadable. A theme with an accent alone
+   follows the system, accent included. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #3b82f6;
+    --accent-soft: #1b2540;
+    --bg: #0e0e10;
+    --panel: #18181b;
+    --ink: #ececef;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  }
+}
+
+/* A pinned-light subtree: the light defaults again, then the tenant's inline
+   properties override whichever keys it set. */
+[data-scheme="light"] {
+  color-scheme: light;
+  --accent: #2563eb;
+  --accent-soft: #eef3ff;
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --ink: #18181b;
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.05);
+  --shadow-2: 0 12px 32px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+}
+
+/* Derived. Declared wherever the base colours can change (see the top). */
+:root, .tenant-root, [data-scheme] {
+  --muted: color-mix(in srgb, var(--ink) 60%, var(--panel));
+  --faint: color-mix(in srgb, var(--ink) 40%, var(--panel));
+  --line: color-mix(in srgb, var(--ink) 10%, var(--panel));
+  --line-strong: color-mix(in srgb, var(--ink) 18%, var(--panel));
+  --surface-2: color-mix(in srgb, var(--ink) 4%, var(--panel));
+  --surface-3: color-mix(in srgb, var(--ink) 8%, var(--panel));
+  --field: var(--panel);
+  /* Mixing toward --ink darkens on a light page and lightens on a dark one:
+     the right hover in both. */
+  --accent-hover: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  /* The accent used as TEXT: nudged toward --ink for contrast on --panel. */
+  --accent-text: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  --ring: color-mix(in srgb, var(--accent) 35%, transparent);
+  --ok-soft: color-mix(in srgb, var(--ok) 10%, var(--panel));
+  --ok-line: color-mix(in srgb, var(--ok) 30%, var(--panel));
+  --warn-soft: color-mix(in srgb, var(--warn) 10%, var(--panel));
+  --warn-line: color-mix(in srgb, var(--warn) 30%, var(--panel));
+  --danger-soft: color-mix(in srgb, var(--danger) 9%, var(--panel));
+  --danger-line: color-mix(in srgb, var(--danger) 30%, var(--panel));
+}

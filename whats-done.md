@@ -7677,3 +7677,30 @@ and night, #7230 and #6519 (the user's walk), and the function answers
 `clashing: 2, pendingStaff: 2, pendingRequests: 0`: both count, because
 confirming either makes the other the 409. Web typecheck clean; the
 parser and the type are unchanged (the key kept its name and shape).
+
+## UI refresh, Phase 0: the foundation · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** plan/ui-refresh.md written (eleven phases, five rules, § 7
+answered by taking every recommendation), then Phase 0: `globals.css`
+split into `app/styles/{tokens,base,chat,screens}.css`; every literal
+colour and size replaced by a token; buttons in four kinds (default,
+primary, ghost, danger) and a small size, a busy spinner on
+`aria-busy`, 40 px targets on a coarse pointer; one rule for every text
+control (password, URL and time inputs were unstyled before); a focus
+ring on everything; notices with a side bar; `.badge`; dark mode with the
+light pin (`pinsLightScheme()`); `components/icons.tsx`. D-101.
+
+**Why it matters:** every later phase builds on these tokens, and a
+tenant's accent now reaches hover and focus, which it never did.
+
+**Observed:** the selector diff of the old file against the four new ones
+left nothing uncovered; 0 hex values outside `tokens.css`; 74/74/74
+screenshots (before, after, after dark) by `plan/ui-refresh-shoot.mjs` on
+`next dev --port 3100` (port 3000 belongs to another project on this
+machine), its throwaway owner deleted each run (one leaked by a killed
+run, found and deleted); villa light in dark mode, harbor dark; tests
+65/65; northwind's prompt snapshot identical.
+
+**Trap avoided:** derived tokens declared on `:root` alone would have
+ignored every tenant theme, because `var()` in a custom property resolves
+where it is declared.
