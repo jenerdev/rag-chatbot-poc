@@ -56,10 +56,12 @@ export interface StaffFrameProps {
   session: { auth: SessionState; role: Role | null; onLogout: () => void };
   /** A class for <main>, as the screen had it (the dashboard's). */
   mainClassName?: string;
+  /** The page's primary action, beside its title (Phase 7: "New booking"). Signed in only. */
+  actions?: ReactNode;
   children: ReactNode;
 }
 
-export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, current, title, session, mainClassName, children }: StaffFrameProps) {
+export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLElement>(null);
@@ -190,7 +192,10 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
           <img className="brand-banner" src={bannerUrl} alt="" />
         )}
         <main className={mainClassName ? `staff-content ${mainClassName}` : 'staff-content'}>
-          <h1 className="page-title">{title}</h1>
+          <div className="page-head">
+            <h1 className="page-title">{title}</h1>
+            {actions && <div className="page-actions">{actions}</div>}
+          </div>
           {children}
         </main>
       </div>

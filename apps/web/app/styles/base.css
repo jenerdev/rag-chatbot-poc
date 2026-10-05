@@ -101,7 +101,9 @@ header nav a.button.primary[aria-current="page"] { box-shadow: 0 0 0 3px var(--r
 
 .staff-main { min-width: 0; display: flex; flex-direction: column; }
 .staff-content { width: 100%; max-width: 960px; margin: 0 auto; padding: var(--space-8) var(--space-8) var(--space-10); }
-.page-title { margin: 0 0 var(--space-6); font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-6); }
+.page-title { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; }
+.page-actions { display: flex; gap: var(--space-2); }
 
 /* Below 900 px the sidebar is a drawer (the number is DRAWER_BELOW in
    staff-frame.tsx): off-screen until the menu button opens it, over a
@@ -136,7 +138,7 @@ header nav a.button.primary[aria-current="page"] { box-shadow: 0 0 0 3px var(--r
   }
   .staff-topbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
   .staff-content { padding: var(--space-5) var(--space-4) var(--space-8); }
-  .page-title { margin-bottom: var(--space-4); }
+  .page-head { margin-bottom: var(--space-4); }
 }
 
 /* --- buttons ------------------------------------------------------------ */
@@ -321,6 +323,35 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .notice.ok { background: var(--ok-soft); border-color: var(--ok-line); border-left-color: var(--ok); color: var(--ok); }
 .notice.warn { background: var(--warn-soft); border-color: var(--warn-line); border-left-color: var(--warn); color: var(--warn); }
 .notice button { margin-left: var(--space-3); }
+
+/* --- dialogs and drawers (components/dialogs.tsx, plan/ui-refresh.md Phase 7) */
+
+/* The native <dialog>, opened with showModal(): the top layer, an inert page.
+   The box has no padding, so a click on the backdrop lands on the dialog
+   itself and closes it; the content sits in an inner element. */
+dialog.dialog, dialog.drawer { padding: 0; border: 1px solid var(--line); background: var(--panel); color: var(--ink); box-shadow: var(--shadow-2); }
+dialog.dialog::backdrop, dialog.drawer::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog.dialog { width: min(440px, calc(100vw - 32px)); border-radius: var(--radius-lg); }
+dialog.dialog[open] { animation: dialog-in var(--dur) var(--ease); }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.dialog-inner { padding: var(--space-6); }
+.dialog-inner h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); font-weight: 600; }
+.dialog-body { margin-bottom: var(--space-4); color: var(--muted); font-size: var(--text-sm); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* The drawer: full height on the right; full width on a phone. */
+dialog.drawer { margin: 0 0 0 auto; width: min(560px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border-width: 0 0 0 1px; border-radius: 0; }
+dialog.drawer[open] { animation: drawer-in var(--dur) var(--ease); }
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } }
+.drawer-inner { min-height: 100%; padding: var(--space-5) var(--space-6) var(--space-8); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-5); }
+.drawer-head h2 { margin: 0; font-size: var(--text-lg); font-weight: 600; }
+.drawer-notice { margin-top: var(--space-4); }
+@media (max-width: 560px) { .drawer-inner { padding: var(--space-4); } }
+
+/* A destructive action that is THE answer of a dialog: filled, not outlined. */
+button.danger.solid { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
+button.danger.solid:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 85%, var(--ink)); border-color: transparent; }
 
 /* --- badges ------------------------------------------------------------- */
 

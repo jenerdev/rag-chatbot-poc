@@ -8,9 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–6 done
-> 2026-10-06 (the looks at 0–5 included, no action items; Phase 6's look
-> owed); Phases 7–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–7 done
+> 2026-10-06 (the looks at 0–6 included, no action items; Phase 7's look
+> owed); Phases 8–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -393,6 +393,17 @@ unchanged.
   action, not a permanent card.
 - **The list**: a table with a sticky header, a status filter as tabs
   (Upcoming, Pending, Past, Cancelled), and the phone layout as cards.
+
+**Done 2026-10-06:** `components/dialogs.tsx` (`useConfirmDialog`,
+`Drawer`, both the native `<dialog>`), and `StaffFrame` takes the page's
+`actions`. `plan/ui-refresh-phase7-walk.mjs`, 15/15; every write caught
+in the browser (2 caught: one PATCH, one POST), so HAR-4YXGRU was still
+pending and no "Walk Seven" row existed afterwards. Deviations: the list
+stays the day-by-day availability view rather than a table with
+Upcoming/Past tabs, because "Past" would need a read the screen does not
+make (Rule 3); the status filter (All, Pending, Confirmed, Cancelled)
+narrows what is drawn from the same rows. The screen was not split into
+files: the dialog and the drawer, the reusable parts, were.
 
 ### Phase 8 — Knowledge base and unanswered questions
 

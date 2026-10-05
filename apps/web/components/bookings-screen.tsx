@@ -26,6 +26,12 @@
 // nights and units), with Confirm and Decline. A request holds nothing, so
 // two can ask for the same night; confirming the second is refused by the
 // server (409) and shown as-is. `clash` warns before anyone presses Confirm.
+//
+// The look (plan/ui-refresh.md Phase 7): Requests first, as rows with badges;
+// "New booking" is a side panel opened beside the page title; every decision
+// (confirm, decline, cancel) asks in a dialog with an optional note instead
+// of window.prompt (D-096), the same answer, so the calls are unchanged; the
+// list can be narrowed by status, on screen only (the same rows are read).
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -47,6 +53,8 @@ import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
+import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { Icon } from '@/components/icons';
 
 export interface BookingsScreenProps {
   slug: string;
@@ -135,25 +143,36 @@ function BookingRow({
               : null,
             // D-100: every stay has a reference; "group booking" means several rows, not "has a group".
             booking.reference ? `ref ${booking.reference}` : null,
-            booking.source === 'web' ? 'from the booking page' : perRoom && booking.groupSize > 1 ? 'group booking' : null,
+            perRoom && booking.groupSize > 1 ? 'group booking' : null,
             // D-097: the promo it got, and this night's share of the discount (part of the price shown).
             booking.promoName ? `promo ${booking.promoName}${perRoom && booking.discount ? ` −${formatMoney(booking.discount, perRoom.currency)}` : ''}` : null,
-            booking.status === 'confirmed' ? null : booking.status,
           ]
             .filter(Boolean)
             .join(' · ')}
         </span>
-        {booking.status === 'pending' && (
-          // D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21).
-          <button type="button" className="primary" disabled={busy || booking.clash} onClick={() => onConfirm(booking)}>
-            Confirm
-          </button>
-        )}
-        {!cancelled && (
-          <button type="button" disabled={busy} onClick={() => onCancel(booking)}>
-            Cancel
-          </button>
-        )}
+        <span className="booking-badges">
+          {booking.source === 'web' && <span className="badge accent">Web</span>}
+          {booking.status === 'pending' && <span className="badge warn">Pending</span>}
+          {cancelled && <span className="badge">Cancelled</span>}
+          {booking.status === 'pending' && booking.clash && (
+            <span className="badge danger">
+              <Icon name="alert" size={12} /> Clash
+            </span>
+          )}
+        </span>
+        <span className="booking-actions">
+          {booking.status === 'pending' && (
+            // D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21).
+            <button type="button" className="primary sm" disabled={busy || booking.clash} onClick={() => onConfirm(booking)}>
+              Confirm
+            </button>
+          )}
+          {!cancelled && (
+            <button type="button" className="sm" disabled={busy} onClick={() => onCancel(booking)}>
+              Cancel
+            </button>
+          )}
+        </span>
       </div>
       {/* D-099: the Requests section's warning, on a pending staff booking whose night is already confirmed. Cancel is what staff do with it. */}
       {booking.status === 'pending' && booking.clash && (
@@ -188,7 +207,7 @@ function RequestRow({
   return (
     <div className={`booking request${pending ? '' : ` ${request.status}`}`}>
       <div className="booking-main">
-        <span className="booking-slot">{request.reference}</span>
+        <span className="badge request-ref">{request.reference}</span>
         <span className="booking-guest">{request.guestName}</span>
         <span className="booking-meta">
           {[
@@ -197,22 +216,29 @@ function RequestRow({
             request.total !== null ? formatMoney(request.total, currency) : null,
             request.guestPhone,
             request.guestEmail,
-            // D-100: which door it came through; both are decided here.
-            request.source === 'web' ? 'from the booking page' : 'by staff',
-            pending ? null : request.status,
           ]
             .filter(Boolean)
             .join(' · ')}
         </span>
+        <span className="booking-badges">
+          {/* D-100: which door it came through; both are decided here. */}
+          <span className={request.source === 'web' ? 'badge accent' : 'badge'}>{request.source === 'web' ? 'Web' : 'By staff'}</span>
+          {!pending && <span className={request.status === 'confirmed' ? 'badge ok' : 'badge'}>{request.status === 'confirmed' ? 'Confirmed' : 'Declined'}</span>}
+          {pending && (request.clash || request.closed) && (
+            <span className="badge danger">
+              <Icon name="alert" size={12} /> {request.closed ? 'Closed date' : 'Clash'}
+            </span>
+          )}
+        </span>
         {pending && (
-          <>
-            <button type="button" className="primary" disabled={busy || request.clash || request.closed} onClick={() => onDecide(request, 'confirm')}>
+          <span className="booking-actions">
+            <button type="button" className="primary sm" disabled={busy || request.clash || request.closed} onClick={() => onDecide(request, 'confirm')}>
               Confirm
             </button>
-            <button type="button" disabled={busy} onClick={() => onDecide(request, 'decline')}>
+            <button type="button" className="sm" disabled={busy} onClick={() => onDecide(request, 'decline')}>
               Decline
             </button>
-          </>
+          </span>
         )}
       </div>
       {pending && request.clash && (
@@ -270,6 +296,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // Customer requests from the public booking page, from today on.
   const [requests, setRequests] = useState<BookingRequest[] | null>(null);
   const [showDecided, setShowDecided] = useState(false);
+
+  // The decisions' dialog (D-096's note), the New booking panel, and the
+  // list's status filter, which only narrows what is drawn.
+  const { ask, dialog } = useConfirmDialog();
+  const [formOpen, setFormOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -439,6 +471,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setGuestPhone('');
         setGuestCount('');
         setNotes('');
+        setFormOpen(false);
         void load();
       } catch (error) {
         // A 409 lands here with the server's own sentence: "That slot on …
@@ -455,9 +488,16 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   const cancel = useCallback(
     async (booking: BookingSummary) => {
-      // D-096: the prompt is both the confirmation and the note. Esc or
-      // Cancel on it aborts; OK with nothing typed cancels with no note.
-      const note = window.prompt(`Cancel ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}?\n\nReason (optional):`, '');
+      // D-096: the dialog is both the confirmation and the note. Back or
+      // Escape aborts; the action with nothing typed cancels with no note.
+      const note = await ask({
+        title: 'Cancel this booking?',
+        body: `${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. The slot is free again once it is cancelled.`,
+        noteLabel: 'Reason',
+        actionLabel: 'Cancel booking',
+        backLabel: 'Keep it',
+        danger: true,
+      });
       if (note === null) return;
       setNotice(null);
       setBusy(true);
@@ -478,14 +518,19 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setBusy(false);
       }
     },
-    [api, load, unauthorized],
+    [api, ask, load, unauthorized],
   );
 
   // D-095: confirm a pending staff booking. The server's 409 (another
   // confirmed booking holds the span) arrives with its own sentence.
   const confirmOne = useCallback(
     async (booking: BookingSummary) => {
-      const note = window.prompt(`Confirm ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}?\n\nNote (optional):`, '');
+      const note = await ask({
+        title: 'Confirm this booking?',
+        body: `${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. Confirming takes the slot.`,
+        noteLabel: 'Note',
+        actionLabel: 'Confirm',
+      });
       if (note === null) return;
       setNotice(null);
       setBusy(true);
@@ -507,14 +552,18 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setBusy(false);
       }
     },
-    [api, load, unauthorized],
+    [api, ask, load, unauthorized],
   );
 
   const decide = useCallback(
     async (req: BookingRequest, action: 'confirm' | 'decline') => {
       const what = `${req.reference} for ${req.guestName}`;
-      // D-096: the prompt is both the confirmation and the note.
-      const note = window.prompt(`${action === 'confirm' ? 'Confirm' : 'Decline'} ${what}?\n\n${action === 'confirm' ? 'Note' : 'Reason'} (optional):`, '');
+      // D-096: the dialog is both the confirmation and the note.
+      const note = await ask(
+        action === 'confirm'
+          ? { title: `Confirm ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}. Confirming books the dates; then contact the guest.`, noteLabel: 'Note', actionLabel: 'Confirm' }
+          : { title: `Decline ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}.`, noteLabel: 'Reason', actionLabel: 'Decline', danger: true },
+      );
       if (note === null) return;
       setNotice(null);
       setBusy(true);
@@ -543,7 +592,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setBusy(false);
       }
     },
-    [api, load, unauthorized],
+    [api, ask, load, unauthorized],
   );
 
   // The room filter by name, because availability rows carry the unit's name.
@@ -568,6 +617,11 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const multipleUnits = activeUnits.length > 1;
 
   const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'bookings' as const, title: 'Bookings', session: { auth, role, onLogout: logout } };
+  const newBooking = (
+    <button type="button" className="primary" onClick={() => setFormOpen(true)}>
+      <Icon name="plus" size={16} /> New booking
+    </button>
+  );
 
   if (auth !== 'in') {
     return (
@@ -602,8 +656,11 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   return (
     <>
-      <StaffFrame {...frame}>
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+      <StaffFrame {...frame} actions={newBooking}>
+        {dialog}
+        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
+          {notice?.message}
+        </div>
 
         {requests && requests.length > 0 && (
           <section className="card">
@@ -635,8 +692,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           </section>
         )}
 
-        <section className="card">
-          <h2>New booking</h2>
+        <Drawer open={formOpen} title="New booking" onClose={() => setFormOpen(false)}>
           <form onSubmit={book}>
             {perRoom && (
               <div className="field">
@@ -832,8 +888,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                 {busy ? 'Saving…' : 'Book'}
               </button>
             </div>
+            {/* The page's notice is behind the panel; a refusal is said here too. */}
+            {notice?.kind === 'error' && formOpen && (
+              <div className="notice error drawer-notice" role="alert">
+                {notice.message}
+              </div>
+            )}
           </form>
-        </section>
+        </Drawer>
 
         <section className="card">
           <div className="range-head">
@@ -841,6 +903,13 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               {dayLabel(from)} – {dayLabel(to)}
             </h2>
             <div className="range-nav">
+              <div className="segmented" role="group" aria-label="Show bookings">
+                {(['all', 'pending', 'confirmed', 'cancelled'] as const).map((f) => (
+                  <button key={f} type="button" aria-pressed={statusFilter === f} onClick={() => setStatusFilter(f)}>
+                    {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                  </button>
+                ))}
+              </div>
               {perRoom && (
                 <select aria-label="Show room" value={roomFilter ?? ''} onChange={(e) => setRoomFilter(e.target.value === '' ? null : Number(e.target.value))}>
                   <option value="">All rooms</option>
@@ -890,7 +959,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                     ))}
                   </span>
                 </div>
-                {dayBookings.map((b) => (
+                {dayBookings.filter((b) => statusFilter === 'all' || b.status === statusFilter).map((b) => (
                   <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} onConfirm={confirmOne} perRoom={perRoom ? { currency: setup.currency } : null} />
                 ))}
               </div>

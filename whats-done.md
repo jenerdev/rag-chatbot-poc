@@ -7880,3 +7880,33 @@ wide. A probe found the chart's hidden table: a `<table>` ignores
 `position: relative` it stuck out of the card. Wrapped in a clipped
 `<div>`, the page is 375 px. The walk had checked the width on northwind
 only; it now checks every dashboard it opens.
+
+## UI refresh, Phase 7: the bookings screen · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** the three `window.prompt`s of D-096 (cancel, confirm a staff
+booking, confirm or decline a request) are one dialog
+(`components/dialogs.tsx`, `useConfirmDialog`): a title, who and what, an
+optional note, Back (or "Keep it") and the action, filled red when it
+destroys. It answers as the prompt did, a string or null, so each caller
+changed one line and no request changed. "New booking" is a button beside
+the page title (`StaffFrame`'s new `actions`) that opens the form in a
+side `Drawer`, which stays mounted, so what was typed survives closing it;
+a refusal is said inside it too, and success closes it. Rows carry badges:
+the reference, Web or By staff, Pending, Cancelled, Clash or Closed date
+(with an icon). The list's bookings can be narrowed to Pending, Confirmed
+or Cancelled, on screen only.
+
+**Why it matters:** the decisions are the screen's work; a browser prompt
+could not say what was being decided, or which button was destructive.
+
+**Observed:** `plan/ui-refresh-phase7-walk.mjs`, 15/15 as a throwaway
+harbor owner: Escape on Decline sent nothing and returned focus to Decline;
+Decline with "walk7: dates no longer wanted" sent exactly one PATCH with
+`{action: 'decline', note: …}`; "Keep it" sent nothing; the drawer kept
+"Walk Seven" through Escape and reopening, showed the real quote
+(₱3,150.00 with the automatic promo) and sent one POST with the room and 2
+guests; Cancelled showed 2 of 5 rows. Both writes were answered inside the
+browser: HAR-4YXGRU still pending, 0 "Walk Seven" rows. The first run's
+three failures: two were the walk's (harbor's Day Tour has no rate; the
+drawer said so in the server's words), one was real: the range controls
+did not wrap and made the phone page 569 px; they wrap now (375 px).

@@ -59,7 +59,10 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 
 .range-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: 10px; }
 .range-head h2 { margin: 0; }
-.range-nav { display: flex; gap: 6px; }
+.range-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.range-nav select { width: auto; min-height: var(--control-h); }
+/* A phone: the filter, the room picker and the range buttons each take their own line if they must. */
+@media (max-width: 560px) { .range-nav { width: 100%; } .range-nav select { flex: 1 1 100%; } }
 
 .day { border-top: 1px solid var(--line); padding: 10px 0; }
 .day-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
@@ -79,14 +82,19 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 /* A closed date (D-080): nothing is sold, whatever the bookings say. */
 .slot-chip.closed { background: var(--panel); border-color: var(--line); color: var(--muted); text-decoration: line-through; }
 
-.booking { margin: var(--space-2) 0 0 104px; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); }
-.booking-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* A booking or a request as a row: who and what, its badges, its buttons
+   at the end (plan/ui-refresh.md Phase 7). */
+.booking { margin: var(--space-2) 0 0 104px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); }
+.booking-main { display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; }
 .booking-slot { font-size: var(--text-xs); font-weight: 600; color: var(--accent-text); }
 .booking-guest { font-weight: 600; }
-.booking-meta { flex: 1; font-size: var(--text-sm); color: var(--muted); }
-.booking-notes { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
-.booking.cancelled { opacity: 0.55; }
+.booking-meta { flex: 1 1 220px; font-size: var(--text-sm); color: var(--muted); }
+.booking-badges { display: inline-flex; gap: var(--space-1); flex-wrap: wrap; }
+.booking-actions { display: inline-flex; gap: var(--space-2); margin-left: auto; }
+.booking-notes { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.booking.cancelled { opacity: 0.6; }
 .booking.cancelled .booking-guest { text-decoration: line-through; }
+.request-ref { font-family: var(--font-mono); letter-spacing: 0.02em; }
 
 @media (max-width: 560px) {
   .booking { margin-left: 0; }
@@ -208,6 +216,7 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 /* S-3's requests, and S-7. */
 .booking.request { margin-left: 0; }
 .request-clash { color: var(--danger); }
+.booking.request + .booking.request { margin-top: var(--space-2); }
 .holiday { display: flex; align-items: center; gap: 10px; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
 .holiday:last-child { border-bottom: none; }
 .holiday-day { flex: 0 0 150px; font-variant-numeric: tabular-nums; }
