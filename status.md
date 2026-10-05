@@ -60,7 +60,9 @@
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.
 - [x] The user's look at Phase 0 (2026-10-06): no action items.
-- [ ] Phase 1, login / forgot / reset password. Then Phases 2–10.
+- [x] Phase 1, login / forgot / reset password: walk 18/18, tests 65/65.
+- [ ] The user's look at Phase 1: `plan/ui-refresh/phase1/{before,after,after-dark}/`.
+- [ ] Phase 2, navigation. Then Phases 3–10.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

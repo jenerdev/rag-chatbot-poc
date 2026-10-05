@@ -7704,3 +7704,34 @@ run, found and deleted); villa light in dark mode, harbor dark; tests
 **Trap avoided:** derived tokens declared on `:root` alone would have
 ignored every tenant theme, because `var()` in a custom property resolves
 where it is declared.
+
+## UI refresh, Phase 1: login, forgot, reset · done 2026-10-06, on `feat/ui-refresh`
+
+**What:** `LoginForm` (the 11 staff screens and the platform) and
+`ResetPassword` restyled as one narrow centred card: a full-width button
+with a busy state, "Forgot password?" under it, a "Check your email" state
+with a check instead of a notice, and a "Password set" state. New shared
+pieces in `admin-login.tsx`: `PasswordInput` (show/hide, `aria-pressed`)
+and `FormError` (`role="alert"`, focused when it appears). A refused login
+clears the password and keeps the email. The reset form shows its two
+rules as they are typed ("At least 8 characters", "The passwords match")
+and enables its button only when both are met; the server still checks
+both. The staff intro says to ask an owner instead of naming a `pnpm`
+command.
+
+**Why it matters:** the login is the first thing every member sees, and
+the error used to sit unannounced above the buttons.
+
+**Observed:** `plan/ui-refresh-phase1-walk.mjs`, 18/18: Tab order email →
+password → Show password → Log in → Forgot password?; the error is
+`role=alert` and takes focus ("That email and password do not match a
+staff account for this workspace."); the reset token is wiped from the
+address bar; 5 characters leave the button off, 12 typed twice turn it
+on. No account was made and no email sent: the reset-email request was
+fulfilled inside the browser (R-21). Typecheck clean; tests 65/65. The
+CDP code moved into `plan/ui-refresh-cdp.mjs`, shared by the walk and the
+screenshots.
+
+**Trap avoided:** a crashed run left headless Chrome holding the port, and
+on Windows killing the launcher does not stop its children; the helper now
+picks a fresh port and kills the whole tree (`taskkill /T`).

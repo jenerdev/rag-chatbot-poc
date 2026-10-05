@@ -171,6 +171,17 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 /* Keeps Cancel beside Save when editing, instead of centred by space-between. */
 .form-footer .estimate { margin-right: auto; }
 
+/* A field with a button inside its right edge (the password's show/hide). */
+.input-with-action { position: relative; }
+.input-with-action input { padding-right: 44px; }
+.input-with-action .input-action { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); min-height: 28px; width: 32px; padding: 0; color: var(--muted); }
+.input-with-action .input-action:hover:not(:disabled) { color: var(--ink); }
+@media (pointer: coarse) { .input-with-action .input-action { min-height: 36px; width: 36px; } }
+
+/* A rule under a field, met or not yet (the reset form's length and match). */
+.hint { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: var(--text-xs); color: var(--muted); }
+.hint.met { color: var(--ok); }
+
 /* --- cards -------------------------------------------------------------- */
 
 .card {
@@ -185,6 +196,19 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 @media (max-width: 560px) {
   main { padding: var(--space-4); }
   .card { padding: var(--space-4); }
+}
+
+/* --- the login, forgot and reset cards (plan/ui-refresh.md Phase 1) ------ */
+
+.auth-card { max-width: 400px; margin: var(--space-10) auto; padding: var(--space-8); box-shadow: var(--shadow-1); }
+.auth-card h2 { font-size: var(--text-xl); margin-bottom: var(--space-2); letter-spacing: -0.02em; }
+.auth-intro { margin: 0 0 var(--space-6); color: var(--muted); font-size: var(--text-sm); }
+.auth-wide { width: 100%; min-height: 40px; font-size: var(--text-base); }
+.auth-card .notice { margin: 0 0 var(--space-4); }
+.auth-switch { margin-top: var(--space-4); text-align: center; }
+.auth-done { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: var(--space-4); border-radius: var(--radius-full); background: var(--ok-soft); color: var(--ok); }
+@media (max-width: 560px) {
+  .auth-card { margin: var(--space-4) auto; padding: var(--space-6) var(--space-5); }
 }
 
 /* --- notices ------------------------------------------------------------ */

@@ -12,10 +12,17 @@
 // read once, wiped from the address bar so it does not sit in history or get
 // shared by copy-paste, kept in memory, and sent with the new password to our
 // own route. No supabase-js in the browser. The route does the one HTTP call.
+//
+// The look (plan/ui-refresh.md Phase 1): the login's card, and the two rules
+// a password must pass shown as it is typed, not after the submit.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { describeFailure } from './admin-login';
+import { FormError, PasswordInput, describeFailure } from './admin-login';
+import { Icon } from './icons';
+
+/** The server's rule too (the password route refuses fewer). */
+const MIN_PASSWORD = 8;
 
 type LinkState = { token: string } | { problem: string } | null;
 
@@ -77,61 +84,76 @@ export function ResetPassword({ api, loginHref }: { api: string; loginHref: stri
 
   if ('problem' in link) {
     return (
-      <section className="card">
+      <section className="card auth-card">
         <h2>Set a password</h2>
         <div className="notice error">{link.problem}</div>
-        <Link href={loginHref}>Back to the login form</Link>
+        <Link className="button auth-wide" href={loginHref}>
+          Back to login
+        </Link>
       </section>
     );
   }
 
   if (done) {
     return (
-      <section className="card">
-        <h2>Set a password</h2>
-        <div className="notice ok">{done}</div>
-        <Link className="button" href={loginHref}>
+      <section className="card auth-card">
+        <div className="auth-done">
+          <Icon name="check" size={22} />
+        </div>
+        <h2>Password set</h2>
+        <p className="auth-intro">{done}</p>
+        <Link className="button primary auth-wide" href={loginHref}>
           Log in
         </Link>
       </section>
     );
   }
 
+  const longEnough = password.length >= MIN_PASSWORD;
+  const matches = again !== '' && again === password;
   return (
-    <section className="card">
+    <section className="card auth-card">
       <h2>Set a password</h2>
+      <p className="auth-intro">Choose the password you will log in with.</p>
       <form onSubmit={submit}>
         <div className="field">
           <label htmlFor="new-password">New password</label>
-          <input
-            type="password"
+          <PasswordInput
             id="new-password"
             autoComplete="new-password"
             autoFocus
-            required
-            minLength={8}
+            minLength={MIN_PASSWORD}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
+            describedBy="new-password-rule"
           />
+          <p id="new-password-rule" className={longEnough ? 'hint met' : 'hint'} aria-live="polite">
+            <Icon name={longEnough ? 'check' : 'info'} size={14} /> At least {MIN_PASSWORD} characters
+          </p>
         </div>
         <div className="field">
           <label htmlFor="new-password-again">The same again</label>
-          <input
-            type="password"
+          <PasswordInput
             id="new-password-again"
             autoComplete="new-password"
-            required
             value={again}
-            onChange={(event) => setAgain(event.target.value)}
+            onChange={setAgain}
+            invalid={again !== '' && !password.startsWith(again)}
+            describedBy="new-password-match"
           />
+          <p id="new-password-match" className={matches ? 'hint met' : 'hint'} aria-live="polite">
+            <Icon name={matches ? 'check' : 'info'} size={14} /> {matches ? 'The passwords match' : 'Type it again to confirm'}
+          </p>
         </div>
-        {error && <div className="notice error">{error}</div>}
-        <div className="form-footer">
-          <span className="small muted">At least 8 characters.</span>
-          <button type="submit" className="primary" disabled={busy || password === '' || again === ''}>
-            {busy ? 'Saving…' : 'Set password'}
-          </button>
-        </div>
+        <FormError message={error} />
+        <button
+          type="submit"
+          className="primary auth-wide"
+          aria-busy={busy || undefined}
+          disabled={busy || !longEnough || !matches}
+        >
+          {busy ? 'Saving…' : 'Set password'}
+        </button>
       </form>
     </section>
   );

@@ -8,8 +8,9 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phase 0 done
-> 2026-10-06, the user's look included (no action items); Phases 1–10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–1 done
+> 2026-10-06 (Phase 0's look included, no action items; Phase 1's look owed);
+> Phases 2–10 to do.** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -204,6 +205,13 @@ colours hover and focus.
 **Done when:** a staff login, a wrong password, a forgot-password request and a
 reset all walk by keyboard alone, and the platform login looks the same with
 its own title.
+
+**Done 2026-10-06:** `plan/ui-refresh-phase1-walk.mjs`, 18/18 in a real
+browser (no account made, no email sent: the reset request is answered
+inside the browser). Deviations: the logo and name stay in the page header
+above the card rather than inside it (the header already carries them);
+the staff intro no longer names a `pnpm` command, since staff are not
+developers and owners add members on the Members screen.
 
 ### Phase 2 — Navigation: the header, the staff sidebar, the phone drawer
 
