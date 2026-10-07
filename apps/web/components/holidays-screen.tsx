@@ -30,6 +30,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -396,23 +397,24 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                     </span>
                     <span className="list-row-meta">{d.surcharge > 0 ? `+${formatMoney(d.surcharge, setup.currency)} a night` : ''}</span>
                     <span className="list-row-actions">
-                      <button
-                        type="button"
-                        className="ghost sm"
-                        aria-label={`Edit ${d.label}`}
-                        title="Edit"
-                        disabled={busy}
-                        onClick={() => {
-                          setDay(d.day);
-                          setKind(d.kind);
-                          setLabel(d.label);
-                          setSurcharge(d.surcharge ? centavosToInput(d.surcharge) : '');
-                          setNotice(null);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Icon name="edit" size={16} />
-                      </button>
+                      <Tip label="Edit">
+                        <button
+                          type="button"
+                          className="ghost sm"
+                          aria-label={`Edit ${d.label}`}
+                          disabled={busy}
+                          onClick={() => {
+                            setDay(d.day);
+                            setKind(d.kind);
+                            setLabel(d.label);
+                            setSurcharge(d.surcharge ? centavosToInput(d.surcharge) : '');
+                            setNotice(null);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Icon name="edit" size={16} />
+                        </button>
+                      </Tip>
                       <button type="button" className={d.kind === 'closed' ? 'sm' : 'ghost sm danger'} disabled={busy} onClick={() => remove(d)}>
                         {d.kind === 'closed' ? 'Reopen' : 'Remove'}
                       </button>

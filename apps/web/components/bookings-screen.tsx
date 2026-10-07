@@ -56,6 +56,7 @@ import { formatMoney } from '@/lib/money';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface BookingsScreenProps {
@@ -939,34 +940,46 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           {availability === null || bookings === null ? (
             <LoadState load={loadState} what="bookings" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : (
-            days.map(({ day, slots, bookings: dayBookings }) => (
-              <div key={day} className="day">
-                <div className="day-head">
-                  <span className="day-label">{dayLabel(day)}</span>
-                  <span className="day-slots">
-                    {slots.map((s) => (
-                      <span
-                        key={`${s.unit}/${s.slot}`}
-                        className={`slot-chip ${s.status}`}
-                        title={
-                          s.status === 'closed'
-                            ? 'Closed on the Holidays screen — nothing can be booked'
-                            : s.status === 'taken'
-                              ? 'Overlaps a booking — maybe one from another day'
-                              : 'Free to book'
-                        }
-                      >
-                        {multipleUnits || perRoom ? `${s.unit} · ` : ''}
-                        {s.slot}: {s.status}
-                      </span>
-                    ))}
-                  </span>
+            <>
+              {/* What a chip's word means, written once (plan/ui-components.md
+                  Phase 6). It was each chip's `title`, which a keyboard, a phone
+                  and a screen reader never see; making every chip focusable
+                  instead would have been ~112 Tab stops on harbor's two weeks. */}
+              <p className="small muted slot-legend">
+                <strong>open</strong> free to book · <strong>taken</strong> overlaps a booking, maybe one that starts on
+                another day · <strong>closed</strong> closed on the Holidays screen, nothing can be booked
+              </p>
+              {days.map(({ day, slots, bookings: dayBookings }) => (
+                <div key={day} className="day">
+                  <div className="day-head">
+                    <span className="day-label">{dayLabel(day)}</span>
+                    <span className="day-slots">
+                      {slots.map((s) => (
+                        // The same reason on hover, for the mouse; the legend above says it for everyone.
+                        <Tip
+                          key={`${s.unit}/${s.slot}`}
+                          label={
+                            s.status === 'closed'
+                              ? 'Closed on the Holidays screen: nothing can be booked'
+                              : s.status === 'taken'
+                                ? 'Overlaps a booking, maybe one from another day'
+                                : 'Free to book'
+                          }
+                        >
+                          <span className={`slot-chip ${s.status}`}>
+                            {multipleUnits || perRoom ? `${s.unit} · ` : ''}
+                            {s.slot}: {s.status}
+                          </span>
+                        </Tip>
+                      ))}
+                    </span>
+                  </div>
+                  {dayBookings.filter((b) => statusFilter === 'all' || b.status === statusFilter).map((b) => (
+                    <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} onConfirm={confirmOne} perRoom={perRoom ? { currency: setup.currency } : null} />
+                  ))}
                 </div>
-                {dayBookings.filter((b) => statusFilter === 'all' || b.status === statusFilter).map((b) => (
-                  <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} onConfirm={confirmOne} perRoom={perRoom ? { currency: setup.currency } : null} />
-                ))}
-              </div>
-            ))
+              ))}
+            </>
           )}
         </section>
       </StaffFrame>

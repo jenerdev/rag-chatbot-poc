@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Source, ToolCallRecord } from '@rag/pipeline';
 import { Icon } from './icons';
+import { Tip } from './tooltip';
 
 // The look (plan/ui-refresh.md Phase 4): ONE footer style for "what this
 // answer was built from". The availability evidence stays OPEN (CLAUDE.md
@@ -25,6 +26,13 @@ const FOUND_BY_TITLE: Record<string, string> = {
  */
 function SourceBox({ source }: { source: Source }) {
   const [truncated, setTruncated] = useState(true);
+  // Whether two lines hide anything: a short chunk gets no "Show all" that would show nothing more.
+  const text = useRef<HTMLParagraphElement>(null);
+  const [clipped, setClipped] = useState(false);
+  useEffect(() => {
+    const el = text.current;
+    if (el && truncated) setClipped(el.scrollHeight > el.clientHeight + 1);
+  }, [truncated, source.content]);
 
   return (
     <div className="source">
@@ -36,9 +44,12 @@ function SourceBox({ source }: { source: Source }) {
         {/* Which of the two searches found this chunk (D-015). Worth showing: a
             'keyword' badge on a chunk with a low similarity score is the hybrid
             search visibly doing the job vector search could not. */}
-        <span className={`source-found ${source.foundBy}`} title={FOUND_BY_TITLE[source.foundBy] ?? ''}>
-          {source.foundBy}
-        </span>
+        {/* Focusable, so the keyboard reaches what the word means (plan/ui-components.md Phase 6). */}
+        <Tip label={FOUND_BY_TITLE[source.foundBy] ?? source.foundBy} describe>
+          <span className={`source-found ${source.foundBy}`} tabIndex={0}>
+            {source.foundBy}
+          </span>
+        </Tip>
         {/* Three decimals: the difference between 0.42 and 0.45 is the
             difference between a good match and a mediocre one. */}
         <span className="source-score">
@@ -47,13 +58,17 @@ function SourceBox({ source }: { source: Source }) {
           {source.similarity.toFixed(3)}
         </span>
       </div>
-      <p
-        className={`source-text${truncated ? ' truncated' : ''}`}
-        title="Click to expand"
-        onClick={() => setTruncated((t) => !t)}
-      >
+      {/* A click on the text still toggles it, for the mouse; the button is the
+          control a keyboard and a screen reader have (it was a title, "Click to
+          expand", on a paragraph nothing could focus). */}
+      <p ref={text} className={`source-text${truncated ? ' truncated' : ''}`} onClick={() => setTruncated((t) => !t)}>
         {source.content}
       </p>
+      {(clipped || !truncated) && (
+        <button type="button" className="link source-more" aria-expanded={!truncated} onClick={() => setTruncated((t) => !t)}>
+          {truncated ? 'Show all' : 'Show less'}
+        </button>
+      )}
     </div>
   );
 }

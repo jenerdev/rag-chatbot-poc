@@ -20,6 +20,7 @@ import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { useNotice } from '@/components/toast';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
@@ -133,25 +134,26 @@ export function MembersPanel({
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  className="ghost sm danger"
-                  aria-label={`Remove ${m.email}`}
-                  title="Remove"
-                  disabled={busy}
-                  onClick={async () => {
-                    const sure = await ask({
-                      title: `Remove ${m.email}?`,
-                      body: 'Their next request is refused. Their account stays; it can be added again.',
-                      actionLabel: 'Remove',
-                      backLabel: 'Keep them',
-                      danger: true,
-                    });
-                    if (sure !== null) void write('DELETE', { userId: m.userId }, `Removed ${m.email}.`);
-                  }}
-                >
-                  <Icon name="trash" size={16} />
-                </button>
+                <Tip label="Remove">
+                  <button
+                    type="button"
+                    className="ghost sm danger"
+                    aria-label={`Remove ${m.email}`}
+                    disabled={busy}
+                    onClick={async () => {
+                      const sure = await ask({
+                        title: `Remove ${m.email}?`,
+                        body: 'Their next request is refused. Their account stays; it can be added again.',
+                        actionLabel: 'Remove',
+                        backLabel: 'Keep them',
+                        danger: true,
+                      });
+                      if (sure !== null) void write('DELETE', { userId: m.userId }, `Removed ${m.email}.`);
+                    }}
+                  >
+                    <Icon name="trash" size={16} />
+                  </button>
+                </Tip>
               </span>
             </div>
           ))}

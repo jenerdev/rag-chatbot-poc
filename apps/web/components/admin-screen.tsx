@@ -41,6 +41,7 @@ import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
@@ -163,12 +164,16 @@ function DocumentRow({
         </span>
         {!readOnly && (
           <>
-            <button type="button" className="ghost sm" aria-label={`Edit ${doc.title}`} title="Edit" disabled={deleting || editing} onClick={() => onEdit(doc)}>
-              <Icon name="edit" size={16} />
-            </button>
-            <button type="button" className="ghost sm danger" aria-label={`Delete ${doc.title}`} title="Delete" disabled={deleting || editing} onClick={remove}>
-              <Icon name="trash" size={16} />
-            </button>
+            <Tip label="Edit">
+              <button type="button" className="ghost sm" aria-label={`Edit ${doc.title}`} disabled={deleting || editing} onClick={() => onEdit(doc)}>
+                <Icon name="edit" size={16} />
+              </button>
+            </Tip>
+            <Tip label="Delete">
+              <button type="button" className="ghost sm danger" aria-label={`Delete ${doc.title}`} disabled={deleting || editing} onClick={remove}>
+                <Icon name="trash" size={16} />
+              </button>
+            </Tip>
           </>
         )}
       </div>

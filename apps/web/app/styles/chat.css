@@ -279,6 +279,9 @@
   cursor: pointer;
 }
 .source-text:hover { color: var(--ink); }
+/* Phase 6: the badge is wrapped in a .tip, which is now the header's flex item. */
+.source-head > .tip { margin-left: auto; align-self: center; }
+.source-more { margin-top: var(--space-1); font-size: var(--text-xs); }
 .source-text.truncated { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* --- composer ----------------------------------------------------------- */

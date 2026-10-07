@@ -31,6 +31,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice, type Notice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -334,22 +335,27 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             {/* eslint-disable-next-line @next/next/no-img-element -- a plain public URL; next/image would need remotePatterns for the bucket */}
             <img src={image.url} alt={`${room.name}, photo ${index + 1}`} />
             <figcaption>
-              <button type="button" className="ghost sm" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left" title="Move left">
-                <Icon name="chevron-left" size={16} />
-              </button>
-              <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void removePhoto(image)} aria-label={`Remove photo ${index + 1}`} title="Remove">
-                <Icon name="trash" size={16} />
-              </button>
-              <button
-                type="button"
-                className="ghost sm"
-                disabled={busy || index === room.images.length - 1}
-                onClick={() => movePhoto(index, 1)}
-                aria-label="Move right"
-                title="Move right"
-              >
-                <Icon name="chevron-right" size={16} />
-              </button>
+              <Tip label="Move left">
+                <button type="button" className="ghost sm" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left">
+                  <Icon name="chevron-left" size={16} />
+                </button>
+              </Tip>
+              <Tip label="Remove">
+                <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void removePhoto(image)} aria-label={`Remove photo ${index + 1}`}>
+                  <Icon name="trash" size={16} />
+                </button>
+              </Tip>
+              <Tip label="Move right">
+                <button
+                  type="button"
+                  className="ghost sm"
+                  disabled={busy || index === room.images.length - 1}
+                  onClick={() => movePhoto(index, 1)}
+                  aria-label="Move right"
+                >
+                  <Icon name="chevron-right" size={16} />
+                </button>
+              </Tip>
             </figcaption>
           </figure>
         ))}

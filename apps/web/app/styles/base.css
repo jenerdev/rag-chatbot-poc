@@ -360,6 +360,39 @@ dialog.drawer[open] { animation: drawer-in var(--dur) var(--ease); }
 .tab-panel:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: var(--radius-md); }
 .tenant-head { margin: 0 0 var(--space-3); }
 
+/* --- tooltips (components/tooltip.tsx, plan/ui-components.md Phase 6) ---
+   Above the trigger, in the ink colour on the panel colour (the inverse of
+   the page, so it reads in both schemes). The transparent bottom border is
+   the bridge to the trigger: the pointer crosses it without leaving the tip
+   (WCAG 1.4.13, hoverable). Shown on hover and on keyboard focus; Escape
+   adds .dismissed. */
+.tip { position: relative; display: inline-flex; }
+.tip-text {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 6px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  background-clip: padding-box;
+  color: var(--panel);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  transform: translateX(-50%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-fast) var(--ease), visibility var(--dur-fast) var(--ease);
+}
+.tip:hover > .tip-text, .tip:has(:focus-visible) > .tip-text { opacity: 1; visibility: visible; }
+.tip.dismissed > .tip-text { opacity: 0; visibility: hidden; }
+
 /* --- toasts (components/toast.tsx, plan/ui-components.md Phase 1) --------
    A popover: the UA gives it a centred, bordered box; undo all of that.
    Bottom-right on a desktop, clear of the sidebar; bottom-centre on a

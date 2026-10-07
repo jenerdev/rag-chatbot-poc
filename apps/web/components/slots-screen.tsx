@@ -30,6 +30,7 @@ import { isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface SlotsScreenProps {
@@ -333,9 +334,11 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
                   {s.upcoming > 0 ? ` · ${s.upcoming} upcoming` : ''}
                 </span>
                 <span className="list-row-actions">
-                  <button type="button" className="ghost sm" aria-label={`Edit ${s.name}`} title="Edit" disabled={busy} onClick={() => edit(s)}>
-                    <Icon name="edit" size={16} />
-                  </button>
+                  <Tip label="Edit">
+                    <button type="button" className="ghost sm" aria-label={`Edit ${s.name}`} disabled={busy} onClick={() => edit(s)}>
+                      <Icon name="edit" size={16} />
+                    </button>
+                  </Tip>
                   {s.booked ? (
                     <button
                       type="button"
@@ -354,25 +357,26 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
                       Retire
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      className="ghost sm danger"
-                      aria-label={`Delete ${s.name}`}
-                      title="Delete"
-                      disabled={busy}
-                      onClick={async () => {
-                        const sure = await ask({
-                          title: `Delete "${s.name}"?`,
-                          body: 'It was never booked; its room rates are deleted with it. This cannot be undone.',
-                          actionLabel: 'Delete',
-                          backLabel: 'Keep it',
-                          danger: true,
-                        });
-                        if (sure !== null) void write('DELETE', `/slots/${s.id}`, undefined, `Deleted "${s.name}".`);
-                      }}
-                    >
-                      <Icon name="trash" size={16} />
-                    </button>
+                    <Tip label="Delete">
+                      <button
+                        type="button"
+                        className="ghost sm danger"
+                        aria-label={`Delete ${s.name}`}
+                        disabled={busy}
+                        onClick={async () => {
+                          const sure = await ask({
+                            title: `Delete "${s.name}"?`,
+                            body: 'It was never booked; its room rates are deleted with it. This cannot be undone.',
+                            actionLabel: 'Delete',
+                            backLabel: 'Keep it',
+                            danger: true,
+                          });
+                          if (sure !== null) void write('DELETE', `/slots/${s.id}`, undefined, `Deleted "${s.name}".`);
+                        }}
+                      >
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </Tip>
                   )}
                 </span>
               </div>

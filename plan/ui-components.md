@@ -294,6 +294,20 @@ day's row when the status is `taken` or `closed`.
 **Done when:** Tab onto a taken chip shows its reason; a screen reader reads
 it; axe is clean.
 
+**Done 2026-10-08:** `components/tooltip.tsx` (`Tip`; CSS shows it on
+`:hover` and `:has(:focus-visible)`; Escape dismisses; a transparent
+border bridges to the trigger, so it is hoverable, WCAG 1.4.13). 11 icon
+buttons wrapped, their `title`s gone; no HTML element on a staff screen
+has a `title` now. `plan/ui-components-phase6-walk.mjs`, 12/12. Deviations:
+- The bookings chips are NOT focusable. On harbor's two weeks that would
+  be about 112 Tab stops. Instead, one visible legend above the days says
+  what open, taken and closed mean, for keyboard, touch and screen reader
+  alike; the chips keep a hover tip.
+- The sources panel: the "found by" badge is focusable with a describing
+  tip. And "Click to expand" (a `title` on a paragraph nothing could
+  focus) is now a "Show all" / "Show less" button with `aria-expanded`,
+  shown only when two lines actually hide something.
+
 ### Phase 7 — The record
 
 D-102 in `decisions.md` (toasts for action feedback, banners for standing
