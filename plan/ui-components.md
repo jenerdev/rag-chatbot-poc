@@ -8,8 +8,8 @@
 > ui-refresh § 8 ("Later").
 >
 > Written 2026-10-07 on `feat/ui-refresh`, while ui-refresh Phase 10 is
-> paused, uncommitted. **Status: Phase 0 done 2026-10-08 (ui-refresh
-> Phase 10 committed at `09aed2f`); Phase 1 next.** § 5 answered
+> paused, uncommitted. **Status: Phases 0–1 done 2026-10-08 (ui-refresh
+> Phase 10 committed at `09aed2f`); Phase 2 next.** § 5 answered
 > 2026-10-07: every recommendation taken, by the user's instruction.
 > Decision to record: D-102.
 
@@ -155,6 +155,26 @@ notify({ message: 'Deleted "Summer".', kind: 'ok' });   // replaces setNotice(..
 request at the bottom of Bookings, and saving inside an open drawer each
 show feedback in the viewport; an error toast stays until closed; Tab
 reaches its close button; axe is clean.
+
+**Done 2026-10-08:** `plan/ui-components-phase1-walk.mjs`, 20/20 as a
+harbor owner and a super user; every write caught in the browser, so both
+of harbor's promos and HAR-4YXGRU (pending) were unchanged afterwards.
+Deviations:
+- ONE module-level queue and ONE `<Toaster />` per page, rendered by
+  `StaffFrame` and the platform screen, instead of one region per screen.
+  The platform shows the tenant form and its members panel together, and two
+  regions would have stacked in the same corner. A toast also outlives the
+  component that raised it, so the tenant form now says "Created." (before,
+  it said nothing, because it was replaced).
+- Walked on harbor, not villa: harbor has an unused promo to delete and a
+  request to decide.
+- Declined, not confirmed: harbor's one pending request clashes with a
+  confirmed booking (D-099), so its Confirm is rightly disabled. Both go
+  through the same `decide()`.
+
+Found and fixed: deleting a document said nothing (the row just went); it
+now says "Deleted … and its N chunks." The create-tenant error had no
+`role="alert"`; it has now.
 
 ### Phase 2 — Load state: skeleton and error with Retry (finding 2, trap 4)
 

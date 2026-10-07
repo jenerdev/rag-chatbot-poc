@@ -8066,3 +8066,62 @@ platform form, and reasons hidden in `title`.
 
 **Observed:** both screenshot runs 74/74, throwaway users deleted; harbor
 Promos at 1280 px checked by eye (rendered, not a 500).
+
+## UI components, Phase 1: the toast · 2026-10-08, on `feat/ui-refresh`
+
+**What:** `components/toast.tsx` (`useNotice()`, `notify()`, `<Toaster />`)
+and `lib/toast.ts` (the queue's rules, tested). Eight screens moved off
+their page-top notice: knowledge base, bookings, rooms, holidays, slots,
+promos, the members panel and the tenant form. `useNotice()` keeps the
+`setNotice()` signature, and decides where a message goes. A success is a
+toast that leaves after 5 s, paused while hovered or focused. An error
+while the drawer is open stays in the drawer. Any other error is a toast
+that stays until closed (role alert). The queue is one per tab, and
+`StaffFrame` and the platform screen each render the page's one region.
+The region is a `popover="manual"` element, so it sits in the top layer.
+
+**Why it matters:** before, a row action at the bottom of a page said
+"Deleted …" at the top, off-screen, and an open drawer hid the page's
+notice altogether. That is why five drawers repeated the error. Now the
+words land where the person is looking, and the drawer copy is the ONLY
+place a form's refusal is said.
+
+**Observed:** `plan/ui-components-phase1-walk.mjs`, 20/20. "Deleted "Off
+season 2"." showed at 836–884 px of a 900 px window, was gone after 5 s.
+A 409 stayed after 6 s, Tab reached its Dismiss button, and Enter closed
+it. A 409 inside the open drawer was said in the drawer and NOT as a
+toast. "Declined HAR-4YXGRU …" appeared as a toast. On a phone the toast
+spans 16–359 px of 375, bottom 804 of 812. axe on both kinds, light and
+dark: none. The platform has one region with the form and the members
+panel. Every write was caught; both promos and HAR-4YXGRU were unchanged.
+Full audit: 160 page states, still 0 violations. Typecheck clean; web
+tests 79/79 (6 new).
+
+**Found, not planned:** deleting a document said nothing; it now says
+"Deleted "…" and its N chunks." The tenant form said nothing on create,
+since it is replaced at once; a toast outlives it, so it says "Created."
+
+**Trap met:** the walk's Enter key did nothing on the focused Dismiss
+button. CDP's `keyDown` without `text: "\r"` does not press a button, which
+a real keyboard does. The helper's `key()` sends no text, so a walk that
+presses Enter on a button has to send its own.
+
+**Also measured, the owed Phase 10 suites, once the new OpenAI key was
+in:** pipeline isolation 23/23, filters-only 21/21. `pnpm eval` 55/61,
+with the same six failing on every repeat (book-for-me ×3, leak-2 ×3,
+tool-open ×2, lang-tagalog-2 ×2), so these are not flips:
+- `antecedent`: the known limit (D-017).
+- `tool-open` and `book-for-me`: the battery's "free" date is today + 14,
+  which is 22 October today. A real confirmed staff booking holds villa's
+  Overnight on 22 October (VIL-FJK939, "Code Lucas", made 2026-09-27). The
+  tool says taken, and the replies say taken, correctly. This is the data,
+  not the prompt (trap 24's "flips with the DATE").
+- `book-for-me-harbor`: the room was open, and the model asked the guest
+  to "confirm" instead of naming the page. This is the date-dependent case
+  trap 24 names.
+- `leak-2`: northwind refused correctly; the villa CONTROL refused too.
+  This is the identical-prompt flip trap 24 records.
+- `lang-tagalog-2`: the facts were right, but in English (en-share 0.89 to
+  0.90), not Taglish.
+No pipeline code or prompt text moved on this branch, and the three
+baselines are byte-identical, so nothing was reworded.

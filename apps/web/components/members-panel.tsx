@@ -20,9 +20,8 @@ import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { useNotice } from '@/components/toast';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
-
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 export function MembersPanel({
   api,
@@ -38,7 +37,8 @@ export function MembersPanel({
   const { ask, dialog } = useConfirmDialog();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading members…');
-  const [notice, setNotice] = useState<Notice>(null);
+  // No drawer here: the add form is one field, and its refusal is a toast like every other.
+  const { setNotice } = useNotice();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('staff');
   const [busy, setBusy] = useState(false);
@@ -99,9 +99,6 @@ export function MembersPanel({
         handle bookings and the unanswered questions. A change takes effect on the person&apos;s next request. A tenant
         always keeps at least one owner.
       </p>
-      <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-        {notice?.message}
-      </div>
 
       {members === null ? (
         <div className="small">{loadMessage}</div>

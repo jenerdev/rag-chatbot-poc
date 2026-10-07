@@ -349,6 +349,48 @@ dialog.drawer[open] { animation: drawer-in var(--dur) var(--ease); }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-5); }
 .drawer-head h2 { margin: 0; font-size: var(--text-lg); font-weight: 600; }
 .drawer-notice { margin-top: var(--space-4); }
+
+/* --- toasts (components/toast.tsx, plan/ui-components.md Phase 1) --------
+   A popover: the UA gives it a centred, bordered box; undo all of that.
+   Bottom-right on a desktop, clear of the sidebar; bottom-centre on a
+   phone. The region lets clicks through; only the toasts take them. */
+.toasts {
+  inset: auto var(--space-6) var(--space-6) auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  width: min(380px, calc(100vw - 2 * var(--space-4)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+  animation: toast-in var(--dur) var(--ease);
+}
+.toast > svg { flex: none; margin-top: 1px; color: var(--ok); }
+.toast.error { border-left-color: var(--danger); }
+.toast.error > svg { color: var(--danger); }
+.toast-message { flex: 1; min-width: 0; padding-top: 1px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.toast > button { flex: none; margin: -4px 0; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (max-width: 600px) {
+  .toasts { inset: auto var(--space-4) var(--space-4); width: auto; }
+}
 @media (max-width: 560px) { .drawer-inner { padding: var(--space-4); } }
 
 /* A destructive action that is THE answer of a dialog: filled, not outlined. */

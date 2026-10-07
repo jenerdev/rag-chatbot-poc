@@ -29,6 +29,7 @@ import type { Accommodation, BookingSummary, ImageSummary, SlotSummary } from '@
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
+import { useNotice, type Notice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -56,7 +57,6 @@ interface Setup {
 }
 
 type Auth = 'checking' | 'out' | 'in';
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 /** How far ahead "future bookings" are counted when a room is retired: the admin list's own limit. */
 const LOOKAHEAD_DAYS = 92;
@@ -398,13 +398,13 @@ export function AccommodationsScreen({
   const [setup, setSetup] = useState<Setup | null>(null);
   const [rooms, setRooms] = useState<Accommodation[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading…');
-  const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
 
   // The new-room form, in a drawer.
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
 
   const unauthorized = useCallback(() => {
@@ -529,9 +529,6 @@ export function AccommodationsScreen({
         }
       >
         {dialog}
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-          {notice?.message}
-        </div>
 
         <Drawer open={formOpen} title="Add a room" onClose={() => setFormOpen(false)}>
           <form onSubmit={addRoom}>

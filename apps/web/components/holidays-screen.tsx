@@ -28,6 +28,7 @@ import type { CalendarDay } from '@rag/bookings';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -44,7 +45,6 @@ export interface HolidaysScreenProps {
 }
 
 type Auth = 'checking' | 'out' | 'in';
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 function addDays(date: string, n: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -71,11 +71,11 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const [upcoming, setUpcoming] = useState<CalendarDay[] | null>(null);
   const [past, setPast] = useState<CalendarDay[]>([]);
   const [loadMessage, setLoadMessage] = useState('Loading…');
-  const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
 
   // The form. The surcharge is typed in pesos and sent as centavos.
   const [formOpen, setFormOpen] = useState(false);
+  const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
   const [day, setDay] = useState('');
   const [kind, setKind] = useState<CalendarDay['kind']>('holiday');
@@ -293,9 +293,6 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     <>
       <StaffFrame {...frame} actions={addDate}>
         {dialog}
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-          {notice?.message}
-        </div>
 
         <Drawer open={formOpen} title="Add a holiday or a closed date" onClose={() => setFormOpen(false)}>
           <p className="small muted">

@@ -54,6 +54,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 
 export interface BookingsScreenProps {
@@ -79,7 +80,6 @@ interface Setup {
 }
 
 type Auth = 'checking' | 'out' | 'in';
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 // How many days the screen shows at once. Under both server limits:
 // availability allows 31, the admin list 92.
@@ -270,7 +270,6 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const [availability, setAvailability] = useState<SlotAvailability[] | null>(null);
   const [bookings, setBookings] = useState<BookingSummary[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading…');
-  const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
 
   // The form.
@@ -301,6 +300,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // list's status filter, which only narrows what is drawn.
   const { ask, dialog } = useConfirmDialog();
   const [formOpen, setFormOpen] = useState(false);
+  const { notice, setNotice } = useNotice(formOpen);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
 
   const unauthorized = useCallback(() => {
@@ -658,9 +658,6 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     <>
       <StaffFrame {...frame} actions={newBooking}>
         {dialog}
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-          {notice?.message}
-        </div>
 
         {requests && requests.length > 0 && (
           <section className="card">
@@ -888,7 +885,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                 {busy ? 'Saving…' : 'Book'}
               </button>
             </div>
-            {/* The page's notice is behind the panel; a refusal is said here too. */}
+            {/* A refusal while the panel is open is said here, beside the form, not as a toast (useNotice). */}
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}

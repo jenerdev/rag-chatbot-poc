@@ -27,8 +27,8 @@ import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/sc
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { useNotice } from '@/components/toast';
 
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 type Languages = 'english' | 'taglish' | 'tagalog';
 const LANGUAGES: Languages[] = ['english', 'taglish', 'tagalog'];
 const LANGUAGE_LABELS: Record<Languages, string> = { english: 'English', taglish: 'Taglish', tagalog: 'Tagalog' };
@@ -115,7 +115,9 @@ export function TenantForm({
   onSaved: (tenant: TenantDetail) => void;
   onUnauthorized: () => void;
 }) {
-  const [notice, setNotice] = useState<Notice>(null);
+  // Creating, the form is the whole page: its refusal stays under it, beside
+  // the slug that is usually the cause. Editing, every message is a toast.
+  const { notice, setNotice } = useNotice(!tenant);
   const [busy, setBusy] = useState(false);
 
   const [slug, setSlug] = useState('');
@@ -135,7 +137,7 @@ export function TenantForm({
   const { ask, dialog } = useConfirmDialog();
 
   /** One request; the tenant the route hands back becomes the form's tenant. */
-  async function send(method: string, path: string, body: object | undefined, done: string, created = false) {
+  async function send(method: string, path: string, body: object | undefined, done: string) {
     setBusy(true);
     setNotice(null);
     let response: Response | null = null;
@@ -148,7 +150,9 @@ export function TenantForm({
       if (response.status === 401) return onUnauthorized();
       if (!response.ok) throw new Error('failed');
       const saved: TenantDetail = await response.json();
-      if (!created) setNotice({ message: done, kind: 'ok' });
+      // Said even on create: the toast outlives this form, which the platform
+      // replaces with the new tenant's.
+      setNotice({ message: done, kind: 'ok' });
       onSaved(saved);
     } catch (error) {
       setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
@@ -168,7 +172,7 @@ export function TenantForm({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void send('POST', '/tenants', { slug: slug.trim(), businessName: businessName.trim(), assistantName: assistantName.trim() }, 'Created.', true);
+            void send('POST', '/tenants', { slug: slug.trim(), businessName: businessName.trim(), assistantName: assistantName.trim() }, 'Created.');
           }}
         >
           <div className="field">
@@ -184,7 +188,11 @@ export function TenantForm({
             <label htmlFor="tenant-assistant">Assistant name</label>
             <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
           </div>
-          <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
+          {notice && (
+            <div className="notice error" role="alert">
+              {notice.message}
+            </div>
+          )}
           <div className="form-footer">
             <span className="small muted">A new tenant has no members and no applications yet.</span>
             <button type="submit" className="primary" disabled={busy}>
@@ -199,7 +207,6 @@ export function TenantForm({
   const id = tenant.id;
   return (
     <>
-      <div className={notice ? `notice ${notice.kind}` : 'notice hidden'}>{notice?.message}</div>
 
       <section className="card">
         <h2>

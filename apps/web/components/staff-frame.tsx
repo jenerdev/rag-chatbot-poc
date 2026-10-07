@@ -23,6 +23,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { BrandHeader } from './brand-header';
 import { Icon, type IconName } from './icons';
 import { TenantNav, type SessionState } from './tenant-nav';
+import { Toaster } from './toast';
 import { groupNavItems, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/permissions';
 
@@ -201,6 +202,9 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
           </div>
           {children}
         </main>
+        {/* The page's ONE toast region (components/toast.tsx). Signed out
+            there is nothing to report: the login form says its own errors. */}
+        <Toaster />
       </div>
     </div>
   );

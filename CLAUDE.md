@@ -262,6 +262,7 @@ apps/web/              Next.js 15, App Router
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
   components/staff-frame.tsx  every staff screen's frame (D-101): signed in, a sectioned sidebar (groupNavItems) that is a drawer below 900 px; signed out, the old header
   components/icons.tsx   the icons: hand-drawn inline SVG on a 20 px grid, currentColor, aria-hidden unless labelled (D-101)
+  components/toast.tsx   useNotice(drawerOpen): a success or a refusal as a toast, a refusal in an open drawer stays in it; ONE queue, ONE <Toaster /> per page (StaffFrame, the platform), a popover in the top layer (plan/ui-components.md Phase 1)
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run

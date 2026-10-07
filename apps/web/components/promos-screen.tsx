@@ -30,6 +30,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { centavosToInput, formatMoney, parseMoneyInput } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 
 export interface PromosScreenProps {
@@ -44,7 +45,6 @@ export interface PromosScreenProps {
 }
 
 type Auth = 'checking' | 'out' | 'in';
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 interface Draft {
   id: number | null;
@@ -91,10 +91,10 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   const [role, setRole] = useState<Role | null>(null);
   const [promos, setPromos] = useState<Promo[] | null>(null);
   const [loadMessage, setLoadMessage] = useState('Loading…');
-  const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [formOpen, setFormOpen] = useState(false);
+  const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
   const [showRetired, setShowRetired] = useState(false);
 
@@ -337,9 +337,6 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
     <>
       <StaffFrame {...frame} actions={addPromo}>
         {dialog}
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-          {notice?.message}
-        </div>
 
         <Drawer open={formOpen} title={draft.id === null ? 'Add a promo' : `Edit "${editing?.name ?? draft.name}"`} onClose={closeForm}>
           <p className="small muted">

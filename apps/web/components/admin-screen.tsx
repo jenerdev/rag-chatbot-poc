@@ -39,6 +39,7 @@ import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
+import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
@@ -53,7 +54,6 @@ export interface AdminScreenProps {
 
 type Auth = 'checking' | 'out' | 'in';
 
-type Notice = { message: string; kind: 'ok' | 'error' } | null;
 
 
 /**
@@ -66,7 +66,7 @@ function DocumentRow({
   doc,
   onChanged,
   onError,
-  onClearNotice,
+  onDeleted,
   onUnauthorized,
   onEdit,
   editing,
@@ -84,7 +84,8 @@ function DocumentRow({
   readOnly: boolean;
   onUnauthorized: () => void;
   onError: (message: string) => void;
-  onClearNotice: () => void;
+  /** Said as a toast: before toasts, a delete said nothing; the row just went. */
+  onDeleted: (message: string) => void;
   /** The screen's confirmation dialog (components/dialogs.tsx). */
   ask: (question: Question) => Promise<string | null>;
 }) {
@@ -124,13 +125,13 @@ function DocumentRow({
       response = await fetch(`${api}/documents/${doc.id}`, { method: 'DELETE' });
       if (response.status === 401) return onUnauthorized();
       if (!response.ok) throw new Error('failed');
-      onClearNotice();
+      onDeleted(`Deleted “${doc.title}” and its ${doc.chunkCount} chunk${doc.chunkCount === 1 ? '' : 's'}.`);
       onChanged();
     } catch (error) {
       setDeleting(false);
       onError(`Could not delete: ${await describeFailure(error as Error, response)}`);
     }
-  }, [api, ask, doc.chunkCount, doc.id, doc.title, onChanged, onClearNotice, onError, onUnauthorized]);
+  }, [api, ask, doc.chunkCount, doc.id, doc.title, onChanged, onDeleted, onError, onUnauthorized]);
 
   return (
     <div className="doc">
@@ -209,7 +210,6 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   const canWrite = role !== null && can(role, 'documents:write');
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listMessage, setListMessage] = useState('Loading documents…');
-  const [notice, setNotice] = useState<Notice>(null);
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('');
   const [content, setContent] = useState('');
@@ -217,6 +217,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   // The document the form is editing, or null when it is adding a new one.
   const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
 
   // Any 401 means the session is gone (expired, logged out elsewhere, or the
@@ -400,9 +401,6 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
     <>
       <StaffFrame {...frame} actions={addDocument}>
         {dialog}
-        <div className={notice ? `notice ${notice.kind}` : 'notice hidden'} role={notice?.kind === 'error' ? 'alert' : 'status'}>
-          {notice?.message}
-        </div>
 
         {!canWrite && role && (
           <section className="card">
@@ -474,7 +472,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
                     : 'Add to knowledge base'}
               </button>
             </div>
-            {/* The page's notice is behind the drawer; a refusal is said here too. */}
+            {/* A refusal while the drawer is open is said here, beside the form, not as a toast (useNotice). */}
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
@@ -506,7 +504,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
                   editing={editing?.id === doc.id}
                   readOnly={!canWrite}
                   ask={ask}
-                  onClearNotice={() => setNotice(null)}
+                  onDeleted={(message) => setNotice({ message, kind: 'ok' })}
                   onError={(message) => setNotice({ message, kind: 'error' })}
                 />
               ))}

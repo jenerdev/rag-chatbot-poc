@@ -83,14 +83,20 @@
   160 page states; zoom and motion walk 40/40; build and both bundle greps
   clean; verify 117/118 (the open item below), bookings isolation 31/31
   both ways, rooms 50/50, the three baselines identical. D-101 amended.
-  - [ ] **Owed: `pnpm eval` and `@rag/pipeline isolation` (both ways).** The
-    OpenAI key in `.env` is invalidated (HTTP 401). Replace it, then run
-    both. Expect eval in the 59/61 band, isolation 23/23 (21 filters-only).
+  - [x] The owed suites, with the new key (2026-10-08): isolation 23/23,
+    filters-only 21/21. **eval 55/61**, the same six on every repeat:
+    `antecedent` (known); `tool-open` and `book-for-me`, because the
+    battery's "free" date (today + 14 = 22 Oct) holds a REAL confirmed staff
+    booking at villa (VIL-FJK939, "Code Lucas"); `book-for-me-harbor`, `leak-2`'s
+    control and `lang-tagalog-2` are the model (trap 24). No prompt text
+    moved, baselines identical. **To decide (user):** cancel VIL-FJK939 if it
+    is test data, or leave it; the two villa cases pass again once the
+    battery's date moves off it.
   - Dev server for the walks: `cd apps/web && npx next dev --port 3100`.
     On Windows, stopping the shell leaves Next running: stop its
     `start-server.js` process by PID and check the port before a build.
 
-**UI components (2026-10-07; Phase 0 done 2026-10-08):**
+**UI components (2026-10-07; Phases 0–1 done 2026-10-08):**
 [`plan/ui-components.md`](./plan/ui-components.md). An audit of the UI
 after ui-refresh, and Phases 0–7: toast, load/error state with Retry,
 empty state with its action, search on Unanswered and the knowledge base,
@@ -98,8 +104,12 @@ tabs on the platform tenant form, focusable tooltips, the record.
 - [x] § 5 answered 2026-10-08: every recommendation taken.
 - [x] Phase 0 (2026-10-08): ui-refresh Phase 10 committed at `09aed2f`;
   74 + 74 baseline screenshots in `plan/ui-refresh/components-0/before{,-dark}/`.
-- [ ] Phase 1, the toast: `components/toast.tsx` (a `popover="manual"` region,
-  trap 1), the eight screens' `notice` state onto it, `lib/toast.test.ts`.
+- [x] Phase 1, the toast (2026-10-08): `components/toast.tsx`, one queue and
+  one region per page; eight screens moved; walk 20/20; axe still 0 on 160
+  states; tests 79/79. Screenshots in `plan/ui-refresh/components-1/`.
+- [ ] The user's look at Phase 1.
+- [ ] Phase 2, the load state: `components/load-state.tsx` (a skeleton, and
+  an error with Retry calling the screen's own load), 11 screens.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

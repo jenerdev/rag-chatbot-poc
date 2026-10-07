@@ -11,6 +11,7 @@ import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
 import { Icon } from '@/components/icons';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { TenantForm } from '@/components/tenant-form';
+import { Toaster } from '@/components/toast';
 
 type Auth = 'checking' | 'out' | 'in';
 const API = '/api/platform';
@@ -126,11 +127,19 @@ export function PlatformScreen() {
       </nav>
     </header>
   );
+  // Every branch draws the header, so the page's ONE toast region rides with
+  // it (components/toast.tsx): the tenant form and its members panel share it.
+  const top = (
+    <>
+      {header}
+      {auth === 'in' && <Toaster />}
+    </>
+  );
 
   if (auth !== 'in') {
     return (
       <>
-        {header}
+        {top}
         <main>
           {auth === 'checking' ? (
             <div className="small muted">Checking your session…</div>
@@ -157,7 +166,7 @@ export function PlatformScreen() {
   if (selected === 'new') {
     return (
       <>
-        {header}
+        {top}
         <main>
           <TenantForm
             api={API}
@@ -177,7 +186,7 @@ export function PlatformScreen() {
   if (typeof selected === 'number') {
     return (
       <>
-        {header}
+        {top}
         <main>
           {detail ? (
             <TenantForm
@@ -200,7 +209,7 @@ export function PlatformScreen() {
 
   return (
     <>
-      {header}
+      {top}
       <main>
         {/* The Pulse strip (D-098): every live tenant's counts in one table; archived ones folded. Counts only, no content, no money (plan § 2.4). */}
         {pulse && pulse.length > 0 && (
