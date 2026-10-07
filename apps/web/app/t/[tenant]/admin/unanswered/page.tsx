@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { UNANSWERED_LIMIT } from '@rag/pipeline';
 import { UnansweredScreen } from '@/components/unanswered-screen';
 import { loadBranding } from '@/lib/branding';
 import { loadNavFeatures } from '@/lib/nav';
@@ -23,6 +24,7 @@ export default async function TenantUnansweredPage({ params }: { params: Promise
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
       nav={nav}
+      limit={UNANSWERED_LIMIT}
     />
   );
 }

@@ -15,13 +15,16 @@
 // control; each question is a row with when it was asked under it; an empty
 // Open tab reads as the good news it is.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon } from '@/components/icons';
-import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { ListSearch } from '@/components/list-search';
+import { notify } from '@/components/toast';
+import { PAGE_SIZE, matches } from '@/lib/search';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -32,6 +35,8 @@ export interface UnansweredScreenProps {
   bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
+  /** The list route's cap (UNANSWERED_LIMIT), from the server page: at the cap, a search says "of N loaded". */
+  limit: number;
 }
 
 type Auth = 'checking' | 'out' | 'in';
@@ -47,7 +52,7 @@ function askedLabel(askedAt: string): string {
   });
 }
 
-export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }: UnansweredScreenProps) {
+export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, limit }: UnansweredScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, for the header's links only; the routes decide for themselves.
@@ -56,7 +61,11 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Phase 4: a search over the loaded questions, and the first PAGE_SIZE of them.
+  const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(PAGE_SIZE);
+  useEffect(() => setShown(PAGE_SIZE), [query, tab]);
+  const matching = useMemo(() => questions?.filter((q) => matches(q.question, query)) ?? [], [questions, query]);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -98,15 +107,16 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
   const toggleResolved = useCallback(
     async (q: UnansweredQuestion) => {
       setBusyId(q.id);
-      setError(null);
       let response: Response | null = null;
       try {
         response = await fetch(`${api}/unanswered/${q.id}/resolution`, { method: tab === 'open' ? 'PUT' : 'DELETE' });
         if (response.status === 401) return unauthorized();
         if (!response.ok) throw new Error('failed');
         setQuestions((current) => current?.filter((x) => x.id !== q.id) ?? null);
+        // Before, the row just went; now it says where (plan/ui-components.md Phase 4, found).
+        notify(tab === 'open' ? 'Marked resolved. It is under Resolved now.' : 'Reopened. It is under Open now.', 'ok');
       } catch (failure) {
-        setError(await describeFailure(failure as Error, response));
+        notify(await describeFailure(failure as Error, response), 'error');
       } finally {
         setBusyId(null);
       }
@@ -160,12 +170,6 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
               ? 'Questions the assistant could not answer from the documents (the visitor saw your “no answer” message). Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
               : 'Questions marked resolved. Reopen one if the assistant still cannot answer it.'}
           </p>
-          {error && (
-            <div className="notice error" role="alert">
-              {error}
-            </div>
-          )}
-
           {questions === null ? (
             <LoadState load={loadState} what="questions" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : questions.length === 0 ? (
@@ -186,27 +190,57 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
               )}
             </div>
           ) : (
-            questions.map((q) => (
-              // The question is a React child, so a visitor's text is escaped (CLAUDE.md § Conventions).
-              <div key={q.id} className="unanswered">
-                <div className="unanswered-text">
-                  <span className="unanswered-question">{q.question}</span>
-                  <span className="unanswered-when">
-                    Asked {askedLabel(q.askedAt)}
-                    {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
-                  </span>
+            <>
+              <ListSearch value={query} onChange={setQuery} label="Search the questions" />
+              <p className="list-count" aria-live="polite">
+                {query.trim() === ''
+                  ? `${questions.length} question${questions.length === 1 ? '' : 's'}${questions.length >= limit ? `, the most recent ${limit}` : ''}`
+                  : `${matching.length} of ${questions.length}${questions.length >= limit ? ' loaded' : ''} match`}
+              </p>
+              {matching.length === 0 && (
+                <EmptyState
+                  icon="search"
+                  title={`No question matches “${query.trim()}”`}
+                  action={
+                    <button type="button" onClick={() => setQuery('')}>
+                      Clear search
+                    </button>
+                  }
+                  compact
+                />
+              )}
+              {matching.slice(0, shown).map((q) => (
+                // The question is a React child, so a visitor's text is escaped (CLAUDE.md § Conventions).
+                <div key={q.id} className="unanswered">
+                  <div className="unanswered-text">
+                    <span className="unanswered-question">{q.question}</span>
+                    <span className="unanswered-when">
+                      Asked {askedLabel(q.askedAt)}
+                      {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
+                    </span>
+                  </div>
+                  <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
+                    {tab === 'open' ? (
+                      <>
+                        <Icon name="check" size={14} /> Mark resolved
+                      </>
+                    ) : (
+                      'Reopen'
+                    )}
+                  </button>
                 </div>
-                <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
-                  {tab === 'open' ? (
-                    <>
-                      <Icon name="check" size={14} /> Mark resolved
-                    </>
-                  ) : (
-                    'Reopen'
-                  )}
-                </button>
-              </div>
-            ))
+              ))}
+              {matching.length > shown && (
+                <div className="list-more">
+                  <span>
+                    Showing {shown} of {matching.length}
+                  </span>
+                  <button type="button" className="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+                    Show {Math.min(PAGE_SIZE, matching.length - shown)} more
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </StaffFrame>

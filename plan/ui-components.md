@@ -243,6 +243,19 @@ only when every request has been decided.
 **Done when:** on harbor, a word from one unanswered question narrows the
 list to it, Escape in the field clears it, and the count is right.
 
+**Done 2026-10-08:** `lib/search.ts` (`fold`, `matches`, `PAGE_SIZE`, 6
+tests), `components/list-search.tsx`. Unanswered: the search, the count,
+25 at a time; the cap reaches the screen as a prop from its server page
+(`UNANSWERED_LIMIT`), as CLAUDE.md's conventions say a shared limit must.
+The knowledge base: a search on titles past 8 documents (`SEARCH_FROM`).
+`plan/ui-components-phase4-walk.mjs`, 14/14: on harbor's real 16 open
+questions, "parking" left the 3 that have it; then 60 and 200 made-up
+questions answered in the browser (25, 50, 60; "199 of 200 loaded
+match"; "No question matches" and Clear search); 8 documents no search,
+10 a search. Found and fixed: "Mark resolved" and "Reopen" said nothing
+(the row just went) and put their errors in a banner at the top of the
+card; both are toasts now, like every other row action (Phase 1).
+
 ### Phase 5 — Tabs on the platform tenant form (finding 5, trap 6)
 
 New `components/tabs.tsx`: WAI-ARIA tabs (`tablist`/`tab`/`tabpanel`,

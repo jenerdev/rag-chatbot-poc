@@ -145,6 +145,14 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 .empty-list-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: var(--space-2); border-radius: var(--radius-full); background: var(--surface-3); color: var(--muted); }
 .empty-list-action { margin-top: var(--space-3); }
 .empty-list.compact { padding: var(--space-4); }
+
+/* Search over a loaded list, its count, and "Show more" (Phase 4). The icon
+   sits inside the field's left padding. */
+.list-search { position: relative; margin-bottom: var(--space-3); }
+.list-search > svg { position: absolute; left: var(--space-3); top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.list-search input { width: 100%; padding-left: 36px; }
+.list-count { margin: 0 0 var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+.list-more { display: flex; align-items: center; justify-content: center; gap: var(--space-3); padding-top: var(--space-4); font-size: var(--text-sm); color: var(--muted); }
 .empty-list.compact strong { font-size: var(--text-base); }
 
 /* While a list loads (Phase 2): rows of shimmering bars at a row's height,

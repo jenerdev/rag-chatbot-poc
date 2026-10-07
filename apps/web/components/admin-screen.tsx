@@ -42,6 +42,8 @@ import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { ListSearch } from '@/components/list-search';
+import { matches } from '@/lib/search';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
 export interface AdminScreenProps {
@@ -55,7 +57,8 @@ export interface AdminScreenProps {
 
 type Auth = 'checking' | 'out' | 'in';
 
-
+/** Past this many documents the list gets a search on titles; at or under it, one look is enough. */
+const SEARCH_FROM = 8;
 
 /**
  * One document row, with its chunks revealed on click.
@@ -221,6 +224,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   // The document the form is editing, or null when it is adding a new one.
   const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
 
@@ -355,6 +359,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
     [api, clearForm, content, editing, loadDocuments, source, title, unauthorized],
   );
 
+  const shownDocuments = documents?.filter((doc) => matches(doc.title, query)) ?? [];
   const length = content.trim().length;
   const chunkCount = estimateChunkCount(length);
 
@@ -498,7 +503,21 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
             </EmptyState>
           ) : (
             <div>
-              {documents.map((doc) => (
+              {/* A search only once the list is long enough to need one (plan/ui-components.md Phase 4). */}
+              {documents.length > SEARCH_FROM && <ListSearch value={query} onChange={setQuery} label="Search the titles" />}
+              {shownDocuments.length === 0 && (
+                <EmptyState
+                  icon="search"
+                  title={`No title matches “${query.trim()}”`}
+                  action={
+                    <button type="button" onClick={() => setQuery('')}>
+                      Clear search
+                    </button>
+                  }
+                  compact
+                />
+              )}
+              {shownDocuments.map((doc) => (
                 <DocumentRow
                   key={doc.id}
                   api={api}
