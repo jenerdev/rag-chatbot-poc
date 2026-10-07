@@ -8,8 +8,8 @@
 > ui-refresh § 8 ("Later").
 >
 > Written 2026-10-07 on `feat/ui-refresh`, while ui-refresh Phase 10 is
-> paused, uncommitted. **Status: Phase 0 in progress (2026-10-07). It
-> starts after ui-refresh Phase 10 is committed** (§ 4). § 5 answered
+> paused, uncommitted. **Status: Phase 0 done 2026-10-08 (ui-refresh
+> Phase 10 committed at `09aed2f`); Phase 1 next.** § 5 answered
 > 2026-10-07: every recommendation taken, by the user's instruction.
 > Decision to record: D-102.
 
@@ -121,6 +121,13 @@ ui-refresh's did, so no data moves.
 
 - Finish ui-refresh Phase 10 and commit it (status.md lists what is left).
 - Screenshot the screens this plan touches into `plan/ui-components/0/before/`.
+
+**Done 2026-10-08:** ui-refresh Phase 10 committed (`09aed2f`), the plan
+committed (`33989bc`). 74 screenshots light and 74 dark, every page of the
+three tenants plus the platform login, at 375 and 1280 px. Deviation: they
+are in `plan/ui-refresh/components-0/before{,-dark}/`, under the folder
+`plan/ui-refresh-shoot.mjs` already writes and git ignores, rather than a
+new ignored folder; later phases use `components-<n>/after`.
 
 ### Phase 1 — Toast (findings 1, trap 1–3)
 

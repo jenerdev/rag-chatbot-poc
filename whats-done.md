@@ -8048,3 +8048,21 @@ dev` did not stop Next itself. The server kept port 3100 and answered
 nothing, a curl hung on it, and the build behind the curl never
 started (so trap 16 did not bite). Stop the `start-server.js` process by
 its PID, and check the port is free before building.
+
+## UI components, Phase 0: the prerequisite and the baseline · 2026-10-08, on `feat/ui-refresh`
+
+**What:** `plan/ui-components.md`, an audit of the UI after the refresh
+and a plan of eight phases; § 5 answered (every recommendation taken).
+ui-refresh Phase 10 finished and committed first (`09aed2f`), because
+every phase here edits the same screens. Then 74 screenshots light and
+74 dark into `plan/ui-refresh/components-0/before{,-dark}/`.
+
+**Why it matters:** the audit found the dialog and drawer already
+everywhere (no `window.confirm` left), so the plan is what they do NOT
+cover: action feedback that lands off-screen (8 screens, 68 `setNotice`
+calls), a failed load that reads like a slow one (11 screens), empty
+lists with no button, 200 unanswered questions with no search, one long
+platform form, and reasons hidden in `title`.
+
+**Observed:** both screenshot runs 74/74, throwaway users deleted; harbor
+Promos at 1280 px checked by eye (rendered, not a 500).

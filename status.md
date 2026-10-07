@@ -90,14 +90,16 @@
     On Windows, stopping the shell leaves Next running: stop its
     `start-server.js` process by PID and check the port before a build.
 
-**UI components (2026-10-07; Phase 0 started 2026-10-08):**
+**UI components (2026-10-07; Phase 0 done 2026-10-08):**
 [`plan/ui-components.md`](./plan/ui-components.md). An audit of the UI
 after ui-refresh, and Phases 0–7: toast, load/error state with Retry,
 empty state with its action, search on Unanswered and the knowledge base,
 tabs on the platform tenant form, focusable tooltips, the record.
 - [x] § 5 answered 2026-10-08: every recommendation taken.
-- [ ] Phase 0: ui-refresh Phase 10 committed; baseline screenshots of the
-  screens this plan touches into `plan/ui-components/0/before/`.
+- [x] Phase 0 (2026-10-08): ui-refresh Phase 10 committed at `09aed2f`;
+  74 + 74 baseline screenshots in `plan/ui-refresh/components-0/before{,-dark}/`.
+- [ ] Phase 1, the toast: `components/toast.tsx` (a `popover="manual"` region,
+  trap 1), the eight screens' `notice` state onto it, `lib/toast.test.ts`.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`
