@@ -20,6 +20,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { BarChart, SplitBar } from '@/components/bar-chart';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
@@ -69,7 +70,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
   const [role, setRole] = useState<Role | null>(null);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30);
   const [data, setData] = useState<TenantDashboard | null>(null);
-  const [message, setMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -98,7 +99,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
       setData(await response.json());
     } catch (error) {
       setData(null);
-      setMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, days, unauthorized]);
 
@@ -138,7 +139,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
     return (
       <>
         <StaffFrame {...frame}>
-          <div className="small">{message}</div>
+          <LoadState load={loadState} what="dashboard" rows={4} onRetry={() => { setLoadState(LOADING); void load(); }} />
         </StaffFrame>
       </>
     );
@@ -211,7 +212,9 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
                 </ul>
               </>
             ) : (
-              <p className="small muted">No confirmed check-ins in the next 7 days.</p>
+              <EmptyState icon="calendar" title="No arrivals this week" compact>
+                No confirmed check-ins in the next 7 days.
+              </EmptyState>
             )}
           </section>
         )}

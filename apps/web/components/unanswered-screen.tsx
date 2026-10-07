@@ -21,6 +21,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon } from '@/components/icons';
+import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
@@ -52,7 +53,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
   // What this member is, for the header's links only; the routes decide for themselves.
   const [role, setRole] = useState<Role | null>(null);
   const [questions, setQuestions] = useState<UnansweredQuestion[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
       setQuestions(await response.json());
     } catch (error) {
       setQuestions(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, tab, unauthorized]);
 
@@ -166,7 +167,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav }
           )}
 
           {questions === null ? (
-            <div className="small">{loadMessage}</div>
+            <LoadState load={loadState} what="questions" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : questions.length === 0 ? (
             <div className="empty-list">
               {tab === 'open' ? (

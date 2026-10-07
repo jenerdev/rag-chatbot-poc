@@ -56,6 +56,7 @@ import { formatMoney } from '@/lib/money';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface BookingsScreenProps {
   slug: string;
@@ -269,7 +270,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const [from, setFrom] = useState<string | null>(null);
   const [availability, setAvailability] = useState<SlotAvailability[] | null>(null);
   const [bookings, setBookings] = useState<BookingSummary[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
 
   // The form.
@@ -325,34 +326,37 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   // Once logged in: units, slots, and the tenant's today. The range starts at
   // today, and the form defaults to the first unit, the first slot and today.
-  useEffect(() => {
-    if (auth !== 'in') return;
-    void (async () => {
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${api}/bookings/setup`);
-        if (response.status === 401) return unauthorized();
-        if (!response.ok) throw new Error('failed');
-        const body: Setup = await response.json();
-        setSetup(body);
-        setFrom(body.today);
-        setDate(body.today);
-        setUnitId(body.units.find((u) => u.active)?.id ?? null);
-        setSlotId(body.slots[0]?.id ?? null);
-        // D-097: the automatic promo covering today is pre-selected, "None" one click away (plan § 2.5).
-        const automatic = (body as Setup).promos?.find((p) => p.code === null && p.validFrom <= body.today && p.validTo >= body.today);
-        setPromoId(automatic ? String(automatic.id) : '');
-        if (body.bookingType === 'per_room') {
-          // Capacities for the room list. Staff-only, like everything here.
-          const r = await fetch(`${api}/accommodations`);
-          if (r.status === 401) return unauthorized();
-          if (r.ok) setRooms(await r.json());
-        }
-      } catch (error) {
-        setLoadMessage(await describeFailure(error as Error, response));
+  // Named, not an anonymous effect, so a failed load's Retry runs it again
+  // (plan/ui-components.md Phase 2, trap 4).
+  const loadSetup = useCallback(async () => {
+    let response: Response | null = null;
+    try {
+      response = await fetch(`${api}/bookings/setup`);
+      if (response.status === 401) return unauthorized();
+      if (!response.ok) throw new Error('failed');
+      const body: Setup = await response.json();
+      setSetup(body);
+      setFrom(body.today);
+      setDate(body.today);
+      setUnitId(body.units.find((u) => u.active)?.id ?? null);
+      setSlotId(body.slots[0]?.id ?? null);
+      // D-097: the automatic promo covering today is pre-selected, "None" one click away (plan § 2.5).
+      const automatic = (body as Setup).promos?.find((p) => p.code === null && p.validFrom <= body.today && p.validTo >= body.today);
+      setPromoId(automatic ? String(automatic.id) : '');
+      if (body.bookingType === 'per_room') {
+        // Capacities for the room list. Staff-only, like everything here.
+        const r = await fetch(`${api}/accommodations`);
+        if (r.status === 401) return unauthorized();
+        if (r.ok) setRooms(await r.json());
       }
-    })();
-  }, [api, auth, unauthorized]);
+    } catch (error) {
+      setLoadState(failed(await describeFailure(error as Error, response)));
+    }
+  }, [api, unauthorized]);
+
+  useEffect(() => {
+    if (auth === 'in') void loadSetup();
+  }, [auth, loadSetup]);
 
   const to = from ? addDays(from, RANGE_DAYS - 1) : null;
 
@@ -378,7 +382,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     } catch (error) {
       setAvailability(null);
       setBookings(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, from, roomFilter, to, unauthorized]);
 
@@ -648,7 +652,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     return (
       <>
         <StaffFrame {...frame}>
-          <div className="small">{loadMessage}</div>
+          <LoadState load={loadState} what="setup" onRetry={() => { setLoadState(LOADING); void loadSetup(); }} />
         </StaffFrame>
       </>
     );
@@ -679,7 +683,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               dates: the first one you confirm gets them.
             </p>
             {requests.filter((r) => r.status === 'pending').length === 0 && (
-              <div className="small muted">No requests waiting.</div>
+              <EmptyState icon="calendar" title="No requests waiting" compact>
+                A request from the booking page appears here until it is confirmed or declined.
+              </EmptyState>
             )}
             {requests
               .filter((r) => r.status === 'pending' || showDecided)
@@ -931,7 +937,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           </div>
 
           {availability === null || bookings === null ? (
-            <div className="small">{loadMessage}</div>
+            <LoadState load={loadState} what="bookings" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : (
             days.map(({ day, slots, bookings: dayBookings }) => (
               <div key={day} className="day">

@@ -193,6 +193,17 @@ New `components/load-state.tsx`:
 skeleton; with the route answering 500 (caught in the browser), each shows
 the error and Retry recovers it.
 
+**Done 2026-10-08:** `components/load-state.tsx` (`LoadState`, `Load`,
+`failed()`); 14 load states moved, on 11 screens plus the platform's tenant
+detail and the knowledge base's chunk list. Bookings' and holidays' setup
+loads, and the chunk load, were anonymous code inside an effect or a
+toggle; they are named functions now (`loadSetup`, `loadChunks`), so Retry
+runs exactly what failed (trap 4). The platform's detail load cancels on
+a new selection, so its Retry bumps a counter the effect depends on.
+`plan/ui-components-phase2-3-walk.mjs`: every list of harbor and the
+platform, held (skeleton), failed (an alert in the server's words, with
+Retry), retried (the list drawn), 30 checks.
+
 ### Phase 3 — Empty state with its action (finding 3)
 
 New `<EmptyState icon title action?>{line}</EmptyState>` over the existing
@@ -204,6 +215,19 @@ dashboard arrivals (no action), documents.
 **Done when:** each empty list shows a title, one line and, where adding is
 allowed for the role, a button that opens the right drawer; a staff role
 with no write permission sees no button (`lib/permissions.ts`, the courtesy).
+
+**Done 2026-10-08:** `EmptyState` in `components/load-state.tsx`, with a
+`compact` variant for small panels. Seven sites, each with the page's OWN
+add button (the same element as the header's), so a role that gets no
+header button gets none here either: rooms, holidays, slots, promos,
+documents, platform tenants; requests and the dashboard's arrivals have
+none. The walk (the same script) answers each read with `[]`: 6 empty
+states, each button opens its drawer (the platform's, its new-tenant
+form), staff get no button on the knowledge base, a phone has nothing
+wider than 375 px; 14 checks (44 in the script). Deviation: Unanswered keeps its own empty
+state (a green check, good news), the pattern this one came from. Requests
+is not walked: `[]` hides the whole section, and its empty state shows
+only when every request has been decided.
 
 ### Phase 4 — Search and "show more" (finding 4, trap 5)
 

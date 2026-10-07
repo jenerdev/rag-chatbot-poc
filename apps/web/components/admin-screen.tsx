@@ -41,6 +41,7 @@ import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 /** What the server resolved about the tenant. No ids, no admin hash. */
 export interface AdminScreenProps {
@@ -91,14 +92,11 @@ function DocumentRow({
 }) {
   const [open, setOpen] = useState(false);
   const [chunks, setChunks] = useState<ChunkSummary[] | null>(null);
-  const [chunksMessage, setChunksMessage] = useState('Loading chunks…');
+  const [chunksLoad, setChunksLoad] = useState<Load>(LOADING);
   const [deleting, setDeleting] = useState(false);
 
-  const toggle = useCallback(async () => {
-    const next = !open;
-    setOpen(next);
-    if (!next || chunks !== null) return;
-
+  // Its own function, so Retry runs it again (plan/ui-components.md Phase 2).
+  const loadChunks = useCallback(async () => {
     let response: Response | null = null;
     try {
       response = await fetch(`${api}/documents/${doc.id}/chunks`);
@@ -106,9 +104,15 @@ function DocumentRow({
       if (!response.ok) throw new Error('failed');
       setChunks(await response.json());
     } catch (error) {
-      setChunksMessage(await describeFailure(error as Error, response));
+      setChunksLoad(failed(await describeFailure(error as Error, response)));
     }
-  }, [api, chunks, doc.id, onUnauthorized, open]);
+  }, [api, doc.id, onUnauthorized]);
+
+  const toggle = useCallback(async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && chunks === null) await loadChunks();
+  }, [chunks, loadChunks, open]);
 
   const remove = useCallback(async () => {
     const sure = await ask({
@@ -168,7 +172,7 @@ function DocumentRow({
 
       <div className={`doc-chunks${open ? '' : ' hidden'}`}>
         {chunks === null ? (
-          chunksMessage
+          <LoadState load={chunksLoad} what="chunks" rows={2} onRetry={() => { setChunksLoad(LOADING); void loadChunks(); }} />
         ) : (
           <>
             {chunks.map((chunk) => (
@@ -209,7 +213,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
   const [role, setRole] = useState<Role | null>(null);
   const canWrite = role !== null && can(role, 'documents:write');
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
-  const [listMessage, setListMessage] = useState('Loading documents…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('');
   const [content, setContent] = useState('');
@@ -251,7 +255,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
       setDocuments(await response.json());
     } catch (error) {
       setDocuments(null);
-      setListMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, unauthorized]);
 
@@ -486,11 +490,12 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
           <h2>Documents{documents ? ` (${documents.length})` : ''}</h2>
 
           {documents === null ? (
-            <div className="small">{listMessage}</div>
+            <LoadState load={loadState} what="documents" onRetry={() => { setLoadState(LOADING); void loadDocuments(); }} />
           ) : documents.length === 0 ? (
-            <div className="small muted">
-              {canWrite ? 'No documents yet. "Add a document" gives the bot something to know.' : 'No documents yet.'}
-            </div>
+            // addDocument is undefined for staff, who may not add one: no button, the page's own courtesy.
+            <EmptyState icon="file" title="No documents yet" action={addDocument}>
+              {canWrite ? 'A document gives the assistant something to answer from.' : undefined}
+            </EmptyState>
           ) : (
             <div>
               {documents.map((doc) => (

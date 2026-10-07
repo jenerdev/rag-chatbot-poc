@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { TenantForm } from '@/components/tenant-form';
 import { Toaster } from '@/components/toast';
@@ -21,11 +22,13 @@ export function PlatformScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[] | null>(null);
   const [pulse, setPulse] = useState<PlatformPulse[] | null>(null);
-  const [listMessage, setListMessage] = useState('Loading tenants…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   /** null = the list; 'new' = the create form; a number = that tenant's form. */
   const [selected, setSelected] = useState<number | 'new' | null>(null);
   const [detail, setDetail] = useState<TenantDetail | null>(null);
-  const [detailMessage, setDetailMessage] = useState<string | null>(null);
+  const [detailLoad, setDetailLoad] = useState<Load>(LOADING);
+  // Bumped by Retry: the detail load is an effect (it cancels on a new selection), so it re-runs on this.
+  const [detailTry, setDetailTry] = useState(0);
 
   const askSession = useCallback(async () => {
     try {
@@ -60,7 +63,7 @@ export function PlatformScreen() {
       setTenants(await response.json());
     } catch (error) {
       setTenants(null);
-      setListMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
     // The Pulse strip (D-098): counts only, from platform_dashboard(). A
     // failure here leaves the strip out and the list intact.
@@ -84,7 +87,7 @@ export function PlatformScreen() {
     }
     let cancelled = false;
     setDetail(null);
-    setDetailMessage(null);
+    setDetailLoad(LOADING);
     void (async () => {
       let response: Response | null = null;
       try {
@@ -94,18 +97,24 @@ export function PlatformScreen() {
         const loaded: TenantDetail = await response.json();
         if (!cancelled) setDetail(loaded);
       } catch (error) {
-        if (!cancelled) setDetailMessage(await describeFailure(error as Error, response));
+        if (!cancelled) setDetailLoad(failed(await describeFailure(error as Error, response)));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [selected, unauthorized]);
+  }, [selected, detailTry, unauthorized]);
 
   const logout = useCallback(async () => {
     await fetch(`${API}/session`, { method: 'DELETE' }).catch(() => undefined);
     unauthorized();
   }, [unauthorized]);
+
+  const newTenant = (
+    <button type="button" className="primary" onClick={() => setSelected('new')}>
+      <Icon name="plus" size={16} /> New tenant
+    </button>
+  );
 
   const header = (
     <header>
@@ -200,7 +209,7 @@ export function PlatformScreen() {
               }}
             />
           ) : (
-            <div className="small">{detailMessage ?? 'Loading…'}</div>
+            <LoadState load={detailLoad} what="tenant" rows={4} onRetry={() => setDetailTry((n) => n + 1)} />
           )}
         </main>
       </>
@@ -267,18 +276,16 @@ export function PlatformScreen() {
         <section className="card">
           <div className="range-head">
             <h2>Tenants{tenants ? ` (${tenants.length})` : ''}</h2>
-            <button type="button" className="primary" onClick={() => setSelected('new')}>
-              <Icon name="plus" size={16} /> New tenant
-            </button>
+            {newTenant}
           </div>
           <p className="small muted">
             Each tenant is a workspace at <code>/t/&lt;slug&gt;</code> with its own documents, assistant and theme. Archived
             tenants answer 404 everywhere but here.
           </p>
           {tenants === null ? (
-            <div className="small">{listMessage}</div>
+            <LoadState load={loadState} what="tenants" onRetry={() => { setLoadState(LOADING); void loadTenants(); }} />
           ) : tenants.length === 0 ? (
-            <div className="small muted">No tenants yet.</div>
+            <EmptyState icon="home" title="No tenants yet" action={newTenant} />
           ) : (
             <div>
               {tenants.map((t) => (

@@ -140,6 +140,23 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 .empty-list { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-8) var(--space-4); text-align: center; color: var(--muted); }
 .empty-list strong { color: var(--ink); font-size: var(--text-lg); }
 .empty-list .auth-done { margin-bottom: var(--space-2); }
+/* components/load-state.tsx (plan/ui-components.md Phase 3): the same list,
+   any empty one; a quiet round icon, and the page's add button under it. */
+.empty-list-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: var(--space-2); border-radius: var(--radius-full); background: var(--surface-3); color: var(--muted); }
+.empty-list-action { margin-top: var(--space-3); }
+.empty-list.compact { padding: var(--space-4); }
+.empty-list.compact strong { font-size: var(--text-base); }
+
+/* While a list loads (Phase 2): rows of shimmering bars at a row's height,
+   the booking page's skeleton in list form; never the old rows. */
+.skeleton-list { display: grid; }
+.skeleton-row { display: flex; align-items: center; gap: var(--space-4); min-height: 52px; border-bottom: 1px solid var(--line); }
+.skeleton-row:last-child { border-bottom: 0; }
+.skeleton-bar { flex: 1; height: 12px; max-width: 60%; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.skeleton-bar.short { flex: none; width: 96px; }
+/* A load that failed: the error's own words, and Retry beside them. */
+.load-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.load-error button { margin-left: 0; }
 
 /* --- booking types: rooms (plan/booking-types.md Phase 4) ---------------- */
 

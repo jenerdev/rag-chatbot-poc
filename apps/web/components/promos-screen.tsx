@@ -32,6 +32,7 @@ import { isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface PromosScreenProps {
   slug: string;
@@ -90,7 +91,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
   const [promos, setPromos] = useState<Promo[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [formOpen, setFormOpen] = useState(false);
@@ -125,7 +126,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       setPromos(await response.json());
     } catch (error) {
       setPromos(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, unauthorized]);
 
@@ -423,9 +424,11 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
         <section className="card">
           <h2>Promos offered</h2>
           {promos === null ? (
-            <div className="small">{loadMessage}</div>
+            <LoadState load={loadState} what="promos" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : active.length === 0 ? (
-            <div className="small muted">No promos. "Add a promo" makes one.</div>
+            <EmptyState icon="tag" title="No promos" action={addPromo}>
+              A promo takes a fixed amount or a percentage off the stays in its dates.
+            </EmptyState>
           ) : (
             active.map(row)
           )}

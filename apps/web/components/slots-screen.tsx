@@ -30,6 +30,7 @@ import { isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface SlotsScreenProps {
   slug: string;
@@ -68,7 +69,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   // What this member is, for the header's links only; the routes decide for themselves.
   const [role, setRole] = useState<Role | null>(null);
   const [slots, setSlots] = useState<SlotAdmin[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [formOpen, setFormOpen] = useState(false);
@@ -102,7 +103,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
       setSlots(await response.json());
     } catch (error) {
       setSlots(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, unauthorized]);
 
@@ -314,9 +315,11 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
         <section className="card">
           <h2>Slots offered</h2>
           {slots === null ? (
-            <div className="small">{loadMessage}</div>
+            <LoadState load={loadState} what="slots" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : active.length === 0 ? (
-            <div className="small muted">No slots offered. "Add a slot" makes one; nothing can be booked without one.</div>
+            <EmptyState icon="clock" title="No slots offered" action={addSlot}>
+              Nothing can be booked without one.
+            </EmptyState>
           ) : (
             active.map((s) => (
               <div key={s.id} className="list-row">

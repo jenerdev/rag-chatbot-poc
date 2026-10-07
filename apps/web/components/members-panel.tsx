@@ -20,6 +20,7 @@ import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { useNotice } from '@/components/toast';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
 
@@ -36,7 +37,7 @@ export function MembersPanel({
 }) {
   const { ask, dialog } = useConfirmDialog();
   const [members, setMembers] = useState<Member[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading members…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   // No drawer here: the add form is one field, and its refusal is a toast like every other.
   const { setNotice } = useNotice();
   const [email, setEmail] = useState('');
@@ -52,7 +53,7 @@ export function MembersPanel({
       setMembers(await response.json());
     } catch (error) {
       setMembers(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, onUnauthorized]);
 
@@ -101,7 +102,7 @@ export function MembersPanel({
       </p>
 
       {members === null ? (
-        <div className="small">{loadMessage}</div>
+        <LoadState load={loadState} what="members" onRetry={() => { setLoadState(LOADING); void load(); }} />
       ) : members.length === 0 ? (
         <div className="small muted">Nobody yet. Add the first owner below.</div>
       ) : (

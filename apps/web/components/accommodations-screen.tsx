@@ -31,6 +31,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice, type Notice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -397,7 +398,7 @@ export function AccommodationsScreen({
   const [role, setRole] = useState<Role | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
   const [rooms, setRooms] = useState<Accommodation[] | null>(null);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
 
   // The new-room form, in a drawer.
@@ -446,7 +447,7 @@ export function AccommodationsScreen({
       setSetup(await s.json());
       setRooms(await r.json());
     } catch (error) {
-      setLoadMessage((error as Error).message);
+      setLoadState(failed((error as Error).message));
     }
   }, [call]);
 
@@ -505,28 +506,30 @@ export function AccommodationsScreen({
     return (
       <>
         <StaffFrame {...frame}>
-          <div className="small">{loadMessage}</div>
+          <LoadState load={loadState} what="rooms" onRetry={() => { setLoadState(LOADING); void load(); }} />
         </StaffFrame>
       </>
     );
   }
 
+  const addRoomAction = (
+    <button
+      type="button"
+      className="primary"
+      onClick={() => {
+        setNotice(null);
+        setFormOpen(true);
+      }}
+    >
+      <Icon name="plus" size={16} /> Add a room
+    </button>
+  );
+
   return (
     <>
       <StaffFrame
         {...frame}
-        actions={
-          <button
-            type="button"
-            className="primary"
-            onClick={() => {
-              setNotice(null);
-              setFormOpen(true);
-            }}
-          >
-            <Icon name="plus" size={16} /> Add a room
-          </button>
-        }
+        actions={addRoomAction}
       >
         {dialog}
 
@@ -563,7 +566,13 @@ export function AccommodationsScreen({
           </form>
         </Drawer>
 
-        {rooms.length === 0 && <div className="small muted">No rooms yet. "Add a room" makes one.</div>}
+        {rooms.length === 0 && (
+          <section className="card">
+            <EmptyState icon="bed" title="No rooms yet" action={addRoomAction}>
+              A room needs a rate before the booking page offers it.
+            </EmptyState>
+          </section>
+        )}
         {rooms.map((room) => (
           // The key includes what the card's inputs were initialised from, so
           // after a save the card is rebuilt from the server's values rather

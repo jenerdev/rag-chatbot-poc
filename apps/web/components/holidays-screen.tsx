@@ -30,6 +30,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -70,7 +71,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const [setup, setSetup] = useState<{ today: string; currency: string } | null>(null);
   const [upcoming, setUpcoming] = useState<CalendarDay[] | null>(null);
   const [past, setPast] = useState<CalendarDay[]>([]);
-  const [loadMessage, setLoadMessage] = useState('Loading…');
+  const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
 
   // The form. The surcharge is typed in pesos and sent as centavos.
@@ -104,22 +105,25 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   }, [api]);
 
   // The tenant's today and currency, from the bookings setup (staff only).
+  // Named, not an anonymous effect, so a failed load's Retry runs it again
+  // (plan/ui-components.md Phase 2, trap 4).
+  const loadSetup = useCallback(async () => {
+    let response: Response | null = null;
+    try {
+      response = await fetch(`${api}/bookings/setup`);
+      if (response.status === 401) return unauthorized();
+      if (!response.ok) throw new Error('failed');
+      const body = await response.json();
+      setSetup({ today: body.today, currency: body.currency });
+      setToYear(body.today.slice(0, 4));
+    } catch (error) {
+      setLoadState(failed(await describeFailure(error as Error, response)));
+    }
+  }, [api, unauthorized]);
+
   useEffect(() => {
-    if (auth !== 'in') return;
-    void (async () => {
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${api}/bookings/setup`);
-        if (response.status === 401) return unauthorized();
-        if (!response.ok) throw new Error('failed');
-        const body = await response.json();
-        setSetup({ today: body.today, currency: body.currency });
-        setToYear(body.today.slice(0, 4));
-      } catch (error) {
-        setLoadMessage(await describeFailure(error as Error, response));
-      }
-    })();
-  }, [api, auth, unauthorized]);
+    if (auth === 'in') void loadSetup();
+  }, [auth, loadSetup]);
 
   // Upcoming: today to a year out. Past: the year before today, to copy from.
   const load = useCallback(async () => {
@@ -137,7 +141,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       setPast(await b.json());
     } catch (error) {
       setUpcoming(null);
-      setLoadMessage(await describeFailure(error as Error, response));
+      setLoadState(failed(await describeFailure(error as Error, response)));
     }
   }, [api, setup, unauthorized]);
 
@@ -259,7 +263,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     return (
       <>
         <StaffFrame {...frame}>
-          <div className="small">{loadMessage}</div>
+          <LoadState load={loadState} what="setup" onRetry={() => { setLoadState(LOADING); void loadSetup(); }} />
         </StaffFrame>
       </>
     );
@@ -374,9 +378,11 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         <section className="card">
           <h2>The next twelve months</h2>
           {upcoming === null ? (
-            <div className="small">{loadMessage}</div>
+            <LoadState load={loadState} what="dates" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : upcoming.length === 0 ? (
-            <div className="small muted">No holidays or closed dates listed. Every date is open and priced as a weekday or a weekend.</div>
+            <EmptyState icon="flag" title="No holidays or closed dates" action={addDate}>
+              Every date is open and priced as a weekday or a weekend.
+            </EmptyState>
           ) : (
             months.map(({ month, days }) => (
               <div key={month} className="month-group">
