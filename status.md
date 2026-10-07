@@ -96,7 +96,7 @@
     On Windows, stopping the shell leaves Next running: stop its
     `start-server.js` process by PID and check the port before a build.
 
-**UI components (2026-10-07; Phases 0–1 done 2026-10-08):**
+**UI components (2026-10-07; COMPLETE 2026-10-08, D-102):**
 [`plan/ui-components.md`](./plan/ui-components.md). An audit of the UI
 after ui-refresh, and Phases 0–7: toast, load/error state with Retry,
 empty state with its action, search on Unanswered and the knowledge base,
@@ -107,9 +107,20 @@ tabs on the platform tenant form, focusable tooltips, the record.
 - [x] Phase 1, the toast (2026-10-08): `components/toast.tsx`, one queue and
   one region per page; eight screens moved; walk 20/20; axe still 0 on 160
   states; tests 79/79. Screenshots in `plan/ui-refresh/components-1/`.
-- [ ] The user's look at Phase 1.
-- [ ] Phase 2, the load state: `components/load-state.tsx` (a skeleton, and
-  an error with Retry calling the screen's own load), 11 screens.
+- [x] Phases 2–3, load and empty states (2026-10-08): `components/load-state.tsx`,
+  14 load states on 11 screens, 7 empty states; walk 44/44.
+- [x] Phase 4, search and Show more (2026-10-08): Unanswered and the knowledge
+  base; walk 14/14; tests 85/85.
+- [x] Phase 5, tabs on the platform tenant form (2026-10-08): walk 9/9.
+- [x] Phase 6, tooltips (2026-10-08): `Tip` on 11 icon buttons, a legend on
+  Bookings, the sources panel's badge and "Show all"; walk 12/12.
+- [x] Phase 7, the record: D-102, CLAUDE.md, ui-refresh § 8, whats-done.
+- [ ] **Waiting on the user's word (they asked for it):** the full axe audit
+  (`plan/ui-refresh-a11y.mjs`; last run after Phase 1, 0 violations) and
+  `pnpm eval` (55/61 on 2026-10-08, the reasons above).
+- [ ] The user's look at Phases 1–6 (walk screenshots under
+  `plan/ui-refresh/components-{1,2,4,5,6}/`).
+- [ ] Then: merge `feat/ui-refresh` into `master` (both plans are on it).
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`

@@ -262,7 +262,11 @@ apps/web/              Next.js 15, App Router
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
   components/staff-frame.tsx  every staff screen's frame (D-101): signed in, a sectioned sidebar (groupNavItems) that is a drawer below 900 px; signed out, the old header
   components/icons.tsx   the icons: hand-drawn inline SVG on a 20 px grid, currentColor, aria-hidden unless labelled (D-101)
-  components/toast.tsx   useNotice(drawerOpen): a success or a refusal as a toast, a refusal in an open drawer stays in it; ONE queue, ONE <Toaster /> per page (StaffFrame, the platform), a popover in the top layer (plan/ui-components.md Phase 1)
+  components/toast.tsx   useNotice(drawerOpen): a success or a refusal as a toast, a refusal in an open drawer stays in it; ONE queue, ONE <Toaster /> per page (StaffFrame, the platform), a popover in the top layer (D-102)
+  components/load-state.tsx  LoadState (a skeleton, or an alert with Retry running the load that failed) and EmptyState (title, line, the page's own add button) (D-102)
+  components/list-search.tsx the search field over a loaded list; lib/search.ts matches() and PAGE_SIZE, pure, tested (D-102)
+  components/tabs.tsx    WAI-ARIA tabs, every panel mounted; the platform tenant form's Profile / Applications / Members / Archive (D-102)
+  components/tooltip.tsx Tip: on hover AND keyboard focus, Escape closes it, hoverable; no HTML element keeps a native title (D-102)
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
@@ -659,6 +663,10 @@ All are expanded in `risks.md`.
   darkens it (white on the dark accent was 3.68:1). Dim with colour, never
   opacity. `plan/ui-refresh-a11y.mjs` (axe, 160 page states) ends at 0
   violations; keep it there.
+- Feedback (D-102): an action's result is a toast (`useNotice()`), a
+  standing fact a `.notice` banner; a list shows `LoadState` until its rows
+  arrive and `EmptyState` when there are none; a reason is a `Tip` or
+  visible text, never only a `title`.
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
   markdown rendering is what would take it away. The two exceptions are a

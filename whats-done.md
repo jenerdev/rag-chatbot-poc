@@ -8125,3 +8125,45 @@ tool-open ×2, lang-tagalog-2 ×2), so these are not flips:
   0.90), not Taglish.
 No pipeline code or prompt text moved on this branch, and the three
 baselines are byte-identical, so nothing was reworded.
+
+## UI components, Phases 2–7: load and empty states, search, tabs, tooltips, the record · 2026-10-08, on `feat/ui-refresh`
+
+**What:** four components after the toast (D-102):
+- `load-state.tsx`: 14 load states on 11 screens, and 7 empty states.
+- `list-search.tsx` with `lib/search.ts`: Unanswered, and the knowledge base
+  past 8 documents.
+- `tabs.tsx`: the platform tenant form.
+- `tooltip.tsx`: 11 icon buttons, the Bookings chips, the sources badge.
+At the user's word, no `pnpm eval` and no full axe audit per phase: each
+phase got typecheck, tests and its own walk.
+
+**Why it matters:**
+- A failed load used to read "Loading…"-grey with no way out. Now it is an
+  alert in the server's words with Retry.
+- An empty list now offers its add button, and only to a role that may use
+  it.
+- 200 questions can be searched.
+- The tenant form is four short tabs instead of one long page.
+- No reason is left in a native `title` that only a mouse sees.
+
+**Observed:** walks 44/44 (Phases 2–3: every harbor list and the platform's,
+held, failed, retried, emptied), 14/14 (Phase 4: "parking" left 3 of
+harbor's 16 real open questions; 60 and 200 made-up questions, "199 of 200
+loaded match"), 9/9 (Phase 5: a typed colour survived a visit to Members;
+Save posted the same seven keys), 12/12 (Phase 6: Tab shows a tip, Escape
+hides it, the pointer can rest on it; no `title` on seven staff screens).
+Every write was caught in the browser. Typecheck clean; tests
+13+14+102+359+5+85.
+
+**Deviations, each with its reason in plan/ui-components.md:**
+- Unanswered keeps its own good-news empty state.
+- The tenant tabs keep no URL hash: a reload lands on the tenant list.
+- Booking chips get a legend, not 112 Tab stops.
+
+**Found, not planned:**
+- "Mark resolved" said nothing, and its error was a banner; both are
+  toasts now.
+- A source chunk opened only on a mouse click; it has a "Show all" button
+  now.
+- Three loads were anonymous code (two setups, the chunks); they are named
+  functions, so Retry can call them.

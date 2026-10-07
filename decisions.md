@@ -3322,3 +3322,53 @@ is colour, never opacity. A FILL under white text is its own token,
 on a light page, 72 % of it toward black on a dark one, because a dark
 page's accent is light and white on #3b82f6 was 3.68:1. The axe-core
 script is not a dependency (`plan/ui-refresh/axe/`, git-ignored).
+
+## D-102 · Feedback, load and empty states, search, tabs and tips are five small components, still hand-written · **Added 2026-10-08 (plan/ui-components.md)**
+
+**Decision:** the staff screens share five components instead of each
+screen doing it its own way. All are in `apps/web/components/`, with no
+library (D-101's rule).
+- `toast.tsx`: `useNotice(drawerOpen)` keeps `setNotice()`'s signature. A
+  success is a toast that leaves after 5 s. A refusal while the drawer is
+  open stays in the drawer. Any other refusal is a toast that stays until
+  closed. There is ONE queue per tab and ONE `<Toaster />` per page,
+  rendered by `StaffFrame` and the platform screen, and it is a
+  `popover="manual"` element in the top layer, so it sits above modals.
+- `load-state.tsx`: `LoadState`, a skeleton while loading, or an alert with
+  Retry that runs the load that failed; and `EmptyState`, a title, a line
+  and the page's own add button, or none for a role that may not add.
+- `list-search.tsx` with `lib/search.ts`: a search over the rows already
+  loaded, plus "Show more", 25 at a time.
+- `tabs.tsx`: the WAI-ARIA tabs pattern, every panel kept mounted.
+- `tooltip.tsx`: `Tip`, shown on hover AND keyboard focus, closed by
+  Escape, hoverable (WCAG 1.4.13). No HTML element keeps a native `title`.
+
+The rule this sets: a TOAST says what an action did; a `.notice` BANNER
+says a standing fact (an overlap, a closed date, a contrast warning).
+
+**Why:** the user asked for an audit of reusable UI components, and took
+every recommendation. The dialog and the drawer existed already (D-101).
+What did not:
+- Action feedback appeared at the top of the page, off-screen after a row
+  action, and under an open drawer.
+- A failed load looked exactly like a slow one, and had no retry.
+- Empty lists pointed at a button elsewhere on the page.
+- 200 unanswered questions had no search.
+- The platform's tenant form was one long page.
+- Reasons were kept in `title`, which a keyboard, a phone and a screen
+  reader never see.
+
+**Learned:**
+- A modal `<dialog>` hides everything beneath it, so a page-level message
+  needs the top layer too, which is what `popover` gives.
+- Two panels on one page (the platform's form and its members) need ONE
+  region, or their toasts stack in the same corner. A module queue also
+  lets a message outlive the component that raised it.
+- A legend beats ~112 focusable chips.
+- CDP's `keyDown` needs `text: "\r"` to press a button.
+
+**Measured (2026-10-08, `feat/ui-refresh`):** walks: Phase 1 20/20,
+Phases 2–3 44/44, Phase 4 14/14, Phase 5 9/9, Phase 6 12/12. Every write
+was caught in the browser, so nothing changed. Tests 13+14+102+359+5+85.
+The axe audit (0 on 160 states) was last run after Phase 1; the user
+asked that it and `pnpm eval` wait for their word.

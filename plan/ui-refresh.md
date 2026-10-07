@@ -529,5 +529,5 @@ drawer and dialog built in 7, so they go in that order.
 ## 8. Later (ideas that are features, not design)
 
 Kept here so they do not creep into a phase (trap 7): a command palette for
-staff, toast notifications, keyboard shortcuts, saved filters on Bookings,
+staff, ~~toast notifications~~ (done: plan/ui-components.md Phase 1, D-102), keyboard shortcuts, saved filters on Bookings,
 copy-to-clipboard on a reply.

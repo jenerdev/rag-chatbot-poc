@@ -8,8 +8,10 @@
 > ui-refresh § 8 ("Later").
 >
 > Written 2026-10-07 on `feat/ui-refresh`, while ui-refresh Phase 10 is
-> paused, uncommitted. **Status: Phases 0–1 done 2026-10-08 (ui-refresh
-> Phase 10 committed at `09aed2f`); Phase 2 next.** § 5 answered
+> paused, uncommitted. **Status: complete, Phases 0–7 done 2026-10-08
+> (ui-refresh Phase 10 committed first, at `09aed2f`). Owed, at the user's
+> word: the full axe audit (last run after Phase 1, 0 on 160 states) and
+> `pnpm eval`.** § 5 answered
 > 2026-10-07: every recommendation taken, by the user's instruction.
 > Decision to record: D-102.
 
@@ -309,6 +311,9 @@ has a `title` now. `plan/ui-components-phase6-walk.mjs`, 12/12. Deviations:
   shown only when two lines actually hide something.
 
 ### Phase 7 — The record
+
+**Done 2026-10-08:** D-102; CLAUDE.md (layout, a Feedback convention);
+ui-refresh § 8 crosses off toasts; status and whats-done.
 
 D-102 in `decisions.md` (toasts for action feedback, banners for standing
 facts; the top-layer reason); CLAUDE.md's Layout lists the four new
