@@ -270,6 +270,18 @@ walk compares it with a pre-phase capture).
 
 *Ask first (§ 5 q1): this is the one phase that changes a page's shape.*
 
+**Done 2026-10-08:** `components/tabs.tsx` (the APG pattern: roving
+tabindex, ←/→/Home/End with wrap-around, every panel mounted and labelled
+by its tab). The tenant form's edit view is Profile (the one form, one
+Save), Applications, Members, Archive, under the business name.
+`plan/ui-components-phase5-walk.mjs`, 9/9: a colour typed in Profile was
+still there after Members; the keyboard moved selection and focus; Tab
+went from the tab into its panel; Save posted the same seven keys with
+the typed colour (caught); a phone did not scroll sideways. Deviation: no
+URL hash. A reload of `/platform` returns to the tenant list (the
+selected tenant is not in the URL), so a remembered tab would restore
+nothing.
+
 ### Phase 6 — Tooltip that shows on focus (finding 6)
 
 New `<Tip label>` in `components/tooltip.tsx`: CSS-only show on `:hover`
