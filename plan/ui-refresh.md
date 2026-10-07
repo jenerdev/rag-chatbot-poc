@@ -8,9 +8,10 @@
 > component. This plan does that in eleven phases, one surface each, starting
 > with the foundation every later phase stands on.
 >
-> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–9 done
-> 2026-10-06 (the looks at 0–8 included, no action items; Phase 9's look
-> owed); Phase 10 to do.** Branch
+> Written 2026-10-06, against `b8ec02d` on `master`. **Status: Phases 0–10 done
+> (0–9 on 2026-10-06, every look included, no action items; 10 on
+> 2026-10-08, with `pnpm eval` and the pipeline isolation suite owed to an
+> invalidated OpenAI key).** Branch
 > `feat/ui-refresh`. § 7 answered 2026-10-06: every recommendation taken,
 > by the user's instruction; q6 (no reference given) is a quiet, neutral
 > look: hairlines, few fills, generous space. D-101.
@@ -467,6 +468,15 @@ were unstyled since Phase 0 (the selector listed types only); now
 - `pnpm eval` once (Rule 3's end proof), the isolation suites, verify.
 - D-101 in `decisions.md`; CLAUDE.md's "Frontend" convention updated (tokens,
   icons, the rules above); `flow.md` unaffected; status and whats-done.
+
+**Done 2026-10-08:** axe (`plan/ui-refresh-a11y.mjs`), 160 page states, 0
+violations after four runs; `plan/ui-refresh-phase10-walk.mjs`, 40/40 (200 %
+zoom on 36 pages, reduced motion with its positive twin); the build and both
+bundle greps clean; verify 117/118 (the known open item), bookings isolation
+31/31 both ways, rooms 50/50, the three baselines identical. Owed: `pnpm
+eval` and `@rag/pipeline isolation`, both stopped by an invalidated OpenAI
+key (HTTP 401). Deviation: the fills under white text are their own tokens
+(`--accent-fill`, `--danger-fill`), darkened in dark mode; D-101 amended.
 
 ---
 

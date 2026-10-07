@@ -134,7 +134,7 @@ export function ChatScreen({
   // comes from the server, so there is no request to wait for.
   const emptyKb = documentCount === 0;
 
-  const messagesRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // The conversation lives in the database; the browser only has to remember
   // its id — the server re-sends the last few messages to the model on every
@@ -345,7 +345,8 @@ export function ChatScreen({
         <TenantNav slug={slug} features={nav} current="chat" />
       </BrandHeader>
 
-      <div id="messages" ref={messagesRef} onScroll={onScroll}>
+      {/* <main>: the page's main landmark (Phase 10's audit found none on the chat). */}
+      <main id="messages" ref={messagesRef} onScroll={onScroll}>
         <div className="messages-inner">
           {turns.length === 0 && (
             <div className="empty-state">
@@ -446,9 +447,10 @@ export function ChatScreen({
             })}
           </div>
         </div>
-      </div>
+      </main>
 
-      <div className="composer">
+      {/* A named region, so the composer is inside a landmark like the rest of the page. */}
+      <section className="composer" aria-label="Ask a question">
         {unseen && (
           <button type="button" className="sm jump-down" onClick={jumpDown}>
             <Icon name="chevron-down" size={16} /> New messages
@@ -495,7 +497,7 @@ export function ChatScreen({
           </button>
         </form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
-      </div>
+      </section>
     </div>
   );
 }

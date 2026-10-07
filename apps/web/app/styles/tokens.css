@@ -29,9 +29,11 @@
   --panel: #ffffff;
   --ink: #18181b;
 
-  /* Base: status. Each gets its -soft and -line derived below. */
-  --ok: #15803d;
-  --warn: #b45309;
+  /* Base: status. Each gets its -soft and -line derived below. Green-800 and
+     amber-800, not -700: on their own soft tint the -700s measured 4.38:1
+     (Phase 10's audit), under 4.5:1. */
+  --ok: #166534;
+  --warn: #92400e;
   --danger: #b91c1c;
 
   /* Text on a filled accent, and on the photo overlay (dark in every theme). */
@@ -112,8 +114,8 @@
   --bg: #f7f7f8;
   --panel: #ffffff;
   --ink: #18181b;
-  --ok: #15803d;
-  --warn: #b45309;
+  --ok: #166534;
+  --warn: #92400e;
   --danger: #b91c1c;
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.05);
   --shadow-2: 0 12px 32px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
@@ -121,7 +123,10 @@
 
 /* Derived. Declared wherever the base colours can change (see the top). */
 :root, .tenant-root, [data-scheme] {
-  --muted: color-mix(in srgb, var(--ink) 60%, var(--panel));
+  /* 68%, measured (Phase 10's audit): at 60% muted text on villa's cream
+     background was 4.36:1, under WCAG AA's 4.5:1. */
+  --muted: color-mix(in srgb, var(--ink) 68%, var(--panel));
+  /* For icons, borders and placeholders only, never for text: it is under 4.5:1. */
   --faint: color-mix(in srgb, var(--ink) 40%, var(--panel));
   --line: color-mix(in srgb, var(--ink) 10%, var(--panel));
   --line-strong: color-mix(in srgb, var(--ink) 18%, var(--panel));
@@ -140,4 +145,23 @@
   --warn-line: color-mix(in srgb, var(--warn) 30%, var(--panel));
   --danger-soft: color-mix(in srgb, var(--danger) 9%, var(--panel));
   --danger-line: color-mix(in srgb, var(--danger) 30%, var(--panel));
+  /* A FILL under --on-accent (white): a primary button, the visitor's bubble,
+     a solid danger button. On a light page, the colour itself. */
+  --accent-fill: var(--accent);
+  --accent-fill-hover: var(--accent-hover);
+  --danger-fill: var(--danger);
+}
+
+/* On a dark page the accent is light, and white on it measured 3.68:1
+   (#3b82f6; #f87171 too; Phase 10's audit). The fill is darkened toward
+   black instead: 72% gives white >= 4.98:1 on the default blue, the dark
+   danger and villa's teal, and a tenant's accent keeps its hue. Hover goes
+   darker still, the way it reads on a light page. Not under a pinned-light
+   subtree, which keeps the light rule above. */
+@media (prefers-color-scheme: dark) {
+  :root, .tenant-root:not([data-scheme]) {
+    --accent-fill: color-mix(in srgb, var(--accent) 72%, black);
+    --accent-fill-hover: color-mix(in srgb, var(--accent) 62%, black);
+    --danger-fill: color-mix(in srgb, var(--danger) 72%, black);
+  }
 }

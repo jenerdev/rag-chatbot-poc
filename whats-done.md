@@ -7974,3 +7974,77 @@ listed types only, so every typeless input in the app (the slot name, the
 promo fields, the tenant form) had been unstyled since Phase 0; the Phase 0
 screenshots did not catch it. `input:not([type])` is in the selector now.
 The theme preview had also inherited `.tenant-root`'s `min-height: 100vh`.
+
+## UI refresh, Phase 10 (in progress): the accessibility audit, first pass · 2026-10-06, on `feat/ui-refresh`, uncommitted
+
+**What:** `plan/ui-refresh-a11y.mjs` runs axe-core 4.14.0 (unpacked into
+the git-ignored `plan/ui-refresh/axe/`, not a dependency) on every public,
+staff and platform screen, light and dark, 1280 and 375 px, plus an open
+drawer and an open dialog: 160 page states, every write caught in the
+browser, two throwaway users deleted after.
+
+**Observed, first run:** 5 rules failed: color-contrast (serious, 758
+nodes on 89 states; villa's muted text #747476 on #faf7f2 = 4.36:1),
+scrollable-region-focusable (serious, the platform's Pulse table),
+landmark-one-main (the chat had no `<main>`), region (100 nodes), and
+page-has-heading-one (28 states: exactly the 404 pages the audit visits,
+7 × 2 widths × 2 schemes). Fixed: `--muted` to 68 % ink, text off
+`--faint`, an h1 on the 404, the Pulse table a focusable named region,
+the chat's message list a `<main>`.
+
+**Observed, second run:** 2 rules left: color-contrast on status text
+over its own tint (#15803d on #e8f2ec = 4.38:1, 504 nodes) and region
+(72 nodes, the chat's composer label and something on every signed-in
+staff page). Stopped here at the user's request; status.md has the next
+steps.
+
+## UI refresh, Phase 10 (finished): the audit clean, zoom and motion walked, the bundle clean · 2026-10-08, on `feat/ui-refresh`
+
+**What:** the third and fourth axe runs, after these fixes. The light
+`--ok`/`--warn` are green-800 and amber-800 (#166534, #92400e). The
+chat's composer is a named `<section>` landmark. The phone's staff top
+bar is `role="banner"`; a bare `<header>` would have taken the public
+header's styles. Cancelled bookings and retired rooms are dimmed by
+colour and a surface tint, not opacity. And three new derived tokens:
+`--accent-fill`, `--accent-fill-hover` and `--danger-fill`, under every
+filled control with white text (primary buttons, the solid danger
+button, the visitor's bubble, the photo link's hover).
+`plan/ui-refresh-phase10-walk.mjs` walks 200 % zoom and reduced motion.
+
+**Why it matters:** the dark-mode fill was the last real failure. White
+on the dark accent #3b82f6 is 3.68:1, and on the dark danger #f87171 it
+is under 4.5:1 too. So every primary button and every chat bubble in
+dark mode failed AA for every tenant that follows the system (harbor,
+northwind, the platform). Mixing the hover toward `--ink` made it worse
+in the dark (3.08:1), because ink is light there. The fill is darkened
+toward black in dark mode only: 72 % gives white 6.32:1 on the default
+blue, 4.98:1 on the dark danger, and 8.66:1 on villa's teal. A tenant's
+accent keeps its hue. A pinned-light subtree keeps the plain accent.
+
+**Observed:** axe, third run: 4 rules, contrast down from 504 nodes to
+89 (dark fills and opacity-dimmed rows), plus region on the 375 px top
+bar. Two one-off rules (html-has-lang, landmark-one-main on 2 states at
+375 px) did not recur. **Fourth run: 160 page states, 0 violations.**
+Walk: 36 pages at 200 % zoom (640 CSS px at 2×), none scrolls sideways,
+every heading on screen. Reduced motion: 0 running animations and 0
+transitions with a drawer open, a dialog open and on the chat. The
+positive twin, the chat WITHOUT the preference, has 6 elements with a
+transition, so the zero is the preference's doing (trap 12). 40/40.
+Typecheck clean; tests 13+14+102+359+5+73. The prompt snapshot and both
+tool-definition baselines are byte-identical. `pnpm build` passed; the
+bundle grep printed nothing, and none of the four keys' values is in
+the 81 files of `.next/static`. bookings isolation 31/31 both ways;
+rooms 50/50; verify 117/118, the known open item (villa's staff member).
+
+**Owed:** `pnpm eval` and `@rag/pipeline isolation` (both ways). Both
+stopped at the first embedding call with "OpenAI rejected the API key
+(HTTP 401): Your API key has been invalidated." The 6 isolation checks
+that ran before it passed. No pipeline code moved in Phase 10, and the
+baselines are identical, so nothing here can change their result. They
+run once the key in `.env` is replaced.
+
+**Trap met:** on Windows, stopping the background shell that ran `next
+dev` did not stop Next itself. The server kept port 3100 and answered
+nothing, a curl hung on it, and the build behind the curl never
+started (so trap 16 did not bite). Stop the `start-server.js` process by
+its PID, and check the port is free before building.

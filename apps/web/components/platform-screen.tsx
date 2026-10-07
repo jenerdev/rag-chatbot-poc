@@ -206,7 +206,8 @@ export function PlatformScreen() {
         {pulse && pulse.length > 0 && (
           <section className="card">
             <h2>Pulse, last 30 days</h2>
-            <div className="reply-table pulse">
+            {/* Focusable, so a keyboard can scroll it sideways when it is wider than the card (Phase 10's audit). */}
+            <div className="reply-table pulse" tabIndex={0} role="region" aria-label="Pulse, last 30 days">
               <table>
                 <thead>
                   <tr>

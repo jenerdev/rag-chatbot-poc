@@ -173,7 +173,10 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
       <div className="sidebar-backdrop" aria-hidden="true" onClick={close} />
 
       <div className="staff-main" inert={open || undefined}>
-        <div className="staff-topbar">
+        {/* role, not <header>: the element selector would restyle it as the
+            public header. The landmark keeps the phone's top bar inside one
+            (Phase 10's audit). */}
+        <div className="staff-topbar" role="banner">
           <button
             ref={menuButton}
             type="button"

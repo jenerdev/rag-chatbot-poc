@@ -10,7 +10,8 @@
    under the composer, and a wrapped phone header pushed it off). dvh follows
    a phone's browser bars; vh is the fallback. */
 .chat-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-#messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); }
+/* A <main>, so the base `main` width and margin are undone: this is the scroller, full width. */
+#messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); max-width: none; margin: 0; width: 100%; }
 /* A reading width: a reply line longer than ~70 characters is hard to follow. */
 .messages-inner { max-width: 760px; margin: 0 auto; }
 
@@ -82,7 +83,7 @@
   max-width: 80%;
   padding: 10px var(--space-4);
   border-radius: 18px 18px var(--radius-sm) 18px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--on-accent);
 }
 /* The assistant: text on the page beside its mark, no box. */
@@ -122,7 +123,7 @@
 /* The Photo column (D-094): a View button that opens the lightbox. */
 .reply-table th.photo, .reply-table td.photo { text-align: center; white-space: nowrap; }
 .photo-link { min-height: 0; box-shadow: none; border: 1px solid var(--line-strong); border-radius: var(--radius-full); background: var(--panel); color: var(--accent-text); padding: 2px 10px; font-size: var(--text-xs); cursor: pointer; }
-.photo-link:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.photo-link:hover:not(:disabled) { background: var(--accent-fill); color: var(--on-accent); }
 /* Room cards (D-094, components/room-cards.tsx): a room-list reply as one
    card per room with its photo, in place of the table. Two across on a
    desktop, one on a phone. The lightbox is the photo large on a dark
@@ -313,7 +314,7 @@
 }
 .composer textarea:focus { box-shadow: none; }
 .composer-send { flex: none; width: 36px; min-height: 36px; padding: 0; border-radius: var(--radius-full); }
-.composer-hint { max-width: 760px; margin: 6px auto 0; text-align: center; font-size: var(--text-xs); color: var(--faint); }
+.composer-hint { max-width: 760px; margin: 6px auto 0; text-align: center; font-size: var(--text-xs); color: var(--muted); }
 /* Scrolled up while an answer arrived: the way back down. */
 .jump-down { position: absolute; left: 50%; top: calc(-1 * var(--space-10)); transform: translateX(-50%); border-radius: var(--radius-full); box-shadow: var(--shadow-2); }
 @media (max-width: 560px) {

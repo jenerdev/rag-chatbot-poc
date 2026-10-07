@@ -3312,3 +3312,13 @@ login, at 375 and 1280 px); villa stays light in dark mode, harbor and
 northwind go dark. Typecheck clean; web tests 65/65 (6 new:
 `theme.test.ts`, `icons.test.ts`); northwind's prompt snapshot identical to
 `northwind-prompt-post-emoji.txt`. The user looked: no action items.
+
+**Amended 2026-10-08 (Phase 10, the audit):** an axe-core audit of 160
+page states ends at 0 violations (WCAG 2.0/2.1 A+AA and best practice).
+That cost four colour rules. `--muted` is 68 % ink, not 60 %; text is
+never `--faint`. The light `--ok`/`--warn` are the -800 shades. Dimming
+is colour, never opacity. A FILL under white text is its own token,
+`--accent-fill` (and `-hover`, and `--danger-fill`): the colour itself
+on a light page, 72 % of it toward black on a dark one, because a dark
+page's accent is light and white on #3b82f6 was 3.68:1. The axe-core
+script is not a dependency (`plan/ui-refresh/axe/`, git-ignored).

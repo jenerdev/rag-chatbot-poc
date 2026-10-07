@@ -8,7 +8,8 @@ export default function TenantNotFound() {
   return (
     <main>
       <section className="card">
-        <h2>No such workspace</h2>
+        {/* h1: the page's one heading (Phase 10's audit: a 404 had none). */}
+        <h1 className="page-title">No such workspace</h1>
         <p className="small muted">Check the address you were given.</p>
       </section>
     </main>

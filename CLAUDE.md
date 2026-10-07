@@ -653,7 +653,11 @@ All are expanded in `risks.md`.
   size as a literal; a new shade is a `color-mix()` of the five theme keys,
   declared on `:root, .tenant-root, [data-scheme]` so a tenant's colours
   reach it. A theme that sets a surface key stays light in dark mode
-  (`pinsLightScheme()`, `data-scheme="light"`).
+  (`pinsLightScheme()`, `data-scheme="light"`). A fill under white text is
+  `--accent-fill` / `--danger-fill`, never the bare colour: dark mode
+  darkens it (white on the dark accent was 3.68:1). Dim with colour, never
+  opacity. `plan/ui-refresh-a11y.mjs` (axe, 160 page states) ends at 0
+  violations; keep it there.
 - Frontend: never `dangerouslySetInnerHTML` for anything from the server or the
   model. React escapes children, which is what makes this free — adding
   markdown rendering is what would take it away. The two exceptions are a

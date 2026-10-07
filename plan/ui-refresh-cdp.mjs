@@ -85,7 +85,7 @@ export async function openBrowser({ port = 9400 + Math.floor(Math.random() * 500
       await loaded;
       for (let t = 0; t < 60; t++) {
         await new Promise((r) => setTimeout(r, 500));
-        const busy = await page.eval("/Loading|Checking|Reading the link/.test(document.body.innerText)");
+        const busy = await page.eval("/Loading|Checking|Reading the link/.test(document.body?.innerText ?? 'Loading')");
         if (t >= 2 && busy === false) break;
       }
     },

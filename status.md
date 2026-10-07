@@ -78,8 +78,26 @@
 - [x] Phase 8, knowledge base and unanswered: walk 17/17, tests 68/68.
 - [x] The user's look at Phase 8: no action items.
 - [x] Phase 9, the remaining staff screens and the platform: walk 24/24, tests 73/73.
-- [ ] The user's look at Phase 9: `plan/ui-refresh/phase9/{walk,walk-dark}/`.
-- [ ] Phase 10: the accessibility pass, the suites, the record.
+- [x] The user's look at Phase 9: no action items.
+- [x] Phase 10, the audit and the record (2026-10-08): axe 0 violations on
+  160 page states; zoom and motion walk 40/40; build and both bundle greps
+  clean; verify 117/118 (the open item below), bookings isolation 31/31
+  both ways, rooms 50/50, the three baselines identical. D-101 amended.
+  - [ ] **Owed: `pnpm eval` and `@rag/pipeline isolation` (both ways).** The
+    OpenAI key in `.env` is invalidated (HTTP 401). Replace it, then run
+    both. Expect eval in the 59/61 band, isolation 23/23 (21 filters-only).
+  - Dev server for the walks: `cd apps/web && npx next dev --port 3100`.
+    On Windows, stopping the shell leaves Next running: stop its
+    `start-server.js` process by PID and check the port before a build.
+
+**UI components (2026-10-07; Phase 0 started 2026-10-08):**
+[`plan/ui-components.md`](./plan/ui-components.md). An audit of the UI
+after ui-refresh, and Phases 0–7: toast, load/error state with Retry,
+empty state with its action, search on Unanswered and the knowledge base,
+tabs on the platform tenant form, focusable tooltips, the record.
+- [x] § 5 answered 2026-10-08: every recommendation taken.
+- [ ] Phase 0: ui-refresh Phase 10 committed; baseline screenshots of the
+  screens this plan touches into `plan/ui-components/0/before/`.
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`
