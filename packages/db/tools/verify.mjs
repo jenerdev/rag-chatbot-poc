@@ -21,7 +21,7 @@
 //
 // Run:  pnpm --filter @rag/db verify
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { anonClient, mintPlatformToken, mintTenantToken, parseStoredVector, scopedClient, VECTOR_DIMENSIONS } from '../dist/index.js';
 import { supabase } from '../dist/service.js';
 
@@ -1619,6 +1619,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await bookingTypeChecks(probe.id);
       await customerBookingChecks();
       await rolesChecks();
+      await calendarChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);
@@ -1957,6 +1958,209 @@ async function rolesChecks() {
     for (const userId of Object.values(ids)) {
       const { error: userError } = await supabase.auth.admin.deleteUser(userId);
       if (userError) console.log(`WARN  could not delete a roles-probe user: ${userError.message}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The calendar (plan/calendar.md Phase 1, D-103): calendar_pending(),
+// calendar_slots(), calendar_days(). A throwaway per_room `calendar-probe`
+// with two rooms × two slots (4 sellable pairs a day) and one retired room,
+// and a seeded week, Monday 1 March 2027 to Sunday 7 March, whose every
+// date's state is known by hand:
+//
+//   Mon 1  nothing                               available 0/4
+//   Tue 2  A/Day confirmed                       partial   1/4
+//   Wed 3  all four confirmed                    full      4/4
+//   Thu 4  closed (rate_calendar kind closed)    closed
+//   Fri 5  holiday; ONE two-room pending stay    available 0/4, pending 1 (not 2: § 2.3)
+//   Sat 6  A/Evening confirmed, B/Evening pending  partial 1/4, pending 1
+//   Sun 7  nothing                               available, weekend
+//
+// Every refusal has its positive twin (trap 12): a chat token is refused
+// and the staff token gets the seven rows; another tenant's id is refused
+// and this tenant's is answered; another tenant's room gives nothing and
+// this tenant's room gives its half.
+async function calendarChecks() {
+  const { data: probe, error: probeError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'calendar-probe', business_name: 'calendar probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (probeError) {
+    check(false, 'calendar: create the calendar-probe tenant', probeError.message);
+    return;
+  }
+  let userId = null;
+  try {
+    const app = await supabase
+      .from('tenant_applications')
+      .insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila', booking_type: 'per_room' } });
+    if (app.error) throw new Error(`application: ${app.error.message}`);
+    const { data: units, error: unitError } = await supabase
+      .from('units')
+      .insert([
+        { tenant_id: probe.id, name: 'A', capacity: 2, sort_order: 1, active: true },
+        { tenant_id: probe.id, name: 'B', capacity: 2, sort_order: 2, active: true },
+        { tenant_id: probe.id, name: 'Retired', capacity: 2, sort_order: 3, active: false },
+      ])
+      .select('id, name');
+    if (unitError) throw new Error(`units: ${unitError.message}`);
+    const unit = Object.fromEntries(units.map((u) => [u.name, u.id]));
+    const { data: slots, error: slotError } = await supabase
+      .from('slots')
+      .insert([
+        { tenant_id: probe.id, name: 'Day', start_time: '08:00', duration: '8 hours' },
+        { tenant_id: probe.id, name: 'Evening', start_time: '17:00', duration: '6 hours' },
+      ])
+      .select('id, name');
+    if (slotError) throw new Error(`slots: ${slotError.message}`);
+    const slot = Object.fromEntries(slots.map((s) => [s.name, s.id]));
+    const rates = [];
+    for (const u of ['A', 'B', 'Retired']) for (const s of ['Day', 'Evening']) rates.push({ tenant_id: probe.id, unit_id: unit[u], slot_id: slot[s], weekday_price: 100000, weekend_price: 100000 });
+    const rateInsert = await supabase.from('unit_rates').insert(rates);
+    if (rateInsert.error) throw new Error(`rates: ${rateInsert.error.message}`);
+
+    const row = (u, s, day, status, group) => ({
+      tenant_id: probe.id, unit_id: unit[u], slot_id: slot[s], booked_date: day, guest_name: 'calendar probe', guest_count: 1, status,
+      ...(group ? { group_id: group } : {}),
+    });
+    const seed = async (rows) => {
+      const { error } = await supabase.from('bookings').insert(rows);
+      if (error) throw new Error(`bookings: ${error.code} ${error.message}`);
+    };
+    await seed([row('A', 'Day', '2027-03-02', 'confirmed')]);
+    await seed([row('A', 'Day', '2027-03-03', 'confirmed'), row('A', 'Evening', '2027-03-03', 'confirmed'), row('B', 'Day', '2027-03-03', 'confirmed'), row('B', 'Evening', '2027-03-03', 'confirmed')]);
+    const stay = randomUUID();
+    await seed([row('A', 'Day', '2027-03-05', 'pending', stay), row('B', 'Day', '2027-03-05', 'pending', stay)]);
+    await seed([row('A', 'Evening', '2027-03-06', 'confirmed')]);
+    await seed([row('B', 'Evening', '2027-03-06', 'pending')]);
+    const days = await supabase.from('rate_calendar').insert([
+      { tenant_id: probe.id, day: '2027-03-04', kind: 'closed', label: 'Probe closed', surcharge: 0 },
+      { tenant_id: probe.id, day: '2027-03-05', kind: 'holiday', label: 'Probe holiday', surcharge: 0 },
+    ]);
+    if (days.error) throw new Error(`rate_calendar: ${days.error.message}`);
+
+    const { data: user, error: userError } = await supabase.auth.admin.createUser({
+      email: `calendar-probe-${Date.now()}@example.com`,
+      password: randomBytes(24).toString('base64url'),
+      email_confirm: true,
+    });
+    if (userError) throw new Error(`user: ${userError.message}`);
+    userId = user.user.id;
+    const member = await supabase.from('memberships').insert({ user_id: userId, tenant_id: probe.id, role: 'staff' });
+    if (member.error) throw new Error(`membership: ${member.error.message}`);
+    const staff = asToken(staffToken(probe.id, userId));
+    const chat = asToken(chatToken(probe.id));
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const { data: villaUnit } = await supabase.from('units').select('id').eq('tenant_id', villaRow?.id ?? -1).limit(1).maybeSingle();
+    const week = { p_tenant_id: probe.id, p_from: '2027-03-01', p_to: '2027-03-07' };
+
+    // 119. Who may read it: a chat token is refused (42501), the staff token is
+    //      answered; the staff token naming another tenant is refused.
+    {
+      const chatCall = await chat.rpc('calendar_days', week);
+      const chatSlots = await chat.rpc('calendar_slots', week);
+      const staffCall = await staff.rpc('calendar_days', week);
+      const foreign = await staff.rpc('calendar_days', { ...week, p_tenant_id: villaRow?.id ?? -1 });
+      check(
+        chatCall.error?.code === '42501' && chatSlots.error?.code === '42501' && !staffCall.error && staffCall.data?.length === 7 && foreign.error?.code === '42501',
+        'calendar: a chat token refused, the staff token answered with 7 days, another tenant refused',
+        `chat ${chatCall.error?.code ?? 'ANSWERED'}/${chatSlots.error?.code ?? 'ANSWERED'} · staff ${staffCall.error?.message ?? `${staffCall.data?.length} days`} · foreign ${foreign.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+
+    // 120. Every date's roll-up equals the hand count above.
+    {
+      const { data, error } = await staff.rpc('calendar_days', week);
+      const got = (data ?? []).map((d) => `${d.day.slice(8)} ${d.state} ${d.taken}/${d.sellable} p${d.pending} ${d.rate_kind}${d.label ? ` "${d.label}"` : ''}${d.bookable ? '' : ' !book'}`);
+      const want = [
+        '01 available 0/4 p0 weekday',
+        '02 partial 1/4 p0 weekday',
+        '03 full 4/4 p0 weekday',
+        '04 closed 0/4 p0 closed "Probe closed" !book',
+        '05 available 0/4 p1 holiday "Probe holiday"',
+        '06 partial 1/4 p1 weekend',
+        '07 available 0/4 p0 weekend',
+      ];
+      check(
+        !error && JSON.stringify(got) === JSON.stringify(want),
+        'calendar: each date of the seeded week is available / partial / full / closed / holiday with one two-room pending stay / partial with a pending / weekend',
+        error ? error.message : got.join(' | '),
+      );
+    }
+
+    // 121. The slots under it: 28 rows (7 days × 2 rooms × 2 slots; the retired
+    //      room left out); the closed date's four are `closed`; the two-room
+    //      stay is pending on A/Day and B/Day, once each.
+    {
+      const { data, error } = await staff.rpc('calendar_slots', week);
+      const on = (day, u, s) => data?.find((r) => r.day === day && r.unit === u && r.slot === s);
+      const closed = (data ?? []).filter((r) => r.day === '2027-03-04');
+      check(
+        !error && data.length === 28 && !data.some((r) => r.unit === 'Retired')
+          && closed.length === 4 && closed.every((r) => r.state === 'closed')
+          && on('2027-03-05', 'A', 'Day')?.pending === 1 && on('2027-03-05', 'B', 'Day')?.pending === 1 && on('2027-03-05', 'A', 'Evening')?.pending === 0
+          && on('2027-03-03', 'B', 'Evening')?.state === 'taken' && on('2027-03-01', 'A', 'Day')?.state === 'open',
+        'calendar: 28 slot rows, the closed date closed in every slot, the two-room stay pending once on each of its rooms',
+        error ? error.message : `${data.length} rows · closed ${closed.map((r) => r.state).join(',')} · 5th A/Day ${JSON.stringify(on('2027-03-05', 'A', 'Day'))}`,
+      );
+    }
+
+    // 122. One room: this tenant's room A gives its half (2 sellable a day, the
+    //      3rd full at 2/2); another tenant's room gives 0 slot rows and every
+    //      day `none`; the retired room is `none` too (0 of 0 is never
+    //      "available", plan § 2.1).
+    {
+      const a = await staff.rpc('calendar_days', { ...week, p_unit_id: unit.A });
+      const foreignUnit = await staff.rpc('calendar_slots', { ...week, p_unit_id: villaUnit?.id ?? -1 });
+      const retired = await staff.rpc('calendar_days', { ...week, p_unit_id: unit.Retired });
+      const third = a.data?.find((d) => d.day === '2027-03-03');
+      check(
+        !a.error && a.data.every((d) => d.sellable === 2) && third?.state === 'full' && third?.taken === 2
+          && !foreignUnit.error && foreignUnit.data.length === 0
+          && !retired.error && retired.data.every((d) => d.state === 'none' || d.state === 'closed'),
+        "calendar: one room gives its half; another tenant's room gives nothing; a retired room is `none`, not available",
+        `A ${a.error?.message ?? `${a.data.map((d) => d.sellable).join('')} 3rd ${third?.state}`} · villa's room ${foreignUnit.error?.message ?? `${foreignUnit.data.length} rows`} · retired ${retired.error?.message ?? retired.data.map((d) => d.state).join(',')}`,
+      );
+    }
+
+    // 124. The Day view's bookings (calendar_bookings): the full 3rd lists its
+    //      four confirmed bookings, one per (room, slot); the 5th lists the
+    //      two-room pending stay on A/Day and B/Day; a chat token is refused.
+    {
+      const third = await staff.rpc('calendar_bookings', { p_tenant_id: probe.id, p_day: '2027-03-03' });
+      const fifth = await staff.rpc('calendar_bookings', { p_tenant_id: probe.id, p_day: '2027-03-05' });
+      const chatCall = await chat.rpc('calendar_bookings', { p_tenant_id: probe.id, p_day: '2027-03-03' });
+      const pairs = (rows) => (rows ?? []).map((r) => `${Object.keys(unit).find((k) => unit[k] === r.unit_id)}/${Object.keys(slot).find((k) => slot[k] === r.slot_id)}:${r.status}`).sort().join(',');
+      check(
+        !third.error && pairs(third.data) === 'A/Day:confirmed,A/Evening:confirmed,B/Day:confirmed,B/Evening:confirmed'
+          && !fifth.error && pairs(fifth.data) === 'A/Day:pending,B/Day:pending'
+          && chatCall.error?.code === '42501',
+        "calendar: the Day view's bookings are the ones overlapping each slot; a chat token refused",
+        `3rd ${third.error?.message ?? pairs(third.data)} · 5th ${fifth.error?.message ?? pairs(fifth.data)} · chat ${chatCall.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+
+    // 123. The range: 62 days answered, 63 refused (22023), reversed refused.
+    {
+      const ok = await staff.rpc('calendar_days', { p_tenant_id: probe.id, p_from: '2027-03-01', p_to: '2027-05-01' });
+      const long = await staff.rpc('calendar_days', { p_tenant_id: probe.id, p_from: '2027-03-01', p_to: '2027-05-02' });
+      const reversed = await staff.rpc('calendar_days', { p_tenant_id: probe.id, p_from: '2027-03-07', p_to: '2027-03-01' });
+      check(
+        !ok.error && ok.data.length === 62 && long.error?.code === '22023' && reversed.error?.code === '22023',
+        'calendar: 62 days answered, 63 and a reversed range refused',
+        `62 ${ok.error?.message ?? ok.data.length} · 63 ${long.error?.code ?? 'ANSWERED'} · reversed ${reversed.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'calendar: probe setup', error.message);
+  } finally {
+    const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
+    if (error) console.log(`WARN  could not delete the calendar-probe tenant: ${error.message}`);
+    if (userId) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(userId);
+      if (userError) console.log(`WARN  could not delete the calendar-probe user: ${userError.message}`);
     }
   }
 }

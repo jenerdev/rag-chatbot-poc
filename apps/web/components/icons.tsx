@@ -113,6 +113,16 @@ const PATHS = {
     </>
   ),
   alert: <path d="M10 3.5l7.5 13h-15zM10 8.5V12M10 14.2v.1" />,
+  // The staff calendar (plan/calendar.md, D-103): its nav link, and the two
+  // date markers that sit on top of a cell's background.
+  'calendar-grid': (
+    <>
+      <rect x="3" y="4.5" width="14" height="12" rx="2" />
+      <path d="M3 8.5h14M7 2.5v4M13 2.5v4M7 11.5h.1M10 11.5h.1M13 11.5h.1M7 14h.1M10 14h.1" />
+    </>
+  ),
+  star: <path d="M10 3l2.1 4.4 4.8.6-3.5 3.3.9 4.7L10 13.7 5.7 16l.9-4.7L3.1 8l4.8-.6z" />,
+  flame: <path d="M10 17c-3 0-5-2-5-4.8 0-3.2 3-4.7 3-8.2 2.8 1.6 4 3.9 3.6 6.1.9-.4 1.5-1.2 1.7-2.3 1.7 1.4 1.7 3.1 1.7 4.4C15 15 13 17 10 17z" />,
   logout: <path d="M8 3.5H5A1.5 1.5 0 003.5 5v10A1.5 1.5 0 005 16.5h3M12.5 6.5L16 10l-3.5 3.5M16 10H8" />,
 } satisfies Record<string, ReactNode>;
 

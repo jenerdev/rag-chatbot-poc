@@ -337,7 +337,11 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       if (!response.ok) throw new Error('failed');
       const body: Setup = await response.json();
       setSetup(body);
-      setFrom(body.today);
+      // ?from=YYYY-MM-DD opens the list at that date (the calendar's Day view
+      // links here, plan/calendar.md § 4.2); never before today, where the
+      // availability read refuses.
+      const asked = new URLSearchParams(window.location.search).get('from');
+      setFrom(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked > body.today ? asked : body.today);
       setDate(body.today);
       setUnitId(body.units.find((u) => u.active)?.id ?? null);
       setSlotId(body.slots[0]?.id ?? null);

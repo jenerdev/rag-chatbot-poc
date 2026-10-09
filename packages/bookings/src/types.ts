@@ -209,6 +209,65 @@ export interface BookingsConfig {
 /** A date's rate: the calendar's kind, or the tenant's weekend days, or neither (D-082). */
 export type RateKind = 'weekday' | 'weekend' | 'holiday' | 'peak' | 'closed';
 
+/**
+ * One date on the staff calendar (D-103), as calendar_days() decides it:
+ * closed overrides everything; `none` is 0 sellable pairs (never "available");
+ * full is every (active room, active slot) taken; partial is some.
+ */
+export type OccupancyState = 'closed' | 'none' | 'full' | 'partial' | 'available';
+
+export interface OccupancyDay {
+  day: string;
+  state: OccupancyState;
+  taken: number;
+  sellable: number;
+  /** Distinct pending stays on the date: a three-room request is 1. */
+  pending: number;
+  rateKind: RateKind;
+  /** The holiday, peak or closed date's label, as staff typed it. */
+  label: string | null;
+  /** Not past, not beyond max_advance_days, not closed: what the booking page would take. */
+  bookable: boolean;
+}
+
+/**
+ * A booking on the Day view (D-103): what staff need at the front desk, from
+ * the staff list (BookingSummary), field by field. No price: the calendar
+ * shows none (plan § 6). `date` and `slot` are the booking's OWN, which differ
+ * from the cell's when the stay began earlier and runs into this date.
+ */
+export interface DayBooking {
+  id: number;
+  date: string;
+  slot: string;
+  status: 'pending' | 'confirmed';
+  clash: boolean;
+  guestName: string;
+  guestPhone: string | null;
+  guestEmail: string | null;
+  guestCount: number | null;
+  notes: string | null;
+  reference: string | null;
+  source: 'staff' | 'web';
+}
+
+/** Which booking overlaps which (room, slot) on the Day view's date. */
+export interface DaySlotBooking {
+  unitId: number;
+  slotId: number;
+  booking: DayBooking;
+}
+
+export interface OccupancySlot {
+  day: string;
+  unitId: number;
+  unit: string;
+  slotId: number;
+  slot: string;
+  state: 'closed' | 'taken' | 'open';
+  pending: number;
+}
+
 export interface RoomAvailability {
   date: string;
   unit: string;

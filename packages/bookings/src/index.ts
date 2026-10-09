@@ -20,12 +20,14 @@
 //   accommodations.ts   rooms and their rates, for staff (per_room)
 //   images.ts      room photos in Storage, for staff (per_room)
 //   calendar.ts    holiday and peak days, read by unit_price() (customer booking)
+//   occupancy.ts   the staff calendar: each date's state, from schema-calendar.sql (D-103)
 //   requests.ts    the public booking page's reads and its one write; staff
 //                  confirm or decline a request (customer booking)
 
 export {
   MAX_AVAILABILITY_DAYS,
   MAX_AVAILABILITY_ROWS,
+  MAX_CALENDAR_DAYS,
   MAX_LIST_DAYS,
   MAX_GUEST_NAME,
   MAX_GUEST_PHONE,
@@ -85,6 +87,7 @@ export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from '
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { closedDays } from './closed.js';
+export { calendarDayBookings, calendarDays, calendarSlots } from './occupancy.js';
 export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
 
 export type {
@@ -99,6 +102,11 @@ export type {
   BookingRequest,
   BookingStatus,
   CalendarDay,
+  DayBooking,
+  DaySlotBooking,
+  OccupancyDay,
+  OccupancySlot,
+  OccupancyState,
   BookingSummary,
   BookingTenant,
   BookingType,

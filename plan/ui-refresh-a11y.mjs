@@ -23,7 +23,7 @@ const BASE = process.argv[2] ?? 'http://localhost:3000';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AXE = readFileSync(join(HERE, 'ui-refresh', 'axe', 'axe.min.js'), 'utf8');
 const SLUGS = ['villa', 'harbor', 'northwind'];
-const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/bookings', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
+const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/bookings', '/admin/calendar', '/admin/calendar?view=week', '/admin/calendar?view=day', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
 
 const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', SLUGS);
 const stamp = Date.now();

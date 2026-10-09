@@ -120,7 +120,8 @@ tabs on the platform tenant form, focusable tooltips, the record.
   `pnpm eval` (55/61 on 2026-10-08, the reasons above).
 - [ ] The user's look at Phases 1–6 (walk screenshots under
   `plan/ui-refresh/components-{1,2,4,5,6}/`).
-- [ ] Then: merge `feat/ui-refresh` into `master` (both plans are on it).
+- [x] Merged `feat/ui-refresh` into `master` (fast-forward to `cf6acac`,
+  2026-10-09, by the user's word, before the audit and eval above).
 
 
 **Open items (2026-09-30).** Everything below is merged into `master`
@@ -1273,6 +1274,51 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-09 — the calendar plan (planned, nothing built)
+- **Did:** `plan/calendar.md`: S-12, Day / Week / Month, one state per
+  date from SQL (`calendar_slots()` → `calendar_days()`, security invoker,
+  staff only), background for available / partly / fully / closed, markers
+  for holiday and pending, a legend, colour never the only signal.
+- **Answered:** every § 7 recommendation taken (the user).
+- **Phase 0 done** on `feat/calendar`: verify 117/118 (the known roles
+  check), rooms, both isolation suites both ways, tests
+  13+14+5+102+359+85, the three baselines byte-identical, availability
+  for 2026-10-09..11-08 saved (`plan/calendar/phase0-availability.json`).
+- **Phase 1:** `packages/db/sql/schema-calendar.sql` written (22nd file;
+  three invoker functions; `calendar_slots()` CALLS check_availability()
+  instead of the planned `slot_taken()` extraction, trap 20).
+- **Phase 1 done:** the user ran it; availability byte-identical; verify
+  122/123 (119–123 pass; the known roles failure).
+- **Phase 2 done:** `occupancy.ts`, `GET /api/t/[tenant]/calendar`,
+  `lib/calendar-range.ts`; isolation 16d both ways; HTTP walk 7/7.
+- **Phases 3–4 done** (S-12: month, week, day, legend, nav link, icons,
+  `?from=` on Bookings): after the user's `pnpm dev` restart,
+  `plan/calendar-walk.mjs` all pass, light and dark, 1280 and 375; three
+  fixes from it (the week's 603 px page, the partly/full top edge, the
+  overlapping-request line). Screenshots: `plan/ui-refresh/calendar/`.
+- **Added (user's requests):** a month picker, a year either side of
+  today; it REPLACES the month view's title (week and day keep a text
+  title, no picker). Walk 3e and 3f pass; all pass.
+- **And:** no "Open" on past or beyond-window dates (counts stay); walk
+  1h passes (0 of 11 past dates say it, 20 bookable ones do).
+- **And:** "Previous / Next month|week|day" by view (walk 3g); the week
+  fits all seven days at desktop width (walk 4c; Sunday was cut off).
+- **And:** the shown month's dates keep their colours; the neighbouring
+  months' days are plain, dashed and muted (walk 1i).
+- **And:** the Day view shows each overlapping booking's guest
+  (`calendar_bookings()`, re-run by the user); verify 123/124 (the known
+  roles failure), isolation 16d both ways, walk 3c2, tests web 104.
+- **Phase 5 so far:** typecheck, tests (web 103), isolation both suites
+  both ways, rooms, verify 122/123 (known), baselines identical.
+- **Next:** the user's word for `pnpm eval` and the axe audit; then
+  Phase 6, the record (D-103, CLAUDE.md, whats-done.md).
+
+### 2026-10-09 — `feat/ui-refresh` merged into `master`
+- **Merged** fast-forward to `cf6acac` (22 commits: ui-refresh Phases
+  0–10, ui-components Phases 0–7, and today's three changes), by the
+  user's instruction. The axe audit and `pnpm eval` were NOT run first;
+  they are still owed, now on `master`.
 
 ### 2026-10-09 — checkboxes on Unanswered (D-045 amended), on `feat/ui-refresh`
 - **Did:** a checkbox per row and "Select all shown" on S-4; "Mark N

@@ -145,6 +145,14 @@
   --warn-line: color-mix(in srgb, var(--warn) 30%, var(--panel));
   --danger-soft: color-mix(in srgb, var(--danger) 9%, var(--panel));
   --danger-line: color-mix(in srgb, var(--danger) 30%, var(--panel));
+  /* The staff calendar's date backgrounds (plan/calendar.md § 4.1, D-103):
+     a step stronger than the badges' 10%, so a whole cell reads at a glance;
+     text on them stays --ink. Closed is the grey surface plus a hatch. */
+  --cal-available: color-mix(in srgb, var(--ok) 13%, var(--panel));
+  --cal-partial: color-mix(in srgb, var(--warn) 18%, var(--panel));
+  --cal-full: color-mix(in srgb, var(--danger) 17%, var(--panel));
+  --cal-closed: var(--surface-3);
+  --cal-hatch: color-mix(in srgb, var(--ink) 14%, transparent);
   /* A FILL under --on-accent (white): a primary button, the visitor's bubble,
      a solid danger button. On a light page, the colour itself. */
   --accent-fill: var(--accent);

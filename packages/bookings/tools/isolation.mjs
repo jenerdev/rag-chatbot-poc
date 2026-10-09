@@ -29,6 +29,9 @@ import {
   BookingInputError,
   BookingsNotEnabledError,
   bookingPage,
+  calendarDayBookings,
+  calendarDays,
+  calendarSlots,
   cancelBooking,
   checkAvailability,
   checkRoomAvailability,
@@ -387,6 +390,33 @@ try {
         && still?.name === 'B only' && still?.active === true,
       "promos A: B's promo is unlisted, unedited, unretired, undeleted; B's code is no code to A's customer; B's id no promo to A's staff",
       `list ${aList.length} · edit ${edited} · retire ${retired} · delete ${deleted} · quote "${quoted.promoMessage}" · book ${booked?.message ?? 'BOOKED'} · B still "${still?.name}" active ${still?.active}`,
+    );
+  }
+
+  // 16d. The staff calendar (D-103): B's confirmed night and B's pending
+  //      request are on B's calendar (the positive twin) and nowhere on A's;
+  //      A naming B's room reads no slot rows, and its days have nothing to
+  //      sell rather than B's counts.
+  {
+    const nextDay = day(301);
+    await createBookings(b, { unitId: bRoom.id, guestCount: 1, slotId: bNight.id, date: nextDay, guestName: 'B Pending' });
+    const range = { from: probeDate, to: nextDay };
+    const aDays = (await calendarDays(a, range)).days;
+    const bDays = (await calendarDays(b, range)).days;
+    const aOnB = await calendarSlots(a, range, { unitId: bRoom.id });
+    const aOnBDays = (await calendarDays(a, range, { unitId: bRoom.id })).days;
+    const counts = (days) => days.map((d) => `${d.taken}/${d.sellable}p${d.pending}`).join(' ');
+    // The Day view's guests: B's on B's day, none on A's, none for A naming B's room.
+    const bGuests = (await calendarDayBookings(b, probeDate)).map((r) => r.booking.guestName);
+    const aGuests = (await calendarDayBookings(a, probeDate)).map((r) => r.booking.guestName);
+    const aOnBGuests = await calendarDayBookings(a, probeDate, { unitId: bRoom.id });
+    check(
+      bDays[0]?.taken === 1 && bDays[1]?.pending === 1
+        && aDays.every((d) => d.taken === 0 && d.pending === 0)
+        && aOnB.length === 0 && aOnBDays.every((d) => d.state === 'none' && d.taken === 0 && d.pending === 0)
+        && bGuests.includes('B Guest') && !aGuests.includes('B Guest') && aOnBGuests.length === 0,
+      "calendar A: B's confirmed night, pending request and guest are on B's calendar and not A's; A naming B's room reads nothing",
+      `B ${counts(bDays)} · A ${counts(aDays)} · A on B's room ${aOnB.length} slots, ${aOnBDays.map((d) => d.state).join(',')} · guests B [${bGuests}] A [${aGuests}] A on B ${aOnBGuests.length}`,
     );
   }
 

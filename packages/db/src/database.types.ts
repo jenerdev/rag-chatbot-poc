@@ -881,6 +881,37 @@ export interface Database {
        * sql/schema-rate-kind.sql § 3 — each date's rate kind, from rate_kind(),
        * the branch unit_price() prices by (D-082). Invoker; at most 366 days.
        */
+      /**
+       * sql/schema-calendar.sql (D-103) — the staff calendar. Security INVOKER;
+       * each refuses a caller that is not staff of that tenant (42501), and a
+       * range over 62 days (22023). calendar_slots() calls check_availability()
+       * for "taken"; calendar_days() rolls calendar_slots() up.
+       */
+      calendar_pending: {
+        Args: { p_tenant_id: number; p_from: string; p_to: string; p_unit_id?: number | null };
+        Returns: { day: string; unit_id: number; slot_id: number; group_id: string }[];
+      };
+      calendar_slots: {
+        Args: { p_tenant_id: number; p_from: string; p_to: string; p_unit_id?: number | null };
+        Returns: { day: string; unit_id: number; unit: string; slot_id: number; slot: string; state: 'closed' | 'taken' | 'open'; pending: number }[];
+      };
+      calendar_bookings: {
+        Args: { p_tenant_id: number; p_day: string; p_unit_id?: number | null };
+        Returns: { unit_id: number; slot_id: number; booking_id: number; booked_date: string; status: 'pending' | 'confirmed' }[];
+      };
+      calendar_days: {
+        Args: { p_tenant_id: number; p_from: string; p_to: string; p_unit_id?: number | null };
+        Returns: {
+          day: string;
+          state: 'closed' | 'none' | 'full' | 'partial' | 'available';
+          taken: number;
+          sellable: number;
+          pending: number;
+          rate_kind: 'weekday' | 'weekend' | 'holiday' | 'peak' | 'closed';
+          label: string | null;
+          bookable: boolean;
+        }[];
+      };
       rate_kinds: {
         Args: { p_tenant_id: number; p_from: string; p_to: string };
         Returns: { day: string; kind: 'weekday' | 'weekend' | 'holiday' | 'peak' | 'closed' }[];

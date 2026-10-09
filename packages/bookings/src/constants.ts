@@ -16,6 +16,11 @@ export const MAX_AVAILABILITY_DAYS = 31;
 // see a season at once without an unbounded query.
 export const MAX_LIST_DAYS = 92;
 
+// The longest range the staff calendar reads (plan/calendar.md, D-103): a month
+// grid is six weeks, 42 days; 62 leaves room for two months side by side.
+// sql/schema-calendar.sql refuses more on its own (22023), with the same number.
+export const MAX_CALENDAR_DAYS = 62;
+
 // Free-text bounds. A guest name is not an essay, and notes are not a document.
 export const MAX_GUEST_NAME = 200;
 export const MAX_GUEST_PHONE = 40;
