@@ -1596,6 +1596,17 @@ dates. Check 16 caught it (`in resolved false`).
 a note, or the document that answered it. Then extend this table. It is
 still not a reason to touch `messages`.
 
+**Amended 2026-10-09 (several at once):** the user: "add checkbox to select
+item on unanswered questions. then can resolved checked items". S-4's rows
+have checkboxes and a "Select all shown"; the ticked set goes to
+`PUT /unanswered/resolutions` (`DELETE` reopens) as `{ ids }`, at most
+UNANSWERED_LIMIT. `resolveUnansweredMany()` checks the whole set in ONE
+select (this tenant's, a refusal) and writes ONE upsert, so a set lands whole
+or not at all; the answer names the ids that changed, and an id that is not
+this tenant's is simply absent from it (no 404 per id: "not yours" and "not
+there" still look the same). The one-row route stays for the row's button.
+Same permission, `unanswered:write`, so staff may do it too.
+
 ---
 
 ## D-046 · Relative dates are resolved in code, and an availability question with one is checked before the model is asked · **Added 2026-09-27**

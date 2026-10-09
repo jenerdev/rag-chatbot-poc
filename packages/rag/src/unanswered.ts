@@ -130,3 +130,49 @@ export async function reopenUnanswered(tenant: TenantContext, id: number): Promi
   if ((count ?? 0) > 0) console.log(`[unanswered] tenant=${tenant.slug} reopened ${id}`);
   return (count ?? 0) > 0;
 }
+
+/**
+ * Mark several questions resolved at once: the S-4 checkboxes. Returns the
+ * ids that were resolved; an id that is not one of this tenant's refusals is
+ * left out, the same rule as resolveUnanswered() (and the same check, made
+ * once for the whole set). One upsert for all of them, so a set lands whole
+ * or not at all.
+ */
+export async function resolveUnansweredMany(tenant: TenantContext, ids: number[]): Promise<number[]> {
+  const { data: refusals, error: findError } = await tenant.db
+    .from('messages')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .in('id', ids)
+    .eq('role', 'assistant')
+    .eq('content', NO_ANSWER);
+  if (findError) throw new Error(`Could not load the questions: ${findError.message}`);
+  const found = refusals.map((r) => r.id);
+  if (found.length === 0) return [];
+
+  // Every row carries every key (trap 15), and tenant_id is checked by the
+  // composite FK as in resolveUnanswered().
+  const { error } = await tenant.db
+    .from('unanswered_resolutions')
+    .upsert(
+      found.map((id) => ({ message_id: id, tenant_id: tenant.id })),
+      { onConflict: 'message_id', ignoreDuplicates: true },
+    );
+  if (error) throw new Error(`Could not mark the questions resolved: ${error.message}`);
+  console.log(`[unanswered] tenant=${tenant.slug} resolved ${found.length}: ${found.join(', ')}`);
+  return found;
+}
+
+/** Reopen several at once. Returns the ids that had a resolution of this tenant's. */
+export async function reopenUnansweredMany(tenant: TenantContext, ids: number[]): Promise<number[]> {
+  const { data, error } = await tenant.db
+    .from('unanswered_resolutions')
+    .delete()
+    .eq('tenant_id', tenant.id)
+    .in('message_id', ids)
+    .select('message_id');
+  if (error) throw new Error(`Could not reopen the questions: ${error.message}`);
+  const reopened = data.map((r) => r.message_id);
+  if (reopened.length > 0) console.log(`[unanswered] tenant=${tenant.slug} reopened ${reopened.length}: ${reopened.join(', ')}`);
+  return reopened;
+}

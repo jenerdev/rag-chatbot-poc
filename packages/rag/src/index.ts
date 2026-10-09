@@ -62,7 +62,7 @@ export { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText }
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { executeTool, toolsFor } from './tools.js';
-export { listUnanswered, reopenUnanswered, resolveUnanswered, UNANSWERED_LIMIT } from './unanswered.js';
+export { listUnanswered, reopenUnanswered, reopenUnansweredMany, resolveUnanswered, resolveUnansweredMany, UNANSWERED_LIMIT } from './unanswered.js';
 export {
   archiveTenant,
   createTenant,

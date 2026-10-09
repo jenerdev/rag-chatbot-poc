@@ -11,11 +11,16 @@
 // the answer is in the knowledge base. It adds a resolution row; the visitor's
 // transcript is never touched, and Reopen undoes it.
 //
+// Checkboxes (2026-10-09): tick several rows, or "Select all shown", and
+// resolve (or reopen) them in ONE request to unanswered/resolutions. The
+// selection is of the rows on screen, so it is cleared whenever they change:
+// a new tab, a reload, a new search.
+//
 // The look (plan/ui-refresh.md Phase 8): the two tabs are a segmented
 // control; each question is a row with when it was asked under it; an empty
 // Open tab reads as the good news it is.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
@@ -66,6 +71,25 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
   const [shown, setShown] = useState(PAGE_SIZE);
   useEffect(() => setShown(PAGE_SIZE), [query, tab]);
   const matching = useMemo(() => questions?.filter((q) => matches(q.question, query)) ?? [], [questions, query]);
+  // The ticked rows, by id. Only ever ids of rows on screen (see the top).
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  useEffect(() => setSelected(new Set()), [query, tab, questions]);
+  const visible = useMemo(() => matching.slice(0, shown), [matching, shown]);
+  const allVisibleSelected = visible.length > 0 && visible.every((q) => selected.has(q.id));
+  const someSelected = selected.size > 0 && !allVisibleSelected;
+  const selectAll = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAll.current) selectAll.current.indeterminate = someSelected;
+  }, [someSelected]);
+  const toggleOne = useCallback((id: number, on: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -123,6 +147,39 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
     },
     [api, tab, unauthorized],
   );
+
+  // The ticked rows, resolved (Open) or reopened (Resolved) in one request.
+  // The rows the server names leave this tab; the toast says how many, and
+  // how many it could not change.
+  const bulkToggle = useCallback(async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    let response: Response | null = null;
+    try {
+      response = await fetch(`${api}/unanswered/resolutions`, {
+        method: tab === 'open' ? 'PUT' : 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (response.status === 401) return unauthorized();
+      if (!response.ok) throw new Error('failed');
+      const body = await response.json();
+      const done = new Set<number>(tab === 'open' ? body.resolved : body.reopened);
+      setQuestions((current) => current?.filter((x) => !done.has(x.id)) ?? null);
+      const what = `${done.size} question${done.size === 1 ? '' : 's'}`;
+      const skipped = ids.length - done.size;
+      notify(
+        (tab === 'open' ? `Marked ${what} resolved. They are under Resolved now.` : `Reopened ${what}. They are under Open now.`) +
+          (skipped > 0 ? ` ${skipped} could not be changed; refresh the list.` : ''),
+        skipped > 0 ? 'error' : 'ok',
+      );
+    } catch (failure) {
+      notify(await describeFailure(failure as Error, response), 'error');
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [api, selected, tab, unauthorized]);
 
   const logout = useCallback(async () => {
     await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
@@ -197,6 +254,39 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
                   ? `${questions.length} question${questions.length === 1 ? '' : 's'}${questions.length >= limit ? `, the most recent ${limit}` : ''}`
                   : `${matching.length} of ${questions.length}${questions.length >= limit ? ' loaded' : ''} match`}
               </p>
+              {visible.length > 0 && (
+                <div className="unanswered-bulk">
+                  <label>
+                    <input
+                      ref={selectAll}
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      disabled={bulkBusy}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(visible.map((q) => q.id)) : new Set())}
+                    />
+                    Select all shown
+                  </label>
+                  {selected.size > 0 && (
+                    <>
+                      <span className="small muted" aria-live="polite">
+                        {selected.size} selected
+                      </span>
+                      <button type="button" className="sm primary" aria-busy={bulkBusy || undefined} disabled={bulkBusy || busyId !== null} onClick={() => void bulkToggle()}>
+                        {tab === 'open' ? (
+                          <>
+                            <Icon name="check" size={14} /> Mark {selected.size} resolved
+                          </>
+                        ) : (
+                          `Reopen ${selected.size}`
+                        )}
+                      </button>
+                      <button type="button" className="sm ghost" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+                        Clear selection
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               {matching.length === 0 && (
                 <EmptyState
                   icon="search"
@@ -209,17 +299,26 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
                   compact
                 />
               )}
-              {matching.slice(0, shown).map((q) => (
+              {visible.map((q) => (
                 // The question is a React child, so a visitor's text is escaped (CLAUDE.md § Conventions).
-                <div key={q.id} className="unanswered">
+                <div key={q.id} className={selected.has(q.id) ? 'unanswered selected' : 'unanswered'}>
+                  <input
+                    type="checkbox"
+                    aria-labelledby={`unanswered-${q.id}`}
+                    checked={selected.has(q.id)}
+                    disabled={bulkBusy}
+                    onChange={(e) => toggleOne(q.id, e.target.checked)}
+                  />
                   <div className="unanswered-text">
-                    <span className="unanswered-question">{q.question}</span>
+                    <span className="unanswered-question" id={`unanswered-${q.id}`}>
+                      {q.question}
+                    </span>
                     <span className="unanswered-when">
                       Asked {askedLabel(q.askedAt)}
                       {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
                     </span>
                   </div>
-                  <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null} onClick={() => void toggleResolved(q)}>
+                  <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null || bulkBusy} onClick={() => void toggleResolved(q)}>
                     {tab === 'open' ? (
                       <>
                         <Icon name="check" size={14} /> Mark resolved

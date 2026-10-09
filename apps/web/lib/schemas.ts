@@ -393,3 +393,13 @@ export const addMemberSchema = z
   .refine((v) => (v.email ? 1 : 0) + (v.userId ? 1 : 0) === 1, 'Give an email or a user id, not both');
 export const memberRoleSchema = z.object({ userId, role });
 export const removeMemberSchema = z.object({ userId });
+
+/** Several unanswered questions at once (S-4's checkboxes): their ids, at most `max` (the list's cap, UNANSWERED_LIMIT, from the route). */
+export function unansweredIdsSchema(max: number) {
+  return z.object({
+    ids: z
+      .array(z.number().int().positive(), { required_error: 'Choose at least one question', invalid_type_error: 'Choose at least one question' })
+      .min(1, 'Choose at least one question')
+      .max(max, `At most ${max} questions at once`),
+  });
+}

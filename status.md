@@ -1274,6 +1274,18 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-09 — checkboxes on Unanswered (D-045 amended), on `feat/ui-refresh`
+- **Did:** a checkbox per row and "Select all shown" on S-4; "Mark N
+  resolved" (Open) / "Reopen N" (Resolved) sends the set in ONE request to
+  the new `unanswered/resolutions` route (`resolveUnansweredMany`,
+  `reopenUnansweredMany`). Observed on `pnpm dev`, harbor's real questions,
+  a throwaway staff member: `plan/unanswered-bulk-walk.mjs` 11/11 (PUT of two
+  ids + a missing id + villa's refusal 922 → `{"resolved":[10424,10600]}`,
+  villa's got 0 rows; DELETE reopened the same two; 401 / 400 ×3);
+  `plan/unanswered-bulk-browser-walk.mjs` 12/12 (one request, the toast,
+  select-all 14 of 14 shown, harbor ends with 0 resolutions on the two).
+  Web typecheck exit 0, tests 85/85. Axe audit not re-run.
+
 ### 2026-10-09 — the dashboard is the admin index (D-098 amended), on `feat/ui-refresh`
 - **Did:** `/t/<slug>/admin` resolves the tenant and redirects to
   `/admin/dashboard`; the knowledge base moved to `/admin/documents`

@@ -299,7 +299,7 @@ packages/
     src/tables.ts          pipeTable(): the ONE writer of a table into a reply (D-091); the browser's parser draws exactly this shape
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
     tools/prompt-eval.mjs  the battery, 61 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-* + 3 price-*), three tenants; seeds its own bookings
-    src/unanswered.ts      listUnanswered / resolve / reopen: the questions answered with NO_ANSWER, for staff (D-045)
+    src/unanswered.ts      listUnanswered / resolve / reopen, one or many (the S-4 checkboxes): the questions answered with NO_ANSWER, for staff (D-045)
     src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
     src/members.ts         list (with emails), add an existing account, change a role, remove — shared by owners and the platform
     src/dashboard.ts       the dashboard's typed shapes over tenant_dashboard() and platform_dashboard(), the parser, the days clamp (D-098)
@@ -338,6 +338,7 @@ pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) six login and three role cases, needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/unanswered-bulk-walk.mjs)   # 11 HTTP checks of resolving several unanswered questions at once, needs pnpm dev; unanswered-bulk-browser-walk.mjs the same 12 in a browser
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/tenant-management-phase4-walk.mjs)   # the platform and members routes over HTTP, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
 pnpm --filter @rag/db tenant:fallback -- <slug> <english|taglish|tagalog> "<message>"   # what the chat says when it cannot answer (D-048)

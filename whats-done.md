@@ -8201,3 +8201,27 @@ changed; it names the knowledge base explicitly.
 
 Observed on `pnpm dev`: 307 to `/t/villa/admin/dashboard`; `/admin/documents`
 200; `/t/no-such-tenant/admin` 404. `tsc --noEmit` exit 0; vitest 85/85.
+
+---
+
+## 2026-10-09 — resolve several unanswered questions at once
+
+S-4 rows have a checkbox, and a bar above them ("Select all shown", "N
+selected", "Mark N resolved" or "Reopen N", "Clear selection"). The set
+goes to `unanswered/resolutions` in ONE request, not N calls to the
+one-row route: one select checks every id is this tenant's refusal, one
+upsert writes them, so a partial failure cannot leave half the set
+resolved. The answer lists the ids that changed and the toast counts any
+it could not; an id of another tenant is just absent (rule 6: no
+per-id 404 to enumerate with). The selection is of the rows on screen and
+clears on a tab change, a reload or a new search, so a hidden row is never
+resolved by surprise.
+
+Observed (dev, harbor, a throwaway STAFF member, the lowest role allowed):
+PUT `[10424, 10600, 999999999, 922]` (922 is villa's) answered
+`{"resolved":[10424,10600]}` and villa's 922 had 0 resolution rows; the
+DELETE reopened the same two and the Open list matched the start; an empty
+set gave "Choose at least one question", 201 ids "At most 200 questions at
+once". In the browser the two-row click made exactly 1 request, select-all
+ticked all 14 shown, and harbor ended with 0 resolutions on the two.
+Screenshots: `plan/ui-refresh/unanswered-bulk/`.

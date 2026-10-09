@@ -135,6 +135,10 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 .unanswered-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .unanswered-question { white-space: pre-wrap; overflow-wrap: anywhere; }
 .unanswered-when { font-size: var(--text-xs); color: var(--muted); }
+.unanswered > input[type="checkbox"] { flex: none; }
+.unanswered.selected { background: var(--accent-soft); }
+.unanswered-bulk { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.unanswered-bulk label { display: inline-flex; align-items: center; gap: var(--space-2); }
 
 /* An empty list that is good news: a check, a sentence. */
 .empty-list { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-8) var(--space-4); text-align: center; color: var(--muted); }
