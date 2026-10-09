@@ -187,6 +187,25 @@
 > "group booking" only for several rows (`groupSize`). A volatile function
 > in an UPDATE's SET runs once per ROW: the backfill learned it.
 
+> **Guests manage their stay, and staff verify payments,** since 2026-10-10
+> (D-104–D-109, [`plan/manage-booking.md`](./plan/manage-booking.md),
+> Phases 0–6 and 8; Phase 7, email, gated on deployment). `/t/<slug>/manage`
+> (S-13, public) finds a stay by reference + email OR phone through ONE
+> definer read, `guest_stay()`, and `guest_group()` is the one match every
+> guest door uses; a miss is one sentence, 5 misses lock a reference for an
+> hour. A stay (D-100's group) has a `stays` row: its reference, the
+> amount it must have verified (set at birth), `pay_by`, `review_by`.
+> Payment status is DERIVED (`stay_payment()`), `expired` is stored,
+> `completed` derived. Proofs go to the PRIVATE `payment-proofs` bucket
+> (insert-only for guests), staff verify or reject them on S-14
+> `/admin/payments` (owners and admins: `payments:write`), and a tracked
+> stay with nothing verified needs a note to be confirmed. A tenant may
+> choose a HOLD (`none` by default): `schema-holds.sql` (the 24th file) makes
+> `booking_takes()` the ONE taken test and `bookings_no_overlap` read a
+> `held` flag. Guests ask to cancel or move; staff decide. Every decision is
+> a `booking_events` row written by a trigger. Read that plan's § 0 before
+> touching a payment, a hold, a guest door or the event log.
+
 ## What this is
 
 A **retrieval-augmented chatbot** that answers questions from documents you
@@ -236,6 +255,8 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/slots/page.tsx     S-9 slots — owners and admins (slots:read/write); 404 unless the tenant has the application
   app/t/[tenant]/admin/promos/page.tsx    S-10 promos (D-097) — owners and admins (promos:read/write); 404 unless the tenant has the application
   app/t/[tenant]/admin/dashboard/page.tsx S-11 the dashboard (D-098) — every member (dashboard:read); every tenant; the route is /api/t/[tenant]/dashboard?days=
+  app/t/[tenant]/manage/page.tsx S-13 Manage booking (D-104) — PUBLIC; 404 without the application; ?ref= pre-fills
+  app/t/[tenant]/admin/payments/page.tsx S-14 Payments (D-107, D-108) — every member reads (payments:read); owners and admins decide
   app/platform/page.tsx          the platform: login → tenant list (with the Pulse strip, D-098) → the tenant form (super users only; not linked from /)
   app/platform/reset/page.tsx    where a super user's invite or reset email lands
   app/api/platform/**/route.ts   session, password(-reset), tenants, tenants/[id], /archive, /applications/[key], /members, dashboard — every one on withPlatformRoute() but the three session/password ones
@@ -271,11 +292,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (21 files; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (24 files; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     118 checks (117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     158 checks (125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -286,10 +307,15 @@ packages/
     src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
-    tools/isolation.mjs    31 cross-tenant checks, no API key (16b room photos, 16c promos)
+    tools/isolation.mjs    33 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
-    src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409; the constraint's own 23P01 keeps the sentence
+    src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409 (and, D-106, "is held for another guest"); the constraint's own 23P01 keeps the sentence
+    src/guest.ts           D-104: guestStay(), the guest's one read, typed
+    src/payments.ts        D-107: a guest's proof: checked by its bytes, uploaded insert-only, submit_payment()
+    src/payment-review.ts  D-107: staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
+    src/deadlines.ts       D-105: expire_due_stays(), the sweep before every staff list
+    src/changes.ts         D-108: cancel and reschedule requests: the guest asks, staff decide
     tools/rooms.mjs        50 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b) and references on staff stays (4f, 4g)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
@@ -325,16 +351,18 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 118 checks, no API key needed
+pnpm --filter @rag/db verify    # 158 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 23 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 21 of them, code filters alone (RLS bypassed)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
-pnpm --filter @rag/bookings isolation   # 31 cross-tenant booking checks, on operator staff tokens, no API key
-pnpm --filter @rag/bookings isolation -- --filters-only   # the same 29, code filters alone
+pnpm --filter @rag/bookings isolation   # 33 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 33, code filters alone
 pnpm --filter @rag/bookings rooms       # 50 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
-pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo objects with no row (R-30): list, or delete and count
+pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
+pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/manage-booking-phase2-walk.mjs)   # (and phase3, phase4, phase6) the Manage booking and Payments routes over HTTP, needs pnpm dev
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) six login and three role cases, needs pnpm dev
@@ -490,7 +518,13 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    `member_emails`, `user_id_by_email`, `platform_dashboard`,
    `booking_reference`; D-042 as amended by D-054, D-071, D-076, D-098
    and D-100), each with `search_path = ''` and each checking its caller
-   itself (`booking_reference` also admits a direct session, `session_user
+   itself. **Since manage booking, nine more callable ones** (D-104–D-108):
+   `guest_stay`, `submit_payment`, `request_change`, `withdraw_change` (the
+   guest's, each matching through `guest_group()`), `review_payment`,
+   `record_refund`, `set_payment_settings`, `decide_change` (owners and
+   admins, each asking `app_is_admin()`), `expire_due_stays` (staff or
+   service_role); and trigger-only definers that no token can call (the
+   stay row, the event log, the terms, the holds) (`booking_reference` also admits a direct session, `session_user
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
    is `security invoker`, so it reads under the token's own RLS, and it
    refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a

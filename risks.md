@@ -700,6 +700,46 @@ everyone out, staff and platform alike.
 
 ---
 
+## R-45 · A leaked reference plus the guest's email reads the stay and files requests · **Accepted 2026-10-10 (plan/manage-booking.md § 2.2, D-104)**
+
+Reading: yes, until an OTP exists (Phase 7, with email). Changing: no, every
+guest action is a request staff decide. The lockout (5 misses an hour per
+reference) slows guessing, and also lets a stranger lock a real guest's
+reference for an hour by typing wrong contacts; the guest can still ask the
+resort.
+
+---
+
+## R-46 · Staff verify a fake screenshot · **Accepted 2026-10-10 (D-107)**
+
+The typed amount and "I checked the account" make it a recorded choice, with
+the reviewer's id in the log. Nothing here can check a bank.
+
+---
+
+## R-47 · `on_request` holds let strangers block dates · **Accepted 2026-10-10 (D-106)**
+
+The per-contact cap (3 open requests), the payment window, and the default
+`none`. The settings screen recommends `on_proof` and says why.
+
+---
+
+## R-48 · Proof images are guest PII · **Mitigated 2026-10-10 (D-107)**
+
+Private bucket, insert-only for guests, 5-minute signed URLs for staff, files
+deleted 180 days after the stay. Until `storage-orphans --expired` is run on a
+schedule, retention is as good as whoever remembers to run it.
+
+---
+
+## R-49 · Guests are told nothing until email exists · **Accepted 2026-10-10 (§ 9 q6)**
+
+The Manage booking page is the notification: deadlines, rejections and
+decisions show there. A guest who never comes back learns of an expiry only
+by contacting the resort. Email waits for deployment and a sender domain.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product

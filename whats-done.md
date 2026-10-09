@@ -8225,3 +8225,65 @@ set gave "Choose at least one question", 201 ids "At most 200 questions at
 once". In the browser the two-row click made exactly 1 request, select-all
 ticked all 14 shown, and harbor ended with 0 resolutions on the two.
 Screenshots: `plan/ui-refresh/unanswered-bulk/`.
+
+## 2026-10-10 — Manage booking: guests find, pay and change their stay; staff verify (D-104–D-109)
+
+**What:** `plan/manage-booking.md`, Phases 0–6 and 8's checks, on
+`feat/manage-booking` (it supersedes the on-hold `plan/payments.md`). A
+public Manage booking page (S-13) where a guest finds a stay by reference +
+email or phone; payment settings per tenant; proof of payment to a private
+bucket; a staff Payments screen (S-14) to verify or reject proofs, record
+refunds, decide change requests and set the policy; payment deadlines and
+expiry; an optional per-tenant HOLD; guest cancel and reschedule requests;
+an append-only event log of every decision. Two SQL files:
+`schema-manage-booking.sql` (the 23rd, grown phase by phase, replacing no
+older function) and `schema-holds.sql` (the 24th, which re-makes the four
+availability readers around ONE taken test and guards their older copies).
+
+**Why it matters:** until now a guest who sent a request had no way back
+in, no place to show they paid, and no way to ask for a change but a phone
+call; staff confirmed with no record of payment or of who decided. Three
+statuses kept apart (booking, payment derived, change requests) is what
+lets deposits, partial payments and reschedules coexist without one column
+meaning three things (D-105).
+
+**What the observed values prove:**
+- verify grew from 124 to 158 checks (125–158, the manage probe tenant);
+  every one passes; the one failure throughout is the known roles check.
+  Each refusal has its positive twin (trap 12): the staff role's 42501
+  beside the admin's success, the chat token's empty read beside staff's.
+- With hold `none`, the availability rows of villa and harbor from
+  2026-10-10 for 30 days, and the three prompt baselines, were
+  byte-identical to Phase 0 after every phase: the hold changes nothing for
+  a tenant that does not choose it.
+- The battery went 58 → 55/61 at Phase 5. `rt-tagalog` passed 3 of 3 on
+  repeat; `rt-leak-2`'s retrieval, scores and tool result ("3 slots, 3
+  open") were byte-identical to Phase 0's and `lang-tagalog-2` calls no
+  tool: the model moved with identical inputs (trap 24). Nothing reworded.
+- Bookings isolation 30 (33/33) both ways: A reads none of B's payments,
+  change requests, history or proof, and B's guest is not found on A's
+  page. Pipeline isolation `--filters-only` fell to 20/21 with NO fail
+  line in Phase 8: its dashboard check threw because `manage_attention()`
+  refused `service_role` where `tenant_dashboard()` allows it. A count that
+  drops with no FAIL is still a failure; read the count, not the summary.
+- HTTP walks, real logins: Phase 2 6/6, Phase 3 6/6, Phase 4 5/5, Phase 6
+  4/4, the dashboard walk 14/14.
+
+**Traps it avoided or met:**
+- A dev server goes stale after `@rag/*` rebuilds (`__webpack_modules__…
+  is not a function`, then 404s for routes that exist): restart it before
+  a walk, the same family as trap 16.
+- A BEFORE INSERT trigger that writes another table needs no policy if it
+  is SECURITY DEFINER and writes only the row's own tenant; a refused
+  booking rolls the stay row back with it.
+- A transition table cannot sit on an `UPDATE OF column` trigger; the
+  status log compares old and new itself.
+- The hold could not be `hold_until > now()` in the constraint; it is a
+  flag plus a read-time comparison plus a release before writes (D-106).
+- A reschedule that shifts a two-night stay by one day overlaps itself:
+  the old nights are cancelled BEFORE the new ones are inserted, in one
+  transaction, so a failure leaves the stay untouched.
+
+**Owed:** the axe audit over S-13 and S-14; the user's browser walk;
+Phase 7 (email, OTP) after deployment; the calendar drawing held nights
+apart (they show as taken today).

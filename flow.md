@@ -331,6 +331,17 @@ return 404, with no redirect.
 | `POST` | `/api/t/<slug>/book/request` | send a request: `pending` rows via `request_booking()`; honeypot + per-IP window | `requestBooking` | open |
 | `GET` | `/api/t/<slug>/bookings/requests` | every stay waiting for a decision, web or staff (D-100), one per group with its reference, `source` and `clash` | `listRequests` | admin |
 | `PATCH` | `/api/t/<slug>/bookings/requests/:groupId` | `{ action: confirm \| decline }`, the whole group, any source; 409 on a clash | `confirmRequest` / `declineRequest` | admin |
+| `GET` | `/t/<slug>/manage` | S-13, Manage booking: look up a stay, pay, ask for a change (404 without the application) | `app/t/[tenant]/manage/page.tsx` → `ManageBookingScreen` | public |
+| `POST` | `/api/t/<slug>/manage` | `{ reference, contact }` → the stay through `guest_stay()`; every miss one 404 sentence | `guestStay` | open |
+| `POST` | `/api/t/<slug>/manage/proof` | multipart proof → private bucket → `submit_payment()` | `submitProof` | open |
+| `POST` | `/api/t/<slug>/manage/change`, `…/change/withdraw` | ask to cancel or move (`dryRun` quotes) / withdraw | `requestChange` / `withdrawChange` | open |
+| `GET` | `/t/<slug>/admin/payments` | S-14, Payments: proofs, all payments, change requests, settings | `app/t/[tenant]/admin/payments/page.tsx` → `PaymentsScreen` | public page, staff data |
+| `GET` | `/api/t/<slug>/payments`, `…/payments/:id/proof` | the queue (`?which=open\|all`) / a 5-minute signed proof URL | `listPayments` / `proofUrl` | payments:read |
+| `PATCH` | `/api/t/<slug>/payments/:id` | verify (amount found, account checked, optionally confirm) or reject (reason) | `reviewPayment` | payments:write |
+| `POST` | `/api/t/<slug>/payments/refund` | record a refund made elsewhere | `recordRefund` | payments:write |
+| `GET` / `PUT` | `/api/t/<slug>/payments/settings` | ways to pay, fee, deadlines, hold, refund policy | `paymentSettings` / `setPaymentSettings` | payments:read / payments:settings |
+| `GET` / `PATCH` | `/api/t/<slug>/payments/changes`, `…/changes/:id` | change requests / approve or reject | `listChanges` / `decideChange` | payments:read / payments:write |
+| `GET` | `/api/t/<slug>/stays/:groupId/history` | a stay's `booking_events`, oldest first | `stayHistory` | bookings:read |
 | `GET` / `PUT` | `/api/t/<slug>/holidays` | the holiday calendar / add or change a day | `listCalendar` / `setCalendarDay` | admin |
 | `DELETE` | `/api/t/<slug>/holidays/:day` | remove a day (404 if not there) | `removeCalendarDay` | admin |
 | `POST` | `/api/t/<slug>/holidays/copy` | copy chosen days to another year | `copyCalendarDays` | admin |

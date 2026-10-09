@@ -22,10 +22,12 @@
 > (proof bucket, derived payment status, the events trigger, the outbox)
 > is carried over here and re-checked against today's code.
 >
-> Written 2026-10-10, against `ec8108c` on `master`. **Status: agreed,
-> nothing built.** § 9's seven questions were answered 2026-10-10: every
-> recommendation taken, by the user's instruction ("take all your
-> recommendations").
+> Written 2026-10-10, against `ec8108c` on `master`. § 9's seven questions
+> were answered 2026-10-10: every recommendation taken, by the user's
+> instruction ("take all your recommendations"). **Status: Phases 0–6 and
+> 8's checks done 2026-10-10 on `feat/manage-booking`, recorded as
+> D-104–D-109 and R-45–R-49; Phase 7 (email) gated on deployment; owed:
+> the axe audit over S-13 and S-14 and the user's browser walk.**
 >
 > Read [§ 0](#0-the-six-rules) first.
 

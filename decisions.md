@@ -3391,3 +3391,142 @@ Phases 2–3 44/44, Phase 4 14/14, Phase 5 9/9, Phase 6 12/12. Every write
 was caught in the browser, so nothing changed. Tests 13+14+102+359+5+85.
 The axe audit (0 on 160 states) was last run after Phase 1; the user
 asked that it and `pnpm eval` wait for their word.
+
+---
+
+## D-104 · A guest manages a stay by reference + email or phone, through one definer read; misses are counted in SQL · **Added 2026-10-10 (plan/manage-booking.md)**
+
+**Decision:** `/t/<slug>/manage` (S-13) is public. A guest types the stay's
+reference and the email OR mobile number they booked with (§ 9 q2), and
+`POST /manage` asks `guest_stay()` on the CHAT token. `guest_group()` is the
+ONE match every guest door uses (the lookup, `submit_payment()`,
+`request_change()`, `withdraw_change()`): reference case and spaces aside,
+email case aside, phone normalised as `request_booking()` does (`phone_key()`).
+Every miss is the same `null` and the same 404 sentence (`MANAGE_NOT_FOUND`):
+no such reference, the wrong contact, a stay with no contact on file,
+another tenant's reference, a locked one. After 5 misses in an hour a
+reference answers `null` even to the right contact (`guest_lookup_failures`).
+No guest session and no new token shape (rule 8): the page keeps the two
+facts in React state and sends them with every call.
+
+**Why:** the request asked for lookup without an account. A reference alone
+grants nothing (it can leak in a screenshot), so a second fact is required;
+both together are enough to READ and to ASK, never to change (D-108).
+
+**Measured:** verify 125–128 (found by email and by `+63` phone; guest-facing
+keys only; four kinds of miss all null; the lockout on one reference only);
+walk 2, 6/6; bookings isolation 30.
+
+---
+
+## D-105 · Booking, payment and change requests are three statuses; payment and `completed` are derived, `expired` is stored · **Added 2026-10-10 (plan/manage-booking.md)**
+
+**Decision:** `bookings.status` gains `expired` only. The PAYMENT status is
+`stay_payment()`'s, derived from `payments` every time it is asked
+(`not_tracked | unpaid | submitted | rejected | partially_paid | paid |
+refunded`), with `required`, `received` (verified payments minus verified
+refunds), `outstanding` and `enough`. `completed` is a confirmed stay whose
+last night has ended, derived (`guestStatus()`). Change requests are their
+own table with their own status. A stay is a GROUP (D-100), so `stays` holds
+its reference and its terms (`required_amount`, `pay_by`, `review_by`);
+`required_amount` is computed ONCE, when a web stay is born, by
+`stay_required()` (a percentage rounds UP), so a settings change never moves
+a guest's goalposts. Staff stays are not tracked.
+
+**Why:** the request's own warning: one status column would tangle "is it
+confirmed?", "is it paid?" and "did they ask to move?". A column nobody
+writes cannot disagree with what produced it.
+
+**Measured:** verify 133–136, 143; walk 3, 6/6.
+
+---
+
+## D-106 · A hold is per tenant (`none` / `on_proof` / `on_request`), a flag the constraint reads, released before every write · **Added 2026-10-10 (plan/manage-booking.md § 2.4, § 9 q1). Amends D-070 for tenants that opt in**
+
+**Decision:** `config.payments.hold`, default `none` (every tenant today):
+D-070, D-095, D-099 stand exactly. `on_proof` holds a stay's nights from its
+proof until `review_by`; `on_request` holds a web stay from birth until
+`pay_by`. The mechanism (`schema-holds.sql`, the 24th file):
+`bookings.held` + `held_until`; `bookings_no_overlap` becomes `where (status
+= 'confirmed' or held)`; `booking_takes()` is the ONE taken test every read
+asks (confirmed, or held and not lapsed, using `now()`); lapsed holds are
+released before an insert and a Confirm; a row leaving pending drops its
+hold. `check_availability()`, `check_room_availability()`,
+`request_booking()` and `bookings_pending_not_taken()` were re-made with
+`booking_takes()` (the last also says "is held for another guest", which
+`taken.ts` passes through), and their older copies and the constraint's are
+GUARDED on `booking_takes()` (trap 20).
+
+**Why:** a constraint cannot compare with `now()`, so the hold is a flag; a
+lapsed flag still in the table must block nothing, so reads use the time and
+writes clear the flag first. No job is needed for correctness (pg_cron is
+available, not enabled). `on_request` is the request's preference but lets
+anyone with a phone number block dates, D-070's reason; `on_proof` holds from
+the moment someone has plausibly paid.
+
+**Measured:** verify 145–150; with `none` every tenant's availability
+(2026-10-10 to +30) and the three prompt baselines byte-identical to Phase 0;
+battery 55/61, the three new misses with identical tool results (trap 24).
+
+---
+
+## D-107 · Proof goes to a private bucket on the chat token, insert-only; staff verify with a typed amount; verify and confirm are two operations, one button · **Added 2026-10-10 (plan/manage-booking.md § 2.7)**
+
+**Decision:** `payment-proofs` is PRIVATE (5 MiB, JPEG/PNG/WebP/PDF): any
+token of the tenant may INSERT under `<tenant>/incoming/` and nothing else;
+staff read by a 5-minute signed URL. The route matches the guest before it
+uploads (a stranger stores nothing) and types the file by its first bytes.
+`submit_payment()` (definer) checks the method, amount, date and object, keeps
+one proof under review per stay, and makes a double click one row.
+`review_payment()` (definer, OWNERS and ADMINS, § 9 q4) verifies with the
+amount found in the account and "I checked the account", or rejects with a
+reason the guest reads; "Verify and confirm" does both in one transaction.
+`record_refund()` records money returned elsewhere. Confirming a TRACKED stay
+with nothing verified needs a note (`bookings_confirm_needs_payment_or_note`,
+§ 9 q3), on every door; untracked stays confirm as before. Proof files are
+deleted 180 days after the stay ends (`storage-orphans --expired`), the row
+kept with `proof_removed_at` (§ 9 q7).
+
+**Why:** a screenshot proves nothing; deposits make "paid enough" and
+"confirmed" different moments; staff stays and walk-ins are real.
+
+**Measured:** Phase 0 spike 14/14; verify 133–144, 158; walks 3 and 4.
+
+---
+
+## D-108 · Cancel and reschedule are requests; approval inserts the new nights in the same stay in one transaction · **Added 2026-10-10 (plan/manage-booking.md § 2.8, § 9 q5)**
+
+**Decision:** a guest ASKS (`request_change()`, a dry run first for the
+quote; `withdraw_change()`); owners and admins DECIDE (`decide_change()`).
+One open request per stay. The policy is per tenant: refund tiers by days
+before check-in (`change_terms()`: a percentage of what was RECEIVED, rounded
+down) and a reschedule cutoff. A reschedule keeps the rooms, slot, nights and
+guests and moves the dates; no promo is carried. Approving it cancels the old
+nights and inserts the new ones in the SAME group under `request_booking()`'s
+lock, so the reference holds; a night taken meanwhile is 23P01 and nothing
+changes. A dearer stay's difference becomes the outstanding balance by itself
+(stay_payment() sums the live rows). Approving a cancel cancels the stay and
+keeps the refund due on the request; staff pay and record it.
+
+**Why:** the request: keep the original reservation until the change is
+secured; never promise a refund by cancelling.
+
+**Measured:** verify 151–156; walk 6, 4/4.
+
+---
+
+## D-109 · Every decision is a `booking_events` row written by a trigger · **Added 2026-10-10 (plan/manage-booking.md Rule 2)**
+
+**Decision:** statement-level triggers on `bookings` (creation, status) and
+row triggers on `payments` and `change_requests` append to `booking_events`,
+SECURITY DEFINER, with the actor from the request's own claims (`app_actor()`:
+a staff token's `sub`, a chat token is the guest, `service_role` and the SQL
+editor are the system; a definer acting for the system says so). Staff read
+it; NO token writes, updates or deletes it. A group confirmed in one
+statement is ONE event. The stay's History drawer reads it.
+
+**Why:** the first record of who decided and when (there was no
+`decided_by`); a route cannot forget to log what it does not log.
+
+**Measured:** verify 129–131; walk 4's history, seven steps in order with
+their actors; walk 6's change history.

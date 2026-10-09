@@ -267,6 +267,14 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   RLS 23/23, verify 157/158. New walk
   `plan/manage-booking-phase6-walk.mjs` (change requests over HTTP, real
   logins): **4/4**.
+- [x] Phase 8 part 1 committed `fefcd63`.
+- [x] Phase 8, the record (2026-10-10): D-104–D-109 in decisions.md,
+  R-45–R-49 in risks.md, flow.md's routes, payments.md marked SUPERSEDED,
+  the plan's status, CLAUDE.md (a header section, the layout, the
+  commands, rule 8's nine new callable definer functions, the counts:
+  24 sql files, verify 158, bookings isolation 33), whats-done.md.
+- [ ] Phase 8, owed: the axe audit over S-13 and S-14; **the user's
+  browser walk**; then the merge.
 - [ ] Phase 8: walls, walk, record (isolation cases for the new tables,
   `storage-orphans --expired`, the axe audit over S-13 and S-14, the
   user's browser walk, D-104–D-109, CLAUDE.md, flow.md, payments.md

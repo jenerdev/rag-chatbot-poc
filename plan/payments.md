@@ -6,6 +6,10 @@
 > pending_verification → confirmed`, with `cancelled`, `expired` and
 > `completed` beside them, and a separate payment status.
 >
+> **SUPERSEDED 2026-10-10 by [`manage-booking.md`](./manage-booking.md)**,
+> which was built (D-104–D-109). Kept for the reasoning it records; nothing
+> here describes the code.
+>
 > **ON HOLD since 2026-09-28** (the user's decision). For the MVP, booking is
 > separate from the chat: the chatbot only explains how to book, and
 > customers book on their own page. Nothing in this plan was built; Phase 0's
