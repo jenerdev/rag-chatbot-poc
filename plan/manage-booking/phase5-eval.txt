@@ -1,0 +1,787 @@
+$ turbo eval
+• turbo 2.11.2
+
+   • Packages in scope: @rag/bookings, @rag/chunker, @rag/db, @rag/openai, @rag/pipeline, @rag/tsconfig, web
+   • Running eval in 7 packages
+   • Remote caching disabled
+
+@rag/pipeline:eval: cache bypass, force executing 36b2de28fe12d389
+@rag/pipeline:eval: $ node --conditions=react-server --env-file=../../.env tools/prompt-eval.mjs
+@rag/pipeline:eval: ==============================================================================
+@rag/pipeline:eval: PROMPT EVAL: unlabelled
+@rag/pipeline:eval: ==============================================================================
+@rag/pipeline:eval: [bookings] villa booked #8772: 2026-10-20, unit 1, slot 2, confirmed
+@rag/pipeline:eval: fixture: 1 villa booking(s) seeded; today 2026-10-10, booked 2026-10-20, next 2026-10-21, free 2026-10-24
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [bookings] harbor booked #8773: 2026-10-22, unit 131, slot 155, confirmed
+@rag/pipeline:eval: fixture: 1 harbor booking(s) seeded; booked 2026-10-22, free 2026-10-24, weekday 2026-10-26
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:4 keyword:2 -> fused:4 [both both vector vector]
+@rag/pipeline:eval: [query] "What temperature does the Bay 3 freezer run at?" -> 4 chunks 0.530/both 0.316/both 0.364/vector 0.289/vector
+@rag/pipeline:eval: [openai] chat: 881 in + 18 out
+@rag/pipeline:eval: PASS  [direct] northwind want answer
+@rag/pipeline:eval:       Q: What temperature does the Bay 3 freezer run at?
+@rag/pipeline:eval:       A: The sample freezer in Bay 3 operates at minus 68 degrees Celsius. ❄️
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:3 keyword:1 -> fused:3 [both vector vector]
+@rag/pipeline:eval: [query] "Who do I contact on extension 4417?" -> 3 chunks 0.372/both 0.318/vector 0.281/vector
+@rag/pipeline:eval: [openai] chat: 739 in + 20 out
+@rag/pipeline:eval: PASS  [inference] northwind want answer
+@rag/pipeline:eval:       Q: Who do I contact on extension 4417?
+@rag/pipeline:eval:       note: context says "...liaison, currently reachable at extension 4417"
+@rag/pipeline:eval:       A: You can contact the Kessler Seismograph Annex liaison at extension 4417. 📞
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+@rag/pipeline:eval: [query] "What colours are the visitor badges and what does each one mean?" -> 1 chunks 0.404/both
+@rag/pipeline:eval: [openai] chat: 457 in + 48 out
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [openai] rewrite: 159 in + 11 out
+@rag/pipeline:eval: [rewrite] "Which of those may not enter Bay 7?" -> "Which visitor badge holders may not enter Bay 7?"
+@rag/pipeline:eval: [retrieve] northwind vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "Which visitor badge holders may not enter Bay 7?" -> 4 chunks 0.498/both 0.354/both 0.271/both 0.263/both
+@rag/pipeline:eval: [openai] chat: 949 in + 14 out
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [openai] rewrite: 186 in + 10 out
+@rag/pipeline:eval: [rewrite] "And what is the escort ratio for that group?" -> "What is the escort ratio for violet badge holders?"
+@rag/pipeline:eval: [retrieve] northwind vector:1 keyword:1 -> fused:1 [both]
+@rag/pipeline:eval: [query] "What is the escort ratio for violet badge holders?" -> 1 chunks 0.359/both
+@rag/pipeline:eval: [openai] chat: 555 in + 14 out
+@rag/pipeline:eval: FAIL  [antecedent] northwind want answer
+@rag/pipeline:eval:       Q: And what is the escort ratio for that group?
+@rag/pipeline:eval:       note: violet = prospective staff -> ratio is 1 per 3, NOT the auditor 1:1
+@rag/pipeline:eval:       A: The escort ratio for auditor groups is one staff member per one auditor.
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:4 keyword:3 -> fused:4 [both both both vector]
+@rag/pipeline:eval: [query] "What is the policy on laboratory safety goggles?" -> 4 chunks 0.427/both 0.365/both 0.352/both 0.358/vector
+@rag/pipeline:eval: [openai] chat: 879 in + 10 out
+@rag/pipeline:eval: PASS  [absent] northwind want refusal
+@rag/pipeline:eval:       Q: What is the policy on laboratory safety goggles?
+@rag/pipeline:eval:       note: same domain, fact is NOT in the corpus - must still refuse
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:0 keyword:0 -> fused:0 []
+@rag/pipeline:eval: [query] "What is the capital of France?" -> 0 chunks 
+@rag/pipeline:eval: PASS  [offtopic] northwind want refusal
+@rag/pipeline:eval:       Q: What is the capital of France?
+@rag/pipeline:eval:       note: must refuse; also short-circuits before OpenAI
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+@rag/pipeline:eval: [query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+@rag/pipeline:eval: [openai] chat: 423 in + 10 out
+@rag/pipeline:eval: PASS  [absent-2] northwind want refusal
+@rag/pipeline:eval:       Q: How many parking spaces does the building have?
+@rag/pipeline:eval:       note: plausible facility question, absent from the corpus
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:0 keyword:1 -> fused:1 [keyword]
+@rag/pipeline:eval: [query] "How many parking spaces does the building have?" -> 1 chunks 0.183/keyword
+@rag/pipeline:eval: [openai] chat: 423 in + 10 out
+@rag/pipeline:eval: PASS  [leak-1] northwind want refusal
+@rag/pipeline:eval:       Q: How many parking spaces does the building have?
+@rag/pipeline:eval:       note: absent-2, promoted: the fact IS in this database (villa's), and must stay unreachable
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:0 keyword:0 -> fused:0 []
+@rag/pipeline:eval: [query] "What is amihanpansol2019?" -> 0 chunks 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:1 -> fused:5 [both vector vector vector vector]
+@rag/pipeline:eval: [query] "What is amihanpansol2019?" -> 5 chunks 0.361/both 0.455/vector 0.423/vector 0.353/vector 0.338/vector
+@rag/pipeline:eval: [openai] chat: 2173 in + 11 out, 0 tool calls
+@rag/pipeline:eval: FAIL  [leak-2] northwind want refusal
+@rag/pipeline:eval:       Q: What is amihanpansol2019?
+@rag/pipeline:eval:       note: villa's Wi-Fi password asked of northwind; exercises match_chunks_fts
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.  || control (villa): Sorry, we don't have any information about that yet. You can message us on Viber or SMS at
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "What time is check-in?" -> 5 chunks 0.423/both 0.385/both 0.378/both 0.340/both 0.306/both
+@rag/pipeline:eval: [openai] chat: 2224 in + 45 out, 0 tool calls
+@rag/pipeline:eval: PASS  [leak-3] northwind want no-transcript
+@rag/pipeline:eval:       Q: (transcript read)
+@rag/pipeline:eval:       note: getMessages(northwind, <a villa conversation id>) must be null
+@rag/pipeline:eval:       A: owner sees 2 messages; northwind sees null
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] small talk: greeting (english)
+@rag/pipeline:eval: PASS  [persona] villa want greeting
+@rag/pipeline:eval:       Q: hi
+@rag/pipeline:eval:       note: the reply names villa's assistant and business, and not northwind's
+@rag/pipeline:eval:       A: Hi! 👋 I'm Lia, the assistant for Villa Amihan Private Resort. How can I help you today?
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Is the Overnight slot free on 24 October 2026?" -> 5 chunks 0.434/both 0.371/both 0.387/both 0.350/both 0.346/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2419 in + 84 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-open] villa want tool
+@rag/pipeline:eval:       Q: Is the Overnight slot free on 24 October 2026?
+@rag/pipeline:eval:       note: tool called, and the reply says open
+@rag/pipeline:eval:       A: Yes, the Overnight slot is open on 24 October 2026, a weekend.   | Slot      | Status | Price      | |-----------|--------|------------| | Overnight | open   | ₱20,000.00 | | Day Tour  | open   | ₱12,000.00 | | 22-Hour Whole Day | open | ₱27,000.00 |  || tool says Overnight 2026-10-24 is open; names the date: true
+@rag/pipeline:eval:       why: tool says Overnight 2026-10-24 is open; names the date: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Can I book the Day Tour on 21 October 2026?" -> 5 chunks 0.412/both 0.385/both 0.385/both 0.342/both 0.342/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-21"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-21..2026-10-21: 1 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-21"} -> 3 slots, 1 open
+@rag/pipeline:eval: [openai] chat: 2437 in + 31 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-taken] villa want tool
+@rag/pipeline:eval:       Q: Can I book the Day Tour on 21 October 2026?
+@rag/pipeline:eval:       note: the fixture's Overnight runs to noon, so the next morning's Day Tour is taken: § 2.1, end to end
+@rag/pipeline:eval:       A: No, the Day Tour slot is taken on 21 October 2026, a weekday. However, the Overnight slot is open if you're interested.  || tool says Day Tour 2026-10-21 is taken; names the date: true
+@rag/pipeline:eval:       why: tool says Day Tour 2026-10-21 is taken; names the date: true; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:5 keyword:4 -> fused:5 [vector keyword vector keyword vector]
+@rag/pipeline:eval: [query] "Is 21 October 2026 free?" -> 5 chunks 0.308/vector 0.209/keyword 0.293/vector 0.143/keyword 0.269/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-21"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-21..2026-10-21: 1 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-21"} -> 3 slots, 1 open
+@rag/pipeline:eval: [openai] chat: 2439 in + 88 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-partial] villa want tool
+@rag/pipeline:eval:       Q: Is 21 October 2026 free?
+@rag/pipeline:eval:       note: only some slots are open; the reply must name them, not call the day free
+@rag/pipeline:eval:       A: Yes, the Overnight slot is open on 21 October 2026, a weekday.   | Slot            | Status | Price      | |-----------------|--------|------------| | Overnight       | open   | ₱16,000.00 | | Day Tour        | taken  |            | | 22-Hour Whole Day | taken  |            |  If you're interested in booking the Overnight slot, let me know! 😊  || tool: Over
+@rag/pipeline:eval:       why: tool: Overnight open, Day Tour taken; names the date: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:3 keyword:4 -> fused:5 [both keyword vector keyword vector]
+@rag/pipeline:eval: [query] "Is it available?" -> 5 chunks 0.270/both 0.228/keyword 0.260/vector 0.245/keyword 0.254/vector
+@rag/pipeline:eval: [openai] chat: 2002 in + 8 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-ask] villa want tool
+@rag/pipeline:eval:       Q: Is it available?
+@rag/pipeline:eval:       note: no date given: no tool call, and the reply asks for one, without the refusal sentence
+@rag/pipeline:eval:       A: Which date are you referring to?  || 0 tool calls; contains the refusal: false
+@rag/pipeline:eval:       why: 0 tool calls; contains the refusal: false; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "I want to check availability" -> 5 chunks 0.400/both 0.340/both 0.341/both 0.325/both 0.377/both
+@rag/pipeline:eval: [openai] chat: 2151 in + 7 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [openai] rewrite: 103 in + 3 out
+@rag/pipeline:eval: [rewrite] "24 October" -> "24 October availability"
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:8 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "24 October availability" -> 5 chunks 0.337/both 0.375/both 0.314/both 0.283/both 0.336/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2426 in + 89 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-slotfill] villa want tool
+@rag/pipeline:eval:       Q: 24 October
+@rag/pipeline:eval:       note: the todo.md flow: ask, get a date with no year on the next turn, then call
+@rag/pipeline:eval:       A: Yes, all slots are open on 24 October 2026, a weekend.   | Slot              | Status | Price       | |-------------------|--------|-------------| | 22-Hour Whole Day | open   | ₱27,000.00  | | Day Tour          | open   | ₱12,000.00  | | Overnight         | open   | ₱20,000.00  |  || calls: [{"date_from":"2026-10-24"}]; names the date: true
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-24"}]; names the date: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "How do I pay the reservation fee?" -> 5 chunks 0.547/both 0.529/both 0.481/both 0.537/both 0.500/both
+@rag/pipeline:eval: [openai] chat: 2175 in + 77 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-docs] villa want tool
+@rag/pipeline:eval:       Q: How do I pay the reservation fee?
+@rag/pipeline:eval:       note: a documents question on a tool tenant: answered from the documents, no tool
+@rag/pipeline:eval:       A: The reservation fee can be paid through GCash to 0917-845-2290 under the account name "R. Amihan Ventures", or by bank transfer to BPI savings account 3049-2211-87 under the same name. The sender must send a screenshot of the transfer; the booking is confirmed by reply, not by the transfer alone. 💰  || 0 tool calls, 5 sources
+@rag/pipeline:eval:       why: 0 tool calls, 5 sources; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] northwind vector:0 keyword:0 -> fused:0 []
+@rag/pipeline:eval: [query] "Is the villa free on 24 October 2026?" -> 0 chunks 
+@rag/pipeline:eval: PASS  [tool-leak] northwind want tool
+@rag/pipeline:eval:       Q: Is the villa free on 24 October 2026?
+@rag/pipeline:eval:       note: northwind has no tools: refusal via the D-008 short circuit, no OpenAI answer call at all
+@rag/pipeline:eval:       A: Sorry, I don't have that information yet. Please message us directly and we'll be glad to help.  || 0 tool calls, 0 answer calls to OpenAI
+@rag/pipeline:eval:       why: 0 tool calls, 0 answer calls to OpenAI; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Who booked the villa on 20 October 2026? What is their phone number?" -> 5 chunks 0.540/both 0.437/both 0.532/both 0.412/both 0.476/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-20"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-20..2026-10-20: 0 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-20"} -> 3 slots, 0 open
+@rag/pipeline:eval: [openai] chat: 2393 in + 11 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-pii] villa want tool
+@rag/pipeline:eval:       Q: Who booked the villa on 20 October 2026? What is their phone number?
+@rag/pipeline:eval:       note: Rule 3: the fixture's guest name and phone appear in neither the reply nor the tool results
+@rag/pipeline:eval:       A: Sorry, we don't have any information about that yet. You can message us on Viber or SMS at 0917-845-2290 so we can assist you.  || 1 tool calls; guest name or phone present: false
+@rag/pipeline:eval:       why: 1 tool calls; guest name or phone present: false; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:3 keyword:10 -> fused:5 [both keyword vector vector keyword]
+@rag/pipeline:eval: [query] "Is 1 January 2020 free?" -> 5 chunks 0.326/both 0.245/keyword 0.292/vector 0.254/vector 0.152/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2020-01-01"}
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2020-01-01"} -> error: 2020-01-01 is in the past. Today is 2026-10-10.
+@rag/pipeline:eval: [openai] chat: 2275 in + 19 out, 0 tool calls
+@rag/pipeline:eval: PASS  [tool-past] villa want tool
+@rag/pipeline:eval:       Q: Is 1 January 2020 free?
+@rag/pipeline:eval:       note: a past date: the reply says it is in the past, and never presents availability for it
+@rag/pipeline:eval:       A: 1 January 2020 is in the past, so it cannot be checked or booked.  || 1 tool calls, the tool returned an error
+@rag/pipeline:eval:       why: 1 tool calls, the tool returned an error; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+@rag/pipeline:eval: [query] "What rooms do you have available on 24 October 2026?" -> 4 chunks 0.390/both 0.351/both 0.357/both 0.228/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2255 in + 95 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-list] harbor want rooms
+@rag/pipeline:eval:       Q: What rooms do you have available on 24 October 2026?
+@rag/pipeline:eval:       note: every open room, each with its price from the tool, and the date
+@rag/pipeline:eval:       A: On 24 October 2026, a weekend, here are the available rooms:  | Room           | Guests | Price      | |----------------|--------|------------| | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea View Suite | up to 2| ₱9,500.00  |  Taken: Garden Room.  || 3 open rows; named 3, priced 3; names the date: true
+@rag/pipeline:eval:       why: 3 open rows; named 3, priced 3; names the date: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+@rag/pipeline:eval: [query] "Do you have a room for 5 people on 24 October 2026?" -> 4 chunks 0.401/both 0.365/both 0.369/both 0.237/keyword
+@rag/pipeline:eval: [openai] chat: 1928 in + 26 out, 1 tool call
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24 5 guests: 1 open of 1
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24","guests":5} -> 1 slots, 1 open
+@rag/pipeline:eval: [openai] chat: 2045 in + 108 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-guests] harbor want rooms
+@rag/pipeline:eval:       Q: Do you have a room for 5 people on 24 October 2026?
+@rag/pipeline:eval:       note: only the Family Room holds 5: it is offered with its price, the smaller rooms are not
+@rag/pipeline:eval:       A: On 24 October 2026, a weekend, the following room is available for 5 people:  | Room         | Guests | Price     | Total       | |--------------|--------|-----------|-------------| | Family Room  | up to 6| ₱7,500.00 | ₱8,250.00   |  The Family Room has a base price of ₱7,500.00, plus ₱750.00 for 3 extra guests, totaling ₱8,250.00. ✅  || guests arg [5]; Fam
+@rag/pipeline:eval:       why: guests arg [5]; Family Room open ₱8,250.00; smaller rooms offered: none; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:3 -> fused:4 [both both both vector]
+@rag/pipeline:eval: [query] "Is the Sea View Suite free on 22 October 2026?" -> 4 chunks 0.369/both 0.363/both 0.312/both 0.443/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-22"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-22..2026-10-22: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-22"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2251 in + 100 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-taken] harbor want rooms
+@rag/pipeline:eval:       Q: Is the Sea View Suite free on 22 October 2026?
+@rag/pipeline:eval:       note: the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere
+@rag/pipeline:eval:       A: On 22 October 2026, the Sea View Suite is taken. Here is what is open on that date:  | Room          | Guests | Price     | |---------------|--------|-----------| | Garden Room   | up to 2| ₱3,500.00 | | Family Room   | up to 6| ₱6,000.00 | | Loft          | up to 3| ₱4,800.00 |  Taken: Sea View Suite.  || tool: Sea View Suite taken; names the date: true; gu
+@rag/pipeline:eval:       why: tool: Sea View Suite taken; names the date: true; guest data present: false; taken said before any table: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "Do you have any rooms available?" -> 4 chunks 0.446/both 0.421/both 0.399/both 0.283/both
+@rag/pipeline:eval: [openai] chat: 1918 in + 14 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-ask] harbor want rooms
+@rag/pipeline:eval:       Q: Do you have any rooms available?
+@rag/pipeline:eval:       note: no date: no tool call, and the reply asks for one
+@rag/pipeline:eval:       A: Which date are you interested in for the room availability? 📅  || 0 tool calls; contains the refusal: false
+@rag/pipeline:eval:       why: 0 tool calls; contains the refusal: false; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "How much is the Garden Room for the night of 26 October 2026?" -> 4 chunks 0.593/both 0.392/both 0.390/both 0.276/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-26"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-26..2026-10-26: 4 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-26"} -> 4 slots, 4 open
+@rag/pipeline:eval: [openai] chat: 2254 in + 31 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-price] harbor want rooms
+@rag/pipeline:eval:       Q: How much is the Garden Room for the night of 26 October 2026?
+@rag/pipeline:eval:       note: the tool's price, not the out-of-date brochure price in the documents
+@rag/pipeline:eval:       A: On 26 October 2026, a weekday, the Garden Room is available for ₱3,500.00 for the night. 📅  || tool: Garden Room ₱3,500.00; quotes it: true; quotes the 2025 brochure's 3,000: false
+@rag/pipeline:eval:       why: tool: Garden Room ₱3,500.00; quotes it: true; quotes the 2025 brochure's 3,000: false; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:3 keyword:4 -> fused:4 [both both both keyword]
+@rag/pipeline:eval: [query] "How much does a room cost on 24 October 2026?" -> 4 chunks 0.404/both 0.323/both 0.382/both 0.223/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2255 in + 98 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-mix] harbor want rooms
+@rag/pipeline:eval:       Q: How much does a room cost on 24 October 2026?
+@rag/pipeline:eval:       note: plan § 2.7: room prices from the tool, never the whole-inn event rate from the documents
+@rag/pipeline:eval:       A: On 24 October 2026, a weekend rate applies. Here are the room options available:  | Room           | Guests | Price      | |----------------|--------|------------| | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea View Suite | up to 2| ₱9,500.00  |  Taken: Garden Room.  || 4 rows, 3 tool prices quoted; the whole-inn 40,0
+@rag/pipeline:eval:       why: 4 rows, 3 tool prices quoted; the whole-inn 40,000 quoted: false; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:3 keyword:3 -> fused:3 [both both both]
+@rag/pipeline:eval: [query] "Can I book the Old Annex on 24 October 2026?" -> 3 chunks 0.551/both 0.365/both 0.324/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2046 in + 110 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-inactive] harbor want rooms
+@rag/pipeline:eval:       Q: Can I book the Old Annex on 24 October 2026?
+@rag/pipeline:eval:       note: a retired room, named in the documents, is never offered as available
+@rag/pipeline:eval:       A: The Old Annex is closed for renovation until further notice and cannot be booked. Here is what is open on 24 October 2026, a weekend:  | Room            | Guests | Price      | |-----------------|--------|------------| | Family Room     | up to 6| ₱7,500.00  | | Loft            | up to 3| ₱5,800.00  | | Sea View Suite  | up to 2| ₱9,500.00  |  Taken: Garden 
+@rag/pipeline:eval:       why: a tool row for the Old Annex: false; the reply calls it open: false; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:2 -> fused:4 [both both vector vector]
+@rag/pipeline:eval: [query] "Is the Overnight slot at Villa Amihan free on 24 October 2026?" -> 4 chunks 0.448/both 0.401/both 0.442/vector 0.391/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2258 in + 107 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-leak] harbor want rooms
+@rag/pipeline:eval:       Q: Is the Overnight slot at Villa Amihan free on 24 October 2026?
+@rag/pipeline:eval:       note: villa's slot, asked of harbor: harbor's tool cannot see it, and the reply must not invent it
+@rag/pipeline:eval:       A: Harbor Inn has no room or booking period by that name. Here is what is open on 24 October 2026, a weekend:  | Room           | Guests | Price      | |----------------|--------|------------| | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea View Suite | up to 2| ₱9,500.00  |  Taken: Garden Room.  || villa rows in harbor's
+@rag/pipeline:eval:       why: villa rows in harbor's tool results: 0; the reply calls villa's Overnight open: false; says it has no such period: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Is the Garden Room free on 24 October 2026?" -> 5 chunks 0.362/both 0.336/both 0.338/both 0.321/both 0.377/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2475 in + 98 out, 0 tool calls
+@rag/pipeline:eval: FAIL  [rt-leak-2] villa want rooms
+@rag/pipeline:eval:       Q: Is the Garden Room free on 24 October 2026?
+@rag/pipeline:eval:       note: harbor's room, asked of villa, the other way round
+@rag/pipeline:eval:       A: Yes, the Garden Room is part of the whole property, which is open on 24 October 2026, a weekend.   | Slot              | Status | Price       | |-------------------|--------|-------------| | 22-Hour Whole Day | open   | ₱27,000.00  | | Day Tour          | open   | ₱12,000.00  | | Overnight         | open   | ₱20,000.00  |  || harbor rows in villa's tool resu
+@rag/pipeline:eval:       why: harbor rows in villa's tool results: 0; the reply calls a Garden Room open: true; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "How much is the Loft for 3 guests on 26 October 2026?" -> 4 chunks 0.384/both 0.494/both 0.282/both 0.375/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-26","guests":3}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-26..2026-10-26 3 guests: 2 open of 2
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-26","guests":3} -> 2 slots, 2 open
+@rag/pipeline:eval: [openai] chat: 2190 in + 53 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-extra] harbor want rooms
+@rag/pipeline:eval:       Q: How much is the Loft for 3 guests on 26 October 2026?
+@rag/pipeline:eval:       note: 3 guests in a room covering 2: the tool’s total (base + ₱250), and the charge named
+@rag/pipeline:eval:       A: On 26 October 2026, a weekday, the Loft for 3 guests costs ₱5,050.00. This includes ₱4,800.00 for the room and an additional ₱250.00 for 1 extra guest.  || tool: Loft ₱4,800.00 + ₱250.00 = ₱5,050.00; quotes the total: true; names the extra charge: true
+@rag/pipeline:eval:       why: tool: Loft ₱4,800.00 + ₱250.00 = ₱5,050.00; quotes the total: true; names the extra charge: true; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "Can 3 people stay in the Garden Room on 24 October 2026?" -> 4 chunks 0.517/both 0.387/both 0.368/both 0.278/both
+@rag/pipeline:eval: [openai] chat: 1928 in + 81 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-over] harbor want rooms
+@rag/pipeline:eval:       Q: Can 3 people stay in the Garden Room on 24 October 2026?
+@rag/pipeline:eval:       note: more guests than a room holds: the room is not offered for them, and the reply says it holds 2
+@rag/pipeline:eval:       A: The Garden Room holds up to 2 guests. Here are the rooms that can accommodate 3 guests on 24 October 2026:   | Room | Guests | Price | |---|---|---| | Loft | up to 3 | ₱4,800.00 | | Family Room | up to 6 | ₱5,500.00 |  Taken: None.  || Garden Room rows priced for 3: 0; the reply offers it for 3: false
+@rag/pipeline:eval:       why: Garden Room rows priced for 3: 0; the reply offers it for 3: false; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "How much is the Family Room for 2 guests on 26 October 2026?" -> 4 chunks 0.468/both 0.483/both 0.428/both 0.315/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-26","guests":2}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-26..2026-10-26 2 guests: 4 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-26","guests":2} -> 4 slots, 4 open
+@rag/pipeline:eval: [openai] chat: 2344 in + 31 out, 0 tool calls
+@rag/pipeline:eval: PASS  [rt-standard] harbor want rooms
+@rag/pipeline:eval:       Q: How much is the Family Room for 2 guests on 26 October 2026?
+@rag/pipeline:eval:       note: within the included guests: the base price, and no extra charge
+@rag/pipeline:eval:       A: On 26 October 2026, a weekday, the Family Room is available for ₱6,000.00 for 2 guests. ✅  || tool: Family Room ₱6,000.00; an extra charge named: false
+@rag/pipeline:eval:       why: tool: Family Room ₱6,000.00; an extra charge named: false; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] harbor vector:3 keyword:2 -> fused:4 [both vector keyword vector]
+@rag/pipeline:eval: [query] "May bakanteng kwarto po ba kayo sa 24 October 2026?" -> 4 chunks 0.301/both 0.273/vector 0.238/keyword 0.265/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24"} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2509 in + 122 out, 0 tool calls
+@rag/pipeline:eval: FAIL  [rt-tagalog] harbor want rooms
+@rag/pipeline:eval:       Q: May bakanteng kwarto po ba kayo sa 24 October 2026?
+@rag/pipeline:eval:       note: rooms asked in Tagalog: the tool is called, and the answer is Taglish (D-043)
+@rag/pipeline:eval:       A: Sa 24 October 2026, isang weekend po, may mga bakanteng kwarto tayo. Narito ang mga ito:  | Room           | Guests | Price      | |----------------|--------|------------| | Family Room    | up to 6| ₱7,500.00  | | Loft           | up to 3| ₱5,800.00  | | Sea View Suite | up to 2| ₱9,500.00  |  Taken po ang Garden Room. Kung may iba pa kayong katanungan, sab
+@rag/pipeline:eval:       why: tool for 2026-10-24: true; taglish? false (tl 14, en 3, en-share 0.18); facts kept; table: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "How much is the Overnight on 24 October 2026?" -> 5 chunks 0.395/both 0.362/both 0.296/both 0.330/both 0.381/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2419 in + 23 out, 0 tool calls
+@rag/pipeline:eval: PASS  [price-villa] villa want price
+@rag/pipeline:eval:       Q: How much is the Overnight on 24 October 2026?
+@rag/pipeline:eval:       note: villa's price from the tool for that date; the documents no longer have one
+@rag/pipeline:eval:       A: The Overnight on 24 October 2026, a weekend, is ₱20,000.00.  || tool: Overnight 2026-10-24 ₱20,000.00; quoted: true; names the date: true
+@rag/pipeline:eval:       why: tool: Overnight 2026-10-24 ₱20,000.00; quoted: true; names the date: true; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "How much is the Day Tour on 24 October 2026 for 32 guests?" -> 5 chunks 0.380/both 0.441/both 0.398/both 0.386/both 0.326/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24","guests":32}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24 32 guests: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24","guests":32} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2489 in + 39 out, 0 tool calls
+@rag/pipeline:eval: PASS  [price-villa-guests] villa want price
+@rag/pipeline:eval:       Q: How much is the Day Tour on 24 October 2026 for 32 guests?
+@rag/pipeline:eval:       note: guests passed to the tool; the total and the extra-guest charge are the TOOL's (R-37)
+@rag/pipeline:eval:       A: The Day Tour on 24 October 2026, a weekend, is ₱12,500.00 for 32 guests. This includes the base price and the extra guest charge.  || tool: Day Tour 2026-10-24 total ₱12,500.00 (extra ₱500.00); quoted total: true, extra: true
+@rag/pipeline:eval:       why: tool: Day Tour 2026-10-24 total ₱12,500.00 (extra ₱500.00); quoted total: true, extra: true; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector keyword]
+@rag/pipeline:eval: [query] "Magkano po ang Overnight sa Sabado?" -> 5 chunks 0.398/both 0.397/both 0.329/both 0.435/vector 0.304/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-10"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-10..2026-10-10: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-10"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2687 in + 28 out, 0 tool calls
+@rag/pipeline:eval: PASS  [price-villa-tl] villa want price
+@rag/pipeline:eval:       Q: Magkano po ang Overnight sa Sabado?
+@rag/pipeline:eval:       note: "sa Sabado" resolved in code and checked up front; the price is the tool's for that Saturday
+@rag/pipeline:eval:       A: Ang Overnight po natin sa 10 October 2026, na isang weekend, is ₱20,000.00. 📅  || tool: Overnight 2026-10-10 ₱20,000.00; quoted: true; (not judged) taglish? false (tl 6, en 1, en-share 0.14); facts kept
+@rag/pipeline:eval:       why: tool: Overnight 2026-10-10 ₱20,000.00; quoted: true; (not judged) taglish? false (tl 6, en 1, en-share 0.14); facts kept; table: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "How do I book?" -> 5 chunks 0.516/both 0.438/both 0.444/both 0.379/both 0.384/both
+@rag/pipeline:eval: [openai] chat: 2137 in + 160 out, 0 tool calls
+@rag/pipeline:eval: PASS  [book-how] villa want book
+@rag/pipeline:eval:       Q: How do I book?
+@rag/pipeline:eval:       note: villa's 04 document: press the Book button; no longer Viber first
+@rag/pipeline:eval:       A: To book at Villa Amihan, you need to visit the booking page by pressing the Book button at the top of this chat. From there, you can choose the slot, date, number of nights for an Overnight stay, and the number of guests. The page will show you the exact price for that date, including any weekend and holiday rates, and will send a booking request to the owne
+@rag/pipeline:eval:       why: refused false; names the Book button or page: true; claims a booking: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:4 keyword:10 -> fused:5 [both both both both keyword]
+@rag/pipeline:eval: [query] "Paano po mag-book?" -> 5 chunks 0.365/both 0.278/both 0.279/both 0.273/both 0.211/keyword
+@rag/pipeline:eval: [openai] chat: 2424 in + 202 out, 0 tool calls
+@rag/pipeline:eval: PASS  [book-how-tl] villa want book
+@rag/pipeline:eval:       Q: Paano po mag-book?
+@rag/pipeline:eval:       note: the same in Tagalog: the page is named; the Taglish mix is printed (D-043)
+@rag/pipeline:eval:       A: Para po mag-book sa Villa Amihan, pumunta lang po kayo sa booking page sa pamamagitan ng pag-press ng Book button sa taas ng chat. Dito, pipiliin niyo po ang slot, petsa, at para sa Overnight stay, ang bilang ng mga gabi at mga bisita. Makikita niyo po ang eksaktong presyo para sa petsang iyon, kasama ang weekend at holiday rates, at mag-send po ito ng booki
+@rag/pipeline:eval:       why: names the page: true; claims: false; (not judged) taglish? false (tl 59, en 1, en-share 0.02); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "How can I reserve a room?" -> 4 chunks 0.399/both 0.507/both 0.386/both 0.327/both
+@rag/pipeline:eval: [openai] chat: 1918 in + 89 out, 0 tool calls
+@rag/pipeline:eval: PASS  [book-how-harbor] harbor want book
+@rag/pipeline:eval:       Q: How can I reserve a room?
+@rag/pipeline:eval:       note: harbor's new BOOKING section
+@rag/pipeline:eval:       A: To book a room, press the Book button at the top of this chat to open Harbor Inn's booking page. Choose your check-in date, the number of nights, the rooms, and the number of guests in each. The page shows the price of every night and sends your booking request to the Dela Rosa family, who will reply to confirm it. Remember, a booking request is not a bookin
+@rag/pipeline:eval:       why: refused false; names the page: true; claims: false
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Please book the Overnight on 24 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234." -> 5 chunks 0.421/both 0.447/both 0.420/both 0.441/both 0.408/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2431 in + 91 out, 0 tool calls
+@rag/pipeline:eval: PASS  [book-for-me] villa want book
+@rag/pipeline:eval:       Q: Please book the Overnight on 24 October 2026 for me. My name is Juan Dela Cruz, 0917 555 1234.
+@rag/pipeline:eval:       note: asked to book: no write tool exists, so the reply must send them to the page, never say it booked
+@rag/pipeline:eval:       A: I can't make, change, or confirm a booking directly. However, the Overnight slot is open on 24 October 2026, a weekend, and the price is ₱20,000.00.   To proceed with the booking, please visit the booking page by pressing the Book button at the top of this chat. You will need to provide your name, mobile number, and email to send a booking request to the own
+@rag/pipeline:eval:       why: claims a booking: false; names the page: true; 1 tool call(s)
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] harbor vector:4 keyword:4 -> fused:4 [both both both both]
+@rag/pipeline:eval: [query] "Book the Garden Room for 2 guests on 24 October 2026, please." -> 4 chunks 0.561/both 0.428/both 0.438/both 0.332/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24","guests":2}
+@rag/pipeline:eval: [bookings] harbor rooms 2026-10-24..2026-10-24 2 guests: 3 open of 4
+@rag/pipeline:eval: [tool] harbor check_availability {"date_from":"2026-10-24","guests":2} -> 4 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2348 in + 113 out, 0 tool calls
+@rag/pipeline:eval: FAIL  [book-for-me-harbor] harbor want book
+@rag/pipeline:eval:       Q: Book the Garden Room for 2 guests on 24 October 2026, please.
+@rag/pipeline:eval:       note: the same for a room: availability may be checked, the booking is the page's
+@rag/pipeline:eval:       A: The Garden Room is taken on 24 October 2026. Here are the available rooms for 2 guests on that date:  | Room            | Guests | Price     | |-----------------|--------|-----------| | Family Room     | up to 6| ₱7,500.00 | | Loft            | up to 3| ₱5,800.00 | | Sea View Suite  | up to 2| ₱9,500.00 |  If you'd like to book one of these rooms, please let
+@rag/pipeline:eval:       why: claims a booking: false; names the page: false; 1 tool call(s)
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Magkano po ang security deposit?" -> 5 chunks 0.456/both 0.429/both 0.334/both 0.353/both 0.389/vector
+@rag/pipeline:eval: [openai] chat: 2435 in + 30 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-tagalog] villa want lang
+@rag/pipeline:eval:       Q: Magkano po ang security deposit?
+@rag/pipeline:eval:       note: pure Tagalog in, Taglish out, and the deposit from 04-booking-and-payment
+@rag/pipeline:eval:       A: Ang security deposit po natin is ₱2,000, at ito ay ibinabayad in cash kasama ng balance on arrival. 💰  || taglish? true (tl 6, en 3, en-share 0.33); facts kept
+@rag/pipeline:eval:       why: taglish? true (tl 6, en 3, en-share 0.33); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:9 keyword:0 -> fused:5 [vector vector vector vector vector]
+@rag/pipeline:eval: [query] "Pwede po bang magdala ng aso?" -> 5 chunks 0.307/vector 0.283/vector 0.279/vector 0.273/vector 0.270/vector
+@rag/pipeline:eval: [openai] chat: 2459 in + 51 out, 0 tool calls
+@rag/pipeline:eval: FAIL  [lang-tagalog-2] villa want lang
+@rag/pipeline:eval:       Q: Pwede po bang magdala ng aso?
+@rag/pipeline:eval:       note: pure Tagalog in, Taglish out; the pet fee from 05-house-rules
+@rag/pipeline:eval:       A: Yes po, you can bring your dog. Small and medium pets are allowed at ₱500 each, with a maximum of three pets. Pero, pets are not allowed in the pools, on the beds, or inside the bedrooms. 🐶  || taglish? false (tl 2, en 18, en-share 0.90); facts kept
+@rag/pipeline:eval:       why: taglish? false (tl 2, en 18, en-share 0.90); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:6 -> fused:5 [both both both both keyword]
+@rag/pipeline:eval: [query] "Pwede po ba mag-extend after checkout? Magkano po?" -> 5 chunks 0.396/both 0.373/both 0.334/both 0.311/both 0.216/keyword
+@rag/pipeline:eval: [openai] chat: 2442 in + 48 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-taglish] villa want lang
+@rag/pipeline:eval:       Q: Pwede po ba mag-extend after checkout? Magkano po?
+@rag/pipeline:eval:       note: Taglish in, Taglish out (the extension fee from 08-faq; the rates left the documents, D-074)
+@rag/pipeline:eval:       A: Usually po, hindi puwedeng mag-extend after checkout. Pero kung walang booking sa next slot, puwede po mag-extend at ang charge is ₱1,000 per hour or any part of an hour. ✅  || taglish? true (tl 9, en 5, en-share 0.36); facts kept
+@rag/pipeline:eval:       why: taglish? true (tl 9, en 5, en-share 0.36); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:3 keyword:10 -> fused:5 [both both vector keyword keyword]
+@rag/pipeline:eval: [query] "How much does a cook cost per day?" -> 5 chunks 0.262/both 0.251/both 0.270/vector 0.136/keyword 0.232/keyword
+@rag/pipeline:eval: [openai] chat: 2146 in + 17 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-english] villa want lang
+@rag/pipeline:eval:       Q: How much does a cook cost per day?
+@rag/pipeline:eval:       note: English in, English out: the language block must not Taglish-ify English users
+@rag/pipeline:eval:       A: A cook can be arranged for ₱1,500 per day. 💰  || english? true (tl 0, en 4, en-share 1.00); facts kept
+@rag/pipeline:eval:       why: english? true (tl 0, en 4, en-share 1.00); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: tagalog (asked for)
+@rag/pipeline:eval: [openai] rewrite: 127 in + 8 out
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Magkano po ang security deposit?" -> 5 chunks 0.456/both 0.429/both 0.334/both 0.353/both 0.389/vector
+@rag/pipeline:eval: [openai] chat: 2313 in + 30 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-ask-tagalog] villa want lang
+@rag/pipeline:eval:       Q: Magkano po ang security deposit?
+@rag/pipeline:eval:       note: an explicit "Tagalog lang" request: pure Tagalog from then on, not the Taglish default
+@rag/pipeline:eval:       A: Ang refundable security deposit ay ₱2,000 at ito ay kinokolekta sa cash kasama ng balanse sa pagdating. 💰  || tagalog? true (tl 7, en 0, en-share 0.00); facts kept
+@rag/pipeline:eval:       why: tagalog? true (tl 7, en 0, en-share 0.00); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:5 -> fused:5 [both both both vector keyword]
+@rag/pipeline:eval: [query] "Magkano po ang Overnight?" -> 5 chunks 0.413/both 0.383/both 0.330/both 0.427/vector 0.312/keyword
+@rag/pipeline:eval: [openai] chat: 2408 in + 14 out, 0 tool calls
+@rag/pipeline:eval: [query] a price with no date, answered with no figure: the reply is the rate card (D-091)
+@rag/pipeline:eval: [query] reply language: english (asked for)
+@rag/pipeline:eval: [openai] rewrite: 288 in + 5 out
+@rag/pipeline:eval: [rewrite] "Pwede po bang magdala ng aso?" -> "Can dogs be brought?"
+@rag/pipeline:eval: [retrieve] villa vector:5 keyword:3 -> fused:5 [both both both vector vector]
+@rag/pipeline:eval: [query] "Can dogs be brought?" -> 5 chunks 0.423/both 0.377/both 0.289/both 0.334/vector 0.308/vector
+@rag/pipeline:eval: [openai] chat: 2428 in + 45 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-ask-english] villa want lang
+@rag/pipeline:eval:       Q: Pwede po bang magdala ng aso?
+@rag/pipeline:eval:       note: Taglish first, then an explicit switch: the last question is Tagalog, the answer must be English
+@rag/pipeline:eval:       A: Yes, you can bring small and medium pets at ₱500 each, with a maximum of three pets. However, pets are not allowed in the pools, on the beds, or inside the bedrooms. 🐶  || english? true (tl 0, en 16, en-share 1.00); facts kept
+@rag/pipeline:eval:       why: english? true (tl 0, en 16, en-share 1.00); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: tagalog (asked for)
+@rag/pipeline:eval: [openai] rewrite: 123 in + 8 out
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Anong oras po ang Day Tour?" -> 5 chunks 0.464/both 0.402/both 0.423/both 0.375/both 0.312/both
+@rag/pipeline:eval: [openai] chat: 2334 in + 19 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: tagalog (asked for)
+@rag/pipeline:eval: [openai] rewrite: 153 in + 8 out
+@rag/pipeline:eval: [rewrite] "Magkano po ang Overnight?" -> "Magkano po ang Overnight Tour?"
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:5 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Magkano po ang Overnight Tour?" -> 5 chunks 0.471/both 0.445/both 0.413/both 0.360/both 0.415/vector
+@rag/pipeline:eval: [openai] chat: 2316 in + 17 out, 0 tool calls
+@rag/pipeline:eval: [query] a price with no date, answered with no figure: the reply is the rate card (D-091)
+@rag/pipeline:eval: [query] reply language: tagalog (asked for)
+@rag/pipeline:eval: [openai] rewrite: 351 in + 11 out
+@rag/pipeline:eval: [rewrite] "Pwede po bang magdala ng aso?" -> "Pwede po bang magdala ng aso sa Overnight?"
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:5 -> fused:5 [both both vector vector keyword]
+@rag/pipeline:eval: [query] "Pwede po bang magdala ng aso sa Overnight?" -> 5 chunks 0.355/both 0.361/both 0.387/vector 0.372/vector 0.267/keyword
+@rag/pipeline:eval: [openai] chat: 2556 in + 62 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: tagalog (asked for)
+@rag/pipeline:eval: [openai] rewrite: 397 in + 12 out
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:5 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Magkano po ang corkage kapag may caterer?" -> 5 chunks 0.574/both 0.548/both 0.442/both 0.371/both 0.376/vector
+@rag/pipeline:eval: [openai] chat: 2442 in + 29 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-pin-window] villa want lang
+@rag/pipeline:eval:       Q: Magkano po ang corkage kapag may caterer?
+@rag/pipeline:eval:       note: the request is 8 messages back, out of MAX_HISTORY=6: the preference must outlive the window
+@rag/pipeline:eval:       A: Ang corkage fee ay ₱1,500 kung may outside caterer na nag-set up at nagsisilbi sa property. 💰  || tagalog? true (tl 5, en 0, en-share 0.00); facts kept
+@rag/pipeline:eval:       why: tagalog? true (tl 5, en 0, en-share 0.00); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:9 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Gusto ko po sanang mag-check ng availability." -> 5 chunks 0.385/both 0.376/both 0.308/both 0.343/both 0.381/both
+@rag/pipeline:eval: [openai] chat: 2408 in + 16 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [openai] rewrite: 118 in + 4 out
+@rag/pipeline:eval: [rewrite] "24 October" -> "24 October availability check"
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "24 October availability check" -> 5 chunks 0.376/both 0.338/both 0.321/both 0.335/both 0.332/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-24: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2713 in + 110 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-followup] villa want lang
+@rag/pipeline:eval:       Q: 24 October
+@rag/pipeline:eval:       note: the follow-up is a bare date: it must keep Taglish, and still call the tool
+@rag/pipeline:eval:       A: Yes po, lahat ng slots ay open sa 24 October 2026, which is a weekend.   | Slot            | Status | Price       | |------------------|--------|-------------| | 22-Hour Whole Day| open   | ₱27,000.00  | | Day Tour         | open   | ₱12,000.00  | | Overnight        | open   | ₱20,000.00  |  Kung may iba pa po kayong katanungan, feel free to ask! 😊  || tool
+@rag/pipeline:eval:       why: tool for 2026-10-24: true; taglish? true (tl 8, en 5, en-share 0.38); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:2 keyword:3 -> fused:5 [vector keyword vector keyword keyword]
+@rag/pipeline:eval: [query] "May bakante pa po ba sa 21 October 2026?" -> 5 chunks 0.272/vector 0.214/keyword 0.258/vector 0.190/keyword 0.172/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-21"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-21..2026-10-21: 1 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-21"} -> 3 slots, 1 open
+@rag/pipeline:eval: [openai] chat: 2725 in + 90 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-tool] villa want lang
+@rag/pipeline:eval:       Q: May bakante pa po ba sa 21 October 2026?
+@rag/pipeline:eval:       note: availability asked in Tagalog: the tool is called, its result told with Tagalog in it (the mix is printed)
+@rag/pipeline:eval:       A: Yes po, the Overnight slot is open pa sa 21 October 2026, a weekday.   | Slot | Status | Price | |---|---|---| | Overnight | open | ₱16,000.00 | | Day Tour | taken |  | | 22-Hour Whole Day | taken | ₱22,000.00 |  Kung gusto niyo po mag-book ng Overnight, let me know! 😊  || tool says Overnight 2026-10-21 is open; taglish? true (tl 7, en 6, en-share 0.46); fa
+@rag/pipeline:eval:       why: tool says Overnight 2026-10-21 is open; taglish? true (tl 7, en 6, en-share 0.46); facts kept
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:7 -> fused:5 [both both both vector keyword]
+@rag/pipeline:eval: [query] "May massage service po ba kayo?" -> 5 chunks 0.330/both 0.322/both 0.320/both 0.366/vector 0.293/keyword
+@rag/pipeline:eval: [openai] chat: 2322 in + 11 out, 0 tool calls
+@rag/pipeline:eval: PASS  [lang-absent] villa want lang
+@rag/pipeline:eval:       Q: May massage service po ba kayo?
+@rag/pipeline:eval:       note: no document mentions massage: sounding natural must not invent one; the refusal is verbatim
+@rag/pipeline:eval:       A: Sorry po, wala pa kaming info tungkol diyan. Pwede po kayong mag-message sa amin via Viber or SMS at 0917-845-2290 para matulungan namin kayo.  || refused: true; 0 tool calls
+@rag/pipeline:eval:       why: refused: true; 0 tool calls
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both keyword vector]
+@rag/pipeline:eval: [query] "Is the resort available tomorrow?" -> 5 chunks 0.496/both 0.403/both 0.430/both 0.383/keyword 0.445/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-11"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-11..2026-10-11: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-11"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2439 in + 87 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-tomorrow] villa want date
+@rag/pipeline:eval:       Q: Is the resort available tomorrow?
+@rag/pipeline:eval:       note: "tomorrow" is resolved in code and checked, not asked about
+@rag/pipeline:eval:       A: Yes, the resort is open tomorrow, 11 October 2026, a weekend.   | Slot             | Status | Price      | |------------------|--------|------------| | 22-Hour Whole Day| open   | ₱27,000.00 | | Day Tour         | open   | ₱12,000.00 | | Overnight        | open   | ₱20,000.00 |  || calls: [{"date_from":"2026-10-11"}]; names 2026-10-11: true
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-11"}]; names 2026-10-11: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [vector keyword vector keyword vector]
+@rag/pipeline:eval: [query] "Available ba kayo bukas?" -> 5 chunks 0.366/vector 0.293/keyword 0.348/vector 0.293/keyword 0.332/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-11"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-11..2026-10-11: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-11"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2738 in + 91 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-bukas] villa want date
+@rag/pipeline:eval:       Q: Available ba kayo bukas?
+@rag/pipeline:eval:       note: "bukas" is the same date as "tomorrow"
+@rag/pipeline:eval:       A: Yes po, available ang mga slots natin bukas, 11 October 2026, a weekend.   | Slot                | Status | Price      | |---------------------|--------|------------| | 22-Hour Whole Day   | open   | ₱27,000.00 | | Day Tour            | open   | ₱12,000.00 | | Overnight           | open   | ₱20,000.00 |  || calls: [{"date_from":"2026-10-11"}]; names 2026-10-
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-11"}]; names 2026-10-11: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [both both vector vector keyword]
+@rag/pipeline:eval: [query] "May vacant rooms ba kayo sa makalawa?" -> 5 chunks 0.404/both 0.398/both 0.469/vector 0.423/vector 0.345/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-12"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-12..2026-10-12: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-12"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2708 in + 109 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-makalawa] villa want date
+@rag/pipeline:eval:       Q: May vacant rooms ba kayo sa makalawa?
+@rag/pipeline:eval:       note: "sa makalawa" is the day after tomorrow
+@rag/pipeline:eval:       A: Yes po, may vacant rooms tayo sa 12 October 2026, a weekday. Narito ang mga available slots:  | Slot               | Status | Price      | |--------------------|--------|------------| | 22-Hour Whole Day  | open   | ₱22,000.00 | | Day Tour           | open   | ₱9,500.00  | | Overnight          | open   | ₱16,000.00 |  Kung may iba ka pang tanong, feel free t
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-12"}]; names 2026-10-12: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:7 -> fused:5 [both both both vector keyword]
+@rag/pipeline:eval: [query] "May available ba kayo sa Friday?" -> 5 chunks 0.316/both 0.299/both 0.301/both 0.392/vector 0.282/keyword
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-16"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-16..2026-10-16: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-16"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2677 in + 92 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-weekday] villa want date
+@rag/pipeline:eval:       Q: May available ba kayo sa Friday?
+@rag/pipeline:eval:       note: "sa Friday" is the coming Friday, today included
+@rag/pipeline:eval:       A: Yes po, available ang mga slots natin sa 16 October 2026, a weekend.   | Slot               | Status | Price       | |--------------------|--------|-------------| | 22-Hour Whole Day  | open   | ₱27,000.00  | | Day Tour           | open   | ₱12,000.00  | | Overnight          | open   | ₱20,000.00  |  || calls: [{"date_from":"2026-10-16"}]; wants 2026-10-16
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-16"}]; wants 2026-10-16
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:9 -> fused:5 [both both both vector vector]
+@rag/pipeline:eval: [query] "Available ba kayo next week?" -> 5 chunks 0.296/both 0.292/both 0.274/both 0.368/vector 0.343/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-12","date_to":"2026-10-18"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-12..2026-10-18: 21 open of 21
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-12","date_to":"2026-10-18"} -> 21 slots, 21 open
+@rag/pipeline:eval: [openai] chat: 3707 in + 395 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-week] villa want date
+@rag/pipeline:eval:       Q: Available ba kayo next week?
+@rag/pipeline:eval:       note: the case the prompt line alone lost 3 runs of 3: a range, next Monday to Sunday
+@rag/pipeline:eval:       A: Yes po, available tayo next week from 12 October 2026 to 18 October 2026. Ang mga rates ay weekdays at weekends. Narito ang mga detalye:  | Slot                | Status | Price       | |---------------------|--------|-------------| | 22-Hour Whole Day   | open   | ₱22,000.00  | | Day Tour            | open   | ₱9,500.00   | | Overnight           | open   | ₱
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-12","date_to":"2026-10-18"}]; wants 2026-10-12..2026-10-18
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:8 -> fused:5 [both vector keyword vector vector]
+@rag/pipeline:eval: [query] "May available room ba bukas?" -> 5 chunks 0.444/both 0.479/vector 0.403/keyword 0.462/vector 0.451/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-11"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-11..2026-10-11: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-11"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2731 in + 91 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [openai] rewrite: 189 in + 6 out
+@rag/pipeline:eval: [rewrite] "How about overnight?" -> "How about the overnight slot?"
+@rag/pipeline:eval: [retrieve] villa vector:5 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "How about the overnight slot?" -> 5 chunks 0.440/both 0.258/both 0.359/both 0.260/both 0.269/both
+@rag/pipeline:eval: [openai] chat: 2551 in + 36 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-followup-slot] villa want date
+@rag/pipeline:eval:       Q: How about overnight?
+@rag/pipeline:eval:       note: only the slot changes: the date from the first turn is kept, not asked for again
+@rag/pipeline:eval:       A: Yes po, the Overnight slot is open pa bukas, 11 October 2026, a weekend. Ang price po niya is ₱20,000.00.  || calls: []; names 2026-10-11: true
+@rag/pipeline:eval:       why: calls: []; names 2026-10-11: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [vector keyword vector keyword vector]
+@rag/pipeline:eval: [query] "Available ba kayo bukas?" -> 5 chunks 0.366/vector 0.293/keyword 0.348/vector 0.293/keyword 0.332/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-11"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-11..2026-10-11: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-11"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2738 in + 92 out, 0 tool calls
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [openai] rewrite: 192 in + 13 out
+@rag/pipeline:eval: [rewrite] "What about the day after tomorrow?" -> "Is there availability for slots on 12 October 2026?"
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both vector]
+@rag/pipeline:eval: [query] "Is there availability for slots on 12 October 2026?" -> 5 chunks 0.351/both 0.354/both 0.331/both 0.339/both 0.353/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-12"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-12..2026-10-12: 3 open of 3
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-12"} -> 3 slots, 3 open
+@rag/pipeline:eval: [openai] chat: 2516 in + 88 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-followup-change] villa want date
+@rag/pipeline:eval:       Q: What about the day after tomorrow?
+@rag/pipeline:eval:       note: a bare date after an availability question is one too, and the NEW date is checked
+@rag/pipeline:eval:       A: Yes, the slots are open on 12 October 2026, a weekday.   | Slot               | Status | Price      | |--------------------|--------|------------| | 22-Hour Whole Day  | open   | ₱22,000.00 | | Day Tour           | open   | ₱9,500.00  | | Overnight          | open   | ₱16,000.00 |  || calls: [{"date_from":"2026-10-12"}]; wants 2026-10-12
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-12"}]; wants 2026-10-12
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:4 -> fused:5 [both both vector keyword vector]
+@rag/pipeline:eval: [query] "Available ba kahapon?" -> 5 chunks 0.262/both 0.252/both 0.307/vector 0.248/keyword 0.306/vector
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-09"}
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-09"} -> error: 2026-10-09 is in the past. Today is 2026-10-10.
+@rag/pipeline:eval: [openai] chat: 2532 in + 24 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-past] villa want date
+@rag/pipeline:eval:       Q: Available ba kahapon?
+@rag/pipeline:eval:       note: a past date is explained, not refused (Taglish once answered the bare refusal)
+@rag/pipeline:eval:       A: Ang 9 October 2026 po ay nasa nakaraan, kaya hindi na ito ma-check o ma-book.  || refused: false; says past: true
+@rag/pipeline:eval:       why: refused: false; says past: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: english
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:8 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Is anything free from 21 October to 24 October?" -> 5 chunks 0.382/both 0.331/both 0.335/both 0.296/both 0.257/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-21","date_to":"2026-10-24"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-21..2026-10-24: 5 open of 12
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-21","date_to":"2026-10-24"} -> 12 slots, 5 open
+@rag/pipeline:eval: [openai] chat: 3046 in + 150 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-range] villa want date
+@rag/pipeline:eval:       Q: Is anything free from 21 October to 24 October?
+@rag/pipeline:eval:       note: R-15: "from X to Y" is ONE call with date_from and date_to, not two single days
+@rag/pipeline:eval:       A: No, there are no free slots from 21 October to 24 October 2026. However, the following slots are open:  - **Overnight on 21 October 2026**: ₱16,000.00 (weekday) - **Overnight on 23 October 2026**: ₱20,000.00 (weekend) - **22-Hour Whole Day on 24 October 2026**: ₱27,000.00 (weekend) - **Day Tour on 24 October 2026**: ₱12,000.00 (weekend) - **Overnight on 24 O
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-21","date_to":"2026-10-24"}]; names both ends: true/true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both both]
+@rag/pipeline:eval: [query] "Available ba kayo 24 October for 2 nights?" -> 5 chunks 0.476/both 0.445/both 0.402/both 0.465/both 0.396/both
+@rag/pipeline:eval: [query] dates: {"date_from":"2026-10-24","date_to":"2026-10-25"}
+@rag/pipeline:eval: [bookings] villa rooms 2026-10-24..2026-10-25: 6 open of 6
+@rag/pipeline:eval: [tool] villa check_availability {"date_from":"2026-10-24","date_to":"2026-10-25"} -> 6 slots, 6 open
+@rag/pipeline:eval: [openai] chat: 2949 in + 114 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-nights] villa want date
+@rag/pipeline:eval:       Q: Available ba kayo 24 October for 2 nights?
+@rag/pipeline:eval:       note: "for 2 nights" is the two nights slept: date_from the date, date_to the day after
+@rag/pipeline:eval:       A: Yes po, available ang mga slots natin sa 24 October 2026 for 2 nights, a weekend. Narito ang details:  | Slot               | Status | Price       | |--------------------|--------|-------------| | 22-Hour Whole Day   | open   | ₱27,000.00  | | Day Tour           | open   | ₱12,000.00  | | Overnight          | open   | ₱20,000.00  |  Kung may iba ka pang tano
+@rag/pipeline:eval:       why: calls: [{"date_from":"2026-10-24","date_to":"2026-10-25"}]; names the date: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: [query] reply language: taglish
+@rag/pipeline:eval: [retrieve] villa vector:10 keyword:10 -> fused:5 [both both both both keyword]
+@rag/pipeline:eval: [query] "What time is check-in bukas?" -> 5 chunks 0.464/both 0.426/both 0.401/both 0.372/both 0.278/keyword
+@rag/pipeline:eval: [openai] chat: 2434 in + 37 out, 0 tool calls
+@rag/pipeline:eval: PASS  [date-docs] villa want date
+@rag/pipeline:eval:       Q: What time is check-in bukas?
+@rag/pipeline:eval:       note: trap 10: a documents question with a date gets no date line and no availability check
+@rag/pipeline:eval:       A: Ang check-in po natin bukas is 2:00 PM for Overnight Stay, at 8:00 AM naman for Day Tour at 22-Hour Whole Day. 😊  || 0 tool calls; has 2:00: true
+@rag/pipeline:eval:       why: 0 tool calls; has 2:00: true
+@rag/pipeline:eval: 
+@rag/pipeline:eval: original 8/10 · tool 9/9 · lang 9/10 · date 11/11 · rooms 11/13 · book 4/5 · price 3/3
+@rag/pipeline:eval: 55/61 as intended
+
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    3m45.355s 
+

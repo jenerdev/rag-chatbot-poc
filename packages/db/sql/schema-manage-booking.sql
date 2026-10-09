@@ -7,7 +7,9 @@
 -- stay_payment(), the proof bucket and submit_payment() (12–18), and
 -- guest_stay() redefined IN PLACE with the stay's payment (16). Phase 4:
 -- review_payment(), record_refund(), set_payment_settings() and the
--- confirm-needs-a-note rule (19–23). Phase 6 adds its sections here. NO existing function is
+-- confirm-needs-a-note rule (19–23). Phase 5: the deadlines (pay_by,
+-- review_by, stay_is_due(), expire_due_stays(), 19a–19b; the hold itself is
+-- schema-holds.sql). Phase 6 adds its sections here. NO existing function is
 -- replaced: everything below is added beside what is there, so re-running
 -- an older file cannot undo it (trap 20).
 --
@@ -335,7 +337,8 @@ $$;
 --         "fee": { "kind": "full" } | { "kind": "fixed", "value": 200000 }
 --              | { "kind": "percent", "value": 3000 },   centavos / hundredths of a percent
 --         "pay_within_hours": 24, "review_within_hours": 24,          1–168 (Phase 5 reads them)
---         "terms": "..."                                                ≤ 4000, shown to guests
+--         "terms": "...",                                               ≤ 4000, shown to guests
+--         "hold": "none" | "on_proof" | "on_request"                    Phase 5; absent = none
 --       }
 --
 --     No "payments" key = the tenant takes no payment through the page. A
@@ -360,7 +363,7 @@ begin
     raise exception 'config.payments is an object' using errcode = 'check_violation';
   end if;
   for v_key in select jsonb_object_keys(v_pay) loop
-    if v_key not in ('methods', 'fee', 'pay_within_hours', 'review_within_hours', 'terms') then
+    if v_key not in ('methods', 'fee', 'pay_within_hours', 'review_within_hours', 'terms', 'hold') then
       raise exception 'config.payments has no key "%"', v_key using errcode = 'check_violation';
     end if;
   end loop;
@@ -414,6 +417,10 @@ begin
   if v_pay ? 'terms' and (jsonb_typeof(v_pay->'terms') <> 'string' or char_length(v_pay->>'terms') > 4000) then
     raise exception 'config.payments.terms is text of at most 4000 characters' using errcode = 'check_violation';
   end if;
+  -- Phase 5 (plan § 2.4, § 9 q1): when a stay holds its dates. Absent = none.
+  if v_pay ? 'hold' and coalesce(v_pay->>'hold', '') not in ('none', 'on_proof', 'on_request') then
+    raise exception 'config.payments.hold is "none", "on_proof" or "on_request"' using errcode = 'check_violation';
+  end if;
   return new;
 end;
 $$;
@@ -446,6 +453,12 @@ $$;
 alter table stays add column if not exists required_amount bigint;
 alter table stays drop constraint if exists stays_required_amount;
 alter table stays add constraint stays_required_amount check (required_amount is null or required_amount >= 0);
+-- Phase 5 (plan § 2.5): the deadlines. pay_by: a WEB stay with nothing
+-- verified by then expires (unless a proof sent before it is still being
+-- checked). review_by: set when a proof arrives, the time staff have to
+-- decide it. Null = no deadline (every older stay, every staff stay).
+alter table stays add column if not exists pay_by timestamptz;
+alter table stays add column if not exists review_by timestamptz;
 
 -- Set when a WEB stay is born, from the tenant's settings then and the
 -- stored prices. AFTER INSERT, per statement, so a several-rooms stay is
@@ -458,7 +471,9 @@ set search_path = ''
 as $$
 begin
   update public.stays s
-  set required_amount = public.stay_required(t.total, a.config->'payments'->'fee')
+  set required_amount = public.stay_required(t.total, a.config->'payments'->'fee'),
+      pay_by = case when a.config->'payments' ? 'pay_within_hours'
+                    then now() + make_interval(hours => (a.config->'payments'->>'pay_within_hours')::int) end
   from (
     select n.tenant_id, n.group_id, sum(b.price)::bigint as total
     from (select distinct tenant_id, group_id from born where source = 'web') n
@@ -655,7 +670,12 @@ begin
 
   select jsonb_build_object(
     'reference',   min(s.reference),
-    'status',      v_status,
+    -- 'expired' the moment it is due, before any sweep writes it (§ 2.5).
+    'status',      case when public.stay_is_due(p_tenant_id, v_group) then 'expired' else v_status end,
+    'pay_by',      min(s.pay_by),
+    'review_by',   min(s.review_by),
+    -- schema-holds.sql's columns: when the stay's live hold lapses, or null.
+    'held_until',  max(b.held_until) filter (where b.held and b.held_until > now()),
     'source',      min(b.source),
     'guest_name',  min(b.guest_name),
     'check_in',    min(b.booked_date),
@@ -838,14 +858,84 @@ begin
     raise exception 'The proof of payment did not arrive. Please upload it again.' using errcode = 'invalid_parameter_value';
   end if;
 
+  -- A stay past its payment deadline takes no proof (plan § 2.5): it is
+  -- expired, whether or not the sweep has written the word yet.
+  if public.stay_is_due(p_tenant_id, v_group) then
+    raise exception 'The time to pay for this booking has passed, so it has expired. Please make a new request.'
+      using errcode = 'object_not_in_prerequisite_state';
+  end if;
+
   insert into public.payments (tenant_id, group_id, kind, method, payer_reference, claimed_amount, paid_on, proof_path, idempotency_key)
   values (p_tenant_id, v_group, 'payment', v_method, nullif(btrim(p_payer_reference), ''), p_claimed_amount, p_paid_on, p_proof_path, p_idempotency_key)
   returning id into v_id;
+
+  -- Staff now have review_within_hours to decide it (Phase 5).
+  update public.stays s
+  set review_by = case when v_config->'payments' ? 'review_within_hours'
+                       then now() + make_interval(hours => (v_config->'payments'->>'review_within_hours')::int) end
+  where s.tenant_id = p_tenant_id and s.group_id = v_group;
   return v_id;
 end;
 $$;
 revoke all on function submit_payment(bigint, text, text, text, text, bigint, date, text, uuid) from public, anon;
 grant execute on function submit_payment(bigint, text, text, text, text, bigint, date, text, uuid) to authenticated, service_role;
+
+-- ─── Phase 5: deadlines ──────────────────────────────────────────────────
+
+-- 19a. Is this stay due to expire? ONE place (plan § 2.5): pending, past
+--      pay_by, nothing verified, and no proof sent BEFORE pay_by still
+--      waiting (that one is governed by review_by: staff decide it, the
+--      clock does not). Reads use it at read time, so a stay shows
+--      'expired' the moment it is due; the sweep below writes the word.
+create or replace function stay_is_due(p_tenant_id bigint, p_group_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((
+    select s.pay_by is not null
+       and s.pay_by < now()
+       and public.stay_status(s.tenant_id, s.group_id) = 'pending'
+       and not exists (select 1 from public.payments p
+                       where p.tenant_id = s.tenant_id and p.group_id = s.group_id and p.kind = 'payment'
+                         and (p.status = 'verified' or (p.status = 'submitted' and p.created_at <= s.pay_by)))
+    from public.stays s
+    where s.tenant_id = p_tenant_id and s.group_id = p_group_id
+  ), false)
+$$;
+
+-- 19b. The sweep: every due stay of the tenant → 'expired', as the system
+--      (its events say so). Idempotent: a second run matches nothing.
+--      SECURITY DEFINER so the word is written as 'system' whoever asks;
+--      it checks its caller: staff of the tenant, or service_role. Called
+--      when staff load the Bookings screen or the Payments queue.
+create or replace function expire_due_stays(p_tenant_id bigint)
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_count int;
+begin
+  if coalesce(auth.jwt() ->> 'role', '') <> 'service_role'
+     and (p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_staff()) then
+    raise exception 'expire_due_stays: not staff of tenant %', p_tenant_id using errcode = 'insufficient_privilege';
+  end if;
+  perform set_config('app.actor', 'system', true);
+  update public.bookings b
+  set status = 'expired', decision_note = 'Not paid in time'
+  where b.tenant_id = p_tenant_id and b.status = 'pending'
+    and public.stay_is_due(b.tenant_id, b.group_id);
+  get diagnostics v_count = row_count;
+  perform set_config('app.actor', '', true);
+  return v_count;
+end;
+$$;
+revoke all on function expire_due_stays(bigint) from public, anon;
+grant execute on function expire_due_stays(bigint) to authenticated, service_role;
 
 -- ─── Phase 4: staff verify, reject, refund; the settings; the note rule ───
 
@@ -933,6 +1023,8 @@ begin
   end if;
 
   v_money := public.stay_payment(p_tenant_id, v_pay.group_id);
+  -- A proof sent BEFORE pay_by keeps its stay alive (stay_is_due() is false
+  -- for it), so it can still be verified and confirmed after the deadline.
   if p_action = 'verify' and coalesce(p_confirm, false) and (v_money->>'enough')::boolean
      and public.stay_status(p_tenant_id, v_pay.group_id) = 'pending' then
     update public.bookings

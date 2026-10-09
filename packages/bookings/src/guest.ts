@@ -35,6 +35,12 @@ export interface GuestStay {
   price: { base: number | null; extraGuests: number | null; surcharge: number | null; discount: number | null; total: number | null };
   timezone: string;
   currency: string;
+  /** Phase 5: pay by then, or the stay expires; null = no deadline */
+  payBy: string | null;
+  /** Phase 5: staff decide the proof by then */
+  reviewBy: string | null;
+  /** Phase 5: the dates are held for this guest until then; null = not held */
+  heldUntil: string | null;
   /** stay_payment(): DERIVED from the payments rows, never stored (plan Rule 3) */
   payment: StayPayment;
   /** every proof sent and every refund recorded, oldest first; never the file's path or who reviewed it */
@@ -146,6 +152,9 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
     },
     timezone: text(r.timezone, 'timezone'),
     currency: text(r.currency, 'currency'),
+    payBy: optionalText(r.pay_by, 'pay_by'),
+    reviewBy: optionalText(r.review_by, 'review_by'),
+    heldUntil: optionalText(r.held_until, 'held_until'),
     payment: parsePayment(r.payment),
     payments: (Array.isArray(r.payments) ? r.payments : []).map((p, i) => {
       const x = p as Record<string, unknown>;

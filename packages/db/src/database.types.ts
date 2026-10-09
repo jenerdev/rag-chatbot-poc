@@ -563,6 +563,10 @@ export interface Database {
           during: string;
           /** `check (status in ('pending','confirmed','cancelled','expired'))`; 'expired' since schema-manage-booking.sql */
           status: 'pending' | 'confirmed' | 'cancelled' | 'expired';
+          /** schema-holds.sql: the row holds its span while the guest pays (a flag bookings_no_overlap reads) */
+          held: boolean;
+          /** when the hold lapses; reads compare it with now() */
+          held_until: string | null;
           guest_name: string;
           guest_phone: string | null;
           guest_count: number | null;
@@ -674,6 +678,10 @@ export interface Database {
           created_at: string;
           /** what must be verified before the stay may be confirmed (stay_required()); null = not tracked */
           required_amount: number | null;
+          /** Phase 5: a web stay with nothing verified by then expires; null = no deadline */
+          pay_by: string | null;
+          /** Phase 5: set when a proof arrives, the time staff have to decide it */
+          review_by: string | null;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;
@@ -890,6 +898,21 @@ export interface Database {
       set_payment_settings: {
         Args: { p_tenant_id: number; p_payments: Json | null };
         Returns: Json;
+      };
+      /** schema-manage-booking.sql § 19b: every due stay of the tenant → expired, as the system; staff or service_role */
+      expire_due_stays: {
+        Args: { p_tenant_id: number };
+        Returns: number;
+      };
+      /** schema-manage-booking.sql § 19a: pending, past pay_by, nothing verified, no proof sent in time */
+      stay_is_due: {
+        Args: { p_tenant_id: number; p_group_id: string };
+        Returns: boolean;
+      };
+      /** schema-holds.sql: the ONE taken test, confirmed or held and not lapsed */
+      booking_takes: {
+        Args: { p_status: string; p_held: boolean; p_held_until: string | null };
+        Returns: boolean;
       };
       /** schema-manage-booking.sql § 15: the stay's money, derived; staff under RLS, guests through guest_stay() */
       stay_payment: {

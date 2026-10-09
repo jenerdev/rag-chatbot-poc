@@ -14,6 +14,7 @@
 // No money is added up here (CLAUDE.md, Money): each stay's figures are
 // stay_payment()'s, called once per stay on the list.
 
+import { expireDueStays } from './deadlines.js';
 import { BookingConflictError, BookingInputError } from './errors.js';
 import type { PaymentStatus, StayPayment } from './guest.js';
 import { PROOF_BUCKET } from './payments.js';
@@ -67,6 +68,8 @@ export interface PaymentSettings {
   payWithinHours: number | null;
   reviewWithinHours: number | null;
   terms: string | null;
+  /** Phase 5 (§ 9 q1): when a stay holds its dates; absent = none */
+  hold: 'none' | 'on_proof' | 'on_request';
 }
 
 /** A write's refusal, in the function's own words. */
@@ -85,6 +88,7 @@ function writeError(error: { code?: string; message: string }, what: string): Er
  * (newest first). Each row carries its stay's reference, guest and money.
  */
 export async function listPayments(tenant: BookingTenant, which: 'open' | 'all'): Promise<PaymentRow[]> {
+  await expireDueStays(tenant);
   let query = tenant.db
     .from('payments')
     .select('id, group_id, kind, method, payer_reference, claimed_amount, paid_on, proof_path, status, verified_amount, rejection_reason, note, created_at, reviewed_at')
@@ -248,6 +252,7 @@ export function toConfig(s: PaymentSettings): Record<string, unknown> {
   if (s.payWithinHours !== null) out.pay_within_hours = s.payWithinHours;
   if (s.reviewWithinHours !== null) out.review_within_hours = s.reviewWithinHours;
   if (s.terms?.trim()) out.terms = s.terms.trim();
+  if (s.hold !== 'none') out.hold = s.hold;
   return out;
 }
 
@@ -273,5 +278,6 @@ export function fromConfig(raw: unknown): PaymentSettings | null {
     payWithinHours: num(p.pay_within_hours),
     reviewWithinHours: num(p.review_within_hours),
     terms: str(p.terms),
+    hold: p.hold === 'on_proof' || p.hold === 'on_request' ? p.hold : 'none',
   };
 }

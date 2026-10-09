@@ -7,6 +7,12 @@ import { BookingConflictError } from './errors.js';
 import { takenError, takenMessage } from './taken.js';
 
 describe('takenError', () => {
+  it("passes a hold's words through too (schema-holds.sql)", () => {
+    const error = takenError({ code: '23P01', message: 'taken on 2026-10-20: Garden Room is held for another guest for that slot' });
+    expect(error?.status).toBe(409);
+    expect(error?.message).toBe(takenMessage('2026-10-20', 'Garden Room', true));
+  });
+
   it("passes bookings_pending_not_taken's words through as a 409", () => {
     const error = takenError({ code: '23P01', message: 'taken on 2026-10-20: Garden Room is already confirmed for that slot' });
     expect(error).toBeInstanceOf(BookingConflictError);

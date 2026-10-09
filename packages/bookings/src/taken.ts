@@ -13,17 +13,19 @@
 
 import { BookingConflictError } from './errors.js';
 
-const TAKEN = /^taken on (\d{4}-\d{2}-\d{2}): (.+) is already confirmed for that slot$/;
+// A confirmed night, or (schema-holds.sql, manage-booking Phase 5) a night
+// another guest's stay holds while they pay.
+const TAKEN = /^taken on (\d{4}-\d{2}-\d{2}): (.+) is (already confirmed|held for another guest) for that slot$/;
 
 /** The trigger's refusal as the error the route maps to 409, with its words kept; null for any other error. */
 export function takenError(error: { code?: string; message: string }): BookingConflictError | null {
   if (error.code !== '23P01') return null;
   const match = TAKEN.exec(error.message);
   if (!match) return null;
-  return new BookingConflictError(takenMessage(match[1]!, match[2]!));
+  return new BookingConflictError(takenMessage(match[1]!, match[2]!, match[3] !== 'already confirmed'));
 }
 
-/** "taken on 2026-10-20: Garden Room is already confirmed for that slot", as the trigger writes it. */
-export function takenMessage(date: string, unit: string): string {
-  return `taken on ${date}: ${unit} is already confirmed for that slot`;
+/** "taken on 2026-10-20: Garden Room is already confirmed for that slot" (or "is held for another guest"), as the trigger writes it. */
+export function takenMessage(date: string, unit: string, held = false): string {
+  return `taken on ${date}: ${unit} is ${held ? 'held for another guest' : 'already confirmed'} for that slot`;
 }

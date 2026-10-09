@@ -52,10 +52,13 @@ const BADGE: Record<GuestStatus, { label: string; tone: string }> = {
   expired: { label: 'Expired', tone: '' },
 };
 
-function nextStep(status: GuestStatus, businessName: string): string {
-  switch (status) {
-    case 'pending':
-      return `${businessName} has your request and will confirm it. Until they do, the dates are not held, and someone else may book them.`;
+function nextStep(stay: Found, businessName: string): string {
+  switch (stay.guestStatus) {
+    case 'pending': {
+      const held = stay.heldUntil ? ` Your dates are held for you until ${instantLabel(stay.heldUntil, stay.timezone)}.` : ' Until they do, the dates are not held, and someone else may book them.';
+      const due = stay.payBy && !stay.payment.open && stay.payment.status !== 'not_tracked' ? ` Please pay by ${instantLabel(stay.payBy, stay.timezone)}, or the request expires.` : '';
+      return `${businessName} has your request and will confirm it.${held}${due}`;
+    }
     case 'confirmed':
       return `Your stay is confirmed. ${businessName} will contact you if anything changes.`;
     case 'completed':
@@ -125,7 +128,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
               <strong className="reference">{stay.reference}</strong>
               <span className={`badge ${badge.tone}`}>{badge.label}</span>
             </div>
-            <p className={stay.guestStatus === 'pending' ? 'notice warn' : 'notice'}>{nextStep(stay.guestStatus, businessName)}</p>
+            <p className={stay.guestStatus === 'pending' ? 'notice warn' : 'notice'}>{nextStep(stay, businessName)}</p>
             <div className="stay-summary">
               <div className="stay-summary-title">
                 {stay.guestName}

@@ -21,6 +21,9 @@ const raw = {
   timezone: 'Asia/Manila',
   currency: 'PHP',
   payment: { status: 'unpaid', price: 450000, required: 135000, received: 0, outstanding: 450000, enough: false, open: false },
+  pay_by: '2026-10-11T03:00:00+00:00',
+  review_by: null,
+  held_until: null,
   payments: [],
   pay: {
     methods: [{ kind: 'gcash', label: 'GCash', account_name: 'Harbor Inn', account_number: '0917 000 0000' }],
@@ -35,6 +38,8 @@ describe('parseGuestStay', () => {
     expect(stay.guestName).toBe('Maria Santos');
     expect(stay.rooms).toEqual([{ unit: 'Garden Room', slot: 'Overnight', guests: 2 }]);
     expect(stay.price).toEqual({ base: 400000, extraGuests: 0, surcharge: 50000, discount: 0, total: 450000 });
+    expect(stay.payBy).toBe('2026-10-11T03:00:00+00:00');
+    expect(stay.heldUntil).toBeNull();
   });
 
   it('is null for a miss, whatever the reason (the function returns null)', () => {

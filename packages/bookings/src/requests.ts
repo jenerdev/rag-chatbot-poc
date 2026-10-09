@@ -22,6 +22,7 @@
 // model: the chatbot has no tool that reaches this file (D-037).
 
 import { MAX_STAY_NIGHTS } from './constants.js';
+import { expireDueStays } from './deadlines.js';
 import { bookingsConfig, decisionNote, requireConfig, listSlots, RETIRED } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
@@ -372,6 +373,7 @@ export async function requestBooking(
  */
 export async function listRequests(tenant: BookingTenant, range: { from?: unknown } = {}): Promise<BookingRequest[]> {
   const { timezone } = await requireConfig(tenant);
+  await expireDueStays(tenant);
   const today = localDate(timezone);
   const from = range.from === undefined || range.from === null || range.from === '' ? today : String(range.from);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new BookingInputError(`"${from}" is not a date. Use YYYY-MM-DD.`);

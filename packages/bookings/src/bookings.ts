@@ -11,6 +11,7 @@
 // requests race (plan/bookings.md § 2.2). The insert is attempted, and
 // Postgres says no.
 
+import { expireDueStays } from './deadlines.js';
 import { randomUUID } from 'node:crypto';
 import {
   MAX_AVAILABILITY_DAYS,
@@ -332,6 +333,7 @@ export async function listBookings(
   filter: { unitId?: unknown } = {},
 ): Promise<BookingSummary[]> {
   const { timezone } = await requireConfig(tenant);
+  await expireDueStays(tenant);
   const { from, to } = validateRange(range, {
     today: localDate(timezone),
     maxDays: MAX_LIST_DAYS,

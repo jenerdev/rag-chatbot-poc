@@ -279,6 +279,8 @@ export const paymentSettingsSchema = z.object({
       payWithinHours: z.number().nullable(),
       reviewWithinHours: z.number().nullable(),
       terms: z.string().nullable(),
+      // Absent = "none", so a caller written before Phase 5 keeps today's rule.
+      hold: z.enum(['none', 'on_proof', 'on_request'], { errorMap: () => ({ message: 'The hold is "none", "on_proof" or "on_request".' }) }).default('none'),
     })
     .nullable(),
 });

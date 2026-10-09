@@ -2637,6 +2637,155 @@ async function manageBookingChecks() {
         `saved ${saved.error?.message ?? saved.data?.methods?.[0]?.label} · tz ${cfg?.config?.timezone} · bad ${bad.error?.code} · off ${off.error?.message ?? ('payments' in (cfg2?.config ?? {}) ? 'STILL ON' : 'off')}`,
       );
     }
+
+    // 145–150 are manage-booking Phase 5: deadlines and holds
+    // (schema-holds.sql). Fresh Mondays in May 2027, so nothing above is met.
+    const baseConfig = { timezone: 'Asia/Manila', booking_type: 'per_room' };
+    const setPay = async (hold) => {
+      const { error } = await supabase.from('tenant_applications')
+        .update({ config: { ...baseConfig, payments: { methods: [{ kind: 'gcash', label: 'GCash' }], fee: { kind: 'full' }, pay_within_hours: 24, review_within_hours: 24, hold } } })
+        .eq('tenant_id', probe.id).eq('application_key', 'bookings');
+      if (error) throw new Error(`settings ${hold}: ${error.message}`);
+    };
+    let contactN = 0;
+    const requestStay = async (u, day) => {
+      contactN++;
+      const who = { email: `hold.probe.${contactN}@example.com`, phone: `0919${String(10000000 + contactN).slice(1)}` };
+      const r = await supabase.rpc('request_booking', {
+        p_tenant_id: probe.id, p_slot_id: slotRow.id, p_unit_ids: [unit[u]], p_guests: [1], p_check_in: day, p_nights: 1,
+        p_name: 'Hold Probe', p_phone: who.phone, p_email: who.email, p_notes: null,
+      });
+      if (r.error) return { error: r.error };
+      const { data: g } = await supabase.from('bookings').select('group_id').eq('tenant_id', probe.id).eq('reference', r.data[0].reference).limit(1).single();
+      return { ref: r.data[0].reference, group: g.group_id, ...who };
+    };
+    const rowsOf = async (group) => (await supabase.from('bookings').select('status, held, held_until').eq('tenant_id', probe.id).eq('group_id', group)).data ?? [];
+    const slotState = async (u, day) => {
+      const { data } = await chat.rpc('check_room_availability', { p_tenant_id: probe.id, p_from: day, p_to: day, p_slot: null, p_unit: u, p_guests: null });
+      return data?.[0]?.status;
+    };
+    const proofFor = async (stay) => chat.rpc('submit_payment', {
+      p_tenant_id: probe.id, p_reference: stay.ref, p_contact: stay.email, p_proof_path: await uploadProof(), p_method: 'GCash',
+      p_claimed_amount: 100000, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+    });
+
+    // 145. hold "none" (today's rule, D-070): two requests share a night and
+    //      the night stays open.
+    {
+      await setPay('none');
+      const r1 = await requestStay('A', '2027-05-03');
+      const r2 = await requestStay('A', '2027-05-03');
+      const state = await slotState('A', '2027-05-03');
+      const held = [...(await rowsOf(r1.group)), ...(await rowsOf(r2.group))].some((r) => r.held);
+      check(
+        !r1.error && !r2.error && state === 'open' && !held,
+        'manage: with hold "none", two requests share a night, nothing is held, the night is open (D-070 stands)',
+        `r1 ${r1.error?.message ?? r1.ref} · r2 ${r2.error?.message ?? r2.ref} · ${state} · held ${held}`,
+      );
+    }
+
+    // 146. on_request: a web stay holds from birth until pay_by; the night
+    //      reads taken; a second request is refused; a staff pending insert
+    //      is refused in the hold's own words; the guest sees heldUntil.
+    let held1 = null;
+    {
+      await setPay('on_request');
+      held1 = await requestStay('A', '2027-05-10');
+      const rows = await rowsOf(held1.group);
+      const { data: s } = await supabase.from('stays').select('pay_by').eq('tenant_id', probe.id).eq('group_id', held1.group).single();
+      const state = await slotState('A', '2027-05-10');
+      const second = await requestStay('A', '2027-05-10');
+      const staffInsert = await staff.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.A, slot_id: slotRow.id, booked_date: '2027-05-10', guest_name: 'Walk-in', guest_count: 1 }).select('id');
+      const guest = (await lookup(held1.ref, held1.email)).data;
+      check(
+        rows.every((r) => r.held && r.held_until === s?.pay_by) && state === 'taken' && second.error?.code === '23P01'
+          && staffInsert.error?.code === '23P01' && /held for another guest/.test(staffInsert.error.message) && guest?.held_until,
+        'manage: on_request holds a web stay until pay_by; the night is taken; a second request and a staff booking are refused (the hold\'s words)',
+        `rows ${JSON.stringify(rows)} pay_by ${s?.pay_by} · ${state} · second ${second.error?.code} · staff ${staffInsert.error?.code} "${staffInsert.error?.message}" · guest held_until ${guest?.held_until}`,
+      );
+    }
+
+    // 147. A lapsed hold blocks nothing, with no job: the read says open at
+    //      once, and the next insert releases it and lands.
+    {
+      await supabase.from('bookings').update({ held_until: new Date(Date.now() - 60000).toISOString() }).eq('tenant_id', probe.id).eq('group_id', held1.group);
+      const state = await slotState('A', '2027-05-10');
+      const next = await requestStay('A', '2027-05-10');
+      const old = await rowsOf(held1.group);
+      check(
+        state === 'open' && !next.error && old.every((r) => !r.held && r.status === 'pending'),
+        'manage: a lapsed hold reads open at once and is released by the next insert, which lands (no job needed)',
+        `${state} · next ${next.error?.message ?? next.ref} · old ${JSON.stringify(old)}`,
+      );
+      held1 = next.error ? held1 : next;
+    }
+
+    // 148. on_proof: no hold at birth; a proof holds until review_by; a
+    //      rejection releases it.
+    {
+      await setPay('on_proof');
+      const r = await requestStay('B', '2027-05-17');
+      const before = await rowsOf(r.group);
+      const sent = await proofFor(r);
+      const during = await rowsOf(r.group);
+      const { data: s } = await supabase.from('stays').select('review_by').eq('tenant_id', probe.id).eq('group_id', r.group).single();
+      const rejected = await admin.rpc('review_payment', { p_tenant_id: probe.id, p_payment_id: sent.data, p_action: 'reject', p_amount: null, p_account_checked: false, p_note: 'probe: blurry', p_confirm: false });
+      const after = await rowsOf(r.group);
+      check(
+        before.every((x) => !x.held) && !sent.error && during.every((x) => x.held && x.held_until === s?.review_by) && !rejected.error && after.every((x) => !x.held),
+        'manage: on_proof holds nothing at birth, holds from the proof until review_by, and a rejection releases it',
+        `before ${JSON.stringify(before)} · sent ${sent.error?.message ?? sent.data} · during ${JSON.stringify(during)} · after ${JSON.stringify(after)}`,
+      );
+    }
+
+    // 149. Expiry: past pay_by with nothing sent, the guest reads "expired"
+    //      before any sweep and cannot pay; the sweep writes it as the system,
+    //      once. A stay whose proof came BEFORE pay_by is left alone.
+    {
+      const late = await requestStay('B', '2027-05-24');
+      const inTime = await requestStay('B', '2027-05-31');
+      const proof = await proofFor(inTime);
+      const past = new Date(Date.now() - 60000).toISOString();
+      await supabase.from('stays').update({ pay_by: past }).eq('tenant_id', probe.id).in('group_id', [late.group, inTime.group]);
+      // the proof must count as sent BEFORE pay_by
+      await supabase.from('payments').update({ created_at: new Date(Date.now() - 120000).toISOString() }).eq('id', proof.data);
+      const guest = (await lookup(late.ref, late.email)).data;
+      const pay = await chat.rpc('submit_payment', {
+        p_tenant_id: probe.id, p_reference: late.ref, p_contact: late.email, p_proof_path: await uploadProof(), p_method: 'GCash',
+        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+      });
+      const swept = await staff.rpc('expire_due_stays', { p_tenant_id: probe.id });
+      const again = await staff.rpc('expire_due_stays', { p_tenant_id: probe.id });
+      const lateRows = await rowsOf(late.group);
+      const inTimeRows = await rowsOf(inTime.group);
+      const { data: ev } = await supabase.from('booking_events').select('actor_kind, to_value, note').eq('tenant_id', probe.id).eq('group_id', late.group).order('id', { ascending: false }).limit(1).single();
+      check(
+        guest?.status === 'expired' && pay.error?.code === '55000' && /time to pay/.test(pay.error.message)
+          && swept.data >= 1 && again.data === 0 && lateRows.every((r) => r.status === 'expired')
+          && inTimeRows.every((r) => r.status === 'pending') && ev?.actor_kind === 'system' && ev.to_value === 'expired',
+        'manage: a due stay reads expired before the sweep and takes no proof; the sweep expires it once, as the system; a proof sent in time keeps its stay',
+        `guest ${guest?.status} · pay ${pay.error?.code} · swept ${swept.error?.message ?? swept.data} again ${again.data} · late ${lateRows.map((r) => r.status)} · in time ${inTimeRows.map((r) => r.status)} · ${JSON.stringify(ev)}`,
+      );
+    }
+
+    // 150. Leaving pending drops the hold: confirming the held stay (with a
+    //      note) leaves it confirmed and not held; cancelling another frees it.
+    {
+      await setPay('on_request');
+      const r = await requestStay('B', '2027-06-07');
+      const heldBefore = (await rowsOf(r.group)).every((x) => x.held);
+      const confirm = await staff.from('bookings').update({ status: 'confirmed', decision_note: 'probe: paid at the desk' }).eq('tenant_id', probe.id).eq('group_id', r.group).select('id');
+      const after = await rowsOf(r.group);
+      const other = await requestStay('A', '2027-06-07');
+      const cancel = await staff.from('bookings').update({ status: 'cancelled', decision_note: 'probe' }).eq('tenant_id', probe.id).eq('group_id', other.group).select('id');
+      const freed = await rowsOf(other.group);
+      check(
+        heldBefore && !confirm.error && after.every((x) => x.status === 'confirmed' && !x.held && x.held_until === null)
+          && !cancel.error && freed.every((x) => x.status === 'cancelled' && !x.held),
+        'manage: confirming a held stay keeps it confirmed and drops the flag; cancelling one frees it',
+        `held ${heldBefore} · ${confirm.error?.message ?? JSON.stringify(after)} · cancel ${cancel.error?.message ?? JSON.stringify(freed)}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {

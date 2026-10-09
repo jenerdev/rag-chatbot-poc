@@ -56,7 +56,7 @@
 
 ## ▶ Next up (do this next)
 
-**Manage booking (2026-10-10, planned; nothing built):**
+**Manage booking (2026-10-10, in progress on `feat/manage-booking`; Phases 0–4 done):**
 [`plan/manage-booking.md`](./plan/manage-booking.md). The guest's Manage
 booking page (reference + email or phone), payment proof and staff
 verification, deadlines and the optional hold, cancel and reschedule
@@ -145,7 +145,9 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   is not a function` after the package rebuilds; a restart fixed it, the
   code was right), and check 137's cancelled stay answered P0002, not
   55000, because check 128 had locked its reference: the lockout wins
-  over the state, which is the order wanted (a stranger learns nothing).
+  over the state, which is the order wanted (a stranger learns nothing). Deviation: the plan put Phase 3's checks in
+  rooms; they are in verify (SQL) and the walk (route + package + bucket),
+  where the probe tenant and the HTTP path already are.
 - [x] Phase 3 committed `340dcf0`.
 - [x] Phase 4, S-14 verification (2026-10-10): SQL sections
   19–23: `payments.note`; `review_payment()` (definer, owner/admin only:
@@ -175,10 +177,48 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   The dev server was restarted first (after package rebuilds, trap 16's
   cousin). Output in `plan/manage-booking/phase4-*`. Not yet: the payment badge on the
   Bookings screen and the dashboard's two counts (plan § 4), owed to a
-  later phase. Deviation: the plan put Phase 3's checks in
-  rooms; they are in verify (SQL) and the walk (route + package + bucket),
-  where the probe tenant and the HTTP path already are.
+  later phase.
 
+- [x] Phase 4 committed `47892eb`.
+- [x] Phase 5, deadlines and holds (2026-10-10).
+  `schema-manage-booking.sql` (edited in place): `hold` in the settings
+  validator; `stays.pay_by` (set at birth from `pay_within_hours`) and
+  `review_by` (set when a proof arrives); `stay_is_due()` and
+  `expire_due_stays()` (definer, writes `expired` as the system);
+  `submit_payment()` refuses a due stay; `guest_stay()` says `expired` the
+  moment a stay is due and carries `pay_by`, `review_by`, `held_until`.
+  **New `schema-holds.sql` (the 24th file):** `bookings.held` /
+  `held_until`, `booking_takes()` (the ONE taken test, and the marker),
+  `bookings_no_overlap` → `status = 'confirmed' or held`, release of lapsed
+  holds before an insert and a Confirm (no job needed), a row leaving
+  pending drops its hold, `hold_stay()` / `release_stay()`, on_request at
+  birth, on_proof when review_by is set, release on reject; and the four
+  readers re-made with `booking_takes()` (`check_availability`,
+  `check_room_availability`, `request_booking`,
+  `bookings_pending_not_taken`, which gains "is held for another guest").
+  Their older copies, and the constraint's, are GUARDED on
+  `booking_takes()` in `schema-customer-booking.sql`,
+  `schema-day-price.sql`, `schema-staff-requests.sql`,
+  `schema-taken-span.sql` (trap 20). `taken.ts` passes the hold's words.
+  `deadlines.ts` sweeps before every staff list; the Bookings screen says
+  "Expired"; the Manage page says the deadline and the hold; the Payments
+  settings choose the hold. verify gains 145–150. Tests
+  13+14+5+114+359+107; typecheck clean. The user ran both files. verify
+  **149/150** (145–150 pass; the known roles check); walks 2/3/4 6/6/6/5
+  (walk 4 first failed its settings check: the route then REQUIRED `hold`;
+  it now defaults to "none"; the rerun also needed a dev-server restart);
+  rooms 50/50; isolation 32/32 and 23/23 + 21/21 both ways; the three
+  baselines and the availability rows from 2026-10-10 **byte-identical to
+  Phase 0** (every tenant is `none`). Battery **55/61** (`original 8/10 ·
+  tool 9/9 · lang 9/10 · date 11/11 · rooms 11/13 · book 4/5 · price
+  3/3`), Phase 0 was 58: `antecedent`, `leak-2`, `book-for-me-harbor` as
+  before; `rt-tagalog` passed 3 of 3 on repeat (a flip); `rt-leak-2` and
+  `lang-tagalog-2` failed 3 of 3 on repeat, but `rt-leak-2`'s retrieval,
+  scores and tool result ("3 slots, 3 open") are byte-identical to Phase
+  0's, and `lang-tagalog-2` calls no tool at all: the model moved with
+  the inputs unchanged (trap 24); nothing reworded. The battery ran beside
+  the walks, which seed and delete harbor rows far from its dates.
+  Output in `plan/manage-booking/phase5-*`.
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.

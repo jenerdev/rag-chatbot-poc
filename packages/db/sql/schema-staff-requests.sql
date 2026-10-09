@@ -95,6 +95,14 @@ create trigger bookings_aa_fill_group_and_reference
 -- 3. request_booking(): schema-promos.sql's body, with the inline reference
 --    loop replaced by booking_reference(). Everything else is byte-for-byte
 --    the same: the lock, the limits, the promo, the one insert in date order.
+-- GUARDED (manage-booking Phase 5, 2026-10-10): schema-holds.sql replaces
+-- this with one that asks booking_takes() (a live hold takes a slot too).
+-- Once that file has run, re-running THIS file must not put the
+-- confirmed-only version back, so the step is skipped (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
 create or replace function request_booking (
   p_tenant_id  bigint,
   p_slot_id    bigint,
@@ -302,7 +310,11 @@ begin
     where b.tenant_id = p_tenant_id and b.group_id = v_group
     order by b.booked_date, un.sort_order, un.name;
 end;
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 
 -- 4. The backfill, counted. Rows with no group are single bookings: each

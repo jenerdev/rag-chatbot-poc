@@ -100,11 +100,25 @@ create index if not exists bookings_tenant_reference_idx on bookings (tenant_id,
 --    fail: the new condition covers fewer rows than the old one.
 --    Dropped and re-added on every run; Postgres re-checks the confirmed
 --    rows, which already satisfy it.
-alter table bookings drop constraint if exists bookings_no_overlap;
+-- GUARDED (manage-booking Phase 5, 2026-10-10): schema-holds.sql replaces
+-- this with one that asks booking_takes() (a live hold takes a slot too).
+-- Once that file has run, re-running THIS file must not put the
+-- confirmed-only version back, so the step is skipped (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
+alter table bookings drop constraint if exists bookings_no_overlap
+$ddl$;
+    execute $ddl$
 alter table bookings add  constraint bookings_no_overlap exclude using gist (
   unit_id with =,
   during  with &&
-) where (status = 'confirmed');
+) where (status = 'confirmed')
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. unit_price(): the calendar first, then weekend/weekday as before. Same
 --    signature, so `create or replace` keeps its grants.
@@ -284,6 +298,14 @@ create trigger bookings_compute_during
 --    `status = 'confirmed'`, to match the constraint (step 5). A date with
 --    only requests on it is open, which is true: nobody has it yet. Same
 --    signature, so `create or replace` keeps its grants.
+-- GUARDED (manage-booking Phase 5, 2026-10-10): schema-holds.sql replaces
+-- this with one that asks booking_takes() (a live hold takes a slot too).
+-- Once that file has run, re-running THIS file must not put the
+-- confirmed-only version back, so the step is skipped (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
 create or replace function check_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -342,7 +364,11 @@ begin
       and u.active
     order by d, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 10. check_room_availability: the schema-extra-guests.sql body with the same
 --     one change. Same signature and return type, so `create or replace`

@@ -25,9 +25,25 @@
 -- ten (D-042): this is the same function.
 
 -- 1. The return type changes, so the function is dropped and re-created.
-drop function if exists public.check_room_availability(bigint, date, date, text, text, int);
+-- GUARDED (manage-booking Phase 5, 2026-10-10): schema-holds.sql replaces
+-- this with one that asks booking_takes() (a live hold takes a slot too).
+-- Once that file has run, re-running THIS file must not put the
+-- confirmed-only version back, so the step is skipped (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
+drop function if exists public.check_room_availability(bigint, date, date, text, text, int)
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 2. § 10's body, with day_price.
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
 create function public.check_room_availability (
   p_tenant_id bigint,
   p_from      date,
@@ -111,7 +127,11 @@ begin
       and (p_guests is null or u.capacity is null or u.capacity >= p_guests)
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 3. A dropped function loses its grants: re-applied, as schema-extra-guests.sql § 5 had them.
 revoke all on function public.check_room_availability(bigint, date, date, text, text, int) from public, anon, authenticated;

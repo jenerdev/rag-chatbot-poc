@@ -42,6 +42,14 @@
 -- request_booking() runs with ''.
 
 -- 1. The function.
+-- GUARDED (manage-booking Phase 5, 2026-10-10): schema-holds.sql replaces
+-- this with one that asks booking_takes() (a live hold takes a slot too).
+-- Once that file has run, re-running THIS file must not put the
+-- confirmed-only version back, so the step is skipped (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.booking_takes(text, boolean, timestamptz)') is null then
+    execute $ddl$
 create or replace function bookings_pending_not_taken() returns trigger
 language plpgsql
 set search_path = ''
@@ -68,7 +76,11 @@ begin
   end if;
   return new;
 end;
-$$;
+$$
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 2. The trigger. BEFORE INSERT only (see above); for each row, so one
 --    clashing room refuses a several-rooms statement whole (plan § 2.3).

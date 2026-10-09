@@ -80,12 +80,13 @@ interface SettingsDraft {
   payWithinHours: string;
   reviewWithinHours: string;
   terms: string;
+  hold: 'none' | 'on_proof' | 'on_request';
 }
 
 const NEW_METHOD: SettingsDraft['methods'][number] = { kind: 'gcash', label: 'GCash', accountName: '', accountNumber: '', instructions: '' };
 
 function toDraft(s: PaymentSettings | null): SettingsDraft {
-  if (!s) return { methods: [{ ...NEW_METHOD }], feeKind: 'full', feeValue: '', payWithinHours: '24', reviewWithinHours: '24', terms: '' };
+  if (!s) return { methods: [{ ...NEW_METHOD }], feeKind: 'full', feeValue: '', payWithinHours: '24', reviewWithinHours: '24', terms: '', hold: 'none' };
   return {
     methods: s.methods.map((m) => ({ kind: m.kind, label: m.label, accountName: m.accountName ?? '', accountNumber: m.accountNumber ?? '', instructions: m.instructions ?? '' })),
     feeKind: s.fee.kind,
@@ -93,6 +94,7 @@ function toDraft(s: PaymentSettings | null): SettingsDraft {
     payWithinHours: s.payWithinHours === null ? '' : String(s.payWithinHours),
     reviewWithinHours: s.reviewWithinHours === null ? '' : String(s.reviewWithinHours),
     terms: s.terms ?? '',
+    hold: s.hold,
   };
 }
 
@@ -253,6 +255,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
           payWithinHours: hours(draft.payWithinHours),
           reviewWithinHours: hours(draft.reviewWithinHours),
           terms: draft.terms.trim() || null,
+          hold: draft.hold,
         },
       },
       'Saved the payment settings. Bookings already made keep the amount they were given.',
@@ -430,6 +433,18 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
               <label htmlFor="review-hours">Hours to review</label>
               <input id="review-hours" type="number" min={1} max={168} value={draft.reviewWithinHours} onChange={(e) => setDraft({ ...draft, reviewWithinHours: e.target.value })} />
             </div>
+          </div>
+          <div className="field">
+            <label htmlFor="pay-hold">Hold the dates</label>
+            <select id="pay-hold" value={draft.hold} onChange={(e) => setDraft({ ...draft, hold: e.target.value as SettingsDraft['hold'] })}>
+              <option value="none">Never: a date is taken only when you confirm</option>
+              <option value="on_proof">From the proof of payment, until you review it</option>
+              <option value="on_request">From the request, until the time to pay ends</option>
+            </select>
+            <span className="small muted">
+              A held date cannot be requested or confirmed by anyone else. Holding from the request lets anyone with a phone number block dates
+              for the hours to pay; holding from the proof is the recommended setting.
+            </span>
           </div>
           <div className="field">
             <label htmlFor="pay-terms">

@@ -185,7 +185,7 @@ function BookingRow({
       {/* D-096: what staff wrote when they confirmed or cancelled it. */}
       {booking.decisionNote && (
         <div className="booking-notes decision-note">
-          {booking.status === 'cancelled' ? 'Cancelled' : 'Confirmed'}: {booking.decisionNote}
+          {booking.status === 'cancelled' ? 'Cancelled' : booking.status === 'expired' ? 'Expired' : 'Confirmed'}: {booking.decisionNote}
         </div>
       )}
     </div>
@@ -225,7 +225,11 @@ function RequestRow({
         <span className="booking-badges">
           {/* D-100: which door it came through; both are decided here. */}
           <span className={request.source === 'web' ? 'badge accent' : 'badge'}>{request.source === 'web' ? 'Web' : 'By staff'}</span>
-          {!pending && <span className={request.status === 'confirmed' ? 'badge ok' : 'badge'}>{request.status === 'confirmed' ? 'Confirmed' : 'Declined'}</span>}
+          {!pending && (
+            <span className={request.status === 'confirmed' ? 'badge ok' : 'badge'}>
+              {request.status === 'confirmed' ? 'Confirmed' : request.status === 'expired' ? 'Expired' : 'Declined'}
+            </span>
+          )}
           {pending && (request.clash || request.closed) && (
             <span className="badge danger">
               <Icon name="alert" size={12} /> {request.closed ? 'Closed date' : 'Clash'}
@@ -254,7 +258,7 @@ function RequestRow({
       {/* D-096: what staff wrote when they decided it. */}
       {request.decisionNote && (
         <div className="booking-notes decision-note">
-          {request.status === 'cancelled' ? 'Declined' : 'Confirmed'}: {request.decisionNote}
+          {request.status === 'cancelled' ? 'Declined' : request.status === 'expired' ? 'Expired' : 'Confirmed'}: {request.decisionNote}
         </div>
       )}
     </div>
@@ -303,7 +307,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const { ask, dialog } = useConfirmDialog();
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'expired'>('all');
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -912,9 +916,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
             </h2>
             <div className="range-nav">
               <div className="segmented" role="group" aria-label="Show bookings">
-                {(['all', 'pending', 'confirmed', 'cancelled'] as const).map((f) => (
+                {(['all', 'pending', 'confirmed', 'cancelled', 'expired'] as const).map((f) => (
                   <button key={f} type="button" aria-pressed={statusFilter === f} onClick={() => setStatusFilter(f)}>
-                    {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                    {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : f === 'expired' ? 'Expired' : 'Cancelled'}
                   </button>
                 ))}
               </div>

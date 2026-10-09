@@ -424,6 +424,8 @@ and accepted with one (q3); a `staff` member's verify is a 403 and
 Postgres refuses it too (q4); staff of tenant A cannot sign B's proof (isolation, both ways).
 
 ### Phase 5 — Deadlines and holds (`schema-holds.sql`)
+
+*Done 2026-10-10:* verify 145–150; with `none`, availability and the three baselines byte-identical to Phase 0; battery 55/61, the three new misses the model's (identical tool results, trap 24). Not enabled: pg_cron (the sweep runs before each staff list).
 `pay_by` / `review_by` at creation, `stay_is_due()`, the sweep, then the
 hold (§ 2.4) behind the setting. **Done when**: with `hold: none`
 everything matches Phase 0 (availability, the three baselines, the
