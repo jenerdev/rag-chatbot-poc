@@ -145,7 +145,37 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   is not a function` after the package rebuilds; a restart fixed it, the
   code was right), and check 137's cancelled stay answered P0002, not
   55000, because check 128 had locked its reference: the lockout wins
-  over the state, which is the order wanted (a stranger learns nothing). Deviation: the plan put Phase 3's checks in
+  over the state, which is the order wanted (a stranger learns nothing).
+- [x] Phase 3 committed `340dcf0`.
+- [x] Phase 4, S-14 verification (2026-10-10): SQL sections
+  19–23: `payments.note`; `review_payment()` (definer, owner/admin only:
+  verify with the amount found and "I checked the account", reject with
+  the guest's reason, verify-and-confirm in one transaction);
+  `record_refund()`; `set_payment_settings()` (writes the `payments` key
+  only: tenant staff have no update policy on the config); the trigger
+  `bookings_confirm_needs_payment_or_note` (§ 9 q3, TRACKED stays only: a
+  staff stay and a tenant without settings confirm as before).
+  `payment-review.ts` (queue, signed proof URL, review, refund, history,
+  settings), six routes (`/payments`, `/payments/[id]`,
+  `/payments/[id]/proof`, `/payments/refund`, `/payments/settings`,
+  `/stays/[groupId]/history`), permissions `payments:read` (every role),
+  `payments:write` and `payments:settings` (owner, admin), the S-14 page
+  and screen (tabs To verify / All payments / Settings; review and history
+  drawers), the nav's Payments link in Bookings. Both Confirm doors say the
+  note rule in words. `lib/percent.ts` now holds the promos' percent
+  helpers, shared. verify gains 139–144; walk
+  `plan/manage-booking-phase4-walk.mjs` (5 checks, real logins). Tests
+  13+14+5+113+359+107; typecheck clean. The user re-ran the file. verify
+  **143/144** (139–144 pass; the known roles check); walk **5/5** (staff's
+  Verify a 403 naming `payments:write`; reject → the guest reads the
+  reason → resend; verify-and-confirm; the 409 on a second review; a
+  refund; the history's seven steps in order with their actors; settings
+  by role); walks 2 and 3 still 6/6; rooms 50/50; isolation 32/32 and
+  23/23 + 21/21 both ways; the three baselines and availability identical.
+  The dev server was restarted first (after package rebuilds, trap 16's
+  cousin). Output in `plan/manage-booking/phase4-*`. Not yet: the payment badge on the
+  Bookings screen and the dashboard's two counts (plan § 4), owed to a
+  later phase. Deviation: the plan put Phase 3's checks in
   rooms; they are in verify (SQL) and the walk (route + package + bucket),
   where the probe tenant and the HTTP path already are.
 

@@ -496,6 +496,8 @@ async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' |
   }
   const closedNight = error ? closedError(error) : null;
   if (closedNight) throw new BookingInputError(`${closedNight.message.replace(' Choose another date.', '')} Decline this request, or reopen the date first.`);
+  // manage-booking § 9 q3: a tracked stay with nothing verified needs a note.
+  if (error?.code === '23514' && /No payment has been verified/.test(error.message)) throw new BookingInputError(error.message);
   if (error) throw new Error(`Could not ${to === 'confirmed' ? 'confirm' : 'decline'} the request: ${error.message}`);
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} request ${groupId} → ${to} (${data.length} row(s))`);

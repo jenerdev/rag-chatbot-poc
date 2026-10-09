@@ -2181,6 +2181,7 @@ async function manageBookingChecks() {
   }
   let userId = null;
   const probeProofs = [];
+  const probeUsers = [];
   try {
     const app = await supabase
       .from('tenant_applications')
@@ -2523,6 +2524,119 @@ async function manageBookingChecks() {
         `chat download ${dl ? 'READ' : 'refused'} · staff ${signError?.message ?? `${body?.length} bytes identical ${body?.equals(PNG)}`}`,
       );
     }
+
+    // 139–144 are manage-booking Phase 4: review, refund, settings, and the
+    // confirm-needs-a-note rule. An ADMIN member joins the probe beside the
+    // staff one, so every refusal of staff has its positive twin.
+    const { data: adminUser, error: adminError } = await supabase.auth.admin.createUser({
+      email: `manage-probe-admin-${Date.now()}@example.com`,
+      password: randomBytes(24).toString('base64url'),
+      email_confirm: true,
+    });
+    if (adminError) throw new Error(`admin user: ${adminError.message}`);
+    probeUsers.push(adminUser.user.id);
+    const adminMember = await supabase.from('memberships').insert({ user_id: adminUser.user.id, tenant_id: probe.id, role: 'admin' });
+    if (adminMember.error) throw new Error(`admin membership: ${adminMember.error.message}`);
+    const admin = asToken(staffToken(probe.id, adminUser.user.id));
+    const { data: openPay } = await supabase.from('payments').select('id').eq('tenant_id', probe.id).eq('status', 'submitted').single();
+    const reviewArgs = (over = {}) => ({ p_tenant_id: probe.id, p_payment_id: openPay.id, p_action: 'verify', p_amount: 30000, p_account_checked: true, p_note: null, p_confirm: true, ...over });
+
+    // 139. Staff read but cannot decide: review, refund and settings are
+    //      42501 for the staff role; nothing changed.
+    {
+      const review = await staff.rpc('review_payment', reviewArgs());
+      const refund = await staff.rpc('record_refund', { p_tenant_id: probe.id, p_group_id: webStay.group_id, p_amount: 100, p_method: 'GCash', p_note: 'x' });
+      const settings = await staff.rpc('set_payment_settings', { p_tenant_id: probe.id, p_payments: null });
+      const { data: still } = await supabase.from('payments').select('status').eq('id', openPay.id).single();
+      check(
+        review.error?.code === '42501' && refund.error?.code === '42501' && settings.error?.code === '42501' && still?.status === 'submitted',
+        'manage: a staff member cannot verify, refund or change payment settings (42501); the proof is still waiting',
+        `review ${review.error?.code ?? 'DONE'} · refund ${refund.error?.code ?? 'DONE'} · settings ${settings.error?.code ?? 'DONE'} · ${still?.status}`,
+      );
+    }
+
+    // 140. The admin's refusals in words: no "I checked the account", more
+    //      than the total, a rejection with no reason.
+    {
+      const unchecked = await admin.rpc('review_payment', reviewArgs({ p_account_checked: false }));
+      const tooMuch = await admin.rpc('review_payment', reviewArgs({ p_amount: 100001 }));
+      const noReason = await admin.rpc('review_payment', reviewArgs({ p_action: 'reject', p_note: '  ' }));
+      check(
+        unchecked.error?.code === '22023' && /checked the account/.test(unchecked.error.message) && tooMuch.error?.code === '22023' && noReason.error?.code === '22023',
+        'manage: verify needs "I checked the account" and an amount up to the total; reject needs a reason (22023, in words)',
+        `unchecked ${unchecked.error?.code} · too much ${tooMuch.error?.code} · no reason ${noReason.error?.code}`,
+      );
+    }
+
+    // 141. Verify-and-confirm: the payment verified with the admin's id, the
+    //      stay confirmed in the same call, two events by staff; a second
+    //      review is 55000.
+    {
+      const done = await admin.rpc('review_payment', reviewArgs());
+      const { data: pay } = await supabase.from('payments').select('status, verified_amount, reviewed_by, account_checked').eq('id', openPay.id).single();
+      const { data: rows } = await supabase.from('bookings').select('status, decision_note').eq('tenant_id', probe.id).eq('group_id', webStay.group_id);
+      const { data: ev } = await supabase.from('booking_events').select('kind, from_value, to_value, actor_kind, actor_user').eq('tenant_id', probe.id).eq('group_id', webStay.group_id).order('id');
+      const again = await admin.rpc('review_payment', reviewArgs());
+      const tail = (ev ?? []).slice(-2);
+      check(
+        !done.error && done.data?.confirmed === true && done.data.payment?.status === 'partially_paid'
+          && pay?.status === 'verified' && pay.verified_amount === 30000 && pay.reviewed_by === adminUser.user.id && pay.account_checked
+          && rows?.every((r) => r.status === 'confirmed' && r.decision_note === 'Payment verified')
+          && tail[0]?.to_value === 'payment:verified' && tail[1]?.to_value === 'confirmed' && tail.every((e) => e.actor_kind === 'staff' && e.actor_user === adminUser.user.id)
+          && again.error?.code === '55000',
+        'manage: verify-and-confirm verifies with the admin\'s id and confirms the stay in one call (two events, by that admin); a second review is 55000',
+        `${done.error?.message ?? JSON.stringify(done.data)} · ${JSON.stringify(pay)} · rows ${rows?.map((r) => r.status).join(',')} · events ${tail.map((e) => e.to_value).join(',')} · again ${again.error?.code}`,
+      );
+    }
+
+    // 142. § 9 q3: a TRACKED pending stay with nothing verified cannot be
+    //      confirmed by staff without a note (23514); with one it can. A
+    //      stay that is not tracked confirmed without a note in 129 already.
+    {
+      const { data: rows2, error: e2 } = await supabase.rpc('request_booking', {
+        p_tenant_id: probe.id, p_slot_id: slotRow.id, p_unit_ids: [unit.B], p_guests: [1], p_check_in: '2027-04-26', p_nights: 1,
+        p_name: 'Unpaid Probe', p_phone: '0918 333 4444', p_email: 'unpaid.probe@example.com', p_notes: null,
+      });
+      if (e2) throw new Error(`request_booking 2: ${e2.message}`);
+      const { data: s2 } = await supabase.from('bookings').select('group_id').eq('tenant_id', probe.id).eq('reference', rows2[0].reference).limit(1).single();
+      const bare = await staff.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', probe.id).eq('group_id', s2.group_id).select('id');
+      const noted = await staff.from('bookings').update({ status: 'confirmed', decision_note: 'Paid in cash at the front desk' }).eq('tenant_id', probe.id).eq('group_id', s2.group_id).select('id');
+      check(
+        bare.error?.code === '23514' && /No payment has been verified/.test(bare.error.message) && !noted.error && noted.data.length === 1,
+        'manage: confirming a tracked stay with nothing verified needs a note (23514 without, done with "Paid in cash")',
+        `bare ${bare.error?.code ?? 'CONFIRMED'} · noted ${noted.error?.message ?? noted.data.length}`,
+      );
+    }
+
+    // 143. A refund: more than received is 22023; 100.00 of 300.00 is
+    //      recorded, and the stay's received drops to 200.00.
+    {
+      const tooMuch = await admin.rpc('record_refund', { p_tenant_id: probe.id, p_group_id: webStay.group_id, p_amount: 30001, p_method: 'GCash', p_note: 'probe' });
+      const ok = await admin.rpc('record_refund', { p_tenant_id: probe.id, p_group_id: webStay.group_id, p_amount: 10000, p_method: 'GCash', p_note: 'probe: partial refund' });
+      const money = await admin.rpc('stay_payment', { p_tenant_id: probe.id, p_group_id: webStay.group_id });
+      check(
+        tooMuch.error?.code === '22023' && !ok.error && money.data?.received === 20000 && money.data.status === 'partially_paid',
+        'manage: a refund over what was received is 22023; 100.00 refunded leaves 200.00 received',
+        `too much ${tooMuch.error?.code} · ok ${ok.error?.message ?? ok.data} · ${JSON.stringify(money.data)}`,
+      );
+    }
+
+    // 144. Settings: the admin's write touches the `payments` key only (the
+    //      timezone stays); a bad shape is 23514; null turns payments off.
+    {
+      const next = { methods: [{ kind: 'bank', label: 'BDO', account_number: '0000-1111' }], fee: { kind: 'full' } };
+      const saved = await admin.rpc('set_payment_settings', { p_tenant_id: probe.id, p_payments: next });
+      const { data: cfg } = await supabase.from('tenant_applications').select('config').eq('tenant_id', probe.id).eq('application_key', 'bookings').single();
+      const bad = await admin.rpc('set_payment_settings', { p_tenant_id: probe.id, p_payments: { methods: [], fee: { kind: 'full' } } });
+      const off = await admin.rpc('set_payment_settings', { p_tenant_id: probe.id, p_payments: null });
+      const { data: cfg2 } = await supabase.from('tenant_applications').select('config').eq('tenant_id', probe.id).eq('application_key', 'bookings').single();
+      check(
+        !saved.error && saved.data?.methods?.[0]?.label === 'BDO' && cfg?.config?.timezone === 'Asia/Manila' && cfg.config.booking_type === 'per_room'
+          && bad.error?.code === '23514' && !off.error && cfg2?.config && !('payments' in cfg2.config) && cfg2.config.timezone === 'Asia/Manila',
+        'manage: set_payment_settings writes the payments key alone; a bad shape is 23514; null turns payments off',
+        `saved ${saved.error?.message ?? saved.data?.methods?.[0]?.label} · tz ${cfg?.config?.timezone} · bad ${bad.error?.code} · off ${off.error?.message ?? ('payments' in (cfg2?.config ?? {}) ? 'STILL ON' : 'off')}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {
@@ -2532,9 +2646,9 @@ async function manageBookingChecks() {
     }
     const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
     if (error) console.log(`WARN  could not delete the manage-probe tenant: ${error.message}`);
-    if (userId) {
-      const { error: userError } = await supabase.auth.admin.deleteUser(userId);
-      if (userError) console.log(`WARN  could not delete the manage-probe user: ${userError.message}`);
+    for (const id of [userId, ...probeUsers].filter(Boolean)) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(id);
+      if (userError) console.log(`WARN  could not delete a manage-probe user: ${userError.message}`);
     }
   }
 }

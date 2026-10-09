@@ -413,6 +413,8 @@ double submit is one row; a PNG named `.pdf` and a 6 MiB file are
 refused; a second submission while one is open is refused in words.
 
 ### Phase 4 — S-14 verification
+
+*Done 2026-10-10:* verify 139–144, walk 5/5 (`plan/manage-booking-phase4-walk.mjs`). The note rule (§ 9 q3) applies to TRACKED stays only. Owed: the Bookings screen's payment badge and the dashboard's two counts (§ 4).
 `review_payment()`, `record_refund()`, the screen, the signed URL, the
 history drawer. **Done when** verify-and-confirm is one statement with
 two events; a rejected proof shows its reason on S-13; partial payment

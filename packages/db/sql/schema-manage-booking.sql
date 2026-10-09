@@ -5,8 +5,9 @@
 -- stays, the `expired` status, booking_events, the guest's one read
 -- (sections 1–11). Phase 3: payment settings, the required amount, payments,
 -- stay_payment(), the proof bucket and submit_payment() (12–18), and
--- guest_stay() redefined IN PLACE with the stay's payment (16). Phases 4
--- and 6 add their sections here. NO existing function is
+-- guest_stay() redefined IN PLACE with the stay's payment (16). Phase 4:
+-- review_payment(), record_refund(), set_payment_settings() and the
+-- confirm-needs-a-note rule (19–23). Phase 6 adds its sections here. NO existing function is
 -- replaced: everything below is added beside what is there, so re-running
 -- an older file cannot undo it (trap 20).
 --
@@ -845,6 +846,216 @@ end;
 $$;
 revoke all on function submit_payment(bigint, text, text, text, text, bigint, date, text, uuid) from public, anon;
 grant execute on function submit_payment(bigint, text, text, text, text, bigint, date, text, uuid) to authenticated, service_role;
+
+-- ─── Phase 4: staff verify, reject, refund; the settings; the note rule ───
+
+-- 19. A staff note on a refund (and anything a reviewer wants to add).
+alter table payments add column if not exists note text;
+alter table payments drop constraint if exists payments_note;
+alter table payments add constraint payments_note check (note is null or char_length(note) <= 500);
+
+-- 20. review_payment(): verify or reject ONE submitted proof (plan § 4,
+--     S-14). SECURITY DEFINER, so no token needs an update policy on
+--     payments; it asks the role itself (D-079): an OWNER or ADMIN of the
+--     token's tenant (app_is_admin()), nobody else (§ 9 q4). Staff read the
+--     queue; they cannot decide it.
+--       verify  the amount FOUND in the account (1 to the stay's total) and
+--               "I checked the account", both required (R-46: a recorded
+--               choice, not a click)
+--       reject  a reason, 1–500 characters, which the guest reads
+--       confirm with verify, and only if the stay is pending and now has
+--               enough: pending → confirmed for the whole stay, in the SAME
+--               transaction. A night taken meanwhile is bookings_no_overlap's
+--               23P01, and then NOTHING changes, the verification included:
+--               staff verify without confirming, and decide the clash.
+--     Errors: 42501 not an owner/admin of this tenant; P0002 no such
+--     payment here; 55000 already reviewed; 22023 the input, in words.
+create or replace function review_payment(
+  p_tenant_id       bigint,
+  p_payment_id      bigint,
+  p_action          text,
+  p_amount          bigint,
+  p_account_checked boolean,
+  p_note            text,
+  p_confirm         boolean
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_pay       public.payments%rowtype;
+  v_price     bigint;
+  v_confirmed int := 0;
+  v_money     jsonb;
+begin
+  if p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_admin() then
+    raise exception 'Only an owner or admin of this business can review payments.' using errcode = 'insufficient_privilege';
+  end if;
+
+  select * into v_pay from public.payments p
+  where p.tenant_id = p_tenant_id and p.id = p_payment_id and p.kind = 'payment'
+  for update;
+  if not found then
+    raise exception 'no such payment' using errcode = 'no_data_found';
+  end if;
+  if v_pay.status <> 'submitted' then
+    raise exception 'This proof was already %.', case v_pay.status when 'verified' then 'verified' else 'rejected' end
+      using errcode = 'object_not_in_prerequisite_state';
+  end if;
+
+  if p_action = 'verify' then
+    v_price := ((public.stay_payment(p_tenant_id, v_pay.group_id))->>'price')::bigint;
+    if p_amount is null or p_amount < 1 or (v_price is not null and p_amount > v_price) then
+      raise exception 'Type the amount you found in the account: more than zero, and no more than the booking''s total.'
+        using errcode = 'invalid_parameter_value';
+    end if;
+    if not coalesce(p_account_checked, false) then
+      raise exception 'Tick "I checked the account" once the money is there. A screenshot alone proves nothing.'
+        using errcode = 'invalid_parameter_value';
+    end if;
+    update public.payments
+    set status = 'verified', verified_amount = p_amount, account_checked = true,
+        reviewed_by = auth.uid(), reviewed_at = now(), note = nullif(btrim(coalesce(p_note, '')), '')
+    where id = v_pay.id;
+  elsif p_action = 'reject' then
+    if char_length(btrim(coalesce(p_note, ''))) not between 1 and 500 then
+      raise exception 'Say why the proof is not accepted (the guest reads it), in at most 500 characters.'
+        using errcode = 'invalid_parameter_value';
+    end if;
+    update public.payments
+    set status = 'rejected', rejection_reason = btrim(p_note), reviewed_by = auth.uid(), reviewed_at = now()
+    where id = v_pay.id;
+  else
+    raise exception 'The action is "verify" or "reject".' using errcode = 'invalid_parameter_value';
+  end if;
+
+  v_money := public.stay_payment(p_tenant_id, v_pay.group_id);
+  if p_action = 'verify' and coalesce(p_confirm, false) and (v_money->>'enough')::boolean
+     and public.stay_status(p_tenant_id, v_pay.group_id) = 'pending' then
+    update public.bookings
+    set status = 'confirmed', decision_note = coalesce(nullif(btrim(coalesce(p_note, '')), ''), 'Payment verified')
+    where tenant_id = p_tenant_id and group_id = v_pay.group_id and status = 'pending';
+    get diagnostics v_confirmed = row_count;
+  end if;
+
+  return jsonb_build_object('payment', v_money, 'confirmed', v_confirmed > 0);
+end;
+$$;
+revoke all on function review_payment(bigint, bigint, text, bigint, boolean, text, boolean) from public, anon;
+grant execute on function review_payment(bigint, bigint, text, bigint, boolean, text, boolean) to authenticated, service_role;
+
+-- 21. record_refund(): staff RECORD a refund they made elsewhere (no money
+--     moves here). Owner or admin; at most what was received; a note saying
+--     how. A refund is a payments row of kind 'refund', verified at once,
+--     so stay_payment() subtracts it like any other row.
+create or replace function record_refund(
+  p_tenant_id bigint,
+  p_group_id  uuid,
+  p_amount    bigint,
+  p_method    text,
+  p_note      text
+)
+returns bigint
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_received bigint;
+  v_tz       text;
+  v_id       bigint;
+begin
+  if p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_admin() then
+    raise exception 'Only an owner or admin of this business can record a refund.' using errcode = 'insufficient_privilege';
+  end if;
+  if not exists (select 1 from public.stays s where s.tenant_id = p_tenant_id and s.group_id = p_group_id) then
+    raise exception 'no such booking' using errcode = 'no_data_found';
+  end if;
+  v_received := ((public.stay_payment(p_tenant_id, p_group_id))->>'received')::bigint;
+  if p_amount is null or p_amount < 1 or p_amount > v_received then
+    raise exception 'A refund is more than zero and no more than what was received.' using errcode = 'invalid_parameter_value';
+  end if;
+  if char_length(btrim(coalesce(p_method, ''))) not between 1 and 40 or char_length(btrim(coalesce(p_note, ''))) not between 1 and 500 then
+    raise exception 'Say how the money was returned (1–40 characters) and add a note (1–500).' using errcode = 'invalid_parameter_value';
+  end if;
+  select a.config->>'timezone' into v_tz from public.tenant_applications a
+  where a.tenant_id = p_tenant_id and a.application_key = 'bookings';
+
+  insert into public.payments (tenant_id, group_id, kind, method, claimed_amount, paid_on, idempotency_key,
+                               status, verified_amount, account_checked, reviewed_by, reviewed_at, note)
+  values (p_tenant_id, p_group_id, 'refund', btrim(p_method), p_amount, (now() at time zone coalesce(v_tz, 'UTC'))::date, gen_random_uuid(),
+          'verified', p_amount, true, auth.uid(), now(), btrim(p_note))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+revoke all on function record_refund(bigint, uuid, bigint, text, text) from public, anon;
+grant execute on function record_refund(bigint, uuid, bigint, text, text) to authenticated, service_role;
+
+-- 22. set_payment_settings(): the Settings tab's ONE write. Owner or admin.
+--     tenant_applications has no update policy for a tenant's own staff
+--     (only super users edit the whole config), so this writes the
+--     `payments` key and nothing else; null removes it (payments off). The
+--     validator (§ 12) checks the shape as for any write.
+create or replace function set_payment_settings(p_tenant_id bigint, p_payments jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_config jsonb;
+begin
+  if p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_admin() then
+    raise exception 'Only an owner or admin of this business can change payment settings.' using errcode = 'insufficient_privilege';
+  end if;
+  update public.tenant_applications a
+  set config = case when p_payments is null or p_payments = 'null'::jsonb then a.config - 'payments'
+                    else jsonb_set(a.config, '{payments}', p_payments) end
+  where a.tenant_id = p_tenant_id and a.application_key = 'bookings'
+  returning a.config into v_config;
+  if v_config is null then
+    raise exception 'no bookings application' using errcode = 'no_data_found';
+  end if;
+  return v_config->'payments';
+end;
+$$;
+revoke all on function set_payment_settings(bigint, jsonb) from public, anon;
+grant execute on function set_payment_settings(bigint, jsonb) to authenticated, service_role;
+
+-- 23. Confirming a TRACKED stay with nothing verified needs a note (§ 9 q3):
+--     "paid in cash", "Viber". The rule is Postgres's, so every door that
+--     confirms meets it: the Requests section, the list's Confirm, a script.
+--     A stay that is not tracked (staff stays; a tenant with no payment
+--     settings) is untouched, as before. BEFORE UPDATE, per row, as the
+--     caller (staff read stays and payments).
+create or replace function bookings_confirm_needs_payment_or_note() returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_required bigint;
+begin
+  if old.status = 'pending' and new.status = 'confirmed' and btrim(coalesce(new.decision_note, '')) = '' then
+    select s.required_amount into v_required from public.stays s
+    where s.tenant_id = new.tenant_id and s.group_id = new.group_id;
+    if v_required is not null and not ((public.stay_payment(new.tenant_id, new.group_id))->>'enough')::boolean then
+      raise exception 'No payment has been verified for this booking yet. Add a note saying why it is confirmed, for example "paid in cash".'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists bookings_confirm_needs_payment_or_note on bookings;
+create trigger bookings_confirm_needs_payment_or_note
+  before update on bookings
+  for each row execute function bookings_confirm_needs_payment_or_note();
 
 -- PostgREST caches the schema: the new table, function and columns are
 -- unknown to it until told.

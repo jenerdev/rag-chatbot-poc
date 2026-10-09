@@ -25,6 +25,7 @@
 //                  confirm or decline a request (customer booking)
 //   guest.ts       the guest's own stay, by reference + email or phone (manage booking)
 //   payments.ts    a guest's proof of payment: checked, uploaded, submitted (manage booking)
+//   payment-review.ts  staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -92,6 +93,21 @@ export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGu
 export type { GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
 export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, sniffProofType, submitProof } from './payments.js';
 export type { ProofInput, ProofType } from './payments.js';
+export {
+  fromConfig as paymentSettingsFromConfig,
+  listPayments,
+  MAX_PAYMENT_ROWS,
+  paymentSettings,
+  PROOF_URL_SECONDS,
+  proofUrl,
+  recordRefund,
+  reviewPayment,
+  setPaymentSettings,
+  stayHistory,
+  stayPayment,
+  toConfig as paymentSettingsToConfig,
+} from './payment-review.js';
+export type { PaymentRow, PaymentSettings, Review, StayEvent } from './payment-review.js';
 export { closedDays } from './closed.js';
 export { calendarDayBookings, calendarDays, calendarSlots } from './occupancy.js';
 export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';

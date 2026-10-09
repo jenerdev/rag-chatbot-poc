@@ -25,6 +25,9 @@ const POSTGRES: Record<Permission, Role[]> = {
   'slots:write': ADMIN_ONLY, // slots_insert/update/delete (schema-slots.sql)
   'promos:read': ADMIN_ONLY, // promos_select is any MEMBER (the staff form lists them); the SCREEN is admin-only, so the route is too
   'promos:write': ADMIN_ONLY, // promos_insert/update/delete → app_is_admin() (schema-promos.sql)
+  'payments:read': ANY_MEMBER, // payments_read / stays_read / booking_events_read → app_is_staff() (schema-manage-booking.sql)
+  'payments:write': ADMIN_ONLY, // review_payment() / record_refund() refuse unless app_is_admin()
+  'payments:settings': ADMIN_ONLY, // set_payment_settings() refuses unless app_is_admin()
   'unanswered:read': ANY_MEMBER, // unanswered_resolutions_read → app_is_staff()
   'unanswered:write': ANY_MEMBER, // unanswered_resolutions_insert/delete → app_is_staff()
   'members:manage': OWNER_ONLY, // memberships_owner_insert/update/delete

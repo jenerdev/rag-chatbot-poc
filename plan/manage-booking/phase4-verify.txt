@@ -1,0 +1,155 @@
+$ node --conditions=react-server --env-file=../../.env tools/verify.mjs
+PASS  read documents  — 21 rows
+PASS  read chunks  — 86 rows
+PASS  read conversations  — 5257 rows
+PASS  read messages  — 12948 rows
+PASS  embedding arrives as a string  — typeof string
+PASS  parses to 1536 finite numbers  — 1536 dims
+PASS  match_chunks rows match MatchRow
+PASS  a chunk is its own nearest neighbour  — chunk 412, top 412
+PASS  self-similarity is 1  — 1.000000
+PASS  results are ordered most-similar first  — 1.000 > 0.673 > 0.654
+PASS  every row has a tenant_id  — documents 0 · chunks 0 · conversations 0 · messages 0
+PASS  a chunk cannot belong to another tenant's document  — 23503 insert or update on table "chunks" violates foreign key constraint "chunks_document_tenant_fk"
+PASS  match_chunks(own tenant) finds the chunk at 1.000000  — top 412 at 1.000000
+PASS  match_chunks(another tenant) returns zero rows  — 0 rows
+PASS  read the bookings tables  — tenant_applications 3 · units 12 · slots 7 · bookings 32
+PASS  villa has bookings, northwind has none  — villa {"timezone":"Asia/Manila"} · northwind 0 rows
+PASS  an unknown timezone is refused  — 22023 time zone "Mars/Olympus_Mons" not recognized
+PASS  during is computed from slot and timezone  — ["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")
+PASS  a supplied during is overwritten  — ["2026-11-01 06:00:00+00","2026-11-02 04:00:00+00")
+PASS  an Overnight blocks the next day's Day Tour  — 23P01 conflicting key value violates exclusion constraint "bookings_no_overlap"
+PASS  back-to-back slots do not overlap  — ["2026-10-05 00:00:00+00","2026-10-05 09:00:00+00") then ["2026-10-05 09:00:00+00","2026-10-05 13:00:00+00")
+PASS  a cancelled booking frees its slot  — ["2026-10-02 00:00:00+00","2026-10-02 09:00:00+00")
+PASS  a booking cannot use another tenant's unit  — 23503 Unit 1 does not belong to tenant 855
+PASS  a booking cannot use another tenant's slot  — 23503 Slot 1 does not belong to tenant 855
+PASS  check_availability matches the constraint  — 2026-10-01 Day Tour open, 2026-10-01 Overnight taken, 2026-10-01 Evening open, 2026-10-02 Day Tour taken, 2026-10-02 Overnight taken, 2026-10-02 Evening open
+PASS  check_availability returns no guest data  — keys: booked_date,slot,status,unit
+PASS  check_availability(northwind) returns zero rows  — 0 rows
+PASS  roles: bookings cannot be switched off while a booking is live  — 23514 Tenant 855 has 1 live booking(s) that have not ended; bookings cannot be switched off
+PASS  roles: switched off once every booking is cancelled  — 1 row deleted
+PASS  no bookings application, no bookings  — 23503 Tenant 855 does not have the bookings application
+PASS  auth: schema-auth.sql is applied  — villa's token sees 30 chunks
+PASS  auth: anon reads 0 chunks and cannot call match_chunks  — 0 rows · 42501 permission denied for function match_chunks
+PASS  auth: RLS alone, documents under villa's token  — 8 rows, 0 foreign, villa has 8
+PASS  auth: RLS alone, chunks under villa's token  — 30 rows, 0 foreign, villa has 30
+PASS  auth: RLS alone, conversations under villa's token  — 3005 rows, 0 foreign, villa has 3005
+PASS  auth: RLS alone, messages under villa's token  — 7752 rows, 0 foreign, villa has 7752
+PASS  auth: match_chunks under its own token finds the chunk  — top 412, want 412
+PASS  auth: match_chunks naming another tenant returns 0 under RLS  — 0 rows
+PASS  auth: a chat token reads 0 bookings  — 0 rows, the probe has 5
+PASS  auth: a chat token cannot insert a booking  — 42501 new row violates row-level security policy for table "bookings"
+PASS  auth: check_availability under its own token  — Day Tour open, Overnight taken, Evening open, Day Tour taken, Overnight taken, Evening open
+PASS  auth: check_availability refuses another tenant's id  — 42501 check_availability: tenant 3 is not the token's tenant
+PASS  auth: app_is_admin() is false for a chat token  — false
+PASS  auth: a chat token reads 0 tenants rows  — 0 rows
+PASS  auth: tenant_public('villa') has only public columns  — keys: assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,suggested_questions,theme
+PASS  auth: staff without a membership cannot insert  — 42501 new row violates row-level security policy for table "documents"
+PASS  auth: a member can insert and delete a document  — deleted 1
+PASS  auth: resolutions are staff-only  — chat insert 42501 · staff insert ok · chat reads 0 · staff reads 1 · staff deletes 1
+PASS  auth: a token for the wrong tenant cannot write or read bookings  — document 42501 · booking 42501 · bookings read 0
+PASS  auth: a Supabase Auth token alone reads 0 chunks  — 0 rows
+PASS  booking types: schema applied, villa has one active unit  — [{"id":1,"active":true,"capacity":45,"description":null}]
+PASS  whole_resort: a supplied price is stored as null  — price null
+PASS  whole_resort: a second active unit is refused  — 23514 A whole-resort tenant has exactly one active unit; tenant 855 would have 2
+PASS  whole_resort: a second inactive unit is allowed  — inserted
+PASS  check_room_availability(no rates) returns 0 rows  — 0 rows; check_availability 6 rows
+PASS  booking_type: "per_bed" refused, "per_room" accepted  — 23514 · per_room ok
+PASS  per_room → whole_resort refused with several active units  — 23514 Tenant 856 has 3 active units; a whole-resort tenant has at most one
+PASS  per_room: two rooms on one night, priced by the database  — Garden 2026-10-05 350000, Family 2026-10-05 600000, Garden 2026-10-09 450000
+PASS  per_room: a group with one clash saves nothing  — 23P01; rows left on 12 Oct: 0
+PASS  per_room: over capacity refused, at capacity allowed  — 3 guests 23514 · 2 guests ok
+PASS  per_room: a room with no rate is refused  — 23514 Unit 2012 has no rate for slot 1214
+PASS  per_room: an inactive room is refused, even with a rate  — 23503 Unit 2013 is not active
+PASS  per_room: a rate edit leaves history alone  — stored 350000, new quote 999900
+PASS  check_room_availability: priced active rooms, no guest data  — Garden Room 2 taken 999900, Family Room 6 taken 600000 · keys booked_date,capacity,day_price,extra_guest_price,extra_person_rate,price,slot,standard_capacity,status,total,unit
+PASS  check_room_availability: 3 guests leaves only the Family Room  — Family Room
+PASS  check_availability skips inactive units  — Family Room,Garden Room,Unpriced Room
+PASS  a type switch is refused while bookings are live  — 23514 Tenant 856 has 1 live booking(s) that have not ended; its booking type cannot change
+PASS  extra guests: a room booking needs a guest count  — 23514 A room booking needs a guest count
+PASS  extra guests: standard above the maximum is refused; 2 of 4 is accepted  — Quad ok · Garden standard 3 of 2: 23514
+PASS  extra guests: unit_quote for 1–4 guests  — 1:350000+0=350000 2:350000+0=350000 3:350000+25000=375000 4:350000+50000=400000
+PASS  extra guests: 3 guests stored as 350000 + 25000, forged values ignored; 5 refused  — 350000 + 25000 = 375000 · 5 guests: 23514
+PASS  extra guests: 2 → 4 guests reprices (at the current rate); the same count keeps the old price  — same count 350000 · 4 guests 410000 (extra 50000)
+PASS  extra guests: room availability shows base, fee and total  — 3 guests 350000 + 25000 = 375000 · no count 350000 + 0 = 350000
+PASS  extra guests: a room with no maximum fits 5 guests; a 2-guest room does not  — Family Room, No Limit
+PASS  auth: unit_rates read by the tenant, written by its staff  — chat sees 5 of 5 · chat insert 42501 · staff insert ok
+PASS  auth: units written by their own staff only  — chat 42501 · staff ok · deactivate false · villa-claiming 42501
+PASS  auth: unit_images staff-only, own folder, 6 per room, path fixed  — chat 42501 · villa folder 23514 · six 6 · 7th 23514 · reorder 9 · repath 42501
+PASS  auth: check_room_availability for its own tenant only  — own 5 rows · villa 42501
+PASS  customer booking: schema applied  — rate_calendar 24 rows
+PASS  whole_resort: unpriced until it has a rate; an older booking stays null  — before null · kept null · after 1600000
+PASS  holidays: weekend rate + surcharge on 24 Dec (₱24,500); a holiday_price wins  — 24 Dec 2000000+50000+400000=2450000 · 23 Dec 1600000+50000+0=1650000 · with holiday_price 2500000+50000+400000=2950000
+PASS  holidays: the stored booking is 2000000 + 50000 + 400000, forged values ignored  — 2000000 + 50000 + 400000 = 2450000
+PASS  request_booking is the only way in: chat insert and anon call refused  — chat insert 42501 · anon 42501
+PASS  request_booking: a 2-night stay is 2 pending rows, one group, priced per night  — 2026-11-19 1650000, 2026-11-20 2050000 · VER-PWCC35 · ends 2026-11-21T04:00:00+00:00
+PASS  a request holds nothing; confirming it over a confirmed night is 23P01, all or nothing  — availability open · staff ok · confirm 23P01 · pending,pending
+PASS  request_booking: a confirmed night is refused up front  — 23P01 That date is no longer available
+PASS  request_booking: another tenant's id or unit is refused, nothing saved  — tenant 42501 · unit 23503 Unit 1 does not belong to tenant 857 · rows 2 → 2
+PASS  request_booking: 14 nights accepted, 15 refused, a 2-night Day Tour refused  — 14 14 rows · 15 22023 · Day Tour 22023
+PASS  request_booking: max_stay_nights and max_advance_days come from the tenant config  — 3 3 rows · 4 22023 "A stay is 1 to 3 nights, not 4" · +250d 22023 "Bookings open 200 days ahead; 2027-07-27 is too far"
+PASS  request_booking: bad phone, email, name and a past date refused; +63 normalised  — 22023,22023,22023,22023 · +63 09170000006
+PASS  request_booking: 3 open requests per phone, the 4th refused (54000)  — ok,ok,54000 · another contact ok
+PASS  request_booking: a slot with no price is refused, nothing saved  — 22023 This slot has no price yet · rows 6 → 6
+PASS  auth: rate_calendar read by the tenant, written by its staff, invisible to villa  — chat sees 1 of 1 · chat insert 42501 · staff ok · villa 0
+PASS  booking_page: an unknown key refused, instructions and guest_hint accepted  — 23514 · ok
+PASS  villa: three rates, Overnight nightly, older bookings unpriced  — 3 rates · nightly Overnight · older priced 0
+PASS  promos: the schema is applied (table, columns, promo_uses)  — ok
+PASS  promos: an admin creates; a chat token sees none and inserts none; a code is unique per tenant, free at another  — create ok/ok · chat sees 0 · chat insert 42501 · dup 23505 · villa 2
+PASS  promo_for_request: a wrong code and another tenant's code are nothing; the code is the promo; outside its dates 'dates'; no code gives the automatic one  — wrong 0 · villa's 0 · right 369 (null) · outside dates · automatic 370
+PASS  request_booking with a code: 10 % off every night, the price net, promo_id and discount stored  — 1600000 − 160000 = 1440000, 1600000 − 160000 = 1440000 · stored 369/160000, 369/160000
+PASS  a fixed promo: on the first night only; max_uses 1 refuses the 2nd request; a cancelled one frees it; promo_uses counts 1  — first 50000,0 · second 23514 · third ok · uses 1
+PASS  the trigger: another tenant's promo is refused; a forged discount is overwritten; an edited promo leaves a stored discount alone  — foreign 23503 · forged null · kept 160000,160000 vs 160000
+PASS  roles: schema-roles.sql is applied (memberships.role, platform_admins)  — 13 memberships · 2 platform admins
+PASS  roles: app_role() reads the row (owner, admin, staff), null for a chat token  — {"owner":"owner","admin":"admin","staff":"staff","chat":null}
+PASS  roles: staff cannot insert a document, admin can  — staff 42501 · admin #755
+PASS  roles: staff can insert and read a booking  — #8523 · reads 1
+PASS  roles: tenants read by the platform only, and the platform reads no tenant table  — chat 0 · staff 0 · platform 6 of 6 · documents 0 chunks 0 bookings 0
+PASS  roles: app_super without a platform_admins row reads 0 tenants  — 0 rows
+PASS  dashboard: a chat token refused; the staff counts equal the truth; money null for staff, present for the owner; another tenant refused  — app 23505 · chat 42501 · staff 1/1/1/1 buckets 30 team {"staff":1,"admins":1,"owners":1} money null · owner money {"pending":0,"perWeek":[{"weekOf":"2026-09-06","co · foreign 42501
+PASS  platform_dashboard: the super user gets counts only, this tenant 3 members / 1 conversation / 1 refusal; a tenant token refused  — 6 tenants · mine {"tenant_id":858,"slug":"roles-probe","business_name":"roles probe","archived_at":null,"members":3,"documents":0,"conversations_30d":1,"refusals_30d":1,"open_unanswered":1,"pending_requests":0,"confirmed_stays_30d":0} · owner 42501
+PASS  roles: the platform edits and archives a tenant; tenant_public hides an archived one  — renamed Probe 2 · archived 1 · public while archived 0 · after 1
+PASS  roles: theme, url, name and slug shapes refused; a valid theme accepted  — 5 refused · valid accepted
+PASS  roles: suggested questions set by the platform, read by anon in order, bad shapes refused, null clears  — 6 refused · public ["What rooms do you have?","Do you allow pets?"] · cleared null
+PASS  roles: max_stay_nights and max_advance_days validated by the trigger  — 4 refused · 7 / 90 accepted
+PASS  roles: member_emails() lists the tenant to its members, refuses a chat token and another tenant  — 3 members with emails · chat 42501 · villa 42501
+PASS  roles: user_id_by_email() for an owner (trimmed, any case), null when unknown, refused for staff  — found true · missing null · staff 42501
+PASS  roles: a member reads its tenant's memberships, a chat token none  — staff 3 · chat 0
+FAIL  roles: an owner changes a role in its tenant only; staff changes nothing  — owner→ 1 row · staff→ 0 · across tenants 0 · villa still admin,staff,admin,owner
+PASS  roles: the last owner cannot leave or step down; with a second owner it can  — delete 23514 · demote 23514 · second owner 1 · then delete 1
+PASS  calendar: a chat token refused, the staff token answered with 7 days, another tenant refused  — chat 42501/42501 · staff 7 days · foreign 42501
+PASS  calendar: each date of the seeded week is available / partial / full / closed / holiday with one two-room pending stay / partial with a pending / weekend  — 01 available 0/4 p0 weekday | 02 partial 1/4 p0 weekday | 03 full 4/4 p0 weekday | 04 closed 0/4 p0 closed "Probe closed" !book | 05 available 0/4 p1 holiday "Probe holiday" | 06 partial 1/4 p1 weekend | 07 available 0/4 p0 weekend
+PASS  calendar: 28 slot rows, the closed date closed in every slot, the two-room stay pending once on each of its rooms  — 28 rows · closed closed,closed,closed,closed · 5th A/Day {"day":"2027-03-05","unit_id":2021,"unit":"A","slot_id":1218,"slot":"Day","state":"open","pending":1}
+PASS  calendar: one room gives its half; another tenant's room gives nothing; a retired room is `none`, not available  — A 2222222 3rd full · villa's room 0 rows · retired none,none,none,closed,none,none,none
+PASS  calendar: the Day view's bookings are the ones overlapping each slot; a chat token refused  — 3rd A/Day:confirmed,A/Evening:confirmed,B/Day:confirmed,B/Evening:confirmed · 5th A/Day:pending,B/Day:pending · chat 42501
+PASS  calendar: 62 days answered, 63 and a reversed range refused  — 62 62 · 63 22023 · reversed 22023
+PASS  manage: one stay per group (a two-room insert is one), every group has its stay, staff read 3, a chat token 0  — probe stays 3 · groups without a stay 0 · staff 3 · chat 0
+PASS  manage: guest_stay finds a stay by reference + email or phone, guest-facing columns only  — email pending 2 rooms total 200000 · phone MAN-3PRCBC · keys check_in,created_at,currency,ended,ends_at,guest_name,nights,pay,payment,payments,price,reference,rooms,source,starts_at,status,timezone
+PASS  manage: a wrong contact, an unknown reference and a stay with no contact are all null; another tenant's id is refused  — wrong null · unknown null · no contact null · foreign 42501 · twin MAN-2MXF3W
+PASS  manage: after 5 misses the right pair is null for that reference only; the misses are counted and unreadable  — locked null · other MAN-3PRCBC · misses 5 · chat read 0
+PASS  manage: one created event per stay, one status event per statement with the staff user and the note; staff read them, a chat token none  — stay 1 created:>pending/system/2 status:pending>confirmed/staff/2 · stay 2 last "probe: guest called" · staff 5/5 · chat 0
+PASS  manage: no token writes the event log (insert refused, update and delete touch 0)  — insert 42501 · update 0 · delete 0 · 5 → 5
+PASS  manage: 'expired' is accepted and logged; an unknown status is 23514  — expired 1 · bogus 23514 · event {"actor_kind":"system","from_value":"pending","to_value":"expired"}
+PASS  manage: deleting the last booking of a stay removes the stay and its events; a stay with bookings cannot go  — blocked 23503 · stay left 0 · events left 0
+PASS  manage: stay_required (full, fixed, fixed capped, percent rounded UP); five bad settings refused, a good one kept  — 450000,200000,450000,33331,30000 · refused 23514,23514,23514,23514,23514 · set ok
+PASS  manage: a web stay is born with its required amount (30 % of 1,000.00 = 300.00); a staff stay is not tracked; the guest sees unpaid and how to pay  — web 30000 · staff null · guest {"open":false,"price":100000,"enough":false,"status":"unpaid","received":0,"required":30000,"outstanding":100000} methods 2 · staff stay not_tracked
+PASS  manage: submit_payment refuses a wrong method, a missing file, too much and a future date (22023); a double click is one row; a second proof while one is open is 55000 in words  — method 22023 · object 22023 · amount 22023 · date 22023 · first 4 again 4 · second 55000 "A payment for this booking is already being checked. Please wait for the resort to review it." · rows 1
+PASS  manage: the guest sees the proof as being checked (no file path); staff read the row and stay_payment(); a chat token reads none; the log has it, by the guest  — guest submitted/1 · staff 1 · chat 0 · events [{"kind":"payment","to_value":"payment:submitted","actor_kind":"guest","amount":30000}] · stay_payment submitted
+PASS  manage: a not-tracked stay and a cancelled one take no payment (55000); the wrong contact is a miss (P0002); another tenant's id is 42501  — not tracked 55000 "This booking does not take payment on this page. Please contact the resort." · cancelled P0002 · miss P0002 · foreign 42501
+PASS  manage: a chat token cannot read a proof back; staff sign a URL that serves it  — chat download refused · staff 70 bytes identical true
+PASS  manage: a staff member cannot verify, refund or change payment settings (42501); the proof is still waiting  — review 42501 · refund 42501 · settings 42501 · submitted
+PASS  manage: verify needs "I checked the account" and an amount up to the total; reject needs a reason (22023, in words)  — unchecked 22023 · too much 22023 · no reason 22023
+PASS  manage: verify-and-confirm verifies with the admin's id and confirms the stay in one call (two events, by that admin); a second review is 55000  — {"payment":{"open":false,"price":100000,"enough":true,"status":"partially_paid","received":30000,"required":30000,"outstanding":70000},"confirmed":true} · {"status":"verified","verified_amount":30000,"reviewed_by":"c44ba0f8-cb1c-417b-99b6-51329f1c789c","account_checked":true} · rows confirmed · events payment:verified,confirmed · again 55000
+PASS  manage: confirming a tracked stay with nothing verified needs a note (23514 without, done with "Paid in cash")  — bare 23514 · noted 1
+PASS  manage: a refund over what was received is 22023; 100.00 refunded leaves 200.00 received  — too much 22023 · ok 5 · {"open":false,"price":100000,"enough":false,"status":"partially_paid","received":20000,"required":30000,"outstanding":80000}
+PASS  manage: set_payment_settings writes the payments key alone; a bad shape is 23514; null turns payments off  — saved BDO · tz Asia/Manila · bad 23514 · off off
+
+documents 21 · chunks 86 · conversations 5257 · messages 12948
+
+1 CHECK(S) FAILED
+[ELIFECYCLE] Command failed with exit code 1.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in C:
+  │ \Users\65813\Desktop\Projects\implementations\rag-chatbot-poc\packages\db
+

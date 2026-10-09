@@ -238,6 +238,51 @@ export const manageLookupSchema = z.object({
   }),
 });
 
+/**
+ * S-14 (plan/manage-booking.md Phase 4): verify or reject one proof. The
+ * amount is pesos as typed, parsed by string (lib/money.ts); review_payment()
+ * decides the rest in words (the range, "I checked the account", a reason).
+ */
+export const reviewPaymentSchema = z.object({
+  action: z.enum(['verify', 'reject'], { errorMap: () => ({ message: 'The action is "verify" or "reject".' }) }),
+  amount: z.string({ invalid_type_error: 'The amount must be text, like 1500 or 1,500.00' }).nullish(),
+  accountChecked: z.boolean({ invalid_type_error: '"I checked the account" is true or false' }).optional(),
+  note: z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish(),
+  confirm: z.boolean({ invalid_type_error: '"confirm" is true or false' }).optional(),
+});
+
+/** A refund made elsewhere, recorded (record_refund() checks it against what was received). */
+export const recordRefundSchema = z.object({
+  groupId: z.string({ required_error: 'Which booking?', invalid_type_error: 'Which booking?' }),
+  amount: z.string({ required_error: 'The amount refunded is required', invalid_type_error: 'The amount must be text, like 1500' }),
+  method: z.string({ required_error: 'How was it returned?', invalid_type_error: 'How was it returned?' }),
+  note: z.string({ required_error: 'A note is required', invalid_type_error: 'The note must be text.' }),
+});
+
+const payMethod = z.object({
+  kind: z.enum(['gcash', 'bank', 'other'], { errorMap: () => ({ message: 'A way to pay is GCash, bank or other.' }) }),
+  label: z.string({ required_error: 'Each way to pay needs a label', invalid_type_error: 'Each way to pay needs a label' }),
+  accountName: z.string().nullish(),
+  accountNumber: z.string().nullish(),
+  instructions: z.string().nullish(),
+});
+
+/** The Settings tab: the whole `payments` setting, or null to turn payments off. The SQL validator decides the limits. */
+export const paymentSettingsSchema = z.object({
+  settings: z
+    .object({
+      methods: z.array(payMethod),
+      fee: z.union([
+        z.object({ kind: z.literal('full') }),
+        z.object({ kind: z.enum(['fixed', 'percent']), value: z.number({ invalid_type_error: 'The fee is a number' }) }),
+      ]),
+      payWithinHours: z.number().nullable(),
+      reviewWithinHours: z.number().nullable(),
+      terms: z.string().nullable(),
+    })
+    .nullable(),
+});
+
 /** The optional note on a decision (D-096): the package bounds it too. */
 const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish();
 

@@ -717,6 +717,8 @@ export async function confirmBooking(tenant: BookingTenant, id: unknown, note?: 
   }
   const closedNight = error ? closedError(error) : null;
   if (closedNight) throw new BookingInputError(`${closedNight.message.replace(' Choose another date.', '')} Cancel this booking, or reopen the date first.`);
+  // manage-booking § 9 q3: a tracked stay with nothing verified needs a note.
+  if (error?.code === '23514' && /No payment has been verified/.test(error.message)) throw new BookingInputError(error.message);
   if (error) throw new Error(`Could not confirm the booking: ${error.message}`);
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} confirmed #${bookingId}${row.group_id ? ` (group ${row.group_id}, ${data.length} row(s))` : ''}`);

@@ -31,6 +31,7 @@ const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   chat: 'chat',
   book: 'book',
   manage: 'search',
+  payments: 'check',
   dashboard: 'chart',
   documents: 'file',
   unanswered: 'help',

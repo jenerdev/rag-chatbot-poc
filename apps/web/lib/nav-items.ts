@@ -22,7 +22,7 @@ export interface NavFeatures {
   book: boolean;
 }
 
-export type NavPage = 'chat' | 'book' | 'manage' | 'dashboard' | 'documents' | 'unanswered' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'documents' | 'unanswered' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
 
 export interface NavItem {
   page: NavPage;
@@ -51,6 +51,8 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
     ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],
     // S-12 (plan/calendar.md, D-103): a view of the same bookings, so the same permission.
     ['calendar', 'Calendar', '/admin/calendar', features.bookings && can(role, 'bookings:read')],
+    // S-14 (plan/manage-booking.md): proofs to verify, refunds, the payment settings.
+    ['payments', 'Payments', '/admin/payments', features.bookings && can(role, 'payments:read')],
     ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read')],
     ['holidays', 'Holidays', '/admin/holidays', features.bookings && can(role, 'holidays:read')],
     ['slots', 'Slots', '/admin/slots', features.bookings && can(role, 'slots:read')],
@@ -72,6 +74,7 @@ const GROUP_OF: Readonly<Partial<Record<NavPage, NavGroup>>> = {
   unanswered: 'Content',
   bookings: 'Bookings',
   calendar: 'Bookings',
+  payments: 'Bookings',
   rooms: 'Bookings',
   holidays: 'Bookings',
   slots: 'Bookings',

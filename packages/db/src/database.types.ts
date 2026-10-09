@@ -722,6 +722,8 @@ export interface Database {
           reviewed_by: string | null;
           reviewed_at: string | null;
           rejection_reason: string | null;
+          /** a reviewer's or refunder's note (Phase 4) */
+          note: string | null;
           created_at: string;
         };
         Insert: Record<never, never>;
@@ -865,6 +867,29 @@ export interface Database {
           p_idempotency_key: string;
         };
         Returns: number;
+      };
+      /** schema-manage-booking.sql § 20: owner/admin verify or reject one proof; verify may confirm the stay in the same transaction */
+      review_payment: {
+        Args: {
+          p_tenant_id: number;
+          p_payment_id: number;
+          p_action: string;
+          p_amount: number | null;
+          p_account_checked: boolean;
+          p_note: string | null;
+          p_confirm: boolean;
+        };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 21: owner/admin record a refund made elsewhere */
+      record_refund: {
+        Args: { p_tenant_id: number; p_group_id: string; p_amount: number; p_method: string; p_note: string };
+        Returns: number;
+      };
+      /** schema-manage-booking.sql § 22: owner/admin write config.payments and nothing else; null turns payments off */
+      set_payment_settings: {
+        Args: { p_tenant_id: number; p_payments: Json | null };
+        Returns: Json;
       };
       /** schema-manage-booking.sql § 15: the stay's money, derived; staff under RLS, guests through guest_stay() */
       stay_payment: {

@@ -573,3 +573,10 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 .pay-history { list-style: none; margin: 0; padding: 0; }
 .pay-history li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .pay-history li > span:first-child { flex: 1; }
+
+/* S-14, Payments (plan/manage-booking.md Phase 4). */
+.plain-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.pay-method-edit { padding: var(--space-3); margin-bottom: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.stay-history { margin: 0 0 var(--space-4); padding-left: var(--space-5); }
+.stay-history li { margin-bottom: var(--space-2); }
+.check-line { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-3); }

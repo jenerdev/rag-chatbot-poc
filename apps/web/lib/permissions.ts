@@ -42,6 +42,12 @@ export const PERMISSIONS = [
   /** the Promos screen (D-097): discounts, their codes and limits; the read is admin-only because the screen is */
   'promos:read',
   'promos:write',
+  /** S-14 Payments: the proof queue, a proof's signed URL, a stay's history. Any member reads */
+  'payments:read',
+  /** verify, reject, record a refund (§ 9 q4: owners and admins; review_payment() asks again) */
+  'payments:write',
+  /** the Payments screen's Settings tab: ways to pay, the fee, the terms */
+  'payments:settings',
   'unanswered:read',
   /** resolve and reopen */
   'unanswered:write',
@@ -50,8 +56,8 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'unanswered:read', 'unanswered:write'];
-const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write'];
+const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'payments:read', 'unanswered:read', 'unanswered:write'];
+const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write', 'payments:write', 'payments:settings'];
 const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
 
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
