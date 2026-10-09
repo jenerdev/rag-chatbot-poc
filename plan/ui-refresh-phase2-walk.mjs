@@ -125,7 +125,7 @@ try {
   const head = await page.eval("Math.round(document.querySelector('header').getBoundingClientRect().height)");
   check(head <= 64, '5. phone header is one row', `${head}px`);
   check(await page.eval("![...document.querySelectorAll('header nav a')].some(a => a.textContent === 'Chat') && [...document.querySelectorAll('header nav a')].some(a => a.textContent === 'Book')"), '5b. no Chat link on the chat; Book there');
-  check(await page.eval("document.querySelector('header nav a[href$=\"/admin\"] .narrow-hidden')?.textContent === 'Staff login'"), '5c. Staff login: an icon, its words for screen readers');
+  check(await page.eval("!document.querySelector('header nav a[href$=\"/admin\"]')"), '5c. no Staff login on the chat');
   const gap = await page.eval("Math.round(innerHeight - document.querySelector('.composer').getBoundingClientRect().bottom)");
   check(Math.abs(gap) <= 1, '5d. the composer sits on the bottom edge', `${gap}px below it`);
 

@@ -1274,6 +1274,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-09 — no "Staff login" on the chat, on `feat/ui-refresh`
+- **Did:** `tenant-nav.tsx` offers "Staff login" on the public pages but
+  the chat (book and reset keep it); staff reach `/t/<slug>/admin` by its
+  address. A signed-in member still sees Dashboard and Log out there.
+  `plan/ui-refresh-phase2-walk.mjs` check 5c now asserts the absence.
+  Web typecheck clean (exit 0). Walk not re-run.
+
 ### 2026-10-05 — the dashboard's "would clash on Confirm" counts competing pendings (D-098 amended), on master
 - **Did:** the `clashing` subquery also counts a pending stay whose unit
   and span another pending stay wants; the caption says both; the SQL

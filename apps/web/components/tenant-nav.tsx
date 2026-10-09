@@ -6,8 +6,8 @@
 // A staff screen already asks /admin/session for itself, so it passes what it
 // learned as `session`, and its own logout, which also clears its data. The
 // public pages (chat, book, reset) pass nothing, and the nav asks for itself:
-// a visitor with no cookie gets `admin: false` and sees the public links and
-// "Staff login".
+// a visitor with no cookie gets `admin: false` and sees the public links and,
+// on every public page but the chat, "Staff login".
 //
 // Since plan/ui-refresh.md Phase 2 a SIGNED-IN staff page draws its links in
 // the sidebar (staff-frame.tsx), so this header is only ever the public one
@@ -61,8 +61,10 @@ export function TenantNav({
   const role = auth === 'in' ? (session?.role ?? own.role) : null;
   const logout = session?.onLogout ?? ownLogout;
   // A staff page shows its own login form when logged out, so "Staff login"
-  // is offered only from the public pages.
+  // is offered only from the public pages, and not from the chat: that is the
+  // visitor's page, and staff reach /t/<slug>/admin by its address.
   const publicPage = current === 'chat' || current === 'book' || current === 'reset';
+  const offerLogin = publicPage && current !== 'chat';
 
   const all = navItems(slug, features, role);
   const isPublic = (page: NavPage) => page === 'chat' || page === 'book';
@@ -87,7 +89,7 @@ export function TenantNav({
           <span className="narrow-hidden">{staffHome.label}</span>
         </Link>
       )}
-      {auth === 'out' && publicPage && (
+      {auth === 'out' && offerLogin && (
         <Link className="button" href={`/t/${slug}/admin`}>
           <Icon name="user" size={16} />
           <span className="narrow-hidden">Staff login</span>

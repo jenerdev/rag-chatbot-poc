@@ -8167,3 +8167,16 @@ Every write was caught in the browser. Typecheck clean; tests
   now.
 - Three loads were anonymous code (two setups, the chunks); they are named
   functions, so Retry can call them.
+
+---
+
+## 2026-10-09 — the chat stops offering "Staff login"
+
+The chat is the visitor's page; a staff link there was an invitation to
+the wrong audience. `TenantNav` now draws "Staff login" on the book and
+reset pages only (`offerLogin`). Nothing about the session changed: a
+signed-in member on the chat still gets one Dashboard link and Log out,
+and `/t/<slug>/admin` still shows its own login card. The Phase 2 walk's
+5c asserted the old link, so it now asserts no `/admin` link in the chat
+header. Observed: `tsc --noEmit` in apps/web exit 0; the walk was not
+re-run this session.
