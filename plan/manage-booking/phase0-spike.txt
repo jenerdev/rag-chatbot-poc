@@ -1,0 +1,17 @@
+PASS  the bucket is private  — public: false, limit 5242880, types image/jpeg,image/png,image/webp,application/pdf
+PASS  a chat token uploads under its own <tenant>/incoming/  — landed at 67/incoming/68d382bb-8035-4ec7-93c7-56706a8e84c8.png
+PASS  a chat token cannot upload into its own tenant, outside incoming/  — 403 new row violates row-level security policy; landed: false
+PASS  a chat token cannot upload into villa's incoming/  — 403 new row violates row-level security policy; landed: false
+PASS  a chat token uploads a PDF  — landed
+PASS  the bucket refuses SVG  — 415 mime type image/svg+xml is not supported
+PASS  the bucket refuses a file over 5 MiB  — 413 The object exceeded the maximum allowed size
+PASS  a chat token cannot download the proof  — Object not found
+PASS  a chat token lists nothing; harbor staff lists the proof  — chat 0 · staff 2 (ok)
+PASS  a chat token cannot sign a URL  — Object not found
+PASS  a chat token cannot overwrite the proof  — 403 new row violates row-level security policy; bytes unchanged: true
+PASS  harbor staff sign a URL that serves the proof  — 200, 70 bytes, identical: true
+PASS  villa staff cannot sign harbor's proof  — Object not found
+PASS  the public URL serves nothing (private bucket)  — 400
+cleanup: 2 of 2 objects removed
+
+ALL SPIKE CHECKS PASS

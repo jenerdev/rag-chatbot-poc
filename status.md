@@ -56,6 +56,44 @@
 
 ## ▶ Next up (do this next)
 
+**Manage booking (2026-10-10, planned; nothing built):**
+[`plan/manage-booking.md`](./plan/manage-booking.md). The guest's Manage
+booking page (reference + email or phone), payment proof and staff
+verification, deadlines and the optional hold, cancel and reschedule
+requests, `booking_events`. Supersedes `plan/payments.md`.
+- [x] Plan written against `ec8108c`; § 9's seven questions answered
+  2026-10-10: every recommendation taken (hold setting, default `none`,
+  `on_proof` for real tenants; email OR phone; Confirm with nothing
+  verified needs a note; owners and admins verify; reschedule difference
+  becomes outstanding; email after deployment; proofs kept 180 days).
+- [x] Phase 0, baseline (2026-10-10, branch `feat/manage-booking` from
+  `ec8108c`; saved in `plan/manage-booking/phase0-*`): typecheck clean;
+  tests 13+14+5+102+359+104; verify 123/124 (the known roles check);
+  rooms 50/50; bookings isolation 32/32 both ways; pipeline isolation
+  23/23, filters-only 21/21; northwind's prompt and villa's and harbor's
+  tool definitions byte-identical to their baselines; availability from
+  2026-10-10 saved (villa 93, harbor 248 + 124 rows); battery **58/61**
+  (`original 8/10 · tool 9/9 · lang 10/10 · date 11/11 · rooms 13/13 ·
+  book 4/5 · price 3/3`): `antecedent` (known), `leak-2` and
+  `book-for-me-harbor` (the model, trap 24). `tool-open` and `book-for-me`
+  pass again: the battery's date has moved off VIL-FJK939.
+- [x] Phase 0, spike (a), the private bucket (2026-10-10; the user ran
+  Part A): `plan/manage-booking-phase0-spike.mjs` **14/14**, saved in
+  `plan/manage-booking/phase0-spike.txt`. A chat token uploads a PNG and a
+  PDF under `<tenant>/incoming/` and nothing else (outside it, and villa's
+  folder: 403 RLS); it cannot download, list (0), sign or overwrite (403,
+  bytes unchanged); harbor staff list it and sign a URL that serves the
+  identical 70 bytes; villa staff cannot sign it; the public URL is 400;
+  SVG 415, 5 MiB + 1 413. Cleanup 2 of 2 removed. § 2.7 stands as written.
+- [x] Phase 0, spike (b) (2026-10-10, the user ran Part B): `pg_cron`
+  default version 1.6.4, installed version NULL: **available, not
+  enabled**. Only § 2.5's tidy-up sweep would use it; Phase 5 decides
+  whether to enable it.
+- [ ] Spike cleanup, by the user: the `payment-proofs-spike` bucket still
+  exists, empty (checked 2026-10-10). Part C's lines are commented out in
+  the file, so running it as-is does nothing: select the four lines
+  without their `--` and run them. Blocks nothing.
+
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.
@@ -1309,6 +1347,10 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **And:** the Day view shows each overlapping booking's guest
   (`calendar_bookings()`, re-run by the user); verify 123/124 (the known
   roles failure), isolation 16d both ways, walk 3c2, tests web 104.
+- **Committed** `ec8108c` on `feat/calendar` and **merged** into `master`
+  (fast-forward), by the user's instruction, before `pnpm eval`, the axe
+  audit and Phase 6's record (D-103 in decisions.md, CLAUDE.md,
+  whats-done.md): those three are owed, now on `master`.
 - **Phase 5 so far:** typecheck, tests (web 103), isolation both suites
   both ways, rooms, verify 122/123 (known), baselines identical.
 - **Next:** the user's word for `pnpm eval` and the axe audit; then
