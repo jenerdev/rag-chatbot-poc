@@ -275,12 +275,9 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   24 sql files, verify 158, bookings isolation 33), whats-done.md.
 - [ ] Phase 8, owed: the axe audit over S-13 and S-14; **the user's
   browser walk**; then the merge.
-- [ ] Phase 8: walls, walk, record (isolation cases for the new tables,
-  `storage-orphans --expired`, the axe audit over S-13 and S-14, the
-  user's browser walk, D-104–D-109, CLAUDE.md, flow.md, payments.md
-  marked superseded, whats-done). Owed into it: the Bookings screen's
-  payment badge and the dashboard's two counts (§ 4); a Phase 6 HTTP walk;
-  the calendar drawing held nights apart.
+- [ ] Follow-up (not in the plan's phases): the staff calendar drawing
+  held nights apart (they show as taken today).
+
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.
