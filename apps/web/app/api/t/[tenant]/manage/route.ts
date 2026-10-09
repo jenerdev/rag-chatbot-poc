@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { guestStatus, guestStay } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
+import { MANAGE_NOT_FOUND } from '@/lib/manage';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { firstError, manageLookupSchema } from '@/lib/schemas';
@@ -9,8 +10,6 @@ import { withTenantRoute } from '@/lib/tenant';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Every miss, whatever its reason, in the same words (plan Rule 4). */
-const NOT_FOUND = 'We could not find that booking. Check the reference and the email or mobile number you booked with.';
 
 /**
  * Look up a stay for the Manage booking page (plan/manage-booking.md,
@@ -38,7 +37,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   }
 
   const stay = await guestStay(tenant, parsed.data.reference, parsed.data.contact);
-  if (!stay) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });
+  if (!stay) return NextResponse.json({ error: MANAGE_NOT_FOUND }, { status: 404 });
   // The word the guest reads ('completed' is derived, plan § 2.6), decided
   // here so the page never re-derives it.
   return NextResponse.json({ stay: { ...stay, guestStatus: guestStatus(stay) } });

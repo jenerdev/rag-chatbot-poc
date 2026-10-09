@@ -404,6 +404,8 @@ from the booking page. **Done when** a walk finds a web stay by email and
 by phone, fails the same way on every miss, and shows no staff note.
 
 ### Phase 3 — Payment settings and proof
+
+*Done 2026-10-10:* verify 133–138, walk 6/6 (`plan/manage-booking-phase3-walk.mjs`); the checks went to verify and the walk, not rooms.
 The config keys and validator, `payments`, `stay_payment()`,
 `submit_payment()`, the bucket, the upload route. **Done when** rooms
 proves fee full / fixed / percent (rounded **up** to the centavo); a

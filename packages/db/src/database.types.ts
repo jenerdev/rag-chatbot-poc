@@ -672,6 +672,8 @@ export interface Database {
           group_id: string;
           reference: string;
           created_at: string;
+          /** what must be verified before the stay may be confirmed (stay_required()); null = not tracked */
+          required_amount: number | null;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;
@@ -687,12 +689,40 @@ export interface Database {
           actor_kind: 'guest' | 'staff' | 'system';
           /** the staff user's id; null for a guest or the system */
           actor_user: string | null;
-          kind: 'created' | 'status';
+          kind: 'created' | 'status' | 'payment';
           from_value: string | null;
           to_value: string | null;
           /** rows of the group the statement touched */
           row_count: number | null;
           note: string | null;
+          /** kind 'payment': which payments row, and its claimed or verified amount */
+          payment_id: number | null;
+          amount: number | null;
+        };
+        Insert: Record<never, never>;
+        Update: Record<never, never>;
+        Relationships: [];
+      };
+      /** schema-manage-booking.sql § 14: proofs a guest sent (and refunds staff record); staff read, nobody writes through a policy */
+      payments: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          group_id: string;
+          kind: 'payment' | 'refund';
+          method: string;
+          payer_reference: string | null;
+          claimed_amount: number;
+          paid_on: string;
+          proof_path: string | null;
+          idempotency_key: string;
+          status: 'submitted' | 'verified' | 'rejected';
+          verified_amount: number | null;
+          account_checked: boolean;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          rejection_reason: string | null;
+          created_at: string;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;
@@ -820,6 +850,31 @@ export interface Database {
       guest_stay: {
         Args: { p_tenant_id: number; p_reference: string; p_contact: string };
         Returns: Json;
+      };
+      /** schema-manage-booking.sql § 18: the guest's one write here; P0002 a miss, 22023 bad input, 55000 the wrong state */
+      submit_payment: {
+        Args: {
+          p_tenant_id: number;
+          p_reference: string;
+          p_contact: string;
+          p_proof_path: string;
+          p_method: string;
+          p_claimed_amount: number;
+          p_paid_on: string;
+          p_payer_reference: string | null;
+          p_idempotency_key: string;
+        };
+        Returns: number;
+      };
+      /** schema-manage-booking.sql § 15: the stay's money, derived; staff under RLS, guests through guest_stay() */
+      stay_payment: {
+        Args: { p_tenant_id: number; p_group_id: string };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 13: the ONE required-amount rule (a percentage rounds up) */
+      stay_required: {
+        Args: { p_total: number; p_fee: Json };
+        Returns: number | null;
       };
       booking_reference: {
         Args: { p_tenant_id: number };

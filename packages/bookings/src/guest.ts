@@ -35,6 +35,48 @@ export interface GuestStay {
   price: { base: number | null; extraGuests: number | null; surcharge: number | null; discount: number | null; total: number | null };
   timezone: string;
   currency: string;
+  /** stay_payment(): DERIVED from the payments rows, never stored (plan Rule 3) */
+  payment: StayPayment;
+  /** every proof sent and every refund recorded, oldest first; never the file's path or who reviewed it */
+  payments: GuestPayment[];
+  /** how to pay, from the tenant's settings; null when the tenant takes no payment on the page */
+  pay: { methods: PayMethod[]; terms: string | null } | null;
+}
+
+export type PaymentStatus = 'not_tracked' | 'unpaid' | 'submitted' | 'rejected' | 'partially_paid' | 'paid' | 'refunded';
+
+export interface StayPayment {
+  status: PaymentStatus;
+  /** the live rows' stored prices, summed in SQL */
+  price: number | null;
+  /** what must be verified before the stay may be confirmed; null = not tracked */
+  required: number | null;
+  /** verified payments minus verified refunds */
+  received: number;
+  outstanding: number | null;
+  /** received >= required */
+  enough: boolean;
+  /** a proof is being checked: no second one until it is decided */
+  open: boolean;
+}
+
+export interface GuestPayment {
+  kind: 'payment' | 'refund';
+  method: string;
+  claimedAmount: number;
+  verifiedAmount: number | null;
+  paidOn: string;
+  status: 'submitted' | 'verified' | 'rejected';
+  rejectionReason: string | null;
+  createdAt: string;
+}
+
+export interface PayMethod {
+  kind: 'gcash' | 'bank' | 'other';
+  label: string;
+  accountName: string | null;
+  accountNumber: string | null;
+  instructions: string | null;
 }
 
 /** The word a guest reads: `completed` is derived, never stored (plan § 2.6). */
@@ -49,6 +91,10 @@ export const MAX_GUEST_REFERENCE = 20;
 export const MAX_GUEST_CONTACT = 254;
 
 const STATUSES: readonly BookingStatus[] = ['pending', 'confirmed', 'cancelled', 'expired'];
+
+const PAYMENT_STATUSES: readonly PaymentStatus[] = ['not_tracked', 'unpaid', 'submitted', 'rejected', 'partially_paid', 'paid', 'refunded'];
+
+const optionalText = (v: unknown, name: string): string | null => (v === null || v === undefined ? null : text(v, name));
 
 const text = (v: unknown, name: string): string => {
   if (typeof v !== 'string') throw new Error(`guest_stay: ${name} is not text`);
@@ -100,6 +146,63 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
     },
     timezone: text(r.timezone, 'timezone'),
     currency: text(r.currency, 'currency'),
+    payment: parsePayment(r.payment),
+    payments: (Array.isArray(r.payments) ? r.payments : []).map((p, i) => {
+      const x = p as Record<string, unknown>;
+      const kind = text(x.kind, `payments[${i}].kind`);
+      const status = text(x.status, `payments[${i}].status`);
+      if (kind !== 'payment' && kind !== 'refund') throw new Error(`guest_stay: unknown payment kind "${kind}"`);
+      if (status !== 'submitted' && status !== 'verified' && status !== 'rejected') throw new Error(`guest_stay: unknown payment status "${status}"`);
+      return {
+        kind,
+        method: text(x.method, `payments[${i}].method`),
+        claimedAmount: count(x.claimed_amount, `payments[${i}].claimed_amount`),
+        verifiedAmount: amount(x.verified_amount, `payments[${i}].verified_amount`),
+        paidOn: text(x.paid_on, `payments[${i}].paid_on`),
+        status,
+        rejectionReason: optionalText(x.rejection_reason, `payments[${i}].rejection_reason`),
+        createdAt: text(x.created_at, `payments[${i}].created_at`),
+      };
+    }),
+    pay: parsePay(r.pay),
+  };
+}
+
+function parsePayment(raw: unknown): StayPayment {
+  if (typeof raw !== 'object' || raw === null) throw new Error('guest_stay: payment is not an object');
+  const p = raw as Record<string, unknown>;
+  const status = text(p.status, 'payment.status') as PaymentStatus;
+  if (!PAYMENT_STATUSES.includes(status)) throw new Error(`guest_stay: unknown payment status "${status}"`);
+  if (typeof p.enough !== 'boolean' || typeof p.open !== 'boolean') throw new Error('guest_stay: payment.enough / open are not booleans');
+  return {
+    status,
+    price: amount(p.price, 'payment.price'),
+    required: amount(p.required, 'payment.required'),
+    received: count(p.received, 'payment.received'),
+    outstanding: amount(p.outstanding, 'payment.outstanding'),
+    enough: p.enough,
+    open: p.open,
+  };
+}
+
+function parsePay(raw: unknown): GuestStay['pay'] {
+  if (raw === null || raw === undefined) return null;
+  const p = raw as Record<string, unknown>;
+  const methods = Array.isArray(p.methods) ? p.methods : [];
+  return {
+    methods: methods.map((m, i) => {
+      const x = m as Record<string, unknown>;
+      const kind = text(x.kind, `pay.methods[${i}].kind`);
+      if (kind !== 'gcash' && kind !== 'bank' && kind !== 'other') throw new Error(`guest_stay: unknown method kind "${kind}"`);
+      return {
+        kind,
+        label: text(x.label, `pay.methods[${i}].label`),
+        accountName: optionalText(x.account_name, `pay.methods[${i}].account_name`),
+        accountNumber: optionalText(x.account_number, `pay.methods[${i}].account_number`),
+        instructions: optionalText(x.instructions, `pay.methods[${i}].instructions`),
+      };
+    }),
+    terms: optionalText(p.terms, 'pay.terms'),
   };
 }
 

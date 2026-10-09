@@ -561,3 +561,15 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 .cal-booking-facts dt { color: var(--muted); }
 .cal-booking-facts dd { margin: 0; overflow-wrap: anywhere; }
 .cal-booking-notes { white-space: pre-wrap; }
+
+/* S-13, Manage booking (plan/manage-booking.md): the payment under the stay. */
+.manage-payment { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.manage-payment h2 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-base); }
+.manage-payment h3 { font-size: var(--text-sm); margin: var(--space-4) 0 var(--space-2); }
+.pay-methods { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-2); }
+.pay-method { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.pay-method .reference { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.proof-form { margin-top: var(--space-3); }
+.pay-history { list-style: none; margin: 0; padding: 0; }
+.pay-history li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.pay-history li > span:first-child { flex: 1; }

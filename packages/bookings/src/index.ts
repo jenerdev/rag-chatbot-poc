@@ -24,6 +24,7 @@
 //   requests.ts    the public booking page's reads and its one write; staff
 //                  confirm or decline a request (customer booking)
 //   guest.ts       the guest's own stay, by reference + email or phone (manage booking)
+//   payments.ts    a guest's proof of payment: checked, uploaded, submitted (manage booking)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -88,7 +89,9 @@ export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from '
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';
-export type { GuestStatus, GuestStay } from './guest.js';
+export type { GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
+export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, sniffProofType, submitProof } from './payments.js';
+export type { ProofInput, ProofType } from './payments.js';
 export { closedDays } from './closed.js';
 export { calendarDayBookings, calendarDays, calendarSlots } from './occupancy.js';
 export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';

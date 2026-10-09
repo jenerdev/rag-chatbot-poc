@@ -4,9 +4,10 @@
 // reference and the email or mobile number they booked with, and sees that
 // one stay: its status in words, its dates, its rooms and the stored price.
 //
-// Phase 2 is READ-ONLY. Later phases add the one next action each state
-// allows (pay, upload proof, ask for a change); until then the page says
-// what happens next and nothing more.
+// Each state shows its ONE next action. Since Phase 3 that includes paying:
+// the tenant's ways to pay, the amount the stay needs, and a form that sends
+// a proof (a photo, resized and EXIF-stripped here, or a PDF as it is). The
+// amount typed is a CLAIM; staff verify it against their account.
 //
 // What this screen does NOT do:
 //   - keep the guest "signed in". The reference and contact live in React
@@ -19,12 +20,13 @@
 // Everything from the server is a React child, so it is escaped.
 
 import { useState } from 'react';
-import type { GuestStatus, GuestStay } from '@rag/bookings';
+import type { GuestStatus, GuestStay, PaymentStatus } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { instantLabel } from '@/components/booking-page';
 import { Icon } from '@/components/icons';
 import { TenantNav } from '@/components/tenant-nav';
-import { formatMoney } from '@/lib/money';
+import { centavosToInput, formatMoney } from '@/lib/money';
+import { resizeImage } from '@/lib/resize-image';
 import type { NavFeatures } from '@/lib/nav-items';
 
 export interface ManageBookingScreenProps {
@@ -35,6 +37,8 @@ export interface ManageBookingScreenProps {
   nav: NavFeatures;
   /** from `?ref=`, already checked for shape by the page; '' for none */
   initialReference: string;
+  /** the proof's limits, from @rag/bookings through the server page (never a copy) */
+  limits: { maxProofBytes: number; maxProofEdge: number; maxPayerReference: number };
 }
 
 type Found = GuestStay & { guestStatus: GuestStatus };
@@ -63,15 +67,15 @@ function nextStep(status: GuestStatus, businessName: string): string {
   }
 }
 
-export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, nav, initialReference }: ManageBookingScreenProps) {
+export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
   const [reference, setReference] = useState(initialReference);
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stay, setStay] = useState<Found | null>(null);
 
-  async function lookUp(event: React.FormEvent) {
-    event.preventDefault();
+  async function lookUp(event?: React.FormEvent) {
+    event?.preventDefault();
     setBusy(true);
     setError(null);
     try {
@@ -159,6 +163,15 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
                 </>
               )}
             </div>
+            <PaymentPanel
+              key={stay.payments.length}
+              slug={slug}
+              stay={stay}
+              reference={reference}
+              contact={contact}
+              limits={limits}
+              onSent={() => void lookUp()}
+            />
             <div className="form-footer">
               <button type="button" onClick={another}>
                 Look up another booking
@@ -233,5 +246,234 @@ function Line({ label, amount, currency, discount }: { label: string; amount: nu
       <span>{label}</span>
       <span>{amount < 0 ? `−${formatMoney(-amount, currency)}` : formatMoney(amount, currency)}</span>
     </div>
+  );
+}
+
+/** The payment's status in the guest's words. */
+const PAYMENT_WORDS: Record<PaymentStatus, string> = {
+  not_tracked: '',
+  unpaid: 'Not paid yet',
+  submitted: 'Proof sent, being checked',
+  rejected: 'Proof not accepted',
+  partially_paid: 'Partly paid',
+  paid: 'Paid',
+  refunded: 'Refunded',
+};
+
+/** The tenant's date today, YYYY-MM-DD, for the "date paid" default. */
+function today(timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+/**
+ * The stay's payment: what it needs, what was sent, and, when the stay can
+ * take one, how to pay and the form for the proof. Re-mounted (by `key`)
+ * after each proof, so the form starts clean with a new idempotency key.
+ */
+function PaymentPanel({
+  slug,
+  stay,
+  reference,
+  contact,
+  limits,
+  onSent,
+}: {
+  slug: string;
+  stay: Found;
+  reference: string;
+  contact: string;
+  limits: ManageBookingScreenProps['limits'];
+  onSent: () => void;
+}) {
+  const pay = stay.payment;
+  const live = stay.status === 'pending' || stay.status === 'confirmed';
+  // What is still owed toward the confirmation amount, or toward the total
+  // once that is met. Both are the database's numbers; this only picks one.
+  const due = pay.required !== null && !pay.enough ? pay.required - pay.received : (pay.outstanding ?? 0);
+  const canPay = live && stay.pay !== null && pay.status !== 'not_tracked' && !pay.open && due > 0;
+
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [method, setMethod] = useState(stay.pay?.methods[0]?.label ?? '');
+  const [amount, setAmount] = useState(due > 0 ? centavosToInput(due) : '');
+  const [paidOn, setPaidOn] = useState(() => today(stay.timezone));
+  const [payerReference, setPayerReference] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (pay.status === 'not_tracked') return null;
+
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    setSending(true);
+    setError(null);
+    try {
+      let body: Blob = file;
+      let name = file.name;
+      if (/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        const resized = await resizeImage(file, limits.maxProofEdge);
+        body = resized.blob;
+        name = resized.blob.type === 'image/webp' ? 'proof.webp' : 'proof.jpg';
+      } else if (file.type !== 'application/pdf') {
+        setError('The proof must be a JPG, PNG or WebP photo, or a PDF.');
+        return;
+      }
+      if (body.size > limits.maxProofBytes) {
+        setError(`The file is ${(body.size / 1048576).toFixed(1)} MB; the limit is ${limits.maxProofBytes / 1048576} MB.`);
+        return;
+      }
+      const form = new FormData();
+      form.append('reference', reference);
+      form.append('contact', contact);
+      form.append('method', method);
+      form.append('amount', amount);
+      form.append('paidOn', paidOn);
+      form.append('payerReference', payerReference);
+      form.append('idempotencyKey', idempotencyKey);
+      form.append('file', body, name);
+      const response = await fetch(`/api/t/${slug}/manage/proof`, { method: 'POST', body: form });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(typeof result.error === 'string' ? result.error : 'The proof could not be sent. Please try again.');
+        return;
+      }
+      onSent();
+    } catch {
+      setError('The proof could not be sent. Check your connection and try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const lastRejected = [...stay.payments].reverse().find((p) => p.kind === 'payment' && p.status === 'rejected');
+
+  return (
+    <section className="manage-payment" aria-labelledby="payment-title">
+      <h2 id="payment-title">
+        Payment <span className="badge">{PAYMENT_WORDS[pay.status]}</span>
+      </h2>
+      <div className="stay-lines">
+        {pay.required !== null && pay.price !== null && pay.required < pay.price && (
+          <div className="quote-line">
+            <span>Needed to confirm</span>
+            <span>{formatMoney(pay.required, stay.currency)}</span>
+          </div>
+        )}
+        <div className="quote-line">
+          <span>Received</span>
+          <span>{formatMoney(pay.received, stay.currency)}</span>
+        </div>
+        {pay.outstanding !== null && (
+          <div className="quote-line quote-total">
+            <strong>Balance</strong>
+            <strong>{formatMoney(pay.outstanding, stay.currency)}</strong>
+          </div>
+        )}
+      </div>
+
+      {pay.open && <p className="notice">Your proof of payment is being checked. You will see the result here.</p>}
+      {pay.status === 'rejected' && lastRejected?.rejectionReason && (
+        <p className="notice error">Your last proof was not accepted: {lastRejected.rejectionReason}</p>
+      )}
+
+      {canPay && stay.pay && (
+        <>
+          <h3>How to pay</h3>
+          <p className="small">
+            Pay {formatMoney(due, stay.currency)} by one of these, then send a photo or PDF of the receipt below.
+          </p>
+          <ul className="pay-methods">
+            {stay.pay.methods.map((m) => (
+              <li key={m.label} className="pay-method">
+                <strong>{m.label}</strong>
+                {m.accountName && <span>{m.accountName}</span>}
+                {m.accountNumber && <span className="reference">{m.accountNumber}</span>}
+                {m.instructions && <span className="small muted">{m.instructions}</span>}
+              </li>
+            ))}
+          </ul>
+          {stay.pay.terms && <div className="instructions">{stay.pay.terms}</div>}
+
+          <form onSubmit={send} className="proof-form" noValidate>
+            <h3>Send your proof of payment</h3>
+            <div className="field-row">
+              <div className="field grow">
+                <label htmlFor="pay-method">Paid by</label>
+                <select id="pay-method" value={method} onChange={(e) => setMethod(e.target.value)}>
+                  {stay.pay.methods.map((m) => (
+                    <option key={m.label} value={m.label}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="pay-amount">Amount paid</label>
+                <input id="pay-amount" type="text" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor="pay-date">Date paid</label>
+                <input id="pay-date" type="date" required value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
+              </div>
+              <div className="field grow">
+                <label htmlFor="pay-ref">
+                  Transaction number <span className="muted">(optional)</span>
+                </label>
+                <input
+                  id="pay-ref"
+                  type="text"
+                  autoComplete="off"
+                  maxLength={limits.maxPayerReference}
+                  value={payerReference}
+                  onChange={(e) => setPayerReference(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="pay-file">Receipt (photo or PDF)</label>
+              <input
+                id="pay-file"
+                type="file"
+                required
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            {error && (
+              <div className="notice error" role="alert">
+                {error}
+              </div>
+            )}
+            <div className="form-footer">
+              <button type="submit" className="primary" aria-busy={sending || undefined} disabled={sending || !file || !amount.trim() || !method}>
+                {sending ? 'Sending…' : 'Send proof of payment'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+
+      {stay.payments.length > 0 && (
+        <>
+          <h3>What you sent</h3>
+          <ul className="pay-history">
+            {stay.payments.map((p) => (
+              <li key={p.createdAt}>
+                <span>
+                  {p.kind === 'refund' ? 'Refund' : p.method} · {p.paidOn}
+                </span>
+                <span>{formatMoney(p.verifiedAmount ?? p.claimedAmount, stay.currency)}</span>
+                <span className={`badge ${p.status === 'verified' ? 'ok' : p.status === 'rejected' ? 'danger' : 'warn'}`}>
+                  {p.status === 'verified' ? 'Verified' : p.status === 'rejected' ? 'Not accepted' : 'Being checked'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }

@@ -125,7 +125,29 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   `?ref=` pre-fill, 400s. The walk's first run failed its own check
   ("no `<script>` in the HTML": every Next page has one); it now reads
   the input's value.
-- [ ] Phase 3: payment settings and proof (SQL by the user).
+- [x] Phase 2 committed `378ae51`.
+- [x] Phase 3, payment settings and proof (2026-10-10): the SQL
+  file grows sections 11–18 (`guest_group()` shared by every guest door,
+  `stay_status()`, the `payments` settings validator, `stay_required()`
+  rounding up, `stays.required_amount` set for WEB stays at birth,
+  `payments` + its log trigger, `stay_payment()` derived, `guest_stay()`
+  redefined in place with the payment, the private `payment-proofs` bucket,
+  `submit_payment()`). `payments.ts` (`checkProof`, `sniffProofType`,
+  `submitProof`; 6 tests), `POST /manage/proof`, the page's payment panel
+  (how to pay, the form, the history). verify gains 133–138; walk
+  `plan/manage-booking-phase3-walk.mjs` (6 checks, its own throwaway
+  tenant). Typecheck clean; tests 13+14+5+113+359+104. The user re-ran
+  the file. verify **137/138** (133–138 pass; the known roles check);
+  walk **6/6** and Phase 2's walk 6/6 again; rooms 50/50; isolation 32/32
+  and 23/23 + 21/21 both ways; the three baselines and availability
+  identical. Output in `plan/manage-booking/phase3-*`. Two things learned:
+  the first walk run hit a stale dev server (`__webpack_modules__[moduleId]
+  is not a function` after the package rebuilds; a restart fixed it, the
+  code was right), and check 137's cancelled stay answered P0002, not
+  55000, because check 128 had locked its reference: the lockout wins
+  over the state, which is the order wanted (a stranger learns nothing). Deviation: the plan put Phase 3's checks in
+  rooms; they are in verify (SQL) and the walk (route + package + bucket),
+  where the probe tenant and the HTTP path already are.
 
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,

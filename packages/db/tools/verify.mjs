@@ -2180,6 +2180,7 @@ async function manageBookingChecks() {
     return;
   }
   let userId = null;
+  const probeProofs = [];
   try {
     const app = await supabase
       .from('tenant_applications')
@@ -2373,9 +2374,162 @@ async function manageBookingChecks() {
         `blocked ${blocked.error?.code ?? 'DELETED'} · stay left ${stay.data?.length} · events left ${ev.count}`,
       );
     }
+
+    // 133–138 are manage-booking Phase 3: settings, the required amount,
+    // submit_payment(), stay_payment(), the proof bucket.
+
+    // 133. The ONE required-amount rule, and the settings validator.
+    {
+      const req = async (total, fee) => (await supabase.rpc('stay_required', { p_total: total, p_fee: fee })).data;
+      const got = [
+        await req(450000, { kind: 'full' }),
+        await req(450000, { kind: 'fixed', value: 200000 }),
+        await req(450000, { kind: 'fixed', value: 900000 }),
+        await req(100001, { kind: 'percent', value: 3333 }),
+        await req(100000, { kind: 'percent', value: 3000 }),
+      ];
+      const base = { timezone: 'Asia/Manila', booking_type: 'per_room' };
+      const method = { kind: 'gcash', label: 'GCash', account_name: 'Probe', account_number: '0917 000 0000' };
+      const bad = async (payments) => (await supabase.from('tenant_applications').update({ config: { ...base, payments } }).eq('tenant_id', probe.id).eq('application_key', 'bookings')).error?.code;
+      const refused = [
+        await bad({ methods: [method], fee: { kind: 'percent', value: 10001 } }),
+        await bad({ methods: [method, { ...method }], fee: { kind: 'full' } }),
+        await bad({ methods: [method], fee: { kind: 'full' }, deposit: 1 }),
+        await bad({ methods: [], fee: { kind: 'full' } }),
+        await bad({ methods: [{ ...method, kind: 'cash' }], fee: { kind: 'full' } }),
+      ];
+      const set = await supabase.from('tenant_applications')
+        .update({ config: { ...base, payments: { methods: [method, { kind: 'bank', label: 'BPI', account_number: '1234-5678' }], fee: { kind: 'percent', value: 3000 }, terms: 'Probe terms' } } })
+        .eq('tenant_id', probe.id).eq('application_key', 'bookings');
+      check(
+        JSON.stringify(got) === JSON.stringify([450000, 200000, 450000, 33331, 30000]) && refused.every((c) => c === '23514') && !set.error,
+        'manage: stay_required (full, fixed, fixed capped, percent rounded UP); five bad settings refused, a good one kept',
+        `${got.join(',')} · refused ${refused.join(',')} · set ${set.error?.message ?? 'ok'}`,
+      );
+    }
+
+    // A WEB stay through request_booking() (as the tools' service client),
+    // on Monday 2027-04-26: 1,000.00 at 30 % → 300.00 required.
+    const payContact = { email: 'Payer.Probe@Example.com', phone: '0918 111 2222' };
+    const { data: webRows, error: webError } = await supabase.rpc('request_booking', {
+      p_tenant_id: probe.id, p_slot_id: slotRow.id, p_unit_ids: [unit.A], p_guests: [1], p_check_in: '2027-04-26', p_nights: 1,
+      p_name: 'Payer Probe', p_phone: payContact.phone, p_email: payContact.email, p_notes: null,
+    });
+    if (webError) throw new Error(`request_booking: ${webError.message}`);
+    const webRef = webRows[0].reference;
+    const { data: webStay } = await supabase.from('bookings').select('group_id').eq('tenant_id', probe.id).eq('reference', webRef).limit(1).single();
+    const proofs = probeProofs; // removed in finally, even if a check throws
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    const uploadProof = async () => {
+      const path = `${probe.id}/incoming/${randomUUID()}.png`;
+      const { error } = await chat.storage.from('payment-proofs').upload(path, PNG, { contentType: 'image/png', upsert: false });
+      if (error) throw new Error(`proof upload: ${error.message}`);
+      proofs.push(path);
+      return path;
+    };
+    const submit = (over = {}) => chat.rpc('submit_payment', {
+      p_tenant_id: probe.id, p_reference: webRef, p_contact: payContact.email, p_proof_path: '', p_method: 'gcash',
+      p_claimed_amount: 30000, p_paid_on: '2026-10-10', p_payer_reference: 'TXN 1', p_idempotency_key: randomUUID(), ...over,
+    });
+
+    // 134. The web stay's terms were set when it was born; a staff stay is
+    //      not tracked; the guest sees "unpaid" with how to pay.
+    {
+      const { data: s } = await supabase.from('stays').select('required_amount').eq('tenant_id', probe.id).eq('group_id', webStay.group_id).single();
+      const { data: staffStay } = await supabase.from('stays').select('required_amount').eq('tenant_id', probe.id).eq('group_id', g1).single();
+      const guest = (await lookup(webRef, payContact.email)).data;
+      const staffSide = (await lookup(ref1, contact.guest_email)).data;
+      check(
+        s?.required_amount === 30000 && staffStay?.required_amount === null
+          && guest?.payment?.status === 'unpaid' && guest.payment.required === 30000 && guest.payment.price === 100000 && guest.payment.enough === false
+          && guest.pay?.methods?.length === 2 && guest.pay.terms === 'Probe terms'
+          && staffSide?.payment?.status === 'not_tracked',
+        'manage: a web stay is born with its required amount (30 % of 1,000.00 = 300.00); a staff stay is not tracked; the guest sees unpaid and how to pay',
+        `web ${s?.required_amount} · staff ${staffStay?.required_amount} · guest ${JSON.stringify(guest?.payment)} methods ${guest?.pay?.methods?.length} · staff stay ${staffSide?.payment?.status}`,
+      );
+    }
+
+    // 135. submit_payment(): refusals in words, then one row; the same key
+    //      again is the same row; another key while one is open is refused.
+    {
+      const wrongMethod = await submit({ p_method: 'Cash', p_proof_path: await uploadProof() });
+      const noObject = await submit({ p_proof_path: `${probe.id}/incoming/${randomUUID()}.png` });
+      const tooMuch = await submit({ p_claimed_amount: 100001, p_proof_path: await uploadProof() });
+      const future = await submit({ p_paid_on: '2030-01-01', p_proof_path: await uploadProof() });
+      const key = randomUUID();
+      const first = await submit({ p_idempotency_key: key, p_proof_path: await uploadProof() });
+      const again = await submit({ p_idempotency_key: key, p_proof_path: '' });
+      const second = await submit({ p_proof_path: await uploadProof() });
+      const { count } = await supabase.from('payments').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      check(
+        wrongMethod.error?.code === '22023' && noObject.error?.code === '22023' && tooMuch.error?.code === '22023' && future.error?.code === '22023'
+          && !first.error && typeof first.data === 'number' && again.data === first.data
+          && second.error?.code === '55000' && /already being checked/.test(second.error.message) && count === 1,
+        'manage: submit_payment refuses a wrong method, a missing file, too much and a future date (22023); a double click is one row; a second proof while one is open is 55000 in words',
+        `method ${wrongMethod.error?.code} · object ${noObject.error?.code} · amount ${tooMuch.error?.code} · date ${future.error?.code} · first ${first.error?.message ?? first.data} again ${again.data} · second ${second.error?.code} "${second.error?.message}" · rows ${count}`,
+      );
+    }
+
+    // 136. Who sees it: the guest (status submitted, the history without the
+    //      file's path), staff (the row), a chat token reading the table
+    //      (nothing); the log has the payment, by the guest.
+    {
+      const guest = (await lookup(webRef, payContact.phone)).data;
+      const staffRows = await staff.from('payments').select('id, proof_path');
+      const chatRows = await chat.from('payments').select('id');
+      const { data: ev } = await supabase.from('booking_events').select('kind, to_value, actor_kind, amount').eq('tenant_id', probe.id).eq('group_id', webStay.group_id).eq('kind', 'payment');
+      const viaStaff = await staff.rpc('stay_payment', { p_tenant_id: probe.id, p_group_id: webStay.group_id });
+      check(
+        guest?.payment?.status === 'submitted' && guest.payment.open === true && guest.payments?.length === 1 && !('proof_path' in guest.payments[0]) && guest.payments[0].method === 'GCash'
+          && staffRows.data?.length === 1 && staffRows.data[0].proof_path?.startsWith(`${probe.id}/incoming/`) && (chatRows.data ?? []).length === 0
+          && ev?.length === 1 && ev[0].to_value === 'payment:submitted' && ev[0].actor_kind === 'guest' && ev[0].amount === 30000
+          && viaStaff.data?.status === 'submitted',
+        'manage: the guest sees the proof as being checked (no file path); staff read the row and stay_payment(); a chat token reads none; the log has it, by the guest',
+        `guest ${guest?.payment?.status}/${guest?.payments?.length} · staff ${staffRows.data?.length} · chat ${(chatRows.data ?? []).length} · events ${JSON.stringify(ev)} · stay_payment ${viaStaff.error?.message ?? viaStaff.data?.status}`,
+      );
+    }
+
+    // 137. Doors that stay shut: a not-tracked (staff) stay and a cancelled
+    //      stay are 55000; the wrong contact is P0002 (a miss); another
+    //      tenant's id is 42501.
+    {
+      const notTracked = await chat.rpc('submit_payment', {
+        p_tenant_id: probe.id, p_reference: ref1, p_contact: contact.guest_email, p_proof_path: '', p_method: 'GCash',
+        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+      });
+      const cancelled = await chat.rpc('submit_payment', {
+        p_tenant_id: probe.id, p_reference: two[0].reference, p_contact: contact.guest_email, p_proof_path: '', p_method: 'GCash',
+        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+      });
+      const miss = await submit({ p_contact: 'not.the.payer@example.com' });
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const foreign = await submit({ p_tenant_id: villaRow?.id ?? -1 });
+      check(
+        notTracked.error?.code === '55000' && (cancelled.error?.code === '55000' || cancelled.error?.code === 'P0002') && miss.error?.code === 'P0002' && foreign.error?.code === '42501',
+        "manage: a not-tracked stay and a cancelled one take no payment (55000); the wrong contact is a miss (P0002); another tenant's id is 42501",
+        `not tracked ${notTracked.error?.code} "${notTracked.error?.message}" · cancelled ${cancelled.error?.code} · miss ${miss.error?.code} · foreign ${foreign.error?.code}`,
+      );
+    }
+
+    // 138. The proof is unreadable to the guest's token and signable by staff.
+    {
+      const path = proofs.at(-2) ?? proofs[0];
+      const { data: dl } = await chat.storage.from('payment-proofs').download(path);
+      const { data: signed, error: signError } = await staff.storage.from('payment-proofs').createSignedUrl(path, 300);
+      const body = signed?.signedUrl ? Buffer.from(await (await fetch(signed.signedUrl)).arrayBuffer()) : null;
+      check(
+        !dl && body?.equals(PNG),
+        'manage: a chat token cannot read a proof back; staff sign a URL that serves it',
+        `chat download ${dl ? 'READ' : 'refused'} · staff ${signError?.message ?? `${body?.length} bytes identical ${body?.equals(PNG)}`}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {
+    if (probeProofs.length) {
+      const { data: removed } = await supabase.storage.from('payment-proofs').remove(probeProofs);
+      if ((removed?.length ?? 0) !== probeProofs.length) console.log(`WARN  removed ${removed?.length ?? 0} of ${probeProofs.length} probe proofs`);
+    }
     const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
     if (error) console.log(`WARN  could not delete the manage-probe tenant: ${error.message}`);
     if (userId) {
