@@ -224,6 +224,20 @@ export const bookRequestSchema = bookQuoteSchema.extend({
   website: z.string().optional(),
 });
 
+/**
+ * The Manage booking lookup (plan/manage-booking.md Phase 2): a reference
+ * and the email or mobile number the guest booked with. POST, so neither
+ * reaches a URL or a log. guest_stay() normalises and decides; this only
+ * refuses what is not text.
+ */
+export const manageLookupSchema = z.object({
+  reference: z.string({ required_error: 'Your booking reference is required', invalid_type_error: 'Your booking reference is required' }),
+  contact: z.string({
+    required_error: 'Your email or mobile number is required',
+    invalid_type_error: 'Your email or mobile number is required',
+  }),
+});
+
 /** The optional note on a decision (D-096): the package bounds it too. */
 const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish();
 

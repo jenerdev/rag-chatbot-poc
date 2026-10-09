@@ -30,6 +30,7 @@ import { ROLE_LABELS, type Role } from '@/lib/permissions';
 const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   chat: 'chat',
   book: 'book',
+  manage: 'search',
   dashboard: 'chart',
   documents: 'file',
   unanswered: 'help',

@@ -1,0 +1,10 @@
+PASS  the right reference + email, and + phone typed another way, find the stay  — email 200 confirmed rooms 1 · phone 200
+PASS  the answer carries no email, phone, notes or staff note  — 479 bytes, none found
+PASS  a wrong email, an unknown reference and a stay with no contact are the same 404 sentence  — 404/404/404 · 1 distinct · We could not find that booking. Check the reference and the email or mobile number you booked with.
+PASS  northwind (no bookings): the route and the page are 404  — route 404 · page 404
+PASS  the page pre-fills a well-formed ?ref= (upper-cased) and drops a malformed one  — good value="HAR-J3BGKV" · bad value=""
+PASS  a reference that is not text, and no JSON at all, are 400; the page is 200  — 400 Your booking reference is required · 400 · page 200
+cleanup: 1 row(s) of 33453c08-2204-4a53-b682-108f654a1359 deleted
+cleanup: 1 row(s) of afcdda94-fa6d-4cd2-a422-875e50561a64 deleted
+
+ALL WALK CHECKS PASS

@@ -108,8 +108,24 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   isolation 23/23, filters-only 21/21; the three baselines and the
   availability rows from 2026-10-10 byte-identical to Phase 0. Output in
   `plan/manage-booking/phase1-*`.
-- [ ] Phase 2: the S-13 page, read-only (route, page, the booking page's
-  link).
+- [x] Phase 1 committed `5247058`.
+- [x] Phase 2, S-13 read-only (2026-10-10): `guest.ts`
+  (`guestStay()`, `parseGuestStay()`, `guestStatus()`; 5 tests),
+  `POST /api/t/<slug>/manage` (open, chat token, its own per-IP key,
+  every miss one 404 sentence), `/t/<slug>/manage` (404 without bookings;
+  `?ref=` pre-fills a well-formed reference only), `manage-booking.tsx`
+  (lookup form, then the stay: status badge and sentence, dates, rooms,
+  the stored price; React state only); the booking page's receipt links
+  "Manage this booking", its intro "Already sent one?". `NavPage` gains
+  `manage` (a public page; no new header link). Typecheck clean; tests
+  13+14+5+107+359+104; walk `plan/manage-booking-phase2-walk.mjs` **6/6**
+  against `next dev --port 3100` (`plan/manage-booking/phase2-walk.txt`):
+  found by email and by `+63` phone, no email/phone/notes/staff note in
+  the JSON, three misses one sentence, northwind 404 route and page,
+  `?ref=` pre-fill, 400s. The walk's first run failed its own check
+  ("no `<script>` in the HTML": every Next page has one); it now reads
+  the input's value.
+- [ ] Phase 3: payment settings and proof (SQL by the user).
 
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,

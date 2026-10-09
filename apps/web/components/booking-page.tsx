@@ -23,6 +23,7 @@
 // which may no longer be true. The promo field opens on request. The
 // receipt leads with the reference, copyable.
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
@@ -82,7 +83,7 @@ function slotEnd(start: string, duration: string): { days: number; time: string 
 }
 
 /** An ISO instant, shown in the tenant's timezone. */
-function instantLabel(iso: string, timezone: string): string {
+export function instantLabel(iso: string, timezone: string): string {
   return new Date(iso).toLocaleString('en-GB', {
     weekday: 'short',
     day: 'numeric',
@@ -278,6 +279,10 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
             </ol>
             {r.instructions && <div className="instructions">{r.instructions}</div>}
             <div className="form-footer">
+              {/* The reference only: the guest still types the email or number they booked with (plan Rule 4). */}
+              <Link className="button primary" href={`/t/${slug}/manage?ref=${encodeURIComponent(r.reference)}`}>
+                Manage this booking
+              </Link>
               <button type="button" onClick={startOver}>
                 Make another request
               </button>
@@ -296,7 +301,8 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
       <main className="book-main">
         <h1 className="page-title">Request a booking</h1>
         <p className="book-intro">
-          Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and contacts you.
+          Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and contacts you.{' '}
+          <Link href={`/t/${slug}/manage`}>Already sent one? Manage your booking.</Link>
         </p>
 
         <form className="book-layout" onSubmit={send}>

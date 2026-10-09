@@ -397,6 +397,8 @@ one event with the staff user; no event can be updated or deleted by any
 token.
 
 ### Phase 2 — S-13, read-only
+
+*Done 2026-10-10:* walk 6/6 (`plan/manage-booking-phase2-walk.mjs`).
 The route (`withTenantRoute`, open, rate-limited), the page, the link
 from the booking page. **Done when** a walk finds a web stay by email and
 by phone, fails the same way on every miss, and shows no staff note.

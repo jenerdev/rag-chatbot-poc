@@ -5,7 +5,7 @@
 //
 // A staff screen already asks /admin/session for itself, so it passes what it
 // learned as `session`, and its own logout, which also clears its data. The
-// public pages (chat, book, reset) pass nothing, and the nav asks for itself:
+// public pages (chat, book, manage, reset) pass nothing, and the nav asks for itself:
 // a visitor with no cookie gets `admin: false` and sees the public links and,
 // on every public page but the chat, "Staff login".
 //
@@ -63,7 +63,7 @@ export function TenantNav({
   // A staff page shows its own login form when logged out, so "Staff login"
   // is offered only from the public pages, and not from the chat: that is the
   // visitor's page, and staff reach /t/<slug>/admin by its address.
-  const publicPage = current === 'chat' || current === 'book' || current === 'reset';
+  const publicPage = current === 'chat' || current === 'book' || current === 'manage' || current === 'reset';
   const offerLogin = publicPage && current !== 'chat';
 
   const all = navItems(slug, features, role);

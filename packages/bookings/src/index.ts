@@ -23,6 +23,7 @@
 //   occupancy.ts   the staff calendar: each date's state, from schema-calendar.sql (D-103)
 //   requests.ts    the public booking page's reads and its one write; staff
 //                  confirm or decline a request (customer booking)
+//   guest.ts       the guest's own stay, by reference + email or phone (manage booking)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -86,6 +87,8 @@ export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder
 export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from './promos.js';
 export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
+export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';
+export type { GuestStatus, GuestStay } from './guest.js';
 export { closedDays } from './closed.js';
 export { calendarDayBookings, calendarDays, calendarSlots } from './occupancy.js';
 export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
