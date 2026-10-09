@@ -977,6 +977,15 @@ grant execute on function expire_due_stays(bigint) to authenticated, service_rol
 
 -- ─── Phase 4: staff verify, reject, refund; the settings; the note rule ───
 
+-- 19-. Retention (§ 9 q7): a proof's FILE is deleted 180 days after its stay
+--      ends (storage-orphans --expired); its payments row (amounts,
+--      reviewer, dates) is kept, with proof_path cleared and the moment
+--      recorded. Phase 8.
+alter table payments add column if not exists proof_removed_at timestamptz;
+alter table payments drop constraint if exists payments_proof;
+alter table payments add constraint payments_proof
+  check (kind <> 'payment' or proof_path is not null or proof_removed_at is not null);
+
 -- 19. A staff note on a refund (and anything a reviewer wants to add).
 alter table payments add column if not exists note text;
 alter table payments drop constraint if exists payments_note;
@@ -1535,6 +1544,34 @@ end;
 $$;
 revoke all on function decide_change(bigint, bigint, text, text) from public, anon;
 grant execute on function decide_change(bigint, bigint, text, text) to authenticated, service_role;
+
+-- 29. The dashboard's two attention counts (plan § 4, Phase 8): proofs
+--     waiting and change requests waiting. A function BESIDE
+--     tenant_dashboard() rather than a change to it, so that file's body is
+--     not redefined here (trap 20); the dashboard read merges the two.
+--     INVOKER, so it counts under the caller's RLS, and it refuses a caller
+--     that is not staff of the tenant, like tenant_dashboard(); service_role
+--     is allowed, for the tools, as there (the filters-only isolation run
+--     reads the dashboard on it).
+create or replace function manage_attention(p_tenant_id bigint)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  if coalesce(auth.jwt() ->> 'role', '') <> 'service_role'
+     and (p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_staff()) then
+    raise exception 'manage_attention: not staff of tenant %', p_tenant_id using errcode = 'insufficient_privilege';
+  end if;
+  return jsonb_build_object(
+    'proofsToVerify', (select count(*) from public.payments p where p.tenant_id = p_tenant_id and p.kind = 'payment' and p.status = 'submitted'),
+    'changeRequests', (select count(*) from public.change_requests c where c.tenant_id = p_tenant_id and c.status = 'pending')
+  );
+end;
+$$;
+revoke all on function manage_attention(bigint) from public, anon;
+grant execute on function manage_attention(bigint) to authenticated, service_role;
 
 -- PostgREST caches the schema: the new table, function and columns are
 -- unknown to it until told.

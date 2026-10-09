@@ -244,6 +244,29 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   in `plan/manage-booking/phase6-*`.
 - [ ] Phase 7, email: GATED (§ 9 q6): skipped until deployment and a
   sender domain.
+- [x] Phase 6 committed `69ca6d4`.
+- [x] Phase 8, part 1 (2026-10-10): bookings isolation 30 (A sees
+  none of B's payments, change requests, history or proof; B's guest not
+  found on A's page; B's twin) passes both ways, 33/33; `storage-orphans`
+  walks `payment-proofs` too (orphans older than an hour; `--expired`
+  deletes files 180 days after the stay, keeps the row) and ran clean;
+  SQL: `payments.proof_removed_at` (the proof constraint allows a removed
+  file) and `manage_attention()` (section 29) for the dashboard's "Proofs
+  to verify" and "Change requests" tiles; the Requests section's payment
+  badge with the pay-by time (`listRequests()` asks `stay_payment()` per
+  pending stay). verify gains 157–158. Tests pass (pipeline's dashboard
+  test now names the two counts). The user ran the file: verify
+  **157/158** (157–158 pass; the known roles check); rooms 50/50;
+  bookings isolation 33/33 both ways; pipeline isolation 23/23; walks
+  2/3/4 6/6/5; the dashboard walk 14/14; baselines and availability
+  identical. **One fault found:** pipeline isolation `--filters-only` gave
+  20/21 with no FAIL line: its dashboard check THREW, because
+  `manage_attention()` refused `service_role` where `tenant_dashboard()`
+  allows it. Fixed in the file (it now admits `service_role`, like the
+  dashboard); the user re-ran the file: filters-only **21/21** again,
+  RLS 23/23, verify 157/158. New walk
+  `plan/manage-booking-phase6-walk.mjs` (change requests over HTTP, real
+  logins): **4/4**.
 - [ ] Phase 8: walls, walk, record (isolation cases for the new tables,
   `storage-orphans --expired`, the axe audit over S-13 and S-14, the
   user's browser walk, D-104–D-109, CLAUDE.md, flow.md, payments.md

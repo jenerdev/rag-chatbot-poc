@@ -1,0 +1,16 @@
+PASS  1. harbor, staff → 200, bookings present, money null  — 200, money=null
+PASS  2. the default window is 30 days with 30 perDay rows  — days=30, perDay=30
+PASS  3. perDay.day and perWeek.weekOf are calendar dates  — 2026-09-11, 2026-09-06
+PASS  4. harbor (per_room) has occupancy  — {"percent":3.3,"activeUnits":4}
+PASS  5. ?days=7 → 7 rows  — days=7, perDay=7
+PASS  6. ?days=500 → clamped to 90 (plan § 4.2)  — 200, days=90, perDay=90
+PASS  7. the harbor cookie on villa → not 200  — 401
+PASS  8. harbor, admin → money present  — confirmed=1952000, perWeek=5
+PASS  9. promos is a list  — 2 promos
+PASS  10. villa → bookings, occupancy null  — 200, occupancy=null
+PASS  11. northwind → bookings null, knowledge and team present  — 200, documents=1, owners=1
+PASS  12. /t/harbor/admin/dashboard → 200 with the title  — 200
+PASS  12. /t/villa/admin/dashboard → 200 with the title  — 200
+PASS  12. /t/northwind/admin/dashboard → 200 with the title  — 200
+
+all passed

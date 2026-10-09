@@ -2908,6 +2908,38 @@ async function manageBookingChecks() {
         `${ok.error?.message ?? 'ok'} · live rows ${rows.length} · ${JSON.stringify(r)} · events ${(ev ?? []).map((e) => `${e.to_value}/${e.actor_kind}`).join(',')}`,
       );
     }
+
+    // 157–158 are manage-booking Phase 8.
+    // 157. manage_attention(): staff read the two counts and they equal the
+    //      truth (counted here by the service client); a chat token and
+    //      another tenant's id are refused.
+    {
+      const counts = await staff.rpc('manage_attention', { p_tenant_id: probe.id });
+      const { count: proofs } = await supabase.from('payments').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('kind', 'payment').eq('status', 'submitted');
+      const { count: changes } = await supabase.from('change_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('status', 'pending');
+      const chatTry = await chat.rpc('manage_attention', { p_tenant_id: probe.id });
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const foreign = await staff.rpc('manage_attention', { p_tenant_id: villaRow?.id ?? -1 });
+      check(
+        !counts.error && counts.data?.proofsToVerify === proofs && counts.data.changeRequests === changes && proofs > 0
+          && chatTry.error?.code === '42501' && foreign.error?.code === '42501',
+        "manage: the dashboard's proofs-to-verify and change-requests counts equal the truth; a chat token and another tenant are refused",
+        `${JSON.stringify(counts.data)} · truth ${proofs}/${changes} · chat ${chatTry.error?.code ?? 'ANSWERED'} · foreign ${foreign.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+
+    // 158. Retention (§ 9 q7): a proof's path may be cleared only with the
+    //      moment it was removed; the row itself stays.
+    {
+      const { data: one } = await supabase.from('payments').select('id').eq('tenant_id', probe.id).eq('kind', 'payment').not('proof_path', 'is', null).limit(1).single();
+      const bare = await supabase.from('payments').update({ proof_path: null }).eq('id', one.id);
+      const kept = await supabase.from('payments').update({ proof_path: null, proof_removed_at: new Date().toISOString() }).eq('id', one.id).select('id, claimed_amount, proof_path');
+      check(
+        bare.error?.code === '23514' && !kept.error && kept.data?.length === 1 && kept.data[0].proof_path === null && kept.data[0].claimed_amount > 0,
+        'manage: a proof path is cleared only with proof_removed_at (23514 without); the payment row stays',
+        `bare ${bare.error?.code ?? 'CLEARED'} · kept ${kept.error?.message ?? JSON.stringify(kept.data)}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {

@@ -171,6 +171,8 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
             <>
               <Tile href={`${base}/bookings`} label="Requests waiting" value={b.attention.pendingRequests} />
               <Tile href={`${base}/bookings`} label="Staff bookings unconfirmed" value={b.attention.pendingStaff} />
+              <Tile href={`${base}/payments`} label="Proofs to verify" value={b.attention.proofsToVerify} warn={b.attention.proofsToVerify > 0} />
+              <Tile href={`${base}/payments`} label="Change requests" value={b.attention.changeRequests} warn={b.attention.changeRequests > 0} />
               <Tile
                 href={`${base}/bookings`}
                 label="Would clash on Confirm"

@@ -1,0 +1,10 @@
+PASS  both roles see the proof; staff's Verify is a 403 naming payments:write; the signed URL serves the exact bytes  — proof 201 · admin 200/1 · staff 200/1 · denied 403 "Your role (staff) may not do this (payments:write). Ask an owner of "manage-walk-4" to change it." · bytes 70
+PASS  the admin rejects with a reason; the guest reads it and can send another proof  — reject 200 · guest rejected "The screenshot is cut off. Please send the whole receipt." · again 201
+PASS  verify-and-confirm confirms the stay; the guest sees it confirmed and 500.00 received; reviewing again is a 409  — 200 {"payment":{"open":false,"price":200000,"enough":true,"status":"partially_paid","received":50000,"required":50000,"outstanding":150000},"confirmed":true} · rows confirmed · twice 409 · guest confirmed/partially_paid
+PASS  the admin records a refund; the history lists all seven steps in order, each with its actor (staff = the admin)  — refund 201 · created:pending:system | payment:payment:submitted:guest | payment:payment:rejected:staff | payment:payment:submitted:guest | payment:payment:verified:staff | status:confirmed:staff | payment:refund:verified:staff
+PASS  settings: staff's PUT is a 403; the admin's is saved and staff can read it; a bad value is a 400 in the database's words  — staff 403 · admin 200 · bad 400 "config.payments.pay_within_hours is a whole number of hours from 1 to 168" · read Walk terms
+cleanup: 2 of 2 proof objects removed
+cleanup: tenant manage-walk-4 deleted
+cleanup: 2 users deleted
+
+ALL WALK CHECKS PASS

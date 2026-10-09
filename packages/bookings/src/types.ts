@@ -506,4 +506,6 @@ export interface BookingRequest {
   clash: boolean;
   /** a night of it is on a closed date (D-080); Postgres refuses the confirm, so decline it */
   closed: boolean;
+  /** manage booking (plan § 4): the stay's payment as stay_payment() derives it, and its deadline; null = not tracked */
+  payment: { status: string; payBy: string | null; enough: boolean } | null;
 }

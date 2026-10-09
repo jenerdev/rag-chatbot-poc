@@ -44,7 +44,8 @@ describe('parseTenantDashboard', () => {
     ]);
     expect(d.knowledge.newest).toEqual({ title: 'Rates', createdAt: '2026-10-02T03:00:00+00:00' });
     expect(d.team).toEqual({ owners: 1, admins: 2, staff: 1 });
-    expect(d.bookings?.attention).toEqual({ pendingRequests: 3, pendingStaff: 1, clashing: 1 });
+    // The two manage-booking counts are not in tenant_dashboard()'s JSON: they read 0 here and are filled by tenantDashboard() from manage_attention().
+    expect(d.bookings?.attention).toEqual({ pendingRequests: 3, pendingStaff: 1, clashing: 1, proofsToVerify: 0, changeRequests: 0 });
     expect(d.bookings?.today.next7[0]).toEqual({ date: '2026-10-08', unit: 'Garden Room', slot: 'Night', guest: 'Ana' });
     expect(d.bookings?.stays.perWeek).toEqual([{ weekOf: '2026-09-01', stays: 4 }]);
     expect(d.bookings?.occupancy?.percent).toBe(38.3);

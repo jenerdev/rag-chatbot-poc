@@ -424,7 +424,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
     for (const r of rows) if (r.status === 'taken') taken.add(`${r.booked_date}|${r.unit}|${r.slot}`);
   }
 
-  return requests
+  const list = requests
     .map(({ groupId, rows, checkIn }) => {
       const first = rows[0]!;
       const unitIds = [...new Set(rows.map((r) => r.unit_id))];
@@ -459,6 +459,33 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
       };
     })
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return withPayment(tenant, list);
+}
+
+/**
+ * Each request's payment (plan/manage-booking.md § 4): stay_payment()'s
+ * status, once per stay (never re-derived here), and the stay's pay_by.
+ * Only PENDING stays are asked: a decided one's payment is on S-14.
+ */
+async function withPayment(tenant: BookingTenant, list: Omit<BookingRequest, 'payment'>[]): Promise<BookingRequest[]> {
+  const pending = list.filter((r) => r.status === 'pending').map((r) => r.groupId);
+  if (pending.length === 0) return list.map((r) => ({ ...r, payment: null }));
+  const { data: stays, error } = await tenant.db.from('stays').select('group_id, pay_by, required_amount').eq('tenant_id', tenant.id).in('group_id', pending);
+  if (error) throw new Error(`Could not load the stays: ${error.message}`);
+  const tracked = new Map(stays.filter((s) => s.required_amount !== null).map((s) => [s.group_id, s.pay_by]));
+  const money = new Map(
+    await Promise.all(
+      [...tracked.keys()].map(async (g) => {
+        const { data, error: rpcError } = await tenant.db.rpc('stay_payment', { p_tenant_id: tenant.id, p_group_id: g });
+        if (rpcError) throw new Error(`Could not load a payment: ${rpcError.message}`);
+        return [g, data as { status: string; enough: boolean }] as const;
+      }),
+    ),
+  );
+  return list.map((r) => {
+    const m = money.get(r.groupId);
+    return { ...r, payment: m ? { status: m.status, enough: m.enough, payBy: tracked.get(r.groupId) ?? null } : null };
+  });
 }
 
 /**

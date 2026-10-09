@@ -734,6 +734,8 @@ export interface Database {
           rejection_reason: string | null;
           /** a reviewer's or refunder's note (Phase 4) */
           note: string | null;
+          /** Phase 8: the proof's file was deleted after the retention period; the row stays */
+          proof_removed_at: string | null;
           created_at: string;
         };
         Insert: Record<never, never>;
@@ -921,6 +923,11 @@ export interface Database {
       /** schema-manage-booking.sql § 22: owner/admin write config.payments and nothing else; null turns payments off */
       set_payment_settings: {
         Args: { p_tenant_id: number; p_payments: Json | null };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 29: the dashboard's proofs-to-verify and change-requests counts; staff of the tenant only */
+      manage_attention: {
+        Args: { p_tenant_id: number };
         Returns: Json;
       };
       /** schema-manage-booking.sql § 25: what cancelling or rescheduling means today (the policy's arithmetic) */

@@ -57,7 +57,8 @@ export interface TenantDashboard {
   team: { owners: number; admins: number; staff: number };
   /** null for a tenant without the bookings application */
   bookings: {
-    attention: { pendingRequests: number; pendingStaff: number; clashing: number };
+    /** proofsToVerify and changeRequests: manage_attention()'s, merged by tenantDashboard() (manage booking § 4) */
+    attention: { pendingRequests: number; pendingStaff: number; clashing: number; proofsToVerify: number; changeRequests: number };
     today: { checkIns: number; checkOuts: number; next7: { date: string; unit: string; slot: string; guest: string }[] };
     window: { days: number; confirmed: number; pending: number; cancelled: number; web: number; staff: number };
     stays: { weeks: number; perWeek: WeekCount[] };
@@ -137,7 +138,13 @@ export function parseTenantDashboard(raw: unknown): TenantDashboard {
     team: { owners: num(team.owners), admins: num(team.admins), staff: num(team.staff) },
     bookings: b
       ? {
-          attention: { pendingRequests: num(obj(b.attention).pendingRequests), pendingStaff: num(obj(b.attention).pendingStaff), clashing: num(obj(b.attention).clashing) },
+          attention: {
+            pendingRequests: num(obj(b.attention).pendingRequests),
+            pendingStaff: num(obj(b.attention).pendingStaff),
+            clashing: num(obj(b.attention).clashing),
+            proofsToVerify: num(obj(b.attention).proofsToVerify),
+            changeRequests: num(obj(b.attention).changeRequests),
+          },
           today: {
             checkIns: num(obj(b.today).checkIns),
             checkOuts: num(obj(b.today).checkOuts),
@@ -185,6 +192,15 @@ export async function tenantDashboard(tenant: TenantContext, days: unknown = DAS
   const { data, error } = await tenant.db.rpc('tenant_dashboard', { p_tenant_id: tenant.id, p_days: dashboardDays(days) });
   if (error) throw fromPostgrest(error, 'Could not load the dashboard');
   const parsed = parseTenantDashboard(data);
+  // manage booking § 4: two counts from a function beside tenant_dashboard(),
+  // counted in SQL like the rest; this only places them.
+  if (parsed.bookings) {
+    const { data: extra, error: extraError } = await tenant.db.rpc('manage_attention', { p_tenant_id: tenant.id });
+    if (extraError) throw fromPostgrest(extraError, 'Could not load the dashboard');
+    const counts = (extra ?? {}) as { proofsToVerify?: number; changeRequests?: number };
+    parsed.bookings.attention.proofsToVerify = counts.proofsToVerify ?? 0;
+    parsed.bookings.attention.changeRequests = counts.changeRequests ?? 0;
+  }
   console.log(`[dashboard] ${tenant.slug} ${parsed.days}d: ${parsed.chat.conversations} conversations, ${parsed.chat.openUnanswered} open, bookings ${parsed.bookings ? 'yes' : 'no'}, money ${parsed.bookings?.money ? 'yes' : 'no'}`);
   return parsed;
 }

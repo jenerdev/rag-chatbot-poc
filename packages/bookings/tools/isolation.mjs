@@ -11,7 +11,9 @@
 //   * ONE booking in villa, 300 days out, HARD-deleted at the end. Cancelling
 //     it would leave a row in villa's real history;
 //   * (24–29, customer booking Phase 6) holiday days and web requests in the
-//     two per_room probes, gone with them.
+//     two per_room probes, gone with them;
+//   * (30, manage booking) a proof object, a payment and a change request on
+//     B's request, gone with the probe (the object removed and counted).
 //
 // TWO WALLS (auth-rls Rule 1). By default staff work runs as each tenant's
 // OPERATOR member, on a staff token, as the admin routes' does, so both the
@@ -41,6 +43,11 @@ import {
   createBookings,
   declineRequest,
   getAccommodation,
+  guestStay,
+  listChanges,
+  listPayments,
+  proofUrl,
+  stayHistory,
   hasBookingPage,
   listAccommodations,
   listBookings,
@@ -161,6 +168,7 @@ async function roomProbe(slug) {
 }
 
 let villaBookingId = null;
+const proofObjects = [];
 try {
   await supabase
     .from('tenant_applications')
@@ -609,6 +617,42 @@ try {
     );
   }
 
+  // 30. Manage booking (plan/manage-booking.md Phase 8): B's request gets a
+  //     proof, a payment row and a change request (seeded as the tools'
+  //     service client, which is not under test). A's staff see none of them
+  //     in the queue, the change requests or the stay's history, and cannot
+  //     sign B's proof; a guest on A's chat token cannot find B's stay with
+  //     B's own reference and email. Each with B's twin.
+  {
+    const proofPath = `${b.id}/incoming/${'0'.repeat(8)}-0000-4000-8000-${String(Date.now()).padStart(12, '0').slice(-12)}.png`;
+    const up = await supabase.storage.from('payment-proofs').upload(proofPath, PNG, { contentType: 'image/png', upsert: false });
+    if (up.error) throw new Error(`proof: ${up.error.message}`);
+    proofObjects.push(proofPath);
+    const { data: pay, error: payError } = await supabase.from('payments')
+      .insert({ tenant_id: b.id, group_id: bGroup, method: 'GCash', claimed_amount: 1000, paid_on: REQ_DATE, proof_path: proofPath, idempotency_key: '11111111-2222-4333-8444-555555555555' })
+      .select('id').single();
+    if (payError) throw new Error(`payment: ${payError.message}`);
+    const ch = await supabase.from('change_requests').insert({ tenant_id: b.id, group_id: bGroup, kind: 'cancel', refund_due: 0 });
+    if (ch.error) throw new Error(`change: ${ch.error.message}`);
+    const { data: bStay } = await supabase.from('stays').select('reference').eq('tenant_id', b.id).eq('group_id', bGroup).single();
+
+    const [aPays, bPays, aChanges, bChanges, aHistory, bHistory, aProof, bProof] = await Promise.all([
+      listPayments(a, 'all'), listPayments(b, 'all'),
+      listChanges(a, 'all'), listChanges(b, 'all'),
+      stayHistory(a, bGroup), stayHistory(b, bGroup),
+      proofUrl(a, pay.id), proofUrl(b, pay.id),
+    ]);
+    const aGuest = await guestStay(chat(a), bStay.reference, contact(2).email);
+    const bGuest = await guestStay(chat(b), bStay.reference, contact(2).email);
+    check(
+      aPays.length === 0 && bPays.length === 1 && aChanges.length === 0 && bChanges.length === 1
+        && aHistory.length === 0 && bHistory.length > 0 && aProof === null && typeof bProof === 'string'
+        && aGuest === null && bGuest?.reference === bStay.reference,
+      "manage A: none of B's payments, change requests, history or proof; B's guest is not found on A's page; B sees all of it",
+      `payments A ${aPays.length} B ${bPays.length} · changes A ${aChanges.length} B ${bChanges.length} · history A ${aHistory.length} B ${bHistory.length} · proof A ${aProof === null ? 'null' : 'SIGNED'} B ${bProof ? 'signed' : 'null'} · guest A ${aGuest?.reference ?? 'null'} B ${bGuest?.reference}`,
+    );
+  }
+
   // 22. B's photo is on the public URL (the twin of 15's refusals), and B
   //     can remove it itself.
   {
@@ -622,6 +666,10 @@ try {
     );
   }
 } finally {
+  if (proofObjects.length) {
+    const { data: removed } = await supabase.storage.from('payment-proofs').remove(proofObjects);
+    if ((removed?.length ?? 0) !== proofObjects.length) console.log(`WARN  removed ${removed?.length ?? 0} of ${proofObjects.length} proof objects`);
+  }
   for (const id of roomProbes) {
     const { data: folders } = await supabase.storage.from('unit-images').list(`${id}`);
     for (const folder of folders ?? []) {

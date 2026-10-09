@@ -29,6 +29,8 @@ import { isIsoDate, sniffImageType } from './validate.js';
 export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 export const PROOF_BUCKET = 'payment-proofs';
 export const MAX_PAYER_REFERENCE = 60;
+/** § 9 q7: a proof's file is kept this many days after its stay ends (storage-orphans --expired). */
+export const PROOF_RETENTION_DAYS = 180;
 /** The browser resizes a photo of a receipt to this longer edge: larger than a room photo, so small print stays readable. */
 export const MAX_PROOF_EDGE = 2000;
 

@@ -95,7 +95,7 @@ export { expireDueStays } from './deadlines.js';
 export { decideChange, listChanges, requestChange, withdrawChange } from './changes.js';
 export type { ChangeInput, ChangeQuote, ChangeRow } from './changes.js';
 export type { ChangeTerms, GuestChange, GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
-export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, sniffProofType, submitProof } from './payments.js';
+export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, PROOF_BUCKET, PROOF_RETENTION_DAYS, sniffProofType, submitProof } from './payments.js';
 export type { ProofInput, ProofType } from './payments.js';
 export {
   fromConfig as paymentSettingsFromConfig,

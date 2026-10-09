@@ -87,6 +87,16 @@ type Auth = 'checking' | 'out' | 'in';
 // availability allows 31, the admin list 92.
 const RANGE_DAYS = 14;
 
+/** stay_payment()'s status, as a badge's words (manage booking § 4). */
+const PAYMENT_LABEL: Record<string, string> = {
+  unpaid: 'Unpaid',
+  submitted: 'Proof to check',
+  rejected: 'Proof rejected',
+  partially_paid: 'Partly paid',
+  paid: 'Paid',
+  refunded: 'Refunded',
+};
+
 /** YYYY-MM-DD plus n days. Done on UTC midnights, so no DST edge can shift the date. */
 function addDays(date: string, n: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -228,6 +238,13 @@ function RequestRow({
           {!pending && (
             <span className={request.status === 'confirmed' ? 'badge ok' : 'badge'}>
               {request.status === 'confirmed' ? 'Confirmed' : request.status === 'expired' ? 'Expired' : 'Declined'}
+            </span>
+          )}
+          {/* manage booking § 4: the payment, from stay_payment(), and the deadline. */}
+          {pending && request.payment && (
+            <span className={`badge ${request.payment.enough ? 'ok' : request.payment.status === 'submitted' ? 'warn' : ''}`}>
+              {PAYMENT_LABEL[request.payment.status] ?? request.payment.status}
+              {request.payment.payBy && !request.payment.enough ? ` · pay by ${new Date(request.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}
             </span>
           )}
           {pending && (request.clash || request.closed) && (

@@ -1,0 +1,8 @@
+PASS  the cancel quote (a dry run) answers and stores nothing  — 200 {"kind":"cancel","refundDue":0,"refundPercent":100} · stored 0
+PASS  the guest quotes a move (+500.00), asks, is refused a second request (409), withdraws, and asks again  — quote 200 50000 · ask 201 · second 409 "You already have a request waiting for this booking. Withdraw it first, or wait for the resort to answer." · withdraw true · again 201
+PASS  staff see the request but cannot approve (403); the admin approves; the guest sees Saturday, the same reference, 1,500.00 owed  — list 200/1 · staff 403 · admin 200 · guest 2026-12-19 MAN-39EMEA confirmed owed 150000
+PASS  the history lists the ask, the withdrawal, the second ask and the approval, each with its actor  — reschedule:pending:guest | reschedule:withdrawn:guest | reschedule:pending:guest | reschedule:approved:staff
+cleanup: tenant manage-walk-6 deleted
+cleanup: 2 users deleted
+
+ALL WALK CHECKS PASS
