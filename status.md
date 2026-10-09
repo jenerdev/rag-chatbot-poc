@@ -93,6 +93,23 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   exists, empty (checked 2026-10-10). Part C's lines are commented out in
   the file, so running it as-is does nothing: select the four lines
   without their `--` and run them. Blocks nothing.
+- [x] Phase 1, SQL (2026-10-10; Phase 0 committed `28c242c`):
+  `packages/db/sql/schema-manage-booking.sql` (the 23rd file; replaces no
+  function): `stays` (+ counted backfill, `bookings_stay_fk`), `expired`
+  in `bookings_status`, `booking_events` (two statement-level definer
+  triggers, `app_actor()`), `guest_lookup_failures`, `phone_key()`,
+  `guest_stay()`. verify gains 125–132; `database.types.ts` and
+  `BookingStatus` gain `expired`, `stays`, `booking_events`, `guest_stay`;
+  typecheck clean. The user ran the file. After: **stays 28 = groups 28**
+  (32 bookings), 0 events (older rows have no history: the log starts
+  now; the suites' events left with their fixtures, check 132's cascade).
+  verify **131/132**, 125–132 all pass (the one failure is the known roles
+  check); rooms 50/50; bookings isolation 32/32 both ways; pipeline
+  isolation 23/23, filters-only 21/21; the three baselines and the
+  availability rows from 2026-10-10 byte-identical to Phase 0. Output in
+  `plan/manage-booking/phase1-*`.
+- [ ] Phase 2: the S-13 page, read-only (route, page, the booking page's
+  link).
 
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,

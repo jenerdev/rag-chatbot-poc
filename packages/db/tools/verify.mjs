@@ -1620,6 +1620,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await customerBookingChecks();
       await rolesChecks();
       await calendarChecks();
+      await manageBookingChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);
@@ -2161,6 +2162,225 @@ async function calendarChecks() {
     if (userId) {
       const { error: userError } = await supabase.auth.admin.deleteUser(userId);
       if (userError) console.log(`WARN  could not delete the calendar-probe user: ${userError.message}`);
+    }
+  }
+}
+
+// 125–132 are manage-booking Phase 1 (plan/manage-booking.md): stays, the
+// event log, 'expired', and guest_stay(), the guest's one read. Their own
+// throwaway tenant, deleted at the end (the cascade takes stays and events).
+async function manageBookingChecks() {
+  const { data: probe, error: probeError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'manage-probe', business_name: 'manage probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (probeError) {
+    check(false, 'manage: create the manage-probe tenant', probeError.message);
+    return;
+  }
+  let userId = null;
+  try {
+    const app = await supabase
+      .from('tenant_applications')
+      .insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila', booking_type: 'per_room' } });
+    if (app.error) throw new Error(`application: ${app.error.message}`);
+    const { data: units, error: unitError } = await supabase
+      .from('units')
+      .insert([
+        { tenant_id: probe.id, name: 'A', capacity: 2, sort_order: 1, active: true },
+        { tenant_id: probe.id, name: 'B', capacity: 2, sort_order: 2, active: true },
+      ])
+      .select('id, name');
+    if (unitError) throw new Error(`units: ${unitError.message}`);
+    const unit = Object.fromEntries(units.map((u) => [u.name, u.id]));
+    const { data: slotRow, error: slotError } = await supabase
+      .from('slots')
+      .insert({ tenant_id: probe.id, name: 'Day', start_time: '08:00', duration: '8 hours' })
+      .select('id')
+      .single();
+    if (slotError) throw new Error(`slots: ${slotError.message}`);
+    const rates = await supabase.from('unit_rates').insert(
+      ['A', 'B'].map((u) => ({ tenant_id: probe.id, unit_id: unit[u], slot_id: slotRow.id, weekday_price: 100000, weekend_price: 150000 })),
+    );
+    if (rates.error) throw new Error(`rates: ${rates.error.message}`);
+
+    const contact = { guest_email: 'Probe.Guest@Example.com', guest_phone: '0917 845 2290' };
+    const row = (u, day, group, withContact) => ({
+      tenant_id: probe.id, unit_id: unit[u], slot_id: slotRow.id, booked_date: day, guest_name: 'Manage Probe', guest_count: 1,
+      status: 'pending', group_id: group, ...(withContact ? contact : {}),
+    });
+    const seed = async (rows) => {
+      const { data, error } = await supabase.from('bookings').insert(rows).select('id, group_id, reference');
+      if (error) throw new Error(`bookings: ${error.code} ${error.message}`);
+      return data;
+    };
+    // Stay 1: two rooms, one group, a contact (2027-04-05 is a Monday, so
+    // weekday rates: 2 × 1,000.00). Stay 2: one room, a contact. Stay 3: no
+    // contact at all (a walk-in typed by staff).
+    const g1 = randomUUID();
+    const one = await seed([row('A', '2027-04-05', g1, true), row('B', '2027-04-05', g1, true)]);
+    const two = await seed([row('A', '2027-04-12', randomUUID(), true)]);
+    const three = await seed([row('B', '2027-04-19', randomUUID(), false)]);
+    const ref1 = one[0].reference;
+
+    const { data: user, error: userError } = await supabase.auth.admin.createUser({
+      email: `manage-probe-${Date.now()}@example.com`,
+      password: randomBytes(24).toString('base64url'),
+      email_confirm: true,
+    });
+    if (userError) throw new Error(`user: ${userError.message}`);
+    userId = user.user.id;
+    const member = await supabase.from('memberships').insert({ user_id: userId, tenant_id: probe.id, role: 'staff' });
+    if (member.error) throw new Error(`membership: ${member.error.message}`);
+    const staff = asToken(staffToken(probe.id, userId));
+    const chat = asToken(chatToken(probe.id));
+    const lookup = (ref, who, tenantId = probe.id) => chat.rpc('guest_stay', { p_tenant_id: tenantId, p_reference: ref, p_contact: who });
+
+    // 125. One stay per group: the two-room insert made ONE stay with its
+    //      reference; every group in the database has its stay; staff read
+    //      the probe's three, a chat token reads none.
+    {
+      const mine = await supabase.from('stays').select('group_id, reference').eq('tenant_id', probe.id);
+      const groups = await supabase.from('bookings').select('tenant_id, group_id');
+      const stays = await supabase.from('stays').select('tenant_id, group_id');
+      const key = (r) => `${r.tenant_id}|${r.group_id}`;
+      const missing = new Set((groups.data ?? []).map(key));
+      for (const r of stays.data ?? []) missing.delete(key(r));
+      const staffRead = await staff.from('stays').select('reference');
+      const chatRead = await chat.from('stays').select('reference');
+      check(
+        !mine.error && mine.data.length === 3 && mine.data.some((r) => r.reference === ref1 && r.group_id === g1)
+          && one[0].reference === one[1].reference && missing.size === 0
+          && staffRead.data?.length === 3 && (chatRead.data ?? []).length === 0,
+        'manage: one stay per group (a two-room insert is one), every group has its stay, staff read 3, a chat token 0',
+        `probe stays ${mine.data?.length} · groups without a stay ${missing.size} · staff ${staffRead.error?.message ?? staffRead.data.length} · chat ${chatRead.error?.message ?? (chatRead.data ?? []).length}`,
+      );
+    }
+
+    // 126. The right pair finds the stay, by email (any case) and by phone
+    //      (any format), on a chat token; the answer is guest-facing only.
+    {
+      const byEmail = await lookup(` ${ref1.toLowerCase()} `, 'probe.guest@EXAMPLE.com');
+      const byPhone = await lookup(ref1, '+63 917 845 2290');
+      const s = byEmail.data;
+      const keys = s ? Object.keys(s).sort().join(',') : '';
+      check(
+        !byEmail.error && s?.reference === ref1 && s.status === 'pending' && s.rooms?.length === 2 && s.nights === 1
+          && Number(s.price?.total) === 200000 && !('notes' in s) && !('guest_email' in s) && !('decision_note' in s)
+          && !byPhone.error && byPhone.data?.reference === ref1,
+        'manage: guest_stay finds a stay by reference + email or phone, guest-facing columns only',
+        `email ${byEmail.error?.message ?? `${s?.status} ${s?.rooms?.length} rooms total ${s?.price?.total}`} · phone ${byPhone.error?.message ?? byPhone.data?.reference} · keys ${keys}`,
+      );
+    }
+
+    // 127. Every miss is the same null: a wrong contact, an unknown
+    //      reference, a stay with no contact on file; another tenant's id
+    //      is refused outright (42501). Positive twin: stay 2's right pair.
+    {
+      const wrong = await lookup(two[0].reference, 'someone.else@example.com');
+      const unknown = await lookup('MAN-ZZZZZZ', contact.guest_email);
+      const noContact = await lookup(three[0].reference, contact.guest_email);
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const foreign = await lookup(ref1, contact.guest_email, villaRow?.id ?? -1);
+      const twin = await lookup(two[0].reference, contact.guest_email);
+      check(
+        !wrong.error && wrong.data === null && !unknown.error && unknown.data === null && !noContact.error && noContact.data === null
+          && foreign.error?.code === '42501' && twin.data?.reference === two[0].reference,
+        "manage: a wrong contact, an unknown reference and a stay with no contact are all null; another tenant's id is refused",
+        `wrong ${wrong.error?.message ?? JSON.stringify(wrong.data)} · unknown ${JSON.stringify(unknown.data)} · no contact ${JSON.stringify(noContact.data)} · foreign ${foreign.error?.code ?? 'ANSWERED'} · twin ${twin.data?.reference}`,
+      );
+    }
+
+    // 128. The lockout: stay 2 has 1 miss from 127; 4 more make 5, and then
+    //      the RIGHT pair is null too; stay 1 (another reference) still answers.
+    {
+      for (let i = 0; i < 4; i++) await lookup(two[0].reference, `nobody${i}@example.com`);
+      const locked = await lookup(two[0].reference, contact.guest_email);
+      const other = await lookup(ref1, contact.guest_email);
+      const counted = await supabase.from('guest_lookup_failures').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('reference', two[0].reference);
+      const chatRead = await chat.from('guest_lookup_failures').select('id');
+      check(
+        !locked.error && locked.data === null && other.data?.reference === ref1 && counted.count === 5 && (chatRead.data ?? []).length === 0,
+        'manage: after 5 misses the right pair is null for that reference only; the misses are counted and unreadable',
+        `locked ${JSON.stringify(locked.data)} · other ${other.data?.reference} · misses ${counted.count} · chat read ${chatRead.error?.message ?? (chatRead.data ?? []).length}`,
+      );
+    }
+
+    // 129. The event log: each seed left ONE 'created' event per stay (system,
+    //      row_count 2 for the two-room one); a staff Confirm of stay 1 is ONE
+    //      status event, actor staff with the user's id; a decline with a
+    //      note carries the note. Staff read them, a chat token none.
+    {
+      const confirm = await staff.from('bookings').update({ status: 'confirmed' }).eq('tenant_id', probe.id).eq('group_id', g1).select('id');
+      const decline = await staff.from('bookings').update({ status: 'cancelled', decision_note: 'probe: guest called' }).eq('tenant_id', probe.id).eq('group_id', two[0].group_id).select('id');
+      const { data: events } = await supabase.from('booking_events').select('group_id, actor_kind, actor_user, kind, from_value, to_value, row_count, note').eq('tenant_id', probe.id).order('id');
+      const of = (g) => (events ?? []).filter((e) => e.group_id === g);
+      const e1 = of(g1);
+      const e2 = of(two[0].group_id);
+      const staffRead = await staff.from('booking_events').select('id');
+      const chatRead = await chat.from('booking_events').select('id');
+      check(
+        !confirm.error && confirm.data.length === 2 && !decline.error
+          && e1.length === 2 && e1[0].kind === 'created' && e1[0].actor_kind === 'system' && e1[0].row_count === 2 && e1[0].to_value === 'pending'
+          && e1[1].kind === 'status' && e1[1].from_value === 'pending' && e1[1].to_value === 'confirmed' && e1[1].actor_kind === 'staff' && e1[1].actor_user === userId && e1[1].row_count === 2
+          && e2.at(-1)?.to_value === 'cancelled' && e2.at(-1)?.note === 'probe: guest called'
+          && staffRead.data?.length === (events ?? []).length && (chatRead.data ?? []).length === 0,
+        'manage: one created event per stay, one status event per statement with the staff user and the note; staff read them, a chat token none',
+        `stay 1 ${e1.map((e) => `${e.kind}:${e.from_value ?? ''}>${e.to_value}/${e.actor_kind}/${e.row_count}`).join(' ')} · stay 2 last ${JSON.stringify(e2.at(-1)?.note)} · staff ${staffRead.data?.length}/${events?.length} · chat ${(chatRead.data ?? []).length}`,
+      );
+    }
+
+    // 130. Nobody writes the log: a staff token's insert is refused, its
+    //      update and delete touch nothing (counted by the service client).
+    {
+      const before = await supabase.from('booking_events').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      const ins = await staff.from('booking_events').insert({ tenant_id: probe.id, group_id: g1, actor_kind: 'staff', kind: 'status', to_value: 'confirmed' });
+      const upd = await staff.from('booking_events').update({ note: 'forged' }).eq('tenant_id', probe.id).select('id');
+      const del = await staff.from('booking_events').delete().eq('tenant_id', probe.id).select('id');
+      const after = await supabase.from('booking_events').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      const forged = await supabase.from('booking_events').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('note', 'forged');
+      check(
+        Boolean(ins.error) && (upd.data ?? []).length === 0 && (del.data ?? []).length === 0 && before.count === after.count && forged.count === 0 && before.count > 0,
+        'manage: no token writes the event log (insert refused, update and delete touch 0)',
+        `insert ${ins.error?.code ?? 'ACCEPTED'} · update ${(upd.data ?? []).length} · delete ${(del.data ?? []).length} · ${before.count} → ${after.count}`,
+      );
+    }
+
+    // 131. 'expired' is a status (the system's event says so); a made-up one
+    //      is still refused (23514).
+    {
+      const exp = await supabase.from('bookings').update({ status: 'expired' }).eq('tenant_id', probe.id).eq('group_id', three[0].group_id).select('id');
+      const bogus = await supabase.from('bookings').update({ status: 'bogus' }).eq('tenant_id', probe.id).eq('group_id', three[0].group_id);
+      const { data: last } = await supabase.from('booking_events').select('actor_kind, from_value, to_value').eq('tenant_id', probe.id).eq('group_id', three[0].group_id).order('id', { ascending: false }).limit(1).single();
+      check(
+        !exp.error && exp.data.length === 1 && bogus.error?.code === '23514' && last?.to_value === 'expired' && last?.actor_kind === 'system',
+        "manage: 'expired' is accepted and logged; an unknown status is 23514",
+        `expired ${exp.error?.message ?? exp.data.length} · bogus ${bogus.error?.code ?? 'ACCEPTED'} · event ${JSON.stringify(last)}`,
+      );
+    }
+
+    // 132. Hard-deleting a stay's bookings removes the stay and its events
+    //      (the tools' fixtures); a stay that still has bookings cannot go.
+    {
+      const blocked = await supabase.from('stays').delete().eq('tenant_id', probe.id).eq('group_id', g1);
+      const gone = await supabase.from('bookings').delete().eq('tenant_id', probe.id).eq('group_id', three[0].group_id);
+      const stay = await supabase.from('stays').select('group_id').eq('tenant_id', probe.id).eq('group_id', three[0].group_id);
+      const ev = await supabase.from('booking_events').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('group_id', three[0].group_id);
+      check(
+        blocked.error?.code === '23503' && !gone.error && stay.data?.length === 0 && ev.count === 0,
+        'manage: deleting the last booking of a stay removes the stay and its events; a stay with bookings cannot go',
+        `blocked ${blocked.error?.code ?? 'DELETED'} · stay left ${stay.data?.length} · events left ${ev.count}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'manage: probe setup', error.message);
+  } finally {
+    const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
+    if (error) console.log(`WARN  could not delete the manage-probe tenant: ${error.message}`);
+    if (userId) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(userId);
+      if (userError) console.log(`WARN  could not delete the manage-probe user: ${userError.message}`);
     }
   }
 }

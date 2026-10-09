@@ -45,7 +45,7 @@ export interface SlotAvailability {
   status: 'open' | 'taken' | 'closed';
 }
 
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'expired';
 
 /** One booking as the admin screen shows it. Guest data, so admin-only. */
 export interface BookingSummary {

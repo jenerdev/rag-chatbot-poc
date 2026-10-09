@@ -1,0 +1,60 @@
+$ node --conditions=react-server --env-file=../../.env tools/isolation.mjs "--" "--filters-only"
+WALL: code filters alone (service client, RLS bypassed)
+PASS  northwind: bookings not enabled, 404  — Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind" | Bookings are not enabled for "northwind"
+PASS  villa: 1 unit, 3 slots  — Whole property · 22-Hour Whole Day 08:00, Day Tour 08:00, Overnight 14:00
+[bookings] villa booked #8292: 2027-08-06, unit 1, slot 2, confirmed
+PASS  villa: booking created  — #8292 2027-08-06 Overnight
+PASS  villa: the same slot again is a 409  — That slot on 2027-08-06 overlaps an existing booking.
+[bookings] villa availability 2027-08-06..2027-08-06: 0 open of 3
+PASS  villa: availability shows the booking as taken  — 22-Hour Whole Day taken, Day Tour taken, Overnight taken
+PASS  villa: availability carries no guest data  — keys: date,slot,status,unit
+PASS  probe: listBookings does not include villa's booking  — 0 rows
+[bookings] bookings-probe availability 2027-08-06..2027-08-06: 1 open of 1
+PASS  probe: availability shows only its own unit, all open  — Probe unit/Probe slot open
+PASS  probe: cannot cancel villa's booking  — returned false, villa's is still confirmed
+PASS  probe: a nonexistent id gives the same false  — returned false
+PASS  probe: villa's unit looks exactly like no unit  — "No such unit or slot." vs "No such unit or slot."
+PASS  villa: yesterday is refused  — 2026-10-09 is in the past. Today is 2026-10-10.
+[bookings] rooms-iso-a added room #1969 "A Room"
+[bookings] rooms-iso-b added room #1970 "B Room"
+[bookings] rooms-iso-a rates for room #1969: slot 1185 100000/100000
+[bookings] rooms-iso-b rates for room #1970: slot 1186 200000/200000
+[bookings] rooms-iso-b photo #1485 for room #1970: 837/1970/be66fb32-9d84-4698-a565-714eaeba964f.png, 70 bytes
+[bookings] rooms-iso-b booked #8296: 2027-08-06, unit 1970, slot 1186, confirmed
+PASS  rooms A: lists only its own rooms; B's room is null  — A Room · B's room: null
+PASS  rooms A: cannot change B's room, rates or photo order  — rename null · rates null · order false · a missing room null
+PASS  rooms A: cannot remove, add or list B's photos  — remove false · add null · list 0
+PASS  rooms B: untouched by everything A tried  — {"unit":{"name":"B Room","capacity":2,"standard_capacity":2,"extra_person_rate":25000,"active":true},"rate":{"weekday_price":200000},"objects":1,"photo":{"sort_order":0}}
+PASS  rooms A: roomPhotos() lists A's rooms only, none of B's photos  — rooms A Room · urls 0
+[bookings] rooms-iso-b promo #355 "B only" percent 1000 2027-08-06..2027-08-06 code B-ONLY
+PASS  promos A: B's promo is unlisted, unedited, unretired, undeleted; B's code is no code to A's customer; B's id no promo to A's staff  — list 0 · edit null · retire false · delete false · quote "No such promo code." · book No such promo. · B still "B only" active true
+[bookings] rooms-iso-b booked #8298: 2027-08-07, unit 1970, slot 1186, pending
+[bookings] rooms-iso-a calendar 2027-08-06..2027-08-07: 2 available, 0 partly, 0 full, 0 closed, 0 none
+[bookings] rooms-iso-b calendar 2027-08-06..2027-08-07: 1 available, 0 partly, 1 full, 0 closed, 0 none
+[bookings] rooms-iso-a calendar 2027-08-06..2027-08-07 room 1970: 0 available, 0 partly, 0 full, 0 closed, 2 none
+PASS  calendar A: B's confirmed night, pending request and guest are on B's calendar and not A's; A naming B's room reads nothing  — B 1/1p0 0/1p1 · A 0/1p0 0/1p0 · A on B's room 0 slots, none,none · guests B [B Guest] A [] A on B 0
+PASS  rooms A: B's room quotes and books like no room, and a mixed group saves nothing  — quote "No such unit or slot." vs "No such unit or slot." · group "No such unit or slot." · A's rows 0
+PASS  rooms A: filtering by B's room shows nothing; B sees its booking  — A filtered 0 · B 1
+[bookings] rooms-iso-a rooms 2027-08-06..2027-08-06: 1 open of 1
+[bookings] rooms-iso-b rooms 2027-08-06..2027-08-06: 0 open of 1
+PASS  rooms: each tenant's room availability is its own  — A: A Room open · B: B Room taken
+[bookings] harbor rooms 2027-08-06..2027-08-06: 4 open of 4
+PASS  harbor: its rooms only, no probe's  — Garden Room, Family Room, Loft, Sea View Suite
+PASS  villa: every room function is a 404  — "villa" does not book by room | "villa" does not book by room | "villa" does not book by room
+PASS  rooms A: cannot change B's standard, fee or maximum, nor quote a party in B's room  — update null · quote "No such unit or slot." · B still 2/2 +25000
+[bookings] rooms-iso-b calendar 2027-08-16 peak "B peak" +50000
+[bookings] rooms-iso-a calendar 2027-08-16 holiday "A day" +0
+PASS  calendar: A sees none of B's days, cannot remove one, and keeps its own entry on the same date  — A before 0 · B sees 1 · A remove false · A after A day · B still "B peak" +50000
+PASS  calendar: each tenant's quote carries its own day and surcharge  — A 100000+0=100000 "A day" · B 200000+50000=250000 "B peak"
+PASS  page A: its own room and calendar; B's room quotes like no room; northwind has no page  — units A Room · calendar A day · "No such unit or slot." vs "No such unit or slot." · pages A true, northwind false
+[bookings] rooms-iso-b request ROO-WJVVQY: 2027-08-16 × 1 night(s), 1 unit(s), 1 row(s), pending
+PASS  request A→B's room: refused, nothing saved anywhere; B's own request is pending in B  — "No such unit or slot." · rows A 0, B 0 · B's own ROO-WJVVQY 250000 → pending
+PASS  requests A: sees none of B's (web or staff); cannot confirm or decline B's (false, like a missing id); B's stays pending  — A list 0 · B list 1 (1 web) · confirm false · decline false · missing false · B still pending
+[bookings] rooms-iso-b request 118013dd-e180-4d3d-b2da-4be559453846 → confirmed (1 row(s))
+[bookings] rooms-iso-a rooms 2027-08-16..2027-08-16: 1 open of 1
+[bookings] rooms-iso-b rooms 2027-08-16..2027-08-16: 0 open of 1
+PASS  requests B: confirms its own; A's room stays open, B's is taken  — confirm true · B rows confirmed · A A Room open · B B Room taken
+[bookings] rooms-iso-b removed photo #1485: 837/1970/be66fb32-9d84-4698-a565-714eaeba964f.png
+PASS  rooms B: its own photo is served, and it can remove it  — served 200 · removed true · objects left 0
+
+ALL BOOKINGS ISOLATION CHECKS PASS

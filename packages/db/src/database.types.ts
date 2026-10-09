@@ -561,8 +561,8 @@ export interface Database {
           booked_date: string;
           /** `tstzrange`, as a string like `["2026-10-01 06:00:00+00","2026-10-02 04:00:00+00")` */
           during: string;
-          /** `check (status in ('pending','confirmed','cancelled'))` */
-          status: 'pending' | 'confirmed' | 'cancelled';
+          /** `check (status in ('pending','confirmed','cancelled','expired'))`; 'expired' since schema-manage-booking.sql */
+          status: 'pending' | 'confirmed' | 'cancelled' | 'expired';
           guest_name: string;
           guest_phone: string | null;
           guest_count: number | null;
@@ -597,7 +597,7 @@ export interface Database {
           booked_date: string;
           /** computed by the bookings_compute_during trigger, which overwrites anything supplied */
           during?: never;
-          status?: 'pending' | 'confirmed' | 'cancelled';
+          status?: 'pending' | 'confirmed' | 'cancelled' | 'expired';
           guest_name: string;
           guest_phone?: string | null;
           guest_count?: number | null;
@@ -626,7 +626,7 @@ export interface Database {
           slot_id?: number;
           booked_date?: string;
           during?: never;
-          status?: 'pending' | 'confirmed' | 'cancelled';
+          status?: 'pending' | 'confirmed' | 'cancelled' | 'expired';
           guest_name?: string;
           guest_phone?: string | null;
           guest_count?: number | null;
@@ -665,6 +665,39 @@ export interface Database {
        * (one role). Written only by the CLI with service_role; a token sees only
        * its own user's rows.
        */
+      /** schema-manage-booking.sql: one row per stay (a bookings group); made by a trigger, staff read, nobody writes */
+      stays: {
+        Row: {
+          tenant_id: number;
+          group_id: string;
+          reference: string;
+          created_at: string;
+        };
+        Insert: Record<never, never>;
+        Update: Record<never, never>;
+        Relationships: [];
+      };
+      /** schema-manage-booking.sql: every creation and status change, written by triggers; staff read, nobody writes */
+      booking_events: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          group_id: string;
+          at: string;
+          actor_kind: 'guest' | 'staff' | 'system';
+          /** the staff user's id; null for a guest or the system */
+          actor_user: string | null;
+          kind: 'created' | 'status';
+          from_value: string | null;
+          to_value: string | null;
+          /** rows of the group the statement touched */
+          row_count: number | null;
+          note: string | null;
+        };
+        Insert: Record<never, never>;
+        Update: Record<never, never>;
+        Relationships: [];
+      };
       memberships: {
         Row: {
           user_id: string;
@@ -783,6 +816,11 @@ export interface Database {
         Returns: boolean;
       };
       /** sql/schema-staff-requests.sql § 1 — the ONE maker of a booking reference (D-100); a token of that tenant, service_role or a direct session, else 42501. */
+      /** schema-manage-booking.sql: the guest's ONE read; reference + email or phone → this stay, guest-facing columns, or null (a miss, or locked) */
+      guest_stay: {
+        Args: { p_tenant_id: number; p_reference: string; p_contact: string };
+        Returns: Json;
+      };
       booking_reference: {
         Args: { p_tenant_id: number };
         Returns: string;

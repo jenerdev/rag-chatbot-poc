@@ -385,6 +385,9 @@ overwrite, and a staff token can sign a URL; (b) whether `pg_cron` can be
 enabled on this project (only tidiness depends on it, § 2.5).
 
 ### Phase 1 — SQL: stays, statuses, events, lookup
+
+*Done 2026-10-10:* the user ran `schema-manage-booking.sql`; stays 28 =
+groups 28; verify 125–132 pass; every other suite and baseline unchanged.
 `stays` + backfill (counted: groups before = stays after), `expired`,
 `booking_events` and the bookings trigger, `guest_lookup_failures`,
 `guest_stay()`. **Done when** verify proves: the right pair finds the
