@@ -436,6 +436,8 @@ hold and one 23P01; `on_proof` holds only from the upload; expiry never
 touches a stay whose proof arrived before `pay_by`.
 
 ### Phase 6 — Cancel and reschedule requests
+
+*Done 2026-10-10:* verify 151–156; every other suite, the walks and the baselines unchanged.
 `change_requests`, `request_change()`, `withdraw_change()`,
 `decide_change()`, the quote, the S-13 forms, the S-14 tab. **Done
 when**: one open request per stay; the refund due matches the policy row

@@ -1,0 +1,10 @@
+PASS  the lookup shows the stay unpaid, 300.00 needed to confirm, two ways to pay  — 200 {"status":"unpaid","price":100000,"required":30000,"received":0,"outstanding":100000,"enough":false,"open":false} methods 2
+PASS  a PNG sent as "receipt.pdf" is stored as a .png (its bytes decide); the guest then sees it being checked  — 201 {"paymentId":26} · 903/incoming/65bd22a1-198c-44dc-a839-81a509f46039.png 30000 · then 200 {"stay":{"reference":"MAN-5X4XZH","status":"pending","source":"web","guestName":"Walk Payer","checkIn":"2026-12-08","startsAt":"2026-12-08T00:00:00+00:00","endsAt":"2026-12-08T08:00:00+00:00","ended":false,"nights":1,"createdAt":"2026-10-09T19:13:20.523209+00:00","rooms":[{"unit":"Room","slot":"Day"
+PASS  the same idempotency key again is the same payment, one row  — 201 {"paymentId":26} rows 1
+PASS  a second proof while one is being checked is a 409 in words, and uploads nothing  — 409 "A payment for this booking is already being checked. Please wait for the resort to review it." · objects 1 → 1
+PASS  a 6 MiB file and an HTML file named .jpg are 400s in words  — big 400 "The file is too large; the limit is 5 MB." · html 400 "The proof must be a JPG, PNG or WebP photo, or a PDF."
+PASS  the wrong contact is the lookup's own 404 sentence  — 404 "We could not find that booking. Check the reference and the email or mobile number you booked with." · lookup 404 "We could not find that booking. Check the reference and the email or mobile number you booked with."
+cleanup: 1 of 1 proof objects removed
+cleanup: tenant manage-walk deleted
+
+ALL WALK CHECKS PASS

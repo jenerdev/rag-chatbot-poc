@@ -47,6 +47,31 @@ export interface GuestStay {
   payments: GuestPayment[];
   /** how to pay, from the tenant's settings; null when the tenant takes no payment on the page */
   pay: { methods: PayMethod[]; terms: string | null } | null;
+  /** Phase 6: what a change would mean today (change_terms()) */
+  change: ChangeTerms;
+  /** Phase 6: every change request, oldest first */
+  changes: GuestChange[];
+}
+
+export interface ChangeTerms {
+  daysBefore: number | null;
+  refundPercent: number;
+  /** what the policy would refund TODAY, of what was received; staff pay and record it */
+  refundDue: number;
+  canCancel: boolean;
+  canReschedule: boolean;
+  rescheduleUntilDaysBefore: number | null;
+}
+
+export interface GuestChange {
+  kind: 'cancel' | 'reschedule';
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+  newCheckIn: string | null;
+  quotedDifference: number | null;
+  refundDue: number | null;
+  /** only on a rejection: the reason the guest reads */
+  decisionNote: string | null;
+  createdAt: string;
 }
 
 export type PaymentStatus = 'not_tracked' | 'unpaid' | 'submitted' | 'rejected' | 'partially_paid' | 'paid' | 'refunded';
@@ -174,6 +199,31 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
       };
     }),
     pay: parsePay(r.pay),
+    change: parseTerms(r.change),
+    changes: (Array.isArray(r.changes) ? r.changes : []).map((c, i) => {
+      const x = c as Record<string, unknown>;
+      return {
+        kind: text(x.kind, `changes[${i}].kind`) as GuestChange['kind'],
+        status: text(x.status, `changes[${i}].status`) as GuestChange['status'],
+        newCheckIn: optionalText(x.new_check_in, `changes[${i}].new_check_in`),
+        quotedDifference: amount(x.quoted_difference, `changes[${i}].quoted_difference`),
+        refundDue: amount(x.refund_due, `changes[${i}].refund_due`),
+        decisionNote: optionalText(x.decision_note, `changes[${i}].decision_note`),
+        createdAt: text(x.created_at, `changes[${i}].created_at`),
+      };
+    }),
+  };
+}
+
+function parseTerms(raw: unknown): ChangeTerms {
+  const t = (raw ?? {}) as Record<string, unknown>;
+  return {
+    daysBefore: amount(t.days_before, 'change.days_before'),
+    refundPercent: (amount(t.refund_percent, 'change.refund_percent') ?? 0),
+    refundDue: (amount(t.refund_due, 'change.refund_due') ?? 0),
+    canCancel: t.can_cancel === true,
+    canReschedule: t.can_reschedule === true,
+    rescheduleUntilDaysBefore: amount(t.reschedule_until_days_before, 'change.reschedule_until_days_before'),
   };
 }
 

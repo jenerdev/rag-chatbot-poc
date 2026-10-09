@@ -281,8 +281,25 @@ export const paymentSettingsSchema = z.object({
       terms: z.string().nullable(),
       // Absent = "none", so a caller written before Phase 5 keeps today's rule.
       hold: z.enum(['none', 'on_proof', 'on_request'], { errorMap: () => ({ message: 'The hold is "none", "on_proof" or "on_request".' }) }).default('none'),
+      // Phase 6; absent = no refund tiers, no rescheduling on the page.
+      cancellation: z.array(z.object({ daysBefore: z.number(), refundPercent: z.number() })).default([]),
+      rescheduleUntilDaysBefore: z.number().nullable().default(null),
     })
     .nullable(),
+});
+
+/** Phase 6: a guest's change request (or its quote, `dryRun`). request_change() decides the rest. */
+export const changeRequestSchema = manageLookupSchema.extend({
+  kind: z.enum(['cancel', 'reschedule'], { errorMap: () => ({ message: 'A change is "cancel" or "reschedule".' }) }),
+  newCheckIn: z.string().nullish(),
+  reason: z.string().max(500, 'The reason is too long (500 characters at most).').nullish(),
+  dryRun: z.boolean().optional(),
+});
+
+/** Phase 6: staff decide a change request. */
+export const decideChangeSchema = z.object({
+  action: z.enum(['approve', 'reject'], { errorMap: () => ({ message: 'The action is "approve" or "reject".' }) }),
+  note: z.string().max(500, 'The note is too long (500 characters at most).').nullish(),
 });
 
 /** The optional note on a decision (D-096): the package bounds it too. */

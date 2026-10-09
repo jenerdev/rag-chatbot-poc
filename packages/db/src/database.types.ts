@@ -697,7 +697,7 @@ export interface Database {
           actor_kind: 'guest' | 'staff' | 'system';
           /** the staff user's id; null for a guest or the system */
           actor_user: string | null;
-          kind: 'created' | 'status' | 'payment';
+          kind: 'created' | 'status' | 'payment' | 'change';
           from_value: string | null;
           to_value: string | null;
           /** rows of the group the statement touched */
@@ -706,6 +706,8 @@ export interface Database {
           /** kind 'payment': which payments row, and its claimed or verified amount */
           payment_id: number | null;
           amount: number | null;
+          /** kind 'change': which change_requests row (Phase 6) */
+          change_request_id: number | null;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;
@@ -732,6 +734,28 @@ export interface Database {
           rejection_reason: string | null;
           /** a reviewer's or refunder's note (Phase 4) */
           note: string | null;
+          created_at: string;
+        };
+        Insert: Record<never, never>;
+        Update: Record<never, never>;
+        Relationships: [];
+      };
+      /** schema-manage-booking.sql § 24: a guest's cancel or reschedule request; staff read, nobody writes through a policy */
+      change_requests: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          group_id: string;
+          kind: 'cancel' | 'reschedule';
+          status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+          new_check_in: string | null;
+          quoted_price: number | null;
+          quoted_difference: number | null;
+          refund_due: number | null;
+          guest_reason: string | null;
+          decision_note: string | null;
+          decided_by: string | null;
+          decided_at: string | null;
           created_at: string;
         };
         Insert: Record<never, never>;
@@ -897,6 +921,26 @@ export interface Database {
       /** schema-manage-booking.sql § 22: owner/admin write config.payments and nothing else; null turns payments off */
       set_payment_settings: {
         Args: { p_tenant_id: number; p_payments: Json | null };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 25: what cancelling or rescheduling means today (the policy's arithmetic) */
+      change_terms: {
+        Args: { p_tenant_id: number; p_group_id: string };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 26: the guest asks (dry run = the quote only) */
+      request_change: {
+        Args: { p_tenant_id: number; p_reference: string; p_contact: string; p_kind: string; p_new_check_in: string | null; p_reason: string | null; p_dry_run: boolean };
+        Returns: Json;
+      };
+      /** schema-manage-booking.sql § 27: the guest takes back an open request */
+      withdraw_change: {
+        Args: { p_tenant_id: number; p_reference: string; p_contact: string };
+        Returns: boolean;
+      };
+      /** schema-manage-booking.sql § 28: owner/admin approve (cancel, or move the stay) or reject */
+      decide_change: {
+        Args: { p_tenant_id: number; p_id: number; p_action: string; p_note: string | null };
         Returns: Json;
       };
       /** schema-manage-booking.sql § 19b: every due stay of the tenant → expired, as the system; staff or service_role */

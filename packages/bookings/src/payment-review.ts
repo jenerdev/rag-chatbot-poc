@@ -55,7 +55,7 @@ export interface StayEvent {
   actor: 'guest' | 'staff' | 'system';
   /** the staff member's id, for "you" on the screen */
   actorUser: string | null;
-  kind: 'created' | 'status' | 'payment';
+  kind: 'created' | 'status' | 'payment' | 'change';
   from: string | null;
   to: string | null;
   amount: number | null;
@@ -70,6 +70,10 @@ export interface PaymentSettings {
   terms: string | null;
   /** Phase 5 (§ 9 q1): when a stay holds its dates; absent = none */
   hold: 'none' | 'on_proof' | 'on_request';
+  /** Phase 6: refund tiers by days before check-in; [] = no refund */
+  cancellation: { daysBefore: number; refundPercent: number }[];
+  /** Phase 6: date changes close this many days before check-in; null = none taken on the page */
+  rescheduleUntilDaysBefore: number | null;
 }
 
 /** A write's refusal, in the function's own words. */
@@ -253,6 +257,8 @@ export function toConfig(s: PaymentSettings): Record<string, unknown> {
   if (s.reviewWithinHours !== null) out.review_within_hours = s.reviewWithinHours;
   if (s.terms?.trim()) out.terms = s.terms.trim();
   if (s.hold !== 'none') out.hold = s.hold;
+  if (s.cancellation.length > 0) out.cancellation = s.cancellation.map((t) => ({ days_before: t.daysBefore, refund_percent: t.refundPercent }));
+  if (s.rescheduleUntilDaysBefore !== null) out.reschedule_until_days_before = s.rescheduleUntilDaysBefore;
   return out;
 }
 
@@ -279,5 +285,10 @@ export function fromConfig(raw: unknown): PaymentSettings | null {
     reviewWithinHours: num(p.review_within_hours),
     terms: str(p.terms),
     hold: p.hold === 'on_proof' || p.hold === 'on_request' ? p.hold : 'none',
+    cancellation: (Array.isArray(p.cancellation) ? p.cancellation : []).map((t) => {
+      const x = t as Record<string, unknown>;
+      return { daysBefore: num(x.days_before) ?? 0, refundPercent: num(x.refund_percent) ?? 0 };
+    }),
+    rescheduleUntilDaysBefore: num(p.reschedule_until_days_before),
   };
 }

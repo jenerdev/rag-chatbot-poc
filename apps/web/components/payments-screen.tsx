@@ -20,7 +20,7 @@
 // row's. Amounts are typed as pesos and parsed by string (lib/money.ts).
 
 import { useCallback, useEffect, useState } from 'react';
-import type { PaymentRow, PaymentSettings, StayEvent } from '@rag/bookings';
+import type { ChangeRow, PaymentRow, PaymentSettings, StayEvent } from '@rag/bookings';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
@@ -64,6 +64,11 @@ function when(iso: string, timezone: string): string {
 function eventWords(e: StayEvent, currency: string): string {
   if (e.kind === 'created') return `Booked (${e.note === 'web' ? 'from the booking page' : 'by staff'}), ${e.to}`;
   if (e.kind === 'status') return `${e.from} → ${e.to}${e.note ? `: ${e.note}` : ''}`;
+  if (e.kind === 'change') {
+    const [kind, status] = (e.to ?? '').split(':');
+    const what = kind === 'cancel' ? 'cancel' : `move${e.note && status === 'pending' ? ` to ${e.note}` : ''}`;
+    return status === 'pending' ? `Asked to ${what}` : `Request to ${kind === 'cancel' ? 'cancel' : 'move'} ${status}${status !== 'pending' && e.note ? `: ${e.note}` : ''}`;
+  }
   const amount = e.amount !== null ? ` ${formatMoney(e.amount, currency)}` : '';
   const [kind, status] = (e.to ?? '').split(':');
   if (kind === 'refund') return `Refund recorded${amount}`;
@@ -81,12 +86,23 @@ interface SettingsDraft {
   reviewWithinHours: string;
   terms: string;
   hold: 'none' | 'on_proof' | 'on_request';
+  /** "7:100, 2:50": days before → percent */
+  cancellation: string;
+  rescheduleUntil: string;
+}
+
+/** "7:100, 2:50" ↔ the tiers. null for text that is not that shape. */
+function parseTiers(text: string): { daysBefore: number; refundPercent: number }[] | null {
+  if (text.trim() === '') return [];
+  const tiers = text.split(',').map((part) => /^\s*(\d{1,3})\s*:\s*(\d{1,3})\s*$/.exec(part));
+  if (tiers.some((m) => !m)) return null;
+  return tiers.map((m) => ({ daysBefore: Number(m![1]), refundPercent: Number(m![2]) }));
 }
 
 const NEW_METHOD: SettingsDraft['methods'][number] = { kind: 'gcash', label: 'GCash', accountName: '', accountNumber: '', instructions: '' };
 
 function toDraft(s: PaymentSettings | null): SettingsDraft {
-  if (!s) return { methods: [{ ...NEW_METHOD }], feeKind: 'full', feeValue: '', payWithinHours: '24', reviewWithinHours: '24', terms: '', hold: 'none' };
+  if (!s) return { methods: [{ ...NEW_METHOD }], feeKind: 'full', feeValue: '', payWithinHours: '24', reviewWithinHours: '24', terms: '', hold: 'none', cancellation: '', rescheduleUntil: '' };
   return {
     methods: s.methods.map((m) => ({ kind: m.kind, label: m.label, accountName: m.accountName ?? '', accountNumber: m.accountNumber ?? '', instructions: m.instructions ?? '' })),
     feeKind: s.fee.kind,
@@ -95,6 +111,8 @@ function toDraft(s: PaymentSettings | null): SettingsDraft {
     reviewWithinHours: s.reviewWithinHours === null ? '' : String(s.reviewWithinHours),
     terms: s.terms ?? '',
     hold: s.hold,
+    cancellation: s.cancellation.map((t) => `${t.daysBefore}:${t.refundPercent}`).join(', '),
+    rescheduleUntil: s.rescheduleUntilDaysBefore === null ? '' : String(s.rescheduleUntilDaysBefore),
   };
 }
 
@@ -104,6 +122,8 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   const [role, setRole] = useState<Role | null>(null);
   const [open, setOpen] = useState<PaymentRow[] | null>(null);
   const [all, setAll] = useState<PaymentRow[] | null>(null);
+  const [changes, setChanges] = useState<ChangeRow[] | null>(null);
+  const [changeNote, setChangeNote] = useState<Record<number, string>>({});
   const [settings, setSettings] = useState<PaymentSettings | null | undefined>(undefined);
   const [draft, setDraft] = useState<SettingsDraft>(toDraft(null));
   const [loadState, setLoadState] = useState<Load>(LOADING);
@@ -146,14 +166,20 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   const load = useCallback(async () => {
     let response: Response | null = null;
     try {
-      const [o, a, s] = await Promise.all([fetch(`${api}/payments?which=open`), fetch(`${api}/payments?which=all`), fetch(`${api}/payments/settings`)]);
-      for (const r of [o, a, s]) {
+      const [o, a, s, c] = await Promise.all([
+        fetch(`${api}/payments?which=open`),
+        fetch(`${api}/payments?which=all`),
+        fetch(`${api}/payments/settings`),
+        fetch(`${api}/payments/changes?which=all`),
+      ]);
+      for (const r of [o, a, s, c]) {
         response = r;
         if (r.status === 401) return unauthorized();
         if (!r.ok) throw new Error('failed');
       }
       setOpen(await o.json());
       setAll(await a.json());
+      setChanges(await c.json());
       const loaded = ((await s.json()) as { settings: PaymentSettings | null }).settings;
       setSettings(loaded);
       setDraft(toDraft(loaded));
@@ -245,6 +271,11 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
       return;
     }
     const hours = (text: string) => (text.trim() === '' ? null : Number(text));
+    const tiers = parseTiers(draft.cancellation);
+    if (tiers === null) {
+      setNotice({ message: 'Write the refund policy as days before check-in : percent, separated by commas, like 7:100, 2:50.', kind: 'error' });
+      return;
+    }
     await write(
       'PUT',
       '/payments/settings',
@@ -256,6 +287,8 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
           reviewWithinHours: hours(draft.reviewWithinHours),
           terms: draft.terms.trim() || null,
           hold: draft.hold,
+          cancellation: tiers,
+          rescheduleUntilDaysBefore: draft.rescheduleUntil.trim() === '' ? null : Number(draft.rescheduleUntil),
         },
       },
       'Saved the payment settings. Bookings already made keep the amount they were given.',
@@ -446,6 +479,20 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
               for the hours to pay; holding from the proof is the recommended setting.
             </span>
           </div>
+          <h3>Changes guests may ask for</h3>
+          <div className="field-row">
+            <div className="field grow">
+              <label htmlFor="cancel-tiers">
+                Refund when cancelling <span className="muted">(days before : percent)</span>
+              </label>
+              <input id="cancel-tiers" placeholder="7:100, 2:50" value={draft.cancellation} onChange={(e) => setDraft({ ...draft, cancellation: e.target.value })} />
+              <span className="small muted">7:100, 2:50 refunds all of what was paid 7 or more days ahead, half 2 to 6 days ahead, nothing later. Empty: no refund.</span>
+            </div>
+            <div className="field narrow">
+              <label htmlFor="reschedule-until">Date changes until (days before)</label>
+              <input id="reschedule-until" type="number" min={0} max={365} placeholder="none" value={draft.rescheduleUntil} onChange={(e) => setDraft({ ...draft, rescheduleUntil: e.target.value })} />
+            </div>
+          </div>
           <div className="field">
             <label htmlFor="pay-terms">
               Terms guests read <span className="muted">(optional)</span>
@@ -475,6 +522,78 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   );
 
   const enoughIfVerified = selected && selected.payment.required !== null;
+
+  const changesPanel = (
+    <section className="card">
+      <h2>Change requests</h2>
+      <p className="small muted">
+        Guests ask to cancel or move a stay from the Manage booking page. Nothing changes until you approve. A refund due is yours to pay
+        and then record (History, Record a refund).{!canWrite && ' Only an owner or admin can decide.'}
+      </p>
+      {changes === null ? (
+        <LoadState load={loadState} what="change requests" onRetry={retry} />
+      ) : changes.length === 0 ? (
+        <EmptyState icon="calendar" title="No change requests" />
+      ) : (
+        changes.map((c) => (
+          <div key={c.id} className="list-row">
+            <span className="list-row-lead">{when(c.createdAt, timezone)}</span>
+            <span className="list-row-main">
+              <span className="list-row-title">
+                {c.reference} · {c.guestName}
+              </span>
+              <span className={c.kind === 'cancel' ? 'badge danger' : 'badge accent'}>
+                {c.kind === 'cancel' ? 'Cancel' : `Move ${c.checkIn ?? ''} → ${c.newCheckIn ?? ''}`}
+              </span>
+              <span className={`badge ${c.status === 'pending' ? 'warn' : c.status === 'approved' ? 'ok' : ''}`}>{c.status}</span>
+              {c.guestReason && <span className="small muted">“{c.guestReason}”</span>}
+            </span>
+            <span className="list-row-meta">
+              {c.kind === 'cancel'
+                ? `refund due ${formatMoney(c.refundDue ?? 0, currency)}`
+                : c.quotedDifference
+                  ? `${c.quotedDifference > 0 ? '+' : '−'}${formatMoney(Math.abs(c.quotedDifference), currency)}`
+                  : 'same price'}
+            </span>
+            {c.status === 'pending' && canWrite && (
+              <span className="list-row-actions">
+                <input
+                  aria-label={`Note for ${c.reference}`}
+                  placeholder="Note (required to reject)"
+                  maxLength={500}
+                  value={changeNote[c.id] ?? ''}
+                  onChange={(e) => setChangeNote({ ...changeNote, [c.id]: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="sm danger"
+                  disabled={busy || !(changeNote[c.id] ?? '').trim()}
+                  onClick={() => void write('PATCH', `/payments/changes/${c.id}`, { action: 'reject', note: changeNote[c.id] }, `Rejected ${c.reference}'s request. The guest sees your note.`)}
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  className="sm primary"
+                  disabled={busy}
+                  onClick={() =>
+                    void write(
+                      'PATCH',
+                      `/payments/changes/${c.id}`,
+                      { action: 'approve', note: (changeNote[c.id] ?? '').trim() || null },
+                      c.kind === 'cancel' ? `Cancelled ${c.reference}. Record the refund once you have paid it.` : `Moved ${c.reference} to ${c.newCheckIn}.`,
+                    )
+                  }
+                >
+                  Approve
+                </button>
+              </span>
+            )}
+          </div>
+        ))
+      )}
+    </section>
+  );
 
   return (
     <StaffFrame {...frame}>
@@ -620,6 +739,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
         tabs={[
           { id: 'verify', label: `To verify${open?.length ? ` (${open.length})` : ''}`, panel: toVerify },
           { id: 'all', label: 'All payments', panel: everything },
+          { id: 'changes', label: `Change requests${changes?.some((c) => c.status === 'pending') ? ` (${changes.filter((c) => c.status === 'pending').length})` : ''}`, panel: changesPanel },
           { id: 'settings', label: 'Settings', panel: settingsPanel },
         ]}
       />

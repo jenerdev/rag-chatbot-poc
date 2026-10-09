@@ -1,0 +1,137 @@
+$ node --conditions=react-server --env-file=../../.env tools/rooms.mjs
+[bookings] rooms-probe added room #2098 "Garden Room"
+[bookings] rooms-probe added room #2099 "Family Room"
+[bookings] rooms-probe added room #2100 "Loft"
+PASS  staff add rooms; a duplicate name is a 400  — Garden Room (2), Family Room (6), Loft (4) · duplicate: BookingInputError: There is already a room called "Garden Room".
+[bookings] rooms-probe rates for room #2098: slot 1269 350000/450000
+[bookings] rooms-probe rates for room #2099: slot 1269 600000/750000
+PASS  rates set in centavos; a float is refused; another tenant's room is null  — Family [{"slotId":1269,"slot":"Night","weekdayPrice":600000,"weekendPrice":750000,"holidayPrice":null}] · float BookingInputError: Weekday price must be a whole number of centavos from 0 to 100000000. · villa's room null
+PASS  quote: weekday and weekend from the database, with extra guests; no rate says so  — 2026-11-23 Garden Room 350000+0 + Family Room 600000+75000 = 1025000 · 2026-11-20 450000 · Loft: BookingInputError: Loft has no price for Night yet.
+[bookings] rooms-probe booked #8892, #8893: 2026-11-23, unit 2098+2099, slot 1269, confirmed, group 8b5730c6-5e59-4675-9e1d-010ddbe00dcb
+PASS  two rooms booked as one group; the stored total equals the quote  — group 8b5730c6-5e59-4675-9e1d-010ddbe00dcb · #8892 Garden Room 350000, #8893 Family Room 675000 · total 1025000
+[bookings] rooms-probe booked #8894, #8895: 2026-11-30, unit 2098+2099, slot 1269, pending, group bb9525c8-f4ea-4ec9-b327-72a6503f7783
+[bookings] rooms-probe booked #8896: 2026-11-30, unit 2098, slot 1269, pending
+[bookings] rooms-probe confirmed #8894 (group bb9525c8-f4ea-4ec9-b327-72a6503f7783, 2 row(s))
+PASS  D-095: born pending, holding nothing; Confirm takes the whole group; the clash is a 409 at confirm; a chat token cannot confirm  — pending true · first true → confirmed,confirmed · second BookingConflictError · chat null
+[bookings] rooms-probe cancelled #8896
+PASS  D-096: the decision note is stored trimmed on the whole group, shown on a cancel, and bounded  — confirm "Paid in full|Paid in full" · cancel cancelled "Guest changed plans" · 501 chars: BookingInputError
+[bookings] rooms-probe booked #8897: 2026-12-01, unit 2098, slot 1269, pending
+[bookings] rooms-probe booked #8898: 2026-12-01, unit 2098, slot 1269, pending
+[bookings] rooms-probe confirmed #8897 (group a1d26910-20ae-48a5-bcf5-7d3d9010b985, 1 row(s))
+PASS  D-099: two pendings may share a night; once one is confirmed, a pending insert is refused in words (23P01), a group with one clashing room writes no row, a confirmed insert is still the constraint's, the other pending stays  — pending true · confirm true · raw 23P01 "taken on 2026-12-01: Garden Room is already confirmed for that slot" · package BookingConflictError · group BookingConflictError, Family rows 0 → 0 · confirmed BookingConflictError · P2 pending
+PASS  D-099: the trigger's words reach the caller; the constraint's refusal keeps the sentence; the list flags the clashing pending row  — package "taken on 2026-12-01: Garden Room is already confirmed for that slot" · constraint "That slot on 2026-12-01 overlaps an existing booking." · P2 clash true · P1 clash false
+PASS  D-100: a 2-room staff booking has ONE reference; single staff bookings each have a group and their own reference, all of the web shape  — 2-room ROO-MZDGRK (2 rows) · single ROO-YVJEE3 group set · P1 ROO-VAC7HH · P2 ROO-JEJEXN
+[bookings] rooms-probe booked #8904: 2026-12-02, unit 2098, slot 1269, pending
+[bookings] rooms-probe request 88159767-477c-4914-8f2c-c0ad3f9011b2 → cancelled (1 row(s))
+[bookings] rooms-probe request 0e20e1e0-42cf-4a65-ac8b-b621b6bd88a9 → confirmed (1 row(s))
+PASS  D-100: staff stays are requests too: listed with source and clash, declined and confirmed by group with the note  — P2 staff clash true ROO-JEJEXN → decline true cancelled "Double booked" · fresh staff clash false → confirm true confirmed "Paid"
+[bookings] rooms-probe booked #8906: 2026-11-24, unit 2098, slot 1269, confirmed
+PASS  the same room twice is a 409, and a clashing group saves none of its rooms  — again: BookingConflictError: That slot on 2026-11-23 overlaps an existing booking. · group: BookingConflictError: That slot on 2026-11-24 overlaps an existing booking. · Tuesday rows: Garden Room (Blocker)
+[bookings] rooms-probe rates for room #2100: slot 1269 400000/500000
+[bookings] rooms-probe changed room #2100: active
+PASS  inactive, another tenant's, and missing rooms look identical  — BookingInputError: No such unit or slot. | BookingInputError: No such unit or slot. | BookingInputError: No such unit or slot.
+[bookings] rooms-probe added room #2102 "Unpriced"
+[bookings] rooms-probe booked #8914: 2026-11-20, unit 2098, slot 1269, confirmed
+PASS  no rate and over capacity are 400s; at capacity books at the weekend rate  — BookingInputError: That room has no price for that slot yet. | BookingInputError: That is more guests than the room holds. | fits: 450000
+[bookings] rooms-probe rates for room #2098: slot 1269 999900/999900
+PASS  a rate edit reprices quotes, not bookings  — stored 350000 · new quote 999900
+[bookings] rooms-probe rooms 2026-11-23..2026-11-23: 0 open of 2
+[bookings] rooms-probe rooms 2026-11-23..2026-11-23 6 guests: 0 open of 1
+PASS  room availability: priced active rooms, capacity filter, no guest data  — Garden Room taken 999900, Family Room taken 600000 · 6 guests: Family Room · keys capacity,date,dayPrice,extraGuestPrice,extraPersonRate,price,rateKind,slot,standardCapacity,status,total,unit
+PASS  the room filter shows one room, and another tenant's room shows nothing  — Family: 1 rows · villa's room: 0
+[bookings] rooms-probe photo #1558 for room #2098: 895/2098/f2c7b07c-b7f3-4ede-8a12-247f51aa2d83.png, 70 bytes
+PASS  a photo is stored under its own folder and served; SVG, oversize and another tenant's room are refused  — 895/2098/f2c7b07c-b7f3-4ede-8a12-247f51aa2d83.png 200 · svg: BookingInputError: A photo must be a JPEG, PNG or WebP image. · huge: BookingInputError: The photo is 2.0 MB; the limit is 2 MB. · villa's room: null
+[bookings] rooms-probe photo #1559 for room #2098: 895/2098/b671c741-ccfd-43f2-a4a1-c5f7f9ea36f9.png, 70 bytes
+[bookings] rooms-probe photo #1560 for room #2098: 895/2098/bc555f08-5448-464a-a8be-c6057a78130f.png, 70 bytes
+[bookings] rooms-probe photo #1561 for room #2098: 895/2098/8aea393d-bc21-43c6-bcd7-d5a55b0b2c47.png, 70 bytes
+[bookings] rooms-probe photo #1562 for room #2098: 895/2098/3284db66-867d-4adb-b160-5ea419d2c15c.png, 70 bytes
+[bookings] rooms-probe photo #1563 for room #2098: 895/2098/8ee3b6d5-cf6e-40ec-80be-67d5e9ea305e.png, 70 bytes
+PASS  the 7th photo is refused and its upload removed  — BookingInputError: A room has at most 6 photos. · objects 6 · rows 6
+[bookings] rooms-probe removed photo #1558: 895/2098/f2c7b07c-b7f3-4ede-8a12-247f51aa2d83.png
+PASS  a removed photo takes its object with it; another room's id removes nothing  — via the Family Room false, removed true, again false, objects left 5
+PASS  listAccommodations: order, rates, photos, inactive rooms kept  — Unpriced 0r 0p, Garden Room 1r 5p, Family Room 1r 0p, Loft (inactive) 1r 0p
+[bookings] rooms-probe added room #2103 "Quad"
+[bookings] rooms-probe rates for room #2103: slot 1269 350000/450000
+PASS  extra guests: a new room defaults to standard 2, maximum 4, ₱250  — standard 2, maximum 4, rate 25000
+PASS  extra guests: the quote for 1–4 guests, and 5 refused before booking  — 1:350000+0=350000 2:350000+0=350000 3:350000+25000=375000 4:350000+50000=400000 · 5: BookingInputError: Quad holds at most 4 guests.
+[bookings] rooms-probe booked #8915: 2026-11-23, unit 2103, slot 1269, confirmed
+PASS  extra guests: 3 guests stored and listed as 350000 + 25000 = 375000  — 350000 + 25000 = 375000; group total 375000; listed 350000+25000
+PASS  extra guests: no guest count is a 400; another tenant's room still says 'No such unit'; standard above the maximum refused  — BookingInputError: Enter the number of guests for each room. | BookingInputError: No such unit or slot. | BookingInputError: Standard guests cannot be more than the maximum.
+[bookings] rooms-probe photo #1565 for room #2103: 895/2103/34198e86-7a4b-4e7e-9835-4b3d6f4057f5.png, 70 bytes
+[bookings] rooms-probe photo #1566 for room #2103: 895/2103/e4b33ac7-5cd9-4ec0-b21e-65d758ac4f7d.png, 70 bytes
+[bookings] rooms-probe photo #1567 for room #2103: 895/2103/dd475a4d-8751-41fe-a383-4b7f942cb27e.png, 70 bytes
+PASS  photos: new ones take the next place; a move swaps neighbours  — orders on upload 0,1,2 · → p2,p1,p3 (0,1,2) · past the end false · ← p1,p2,p3
+[bookings] rooms-probe added room #2104 "Hall"
+[bookings] rooms-probe rates for room #2104: slot 1269 1600000/2000000
+PASS  booking page: priced active units only, nightly slot, 14 nights; an unpriced tenant is a 404  — Quad, Garden Room, Family Room, Hall · slots Night* · unpriced: BookingsNotEnabledError: Bookings are not enabled for "rooms-bare"
+PASS  quote: a Thursday + Friday stay is priced night by night  — 2027-01-21 1600000+50000+0=1650000, 2027-01-22 2000000+50000+0=2050000 · total 3700000 · available true
+[bookings] rooms-probe promo #402 "Ten percent" percent 1000 2027-01-21..2027-03-22 code ten-10
+PASS  promos: five bad inputs refused in words; created with the code trimmed; a duplicate code refused; listed with 0 uses  — BookingInputError: Kind must be "fixed" or "percent". | BookingInputError: A percentage is at most 100 %. | BookingInputError: "Valid to" is before "valid from". | BookingInputError: A code is 3 to 32 letters, digits, - or _. | BookingInputError: Usage limit must be a positive whole number. · code "ten-10" · dup: BookingInputError: That code is already used by another promo. · listed 1
+PASS  quoteRequest: the code takes 10 % off each night and the total; a wrong code and one outside its dates change nothing and say why  — plain 3700000 · coded 3330000 (−370000, "Ten percent") · wrong "No such promo code." · outside "The promo "Ten percent" covers stays from 2027-01-21 to 2027-03-22."
+[bookings] rooms-probe request ROO-TQPM4H: 2027-02-04 × 2 night(s), 1 unit(s), 2 row(s), pending
+PASS  requestBooking with the code: the receipt equals the quote; the rows carry the promo's name and discount; uses 1  — receipt −370000 = 3330000 · stored Ten percent/165000, Ten percent/205000 · uses 1
+[bookings] rooms-probe promo #404 "Five hundred off" fixed 50000 2027-01-21..2027-03-22 automatic max 1
+[bookings] rooms-probe booked #8920, #8921: 2027-02-11, unit 2098+2099, slot 1269, pending, group 1bfbf500-9c89-4506-b233-2d92d1604908
+[bookings] rooms-probe promo #402 updated
+[bookings] rooms-probe promo #405 "Unused" fixed 1 2027-01-21..2027-03-22 automatic
+[bookings] rooms-probe promo #405 deleted
+[bookings] rooms-probe promo #402 updated
+PASS  staff promos: a fixed amount on the first room, stored the same; the limit is a 409; retired is refused; delete only when unused; an edit leaves stored discounts alone  — quote 50000,0 = 1549900 · stored 50000,0 · limit BookingConflictError: The promo "Five hundred off" has reached its limit · retired quote BookingInputError: The promo "Ten percent" is no longer offered. · retired code "No such promo code." · delete used BookingInputError: This promo has been used by a booking. Retire it instead. · unused true · kept 165000,205000
+[bookings] rooms-probe calendar 2027-02-18 peak "Probe peak" +400000
+[bookings] rooms-probe calendar 2027-03-02 holiday "Probe holiday" +0
+PASS  calendar: staff write, chat reads; a peak Thursday is ₱24,500 (villa's 24 Dec)  — 2027-02-18,2027-03-02 · chat write: Error: Could not save 2027-02-18: new row violates row-level security policy for table "rate_calendar" · 2000000+50000+400000=2450000 "Probe peak"
+[bookings] rooms-probe rates for room #2104: slot 1269 1600000/2000000
+[bookings] rooms-probe rates for room #2104: slot 1269 1600000/2000000
+PASS  holiday rate: weekend when unset, holiday_price when set; a rate edit without it keeps it  — unset 2000000 · set 2500000 · weekday 1600000 · mixed: BookingInputError: Send a holiday price (or null) for every slot, or for none. · kept 2500000
+[bookings] rooms-probe rooms 2027-02-18..2027-02-18 Hall: 1 open of 1
+[bookings] rooms-probe rooms 2027-01-22..2027-01-22 Hall: 1 open of 1
+[bookings] rooms-probe rooms 2027-01-21..2027-01-21 Hall: 1 open of 1
+[bookings] rooms-probe rooms 2027-03-02..2027-03-02 Hall: 1 open of 1
+PASS  rate kind and day price: each row names its rate, and the day price has the surcharge the page quotes  — weekday 1600000 1600000, weekend 2000000 2000000, peak 2500000 2900000, holiday 2500000 2500000 · page 2950000 - extra 50000
+[bookings] rooms-probe request ROO-4JN5W9: 2027-01-21 × 2 night(s), 1 unit(s), 2 row(s), pending
+PASS  request: 2 pending web rows, one reference, total = the stored prices  — ROO-4JN5W9 · 2 rows pending,pending · receipt 3700000, stored 3700000 · ends 2027-01-23T04:00:00+00:00
+[bookings] rooms-probe request ROO-GXDX35: 2027-01-21 × 2 night(s), 1 unit(s), 2 row(s), pending
+PASS  staff list: one row per request; two requests for the same nights, no clash yet  — ROO-GXDX35 pending 2n 3700000 clash=false · ROO-4JN5W9 pending 2n 3700000 clash=false
+[bookings] rooms-probe request fbdce3aa-97d7-4453-a7c7-080dd368e3b0 → confirmed (2 row(s))
+[bookings] rooms-probe request fbdce3aa-97d7-4453-a7c7-080dd368e3b0 → confirmed (2 row(s))
+[bookings] rooms-probe request be4780ab-1572-4d24-b906-7687cec86968 → cancelled (2 row(s))
+PASS  confirm: whole group; a clashing confirm is 409 and changes nothing; decline; the nights are gone  — confirm true/true · clash true · BookingConflictError: A night of this request was confirmed for another booking. Decline it, or cancel the other booking first. · then pending · decline true → cancelled · quote available false · late BookingConflictError: That date is no longer available. Please choose another. · rows 4 → 4
+PASS  D-099: request_booking() on a confirmed night is refused in SQL (its own check first, the trigger behind it): 23P01, nothing saved  — 23P01 "That date is no longer available" · rows 4 → 4
+PASS  walls: villa's unit is 'No such unit or slot.'; a chat token's confirm is false  — BookingInputError: No such unit or slot. | BookingInputError: No such unit or slot. | chat confirm: false
+[bookings] rooms-probe request ROO-DKTBX6: 2027-05-03 × 1 night(s), 1 unit(s), 1 row(s), pending
+[bookings] rooms-probe request ROO-YSCZ47: 2027-05-10 × 1 night(s), 1 unit(s), 1 row(s), pending
+[bookings] rooms-probe request ROO-VEUQBX: 2027-05-24 × 1 night(s), 1 unit(s), 1 row(s), pending
+PASS  request: the 4th open request from one contact is a 429  — ok,ok,ok,BookingLimitError 429
+[bookings] rooms-probe calendar copied 1 date(s) to 2028
+[bookings] rooms-probe calendar 2027-03-02 removed
+PASS  calendar: a date copied to next year; remove is counted (again false, chat token false)  — copied 2028-02-18 · removed true/false · chat false · left 2027-02-18,2028-02-18
+[bookings] rooms-probe booked #8931: 2027-08-11, unit 2098, slot 1269, confirmed
+[bookings] rooms-probe calendar 2027-08-10 closed "Probe maintenance" +0
+PASS  closing: a date with a confirmed booking is refused; an empty one closes; no surcharge on a closed date  — BookingInputError: 2027-08-11 has 1 confirmed booking. Cancel or move it before closing the date. · 2027-08-10 closed · BookingInputError: A closed date has no surcharge. · table: 23514 new row for relation "rate_calendar" violates check co
+[bookings] rooms-probe booked #8934: 2027-08-12, unit 2099, slot 1269, confirmed
+PASS  closed date: staff refused in words; a raw insert on the staff token and on service_role meets the trigger; the day after books  — BookingInputError: Closed on 2027-08-10 (Probe maintenance). Choose another date. · staff raw: 23514 closed on 2027-08-10: Probe maintenance · service raw: 23514 closed on 2027-08-10: Probe maintenance · twin 2027-08-12
+[bookings] rooms-probe rooms 2027-08-09..2027-08-11 Night: 7 open of 12, 1 day(s) closed
+PASS  customer: a closed date is refused by quote, request and request_booking() itself; availability says 'closed' that day only  — BookingInputError: Closed on 2027-08-10 (Probe maintenance). Choose another date. · BookingInputError: Closed on 2027-08-10 (Probe maintenance). Choose another date. · rpc: 23514 closed on 2027-08-10: Probe maintenance · 2027-08-09 open, 2027-08-10 closed · twin 2 lines
+[bookings] rooms-probe request ROO-JJC7BY: 2027-08-26 × 1 night(s), 1 unit(s), 1 row(s), pending
+[bookings] rooms-probe calendar 2027-08-26 closed "Probe late closure" +0
+[bookings] rooms-probe request 3e1e45ea-b67f-45d8-88e1-b41c3aaf7c2e → cancelled (1 row(s))
+[bookings] rooms-probe calendar 2027-08-10 removed
+[bookings] rooms-probe booked #8937: 2027-08-10, unit 2098, slot 1269, confirmed
+PASS  a request on a date closed later: flagged, confirm refused in words, decline works; reopening makes the date bookable  — closed true · BookingInputError: Closed on 2027-08-26 (Probe late closure). Decline this request, or reopen the date first. · still pending · declined true · reopened true · booked 2027-08-10
+[bookings] rooms-probe slot #1270 "Probe Day" created, 08:00 + 09:00:00
+PASS  slots: an admin creates one; a duplicate name is a 400; a chat token writes nothing; another tenant's slot is "not there"  — Probe Day 08:00 540min · dup: BookingInputError: A slot named "Probe Day" already exists. · chat insert: 42501 · chat update 0 rows · villa's: null
+[bookings] rooms-probe rates for room #2098: slot 1270 200000/250000
+[bookings] rooms-probe booked #8938: 2027-12-08, unit 2098, slot 1270, confirmed
+[bookings] rooms-probe slot #1270 updated: name=Probe Day Tour
+PASS  slots: an upcoming booking fixes the times (words, and the trigger on staff and service_role); the name still changes  — BookingInputError: "Probe Day" has 1 upcoming booking, so its start time and length cannot change. Its name and nightly can. For new times, add a new slot and retire this one. · raw staff 23514 · raw service 23514 · now "Probe Day Tour" 08:00, 1 upcoming
+[bookings] rooms-probe slot #1270 updated: active=false
+[bookings] rooms-probe rooms 2027-12-08..2027-12-08: 3 open of 4
+PASS  slots: a booked slot is retired, not deleted; retired, it is offered nowhere and takes no booking (words, and the trigger on service_role); its booking keeps it  — delete: BookingInputError: This slot has bookings, so it cannot be deleted. Retire it instead: it then takes no new bookings, and its past bookings keep it. · offered [Night] · history [Probe Day Tour,Night] · availability [Night] · new: BookingInputError: That slot is no longer offered. Choose another. · raw 23514 · booking's slot "Probe Day Tour"
+[bookings] rooms-probe slot #1270 updated: active=true
+[bookings] rooms-probe slot #1273 "Probe Spare" created, 18:00 + 02:00:00, nightly
+[bookings] rooms-probe rates for room #2098: slot 1273 100000/100000
+[bookings] rooms-probe slot #1273 deleted
+PASS  slots: a retired slot is offered again; one never booked is deleted with its rates; deleting it twice is "not there"  — offered again true · deleted true · rate rows left 0 · again false
+PASS  villa (whole_resort): rooms are a 404, several units a 400  — PerRoomOnlyError: "villa" does not book by room | PerRoomOnlyError: "villa" does not book by room | PerRoomOnlyError: "villa" does not book by room | several: BookingInputError: This business is booked as a whole, one unit at a time.
+
+ALL ROOMS CHECKS PASS

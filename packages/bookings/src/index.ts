@@ -26,6 +26,7 @@
 //   guest.ts       the guest's own stay, by reference + email or phone (manage booking)
 //   payments.ts    a guest's proof of payment: checked, uploaded, submitted (manage booking)
 //   payment-review.ts  staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
+//   changes.ts     cancel and reschedule requests: the guest asks, staff decide (manage booking)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -91,7 +92,9 @@ export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listReques
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';
 export { expireDueStays } from './deadlines.js';
-export type { GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
+export { decideChange, listChanges, requestChange, withdrawChange } from './changes.js';
+export type { ChangeInput, ChangeQuote, ChangeRow } from './changes.js';
+export type { ChangeTerms, GuestChange, GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
 export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, sniffProofType, submitProof } from './payments.js';
 export type { ProofInput, ProofType } from './payments.js';
 export {

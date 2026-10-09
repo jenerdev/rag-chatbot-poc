@@ -24,6 +24,8 @@ const raw = {
   pay_by: '2026-10-11T03:00:00+00:00',
   review_by: null,
   held_until: null,
+  change: { days_before: 33, refund_percent: 100, refund_due: 0, can_cancel: true, can_reschedule: false, reschedule_until_days_before: null },
+  changes: [],
   payments: [],
   pay: {
     methods: [{ kind: 'gcash', label: 'GCash', account_name: 'Harbor Inn', account_number: '0917 000 0000' }],
@@ -82,6 +84,17 @@ describe('parseGuestStay: the payment (Phase 3)', () => {
   it('fails loudly on a payment status the function never returns', () => {
     expect(() => parseGuestStay({ ...raw, payment: { ...raw.payment, status: 'held' } })).toThrow(/unknown payment status/);
     expect(() => parseGuestStay({ ...raw, payment: undefined })).toThrow(/payment is not an object/);
+  });
+});
+
+describe('parseGuestStay: changes (Phase 6)', () => {
+  it('types the terms and the requests', () => {
+    const stay = parseGuestStay({
+      ...raw,
+      changes: [{ kind: 'reschedule', status: 'rejected', new_check_in: '2026-12-01', quoted_difference: 50000, refund_due: null, decision_note: 'Fully booked', created_at: '2026-10-10T05:00:00+00:00' }],
+    })!;
+    expect(stay.change).toEqual({ daysBefore: 33, refundPercent: 100, refundDue: 0, canCancel: true, canReschedule: false, rescheduleUntilDaysBefore: null });
+    expect(stay.changes[0]).toMatchObject({ kind: 'reschedule', status: 'rejected', quotedDifference: 50000, decisionNote: 'Fully booked' });
   });
 });
 

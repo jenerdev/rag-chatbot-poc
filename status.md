@@ -219,6 +219,37 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   the inputs unchanged (trap 24); nothing reworded. The battery ran beside
   the walks, which seed and delete harbor rows far from its dates.
   Output in `plan/manage-booking/phase5-*`.
+- [x] Phase 5 committed `7bcc9dc`.
+- [x] Phase 6, cancel and reschedule requests (2026-10-10):
+  SQL sections 24–28 in `schema-manage-booking.sql`: `change_requests`
+  (one open per stay, staff read, logged), `cancellation` tiers and
+  `reschedule_until_days_before` in the settings validator,
+  `change_terms()` (the refund today, rounded DOWN, of what was received;
+  whether a change is allowed), `request_change()` (guest; a dry run
+  quotes; a reschedule = same rooms, slot, nights, guests, priced by
+  `unit_quote()`, no promo carried, refused on a taken or closed night),
+  `withdraw_change()`, `decide_change()` (owner/admin; approve a cancel
+  cancels the stay and keeps the refund due on the request; approve a
+  reschedule cancels the old nights and inserts the new ones in the same
+  group under `request_booking()`'s lock, one transaction, a clash = 23P01
+  and nothing changes). `guest_stay()` carries the terms and the
+  requests. `changes.ts`, two guest routes (`/manage/change`,
+  `/manage/change/withdraw`), two staff routes (`/payments/changes`,
+  `/payments/changes/[id]`), the Manage page's "Change your booking"
+  panel, S-14's Change requests tab and the policy settings. verify gains
+  151–156. Tests 13+14+5+115+359+107; typecheck clean. The user re-ran
+  the file. verify **155/156** (151–156 pass; the known roles check);
+  walks 2/3/4 6/6/5; rooms 50/50; isolation 32/32 and 23/23 + 21/21 both
+  ways; the three baselines and availability identical to Phase 0. Output
+  in `plan/manage-booking/phase6-*`.
+- [ ] Phase 7, email: GATED (§ 9 q6): skipped until deployment and a
+  sender domain.
+- [ ] Phase 8: walls, walk, record (isolation cases for the new tables,
+  `storage-orphans --expired`, the axe audit over S-13 and S-14, the
+  user's browser walk, D-104–D-109, CLAUDE.md, flow.md, payments.md
+  marked superseded, whats-done). Owed into it: the Bookings screen's
+  payment badge and the dashboard's two counts (§ 4); a Phase 6 HTTP walk;
+  the calendar drawing held nights apart.
 **UI refresh (2026-10-06, `feat/ui-refresh`, plan/ui-refresh.md, D-101).**
 - [x] Phase 0, the foundation: tokens, derived colours, dark mode, icons,
   four style files. Typecheck clean, tests 65/65, prompt snapshot identical.

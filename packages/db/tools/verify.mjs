@@ -2786,6 +2786,128 @@ async function manageBookingChecks() {
         `held ${heldBefore} · ${confirm.error?.message ?? JSON.stringify(after)} · cancel ${cancel.error?.message ?? JSON.stringify(freed)}`,
       );
     }
+
+    // 151–156 are manage-booking Phase 6: cancel and reschedule requests.
+    // Policy: 7+ days ahead refunds 100 %, 2–6 days 50 %; date changes until
+    // 3 days before. A paid, confirmed web stay on Monday 2027-07-05.
+    {
+      const { error } = await supabase.from('tenant_applications')
+        .update({ config: { ...baseConfig, payments: { methods: [{ kind: 'gcash', label: 'GCash' }], fee: { kind: 'full' }, cancellation: [{ days_before: 7, refund_percent: 100 }, { days_before: 2, refund_percent: 50 }], reschedule_until_days_before: 3 } } })
+        .eq('tenant_id', probe.id).eq('application_key', 'bookings');
+      if (error) throw new Error(`settings phase 6: ${error.message}`);
+    }
+    const moving = await requestStay('A', '2027-07-05');
+    {
+      const sent = await proofFor(moving);
+      const done = await admin.rpc('review_payment', { p_tenant_id: probe.id, p_payment_id: sent.data, p_action: 'verify', p_amount: 100000, p_account_checked: true, p_note: null, p_confirm: true });
+      if (sent.error || done.error || !done.data?.confirmed) throw new Error(`pay and confirm: ${sent.error?.message ?? done.error?.message ?? JSON.stringify(done.data)}`);
+    }
+    const change = (over) => chat.rpc('request_change', { p_tenant_id: probe.id, p_reference: moving.ref, p_contact: moving.email, p_kind: 'cancel', p_new_check_in: null, p_reason: null, p_dry_run: false, ...over });
+    const openChanges = async () => (await supabase.from('change_requests').select('id, kind, status').eq('tenant_id', probe.id).eq('group_id', moving.group).eq('status', 'pending')).data ?? [];
+
+    // 151. The terms today: far ahead, so 100 % of the 1,000.00 received,
+    //      and a date change is allowed; the guest sees them.
+    {
+      const guest = (await lookup(moving.ref, moving.email)).data;
+      const t = guest?.change;
+      check(
+        t?.refund_percent === 100 && t.refund_due === 100000 && t.can_cancel === true && t.can_reschedule === true && t.reschedule_until_days_before === 3 && t.days_before > 7,
+        'manage: change_terms gives today\'s refund (100 % of 1,000.00 received) and allows a date change; the guest sees them',
+        JSON.stringify(t),
+      );
+    }
+
+    // 152. A dry run stores nothing; a real cancel request is stored once; a
+    //      second request is 55000; withdraw clears it; a chat token reads none.
+    {
+      const dry = await change({ p_dry_run: true });
+      const before = (await openChanges()).length;
+      const real = await change({ p_reason: 'probe: plans changed' });
+      const second = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-12' });
+      const chatRead = await chat.from('change_requests').select('id');
+      const staffRead = await staff.from('change_requests').select('id');
+      const withdrawn = await chat.rpc('withdraw_change', { p_tenant_id: probe.id, p_reference: moving.ref, p_contact: moving.email });
+      const after = (await openChanges()).length;
+      check(
+        !dry.error && dry.data?.refund_due === 100000 && before === 0 && !real.error && real.data?.id && second.error?.code === '55000'
+          && (chatRead.data ?? []).length === 0 && staffRead.data?.length >= 1 && withdrawn.data === true && after === 0,
+        'manage: a dry run quotes and stores nothing; one open request at a time (55000); withdraw clears it; a chat token reads no requests',
+        `dry ${dry.error?.message ?? dry.data?.refund_due} · before ${before} · real ${real.error?.message ?? real.data?.id} · second ${second.error?.code} · chat ${(chatRead.data ?? []).length} staff ${staffRead.data?.length} · withdrawn ${withdrawn.data} · after ${after}`,
+      );
+    }
+
+    // 153. Reschedule quotes: another Monday is the same price; a Saturday
+    //      is the weekend rate (+500.00); a night confirmed for someone else
+    //      is refused in words.
+    {
+      const { error: blockError } = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.A, slot_id: slotRow.id, booked_date: '2027-07-19', guest_name: 'Blocker', guest_count: 1, status: 'confirmed' });
+      if (blockError) throw new Error(`blocker: ${blockError.message}`);
+      const monday = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-12', p_dry_run: true });
+      const saturday = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-10', p_dry_run: true });
+      const taken = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-19', p_dry_run: true });
+      check(
+        monday.data?.quoted_price === 100000 && monday.data.quoted_difference === 0 && saturday.data?.quoted_price === 150000 && saturday.data.quoted_difference === 50000
+          && taken.error?.code === '55000' && /not available/.test(taken.error.message),
+        'manage: a reschedule is quoted by unit_quote() (Monday the same, Saturday +500.00); a night someone else holds is refused',
+        `mon ${JSON.stringify(monday.data)} · sat ${JSON.stringify(saturday.data)} · taken ${taken.error?.code} "${taken.error?.message}"`,
+      );
+    }
+
+    // 154. Deciding: staff 42501; reject without a note 22023; the admin
+    //      approves the move to Saturday: old nights cancelled, new ones
+    //      confirmed in the SAME stay, the balance 500.00 owed.
+    {
+      const req = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-10', p_reason: 'probe: weekend instead' });
+      const staffTry = await staff.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
+      const noNote = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'reject', p_note: ' ' });
+      const ok = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
+      const rows = (await supabase.from('bookings').select('booked_date, status, reference, decision_note').eq('tenant_id', probe.id).eq('group_id', moving.group).order('id')).data ?? [];
+      const money = ok.data?.payment;
+      const guest = (await lookup(moving.ref, moving.email)).data;
+      check(
+        staffTry.error?.code === '42501' && noNote.error?.code === '22023' && !ok.error && ok.data?.status === 'approved'
+          && rows.some((r) => r.booked_date === '2027-07-05' && r.status === 'cancelled' && /Rescheduled to 2027-07-10/.test(r.decision_note))
+          && rows.some((r) => r.booked_date === '2027-07-10' && r.status === 'confirmed' && r.reference === moving.ref)
+          && money?.price === 150000 && money.received === 100000 && money.outstanding === 50000
+          && guest?.check_in === '2027-07-10' && guest.status === 'confirmed',
+        'manage: staff cannot decide (42501); a reject needs a note; approving moves the stay in one go (same reference), 500.00 now owed',
+        `staff ${staffTry.error?.code} · no note ${noNote.error?.code} · ${ok.error?.message ?? ok.data?.status} · rows ${rows.map((r) => `${r.booked_date}:${r.status}`).join(',')} · ${JSON.stringify(money)} · guest ${guest?.check_in}/${guest?.status}`,
+      );
+    }
+
+    // 155. A night taken between the request and the approval: the approval
+    //      is 23P01 and NOTHING changes (the request still pending, the stay
+    //      still on its dates).
+    {
+      const req = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-26' });
+      await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.A, slot_id: slotRow.id, booked_date: '2027-07-26', guest_name: 'Late blocker', guest_count: 1, status: 'confirmed' });
+      const clash = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
+      const still = await openChanges();
+      const live = (await supabase.from('bookings').select('booked_date').eq('tenant_id', probe.id).eq('group_id', moving.group).eq('status', 'confirmed')).data ?? [];
+      check(
+        !req.error && clash.error?.code === '23P01' && still.length === 1 && live.length === 1 && live[0].booked_date === '2027-07-10',
+        'manage: a night taken before the approval makes it 23P01, and nothing changes (request pending, stay on its dates)',
+        `req ${req.error?.message ?? req.data?.id} · clash ${clash.error?.code} · open ${still.length} · live ${live.map((r) => r.booked_date)}`,
+      );
+      await chat.rpc('withdraw_change', { p_tenant_id: probe.id, p_reference: moving.ref, p_contact: moving.email });
+    }
+
+    // 156. Approving a cancel: the stay cancelled, the refund due kept on the
+    //      request for staff to pay and record; the log says who asked and who
+    //      decided.
+    {
+      const req = await change({ p_reason: 'probe: cannot come' });
+      const ok = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
+      const rows = (await supabase.from('bookings').select('status').eq('tenant_id', probe.id).eq('group_id', moving.group).in('status', ['pending', 'confirmed'])).data ?? [];
+      const { data: r } = await supabase.from('change_requests').select('status, refund_due, decided_by').eq('id', req.data?.id).single();
+      const { data: ev } = await supabase.from('booking_events').select('kind, to_value, actor_kind').eq('tenant_id', probe.id).eq('group_id', moving.group).eq('change_request_id', req.data?.id).order('id');
+      check(
+        !ok.error && rows.length === 0 && r?.status === 'approved' && r.refund_due === 100000 && r.decided_by === adminUser.user.id
+          && ev?.[0]?.to_value === 'cancel:pending' && ev[0].actor_kind === 'guest' && ev.at(-1)?.to_value === 'cancel:approved' && ev.at(-1)?.actor_kind === 'staff',
+        'manage: approving a cancel cancels the stay and keeps the refund due (1,000.00) on the request; the log has the guest asking and the admin deciding',
+        `${ok.error?.message ?? 'ok'} · live rows ${rows.length} · ${JSON.stringify(r)} · events ${(ev ?? []).map((e) => `${e.to_value}/${e.actor_kind}`).join(',')}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {

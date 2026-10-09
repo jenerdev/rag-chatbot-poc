@@ -175,6 +175,14 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
               limits={limits}
               onSent={() => void lookUp()}
             />
+            <ChangePanel
+              key={`change-${stay.changes.length}-${stay.changes.at(-1)?.status ?? ''}`}
+              slug={slug}
+              stay={stay}
+              reference={reference}
+              contact={contact}
+              onChanged={() => void lookUp()}
+            />
             <div className="form-footer">
               <button type="button" onClick={another}>
                 Look up another booking
@@ -476,6 +484,159 @@ function PaymentPanel({
             ))}
           </ul>
         </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Phase 6: ask to cancel or to move the stay. Every figure is the
+ * database's: the refund the policy gives TODAY, or the new dates' price
+ * and the difference, asked for with a dry run before anything is sent.
+ * Nothing changes the stay until the resort approves (plan Rule 1).
+ */
+function ChangePanel({
+  slug,
+  stay,
+  reference,
+  contact,
+  onChanged,
+}: {
+  slug: string;
+  stay: Found;
+  reference: string;
+  contact: string;
+  onChanged: () => void;
+}) {
+  const open = stay.changes.find((c) => c.status === 'pending') ?? null;
+  const last = stay.changes.at(-1) ?? null;
+  const [mode, setMode] = useState<'none' | 'cancel' | 'reschedule'>('none');
+  const [newCheckIn, setNewCheckIn] = useState('');
+  const [reason, setReason] = useState('');
+  const [quote, setQuote] = useState<{ quotedPrice?: number; quotedDifference?: number; refundDue?: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!open && !stay.change.canCancel && !stay.change.canReschedule && !(last && last.status === 'rejected')) return null;
+
+  async function call(path: string, body: object): Promise<Record<string, unknown> | null> {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/t/${slug}/manage/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reference, contact, ...body }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(typeof result.error === 'string' ? result.error : 'Something went wrong. Please try again.');
+        return null;
+      }
+      return result;
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const money = (n: number) => formatMoney(n, stay.currency);
+
+  return (
+    <section className="manage-payment" aria-labelledby="change-title">
+      <h2 id="change-title">Change your booking</h2>
+      {last?.status === 'rejected' && !open && last.decisionNote && (
+        <p className="notice error">Your last request was not accepted: {last.decisionNote}</p>
+      )}
+      {open ? (
+        <>
+          <p className="notice">
+            {open.kind === 'cancel'
+              ? `You asked to cancel. ${open.refundDue ? `Under the policy you would get back ${money(open.refundDue)}.` : 'Under the policy no refund is due.'}`
+              : `You asked to move your stay to ${open.newCheckIn}.${open.quotedDifference ? ` The price changes by ${open.quotedDifference > 0 ? '+' : '−'}${money(Math.abs(open.quotedDifference))}.` : ''}`}{' '}
+            The resort will answer here. Your booking stays as it is until then.
+          </p>
+          <div className="form-footer">
+            <button type="button" disabled={busy} onClick={async () => { if (await call('change/withdraw', {})) onChanged(); }}>
+              Withdraw this request
+            </button>
+          </div>
+        </>
+      ) : mode === 'none' ? (
+        <div className="form-footer">
+          {stay.change.canReschedule && (
+            <button type="button" onClick={() => { setMode('reschedule'); setQuote(null); }}>
+              Move to other dates
+            </button>
+          )}
+          {stay.change.canCancel && (
+            <button type="button" className="danger" onClick={async () => { setMode('cancel'); setQuote(await call('change', { kind: 'cancel', dryRun: true })); }}>
+              Cancel this booking
+            </button>
+          )}
+        </div>
+      ) : (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const sent = await call('change', { kind: mode, newCheckIn: mode === 'reschedule' ? newCheckIn : null, reason: reason || null, dryRun: false });
+            if (sent) onChanged();
+          }}
+        >
+          {mode === 'cancel' ? (
+            <p className="small">
+              {stay.change.refundPercent > 0 && quote?.refundDue !== undefined
+                ? `Cancelling today, ${stay.change.daysBefore} days before check-in, the policy refunds ${stay.change.refundPercent}% of what you paid: ${money(quote.refundDue)}. The resort pays it back after approving.`
+                : 'Under the policy, no refund is due for a cancellation today.'}
+            </p>
+          ) : (
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor="new-check-in">New check-in date</label>
+                <input id="new-check-in" type="date" required value={newCheckIn} onChange={(e) => { setNewCheckIn(e.target.value); setQuote(null); }} />
+              </div>
+              <div className="field">
+                <span className="small muted">Same rooms, nights and guests.</span>
+                <button type="button" disabled={busy || !newCheckIn} onClick={async () => setQuote(await call('change', { kind: 'reschedule', newCheckIn, dryRun: true }))}>
+                  See the price
+                </button>
+              </div>
+            </div>
+          )}
+          {mode === 'reschedule' && quote?.quotedPrice !== undefined && (
+            <p className="small">
+              New price {money(quote.quotedPrice)}
+              {quote.quotedDifference ? ` (${quote.quotedDifference > 0 ? '+' : '−'}${money(Math.abs(quote.quotedDifference))}; any balance is paid as before)` : ' (no difference)'}.
+              A promo used on the old dates does not carry over.
+            </p>
+          )}
+          <div className="field">
+            <label htmlFor="change-reason">
+              Reason <span className="muted">(optional)</span>
+            </label>
+            <input id="change-reason" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          {error && (
+            <div className="notice error" role="alert">
+              {error}
+            </div>
+          )}
+          <div className="form-footer">
+            <button type="button" disabled={busy} onClick={() => { setMode('none'); setError(null); }}>
+              Back
+            </button>
+            <button type="submit" className="primary" disabled={busy || (mode === 'reschedule' && quote?.quotedPrice === undefined)}>
+              {mode === 'cancel' ? 'Ask to cancel' : 'Ask to move'}
+            </button>
+          </div>
+        </form>
+      )}
+      {mode === 'none' && error && (
+        <div className="notice error" role="alert">
+          {error}
+        </div>
       )}
     </section>
   );

@@ -9,7 +9,8 @@
 -- review_payment(), record_refund(), set_payment_settings() and the
 -- confirm-needs-a-note rule (19–23). Phase 5: the deadlines (pay_by,
 -- review_by, stay_is_due(), expire_due_stays(), 19a–19b; the hold itself is
--- schema-holds.sql). Phase 6 adds its sections here. NO existing function is
+-- schema-holds.sql). Phase 6: change requests, change_terms(),
+-- request_change(), withdraw_change(), decide_change() (24–28). NO existing function is
 -- replaced: everything below is added beside what is there, so re-running
 -- an older file cannot undo it (trap 20).
 --
@@ -338,7 +339,9 @@ $$;
 --              | { "kind": "percent", "value": 3000 },   centavos / hundredths of a percent
 --         "pay_within_hours": 24, "review_within_hours": 24,          1–168 (Phase 5 reads them)
 --         "terms": "...",                                               ≤ 4000, shown to guests
---         "hold": "none" | "on_proof" | "on_request"                    Phase 5; absent = none
+--         "hold": "none" | "on_proof" | "on_request",                   Phase 5; absent = none
+--         "cancellation": [{ "days_before": 7, "refund_percent": 100 }],  Phase 6; absent = no refund
+--         "reschedule_until_days_before": 3                             Phase 6; absent = no rescheduling
 --       }
 --
 --     No "payments" key = the tenant takes no payment through the page. A
@@ -363,7 +366,7 @@ begin
     raise exception 'config.payments is an object' using errcode = 'check_violation';
   end if;
   for v_key in select jsonb_object_keys(v_pay) loop
-    if v_key not in ('methods', 'fee', 'pay_within_hours', 'review_within_hours', 'terms', 'hold') then
+    if v_key not in ('methods', 'fee', 'pay_within_hours', 'review_within_hours', 'terms', 'hold', 'cancellation', 'reschedule_until_days_before') then
       raise exception 'config.payments has no key "%"', v_key using errcode = 'check_violation';
     end if;
   end loop;
@@ -420,6 +423,32 @@ begin
   -- Phase 5 (plan § 2.4, § 9 q1): when a stay holds its dates. Absent = none.
   if v_pay ? 'hold' and coalesce(v_pay->>'hold', '') not in ('none', 'on_proof', 'on_request') then
     raise exception 'config.payments.hold is "none", "on_proof" or "on_request"' using errcode = 'check_violation';
+  end if;
+  -- Phase 6: the cancellation policy, tiers by days before check-in, and
+  -- the reschedule cutoff. [{ "days_before": 7, "refund_percent": 100 },
+  -- { "days_before": 2, "refund_percent": 50 }]: cancelling 7+ days ahead
+  -- refunds all received, 2–6 days half, less than 2 nothing.
+  if v_pay ? 'cancellation' and (
+       jsonb_typeof(v_pay->'cancellation') <> 'array'
+       or jsonb_array_length(v_pay->'cancellation') > 5
+       or exists (select 1 from jsonb_array_elements(v_pay->'cancellation') t
+                  where jsonb_typeof(t) <> 'object'
+                     or jsonb_typeof(t->'days_before') is distinct from 'number'
+                     or jsonb_typeof(t->'refund_percent') is distinct from 'number'
+                     or (t->>'days_before')::numeric not between 0 and 365
+                     or (t->>'days_before')::numeric <> floor((t->>'days_before')::numeric)
+                     or (t->>'refund_percent')::numeric not between 0 and 100
+                     or (t->>'refund_percent')::numeric <> floor((t->>'refund_percent')::numeric))) then
+    raise exception 'config.payments.cancellation is up to 5 tiers of {"days_before": 0–365, "refund_percent": 0–100}, whole numbers'
+      using errcode = 'check_violation';
+  end if;
+  if v_pay ? 'reschedule_until_days_before' and (
+       case when jsonb_typeof(v_pay->'reschedule_until_days_before') <> 'number' then true
+            else (v_pay->>'reschedule_until_days_before')::numeric not between 0 and 365
+                 or (v_pay->>'reschedule_until_days_before')::numeric <> floor((v_pay->>'reschedule_until_days_before')::numeric)
+       end) then
+    raise exception 'config.payments.reschedule_until_days_before is a whole number of days from 0 to 365'
+      using errcode = 'check_violation';
   end if;
   return new;
 end;
@@ -707,7 +736,16 @@ begin
                              from public.payments p where p.tenant_id = p_tenant_id and p.group_id = v_group), '[]'::jsonb),
     'pay',         case when v_config ? 'payments' then jsonb_build_object(
                      'methods', v_config->'payments'->'methods',
-                     'terms',   v_config->'payments'->'terms') end
+                     'terms',   v_config->'payments'->'terms') end,
+    -- Phase 6: what a change would mean today, and the request in flight.
+    'change',      public.change_terms(p_tenant_id, v_group),
+    'changes',     coalesce((select jsonb_agg(jsonb_build_object(
+                                'kind', c.kind, 'status', c.status, 'new_check_in', c.new_check_in,
+                                'quoted_difference', c.quoted_difference, 'refund_due', c.refund_due,
+                                'decision_note', case when c.status = 'rejected' then c.decision_note end,
+                                'created_at', c.created_at)
+                              order by c.created_at, c.id)
+                             from public.change_requests c where c.tenant_id = p_tenant_id and c.group_id = v_group), '[]'::jsonb)
   ) into v_out
   from public.bookings b
   join public.stays s on s.tenant_id = b.tenant_id and s.group_id = b.group_id
@@ -1148,6 +1186,355 @@ drop trigger if exists bookings_confirm_needs_payment_or_note on bookings;
 create trigger bookings_confirm_needs_payment_or_note
   before update on bookings
   for each row execute function bookings_confirm_needs_payment_or_note();
+
+-- ─── Phase 6: cancel and reschedule requests (plan § 2.8, D-108) ─────────
+
+-- 24. change_requests: a guest ASKS, staff decide (plan Rule 1). One open
+--     request per stay. The quote the guest saw is stored with it.
+create table if not exists change_requests (
+  id                bigint      generated always as identity primary key,
+  tenant_id         bigint      not null,
+  group_id          uuid        not null,
+  kind              text        not null,
+  status            text        not null default 'pending',
+  new_check_in      date,
+  quoted_price      bigint,
+  quoted_difference bigint,
+  refund_due        bigint,
+  guest_reason      text,
+  decision_note     text,
+  decided_by        uuid,
+  decided_at        timestamptz,
+  created_at        timestamptz not null default now(),
+  constraint change_requests_stay_fk foreign key (tenant_id, group_id)
+    references stays (tenant_id, group_id) on delete cascade,
+  constraint change_requests_kind check (kind in ('cancel', 'reschedule')),
+  constraint change_requests_status check (status in ('pending', 'approved', 'rejected', 'withdrawn')),
+  constraint change_requests_reschedule check (kind <> 'reschedule' or (new_check_in is not null and quoted_price is not null)),
+  constraint change_requests_reason check (guest_reason is null or char_length(guest_reason) <= 500),
+  constraint change_requests_note check (decision_note is null or char_length(decision_note) <= 500)
+);
+create unique index if not exists change_requests_one_open_idx on change_requests (tenant_id, group_id) where status = 'pending';
+
+alter table change_requests enable row level security;
+drop policy if exists change_requests_read on change_requests;
+create policy change_requests_read on change_requests for select to authenticated
+  using (tenant_id = (select public.app_tenant_id()) and (select public.app_is_staff()));
+
+alter table booking_events drop constraint if exists booking_events_kind;
+alter table booking_events add constraint booking_events_kind check (kind in ('created', 'status', 'payment', 'change'));
+alter table booking_events add column if not exists change_request_id bigint;
+
+create or replace function change_requests_log() returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.booking_events (tenant_id, group_id, actor_kind, actor_user, kind, to_value, change_request_id, amount, note)
+    values (new.tenant_id, new.group_id, public.app_actor(), auth.uid(), 'change', new.kind || ':' || new.status, new.id,
+            coalesce(new.quoted_difference, new.refund_due), coalesce(new.new_check_in::text, new.guest_reason));
+  elsif new.status is distinct from old.status then
+    insert into public.booking_events (tenant_id, group_id, actor_kind, actor_user, kind, from_value, to_value, change_request_id, note)
+    values (new.tenant_id, new.group_id, public.app_actor(), auth.uid(), 'change', old.kind || ':' || old.status, new.kind || ':' || new.status,
+            new.id, new.decision_note);
+  end if;
+  return null;
+end;
+$$;
+revoke all on function change_requests_log() from public, anon, authenticated;
+drop trigger if exists change_requests_log on change_requests;
+create trigger change_requests_log
+  after insert or update on change_requests
+  for each row execute function change_requests_log();
+
+-- 25. change_terms(): what cancelling or rescheduling means TODAY, for the
+--     page and for request_change(). ONE place for the policy's arithmetic:
+--     days before check-in in the tenant's day; the first tier (sorted by
+--     days_before, largest first) the stay is at or beyond gives the
+--     refund percentage of what was RECEIVED, rounded DOWN to the centavo
+--     (a refund owed is never more than the policy says). No tiers = 0.
+create or replace function change_terms(p_tenant_id bigint, p_group_id uuid)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_config   jsonb;
+  v_today    date;
+  v_check_in date;
+  v_days     int;
+  v_percent  int;
+  v_received bigint;
+  v_cutoff   int;
+  v_status   text := public.stay_status(p_tenant_id, p_group_id);
+begin
+  select a.config into v_config from public.tenant_applications a
+  where a.tenant_id = p_tenant_id and a.application_key = 'bookings';
+  v_today := (now() at time zone (v_config->>'timezone'))::date;
+  select min(b.booked_date) into v_check_in from public.bookings b
+  where b.tenant_id = p_tenant_id and b.group_id = p_group_id and b.status = v_status;
+  v_days := v_check_in - v_today;
+  v_received := ((public.stay_payment(p_tenant_id, p_group_id))->>'received')::bigint;
+  select (t->>'refund_percent')::int into v_percent
+  from jsonb_array_elements(coalesce(v_config->'payments'->'cancellation', '[]'::jsonb)) t
+  where (t->>'days_before')::int <= v_days
+  order by (t->>'days_before')::int desc
+  limit 1;
+  v_cutoff := (v_config->'payments'->>'reschedule_until_days_before')::int;
+  return jsonb_build_object(
+    'days_before',     v_days,
+    'refund_percent',  coalesce(v_percent, 0),
+    'refund_due',      (v_received * coalesce(v_percent, 0)) / 100,
+    'can_cancel',      v_status in ('pending', 'confirmed') and v_days >= 0,
+    'can_reschedule',  v_status = 'confirmed' and v_cutoff is not null and v_days >= v_cutoff,
+    'reschedule_until_days_before', v_cutoff
+  );
+end;
+$$;
+revoke all on function change_terms(bigint, uuid) from public, anon;
+grant execute on function change_terms(bigint, uuid) to authenticated, service_role;
+
+-- 26. request_change(): the guest's door (definer, the guest_group() match).
+--     p_dry_run = true returns the quote and stores nothing: the page shows
+--     it BEFORE the guest sends (plan § 4).
+--       cancel      a pending or confirmed stay, not yet begun; the refund
+--                   the policy gives today is stored with the request
+--       reschedule  a confirmed stay, at or before the cutoff; the SAME
+--                   rooms, slot, nights and guests on new dates, priced by
+--                   unit_quote() (no promo is carried: a discount was for
+--                   the old dates, and the quote says the new price as it
+--                   is); the new dates must be free now (booking_takes())
+--     Errors: P0002 a miss; 22023 the input; 55000 the stay's state, the
+--     policy, or a request already open.
+create or replace function request_change(
+  p_tenant_id    bigint,
+  p_reference    text,
+  p_contact      text,
+  p_kind         text,
+  p_new_check_in date,
+  p_reason       text,
+  p_dry_run      boolean
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_group     uuid;
+  v_status    text;
+  v_terms     jsonb;
+  v_config    jsonb;
+  v_today     date;
+  v_check_in  date;
+  v_shift     int;
+  v_price     bigint;
+  v_new_price bigint;
+  v_taken     boolean;
+  v_id        bigint;
+begin
+  if coalesce(auth.jwt() ->> 'role', '') <> 'service_role'
+     and p_tenant_id is distinct from public.app_tenant_id() then
+    raise exception 'request_change: tenant % is not the token''s tenant', p_tenant_id using errcode = 'insufficient_privilege';
+  end if;
+  v_group := public.guest_group(p_tenant_id, p_reference, p_contact);
+  if v_group is null then
+    raise exception 'no such booking' using errcode = 'no_data_found';
+  end if;
+  if p_kind not in ('cancel', 'reschedule') then
+    raise exception 'A change is "cancel" or "reschedule".' using errcode = 'invalid_parameter_value';
+  end if;
+  if p_reason is not null and char_length(p_reason) > 500 then
+    raise exception 'The reason is too long (500 characters at most).' using errcode = 'invalid_parameter_value';
+  end if;
+  if exists (select 1 from public.change_requests c where c.tenant_id = p_tenant_id and c.group_id = v_group and c.status = 'pending') then
+    raise exception 'You already have a request waiting for this booking. Withdraw it first, or wait for the resort to answer.'
+      using errcode = 'object_not_in_prerequisite_state';
+  end if;
+
+  v_status := public.stay_status(p_tenant_id, v_group);
+  v_terms := public.change_terms(p_tenant_id, v_group);
+  v_price := ((public.stay_payment(p_tenant_id, v_group))->>'price')::bigint;
+
+  if p_kind = 'cancel' then
+    if not (v_terms->>'can_cancel')::boolean then
+      raise exception 'This booking can no longer be cancelled here. Please contact the resort.' using errcode = 'object_not_in_prerequisite_state';
+    end if;
+    if coalesce(p_dry_run, false) then
+      return jsonb_build_object('kind', 'cancel', 'refund_due', (v_terms->>'refund_due')::bigint, 'refund_percent', (v_terms->>'refund_percent')::int);
+    end if;
+    insert into public.change_requests (tenant_id, group_id, kind, refund_due, guest_reason)
+    values (p_tenant_id, v_group, 'cancel', (v_terms->>'refund_due')::bigint, nullif(btrim(p_reason), ''))
+    returning id into v_id;
+    return jsonb_build_object('id', v_id, 'kind', 'cancel', 'refund_due', (v_terms->>'refund_due')::bigint);
+  end if;
+
+  -- reschedule
+  if not (v_terms->>'can_reschedule')::boolean then
+    raise exception 'This booking can no longer be moved here: % Please contact the resort.',
+      case when v_status <> 'confirmed' then 'only a confirmed booking can be moved.'
+           when v_terms->>'reschedule_until_days_before' is null then 'the resort does not take date changes on this page.'
+           else format('changes close %s days before check-in.', v_terms->>'reschedule_until_days_before') end
+      using errcode = 'object_not_in_prerequisite_state';
+  end if;
+  select a.config into v_config from public.tenant_applications a where a.tenant_id = p_tenant_id and a.application_key = 'bookings';
+  v_today := (now() at time zone (v_config->>'timezone'))::date;
+  select min(b.booked_date) into v_check_in from public.bookings b
+  where b.tenant_id = p_tenant_id and b.group_id = v_group and b.status = v_status;
+  if p_new_check_in is null or p_new_check_in <= v_today or p_new_check_in = v_check_in
+     or p_new_check_in > v_today + coalesce((v_config->>'max_advance_days')::int, 365) then
+    raise exception 'Choose a new check-in date after today, different from the current one, and within the booking window.'
+      using errcode = 'invalid_parameter_value';
+  end if;
+  v_shift := p_new_check_in - v_check_in;
+
+  -- The new nights: every live row moved by the same number of days.
+  select sum(q.price)::bigint,
+         bool_or(exists (
+           select 1 from public.bookings o
+           where o.tenant_id = p_tenant_id and o.unit_id = b.unit_id and o.group_id <> v_group
+             and public.booking_takes(o.status, o.held, o.held_until)
+             and o.during && public.slot_range(b.booked_date + v_shift, sl.start_time, sl.duration, v_config->>'timezone'))
+         or exists (select 1 from public.rate_calendar rc where rc.tenant_id = p_tenant_id and rc.day = b.booked_date + v_shift and rc.kind = 'closed'))
+    into v_new_price, v_taken
+  from public.bookings b
+  join public.slots sl on sl.tenant_id = b.tenant_id and sl.id = b.slot_id
+  cross join lateral public.unit_quote(p_tenant_id, b.unit_id, b.slot_id, b.booked_date + v_shift, b.guest_count) q
+  where b.tenant_id = p_tenant_id and b.group_id = v_group and b.status = v_status;
+  if v_taken then
+    raise exception 'Those dates are not available. Please choose others.' using errcode = 'object_not_in_prerequisite_state';
+  end if;
+  if v_new_price is null then
+    raise exception 'Those dates have no price yet. Please choose others.' using errcode = 'invalid_parameter_value';
+  end if;
+  if coalesce(p_dry_run, false) then
+    return jsonb_build_object('kind', 'reschedule', 'new_check_in', p_new_check_in, 'quoted_price', v_new_price, 'quoted_difference', v_new_price - v_price);
+  end if;
+  insert into public.change_requests (tenant_id, group_id, kind, new_check_in, quoted_price, quoted_difference, guest_reason)
+  values (p_tenant_id, v_group, 'reschedule', p_new_check_in, v_new_price, v_new_price - v_price, nullif(btrim(p_reason), ''))
+  returning id into v_id;
+  return jsonb_build_object('id', v_id, 'kind', 'reschedule', 'new_check_in', p_new_check_in, 'quoted_price', v_new_price, 'quoted_difference', v_new_price - v_price);
+end;
+$$;
+revoke all on function request_change(bigint, text, text, text, date, text, boolean) from public, anon;
+grant execute on function request_change(bigint, text, text, text, date, text, boolean) to authenticated, service_role;
+
+-- 27. withdraw_change(): the guest takes back their open request.
+create or replace function withdraw_change(p_tenant_id bigint, p_reference text, p_contact text)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_group uuid;
+  v_count int;
+begin
+  if coalesce(auth.jwt() ->> 'role', '') <> 'service_role'
+     and p_tenant_id is distinct from public.app_tenant_id() then
+    raise exception 'withdraw_change: tenant % is not the token''s tenant', p_tenant_id using errcode = 'insufficient_privilege';
+  end if;
+  v_group := public.guest_group(p_tenant_id, p_reference, p_contact);
+  if v_group is null then
+    raise exception 'no such booking' using errcode = 'no_data_found';
+  end if;
+  update public.change_requests c set status = 'withdrawn', decided_at = now()
+  where c.tenant_id = p_tenant_id and c.group_id = v_group and c.status = 'pending';
+  get diagnostics v_count = row_count;
+  return v_count > 0;
+end;
+$$;
+revoke all on function withdraw_change(bigint, text, text) from public, anon;
+grant execute on function withdraw_change(bigint, text, text) to authenticated, service_role;
+
+-- 28. decide_change(): staff approve or reject. Owners and admins (it
+--     moves money owed: a refund due, a balance), like review_payment().
+--       reject     a note the guest reads
+--       cancel     every live row → cancelled, in one statement; the refund
+--                  due stays on the request for staff to pay and RECORD
+--                  (record_refund()); nothing is refunded here
+--       reschedule under request_booking()'s own lock: the old rows are
+--                  cancelled ("rescheduled to …") and the new ones inserted
+--                  in the SAME group (one reference) with the old status, in
+--                  ONE transaction. The insert meets bookings_no_overlap and
+--                  every trigger; a night taken meanwhile is 23P01 and
+--                  nothing changes, the request still pending. Prices are the
+--                  insert trigger's (unit_quote()); the difference becomes
+--                  the stay's outstanding balance by itself (stay_payment()
+--                  sums the live rows), § 9 q5.
+create or replace function decide_change(p_tenant_id bigint, p_id bigint, p_action text, p_note text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_req    public.change_requests%rowtype;
+  v_status text;
+  v_shift  int;
+  v_check  date;
+  v_old    bigint[];
+begin
+  if p_tenant_id is distinct from public.app_tenant_id() or not public.app_is_admin() then
+    raise exception 'Only an owner or admin of this business can decide a change request.' using errcode = 'insufficient_privilege';
+  end if;
+  select * into v_req from public.change_requests c where c.tenant_id = p_tenant_id and c.id = p_id for update;
+  if not found then
+    raise exception 'no such request' using errcode = 'no_data_found';
+  end if;
+  if v_req.status <> 'pending' then
+    raise exception 'This request was already %.', v_req.status using errcode = 'object_not_in_prerequisite_state';
+  end if;
+
+  if p_action = 'reject' then
+    if char_length(btrim(coalesce(p_note, ''))) not between 1 and 500 then
+      raise exception 'Say why (the guest reads it), in at most 500 characters.' using errcode = 'invalid_parameter_value';
+    end if;
+    update public.change_requests set status = 'rejected', decision_note = btrim(p_note), decided_by = auth.uid(), decided_at = now()
+    where id = v_req.id;
+    return jsonb_build_object('status', 'rejected');
+  elsif p_action <> 'approve' then
+    raise exception 'The action is "approve" or "reject".' using errcode = 'invalid_parameter_value';
+  end if;
+
+  v_status := public.stay_status(p_tenant_id, v_req.group_id);
+  if v_req.kind = 'cancel' then
+    update public.bookings b
+    set status = 'cancelled', decision_note = coalesce(nullif(btrim(coalesce(p_note, '')), ''), 'Cancelled at the guest''s request')
+    where b.tenant_id = p_tenant_id and b.group_id = v_req.group_id and b.status in ('pending', 'confirmed');
+  else
+    if v_status <> 'confirmed' then
+      raise exception 'Only a confirmed booking can be moved; this one is %.', v_status using errcode = 'object_not_in_prerequisite_state';
+    end if;
+    perform pg_advisory_xact_lock(hashtextextended('request_booking:' || p_tenant_id::text, 0));
+    select min(b.booked_date), array_agg(b.id) into v_check, v_old from public.bookings b
+    where b.tenant_id = p_tenant_id and b.group_id = v_req.group_id and b.status = 'confirmed';
+    v_shift := v_req.new_check_in - v_check;
+    update public.bookings b
+    set status = 'cancelled', decision_note = format('Rescheduled to %s', v_req.new_check_in)
+    where b.id = any(v_old);
+    insert into public.bookings (tenant_id, unit_id, slot_id, booked_date, guest_name, guest_phone, guest_email, guest_count,
+                                 notes, status, source, group_id, reference, decision_note)
+    select b.tenant_id, b.unit_id, b.slot_id, b.booked_date + v_shift, b.guest_name, b.guest_phone, b.guest_email, b.guest_count,
+           b.notes, 'confirmed', b.source, b.group_id, b.reference, format('Moved from %s', v_check)
+    from public.bookings b
+    where b.id = any(v_old)
+    order by b.booked_date, b.id;
+  end if;
+
+  update public.change_requests set status = 'approved', decision_note = nullif(btrim(coalesce(p_note, '')), ''), decided_by = auth.uid(), decided_at = now()
+  where id = v_req.id;
+  return jsonb_build_object('status', 'approved', 'payment', public.stay_payment(p_tenant_id, v_req.group_id));
+end;
+$$;
+revoke all on function decide_change(bigint, bigint, text, text) from public, anon;
+grant execute on function decide_change(bigint, bigint, text, text) to authenticated, service_role;
 
 -- PostgREST caches the schema: the new table, function and columns are
 -- unknown to it until told.
