@@ -1,28 +1,15 @@
-import { notFound } from 'next/navigation';
-import { AdminScreen } from '@/components/admin-screen';
-import { loadBranding } from '@/lib/branding';
-import { loadNavFeatures } from '@/lib/nav';
+import { notFound, redirect } from 'next/navigation';
 import { getTenant } from '@/lib/tenant';
 
-// S-2 for one tenant. The page itself is public: it holds no data until the
-// browser proves it has this tenant's admin session. Every document call it
-// makes is guarded by requireAdmin() on the server (Phase 6).
+// /t/<slug>/admin is the staff side's front door: it sends a member to the
+// dashboard (S-11), which shows the login form to anyone signed out. The
+// knowledge base (S-2) lives at /admin/documents. The tenant is resolved
+// first, so an unknown or archived one is still a 404, not a redirect.
 
 export const dynamic = 'force-dynamic';
 
-export default async function TenantAdminPage({ params }: { params: Promise<{ tenant: string }> }) {
+export default async function TenantAdminIndex({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
-
-  return (
-    <AdminScreen
-      slug={tenant.slug}
-      businessName={branding.businessName}
-      logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
-      nav={nav}
-    />
-  );
+  redirect(`/t/${tenant.slug}/admin/dashboard`);
 }

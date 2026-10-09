@@ -105,7 +105,7 @@ try {
 
   // 3. No `title` on an HTML element on any staff screen.
   const titled = [];
-  for (const path of ['/admin', '/admin/promos', '/admin/slots', '/admin/holidays', '/admin/accommodations', '/admin/members', '/admin/bookings']) {
+  for (const path of ['/admin/documents', '/admin/promos', '/admin/slots', '/admin/holidays', '/admin/accommodations', '/admin/members', '/admin/bookings']) {
     await page.goto(`${BASE}/t/harbor${path}`);
     await page.until("!!document.querySelector('.staff-content h1')", 30000);
     await sleep(1500);

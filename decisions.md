@@ -3133,6 +3133,14 @@ selective, so the peak and the last bar carry theirs and the rest answer
 on hover and in the table. Cost per tenant stays out (q3): tokens are
 logged, never stored; a later plan.
 
+**Amended 2026-10-09 (q1 reversed):** the user: "Dashboard should be the
+default or index page of admin". `/t/<slug>/admin` now resolves the tenant
+(a 404 stays a 404) and redirects to `/admin/dashboard`; the knowledge base
+moved to `/admin/documents`. A redirect, not the dashboard drawn at two
+URLs, so each page has one address. Old bookmarks and the walk scripts'
+login visits to `/admin` still land on a login card (the dashboard's);
+every walk that meant the knowledge base names `/admin/documents` now.
+
 **Measured (Phases 0–5, two days, on `feat/dashboard`):** verify 117/118
 (117: a chat token refused with 42501, the staff probe's conversations and
 refusals equal to the service truth, `money` null for staff and present

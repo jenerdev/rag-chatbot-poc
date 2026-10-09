@@ -37,7 +37,7 @@ describe('navItems', () => {
       '/t/harbor',
       '/t/harbor/book',
       '/t/harbor/admin/dashboard',
-      '/t/harbor/admin',
+      '/t/harbor/admin/documents',
       '/t/harbor/admin/unanswered',
       '/t/harbor/admin/bookings',
       '/t/harbor/admin/accommodations',

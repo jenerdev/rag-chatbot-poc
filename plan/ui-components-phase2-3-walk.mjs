@@ -51,7 +51,7 @@ const LISTS = [
   { page: '/t/harbor/admin/promos', read: (p) => p === `${T}/promos`, drawn: '.list-row', empty: 'No promos', add: 'Add a promo' },
   { page: '/t/harbor/admin/slots', read: (p) => p === `${T}/slots`, drawn: '.list-row', empty: 'No slots offered', add: 'Add a slot' },
   { page: '/t/harbor/admin/holidays', read: (p) => p === `${T}/holidays`, drawn: '.month-label, .empty-list', empty: 'No holidays or closed dates', add: 'Add a date' },
-  { page: '/t/harbor/admin', read: (p) => p === `${T}/documents`, drawn: '.doc', empty: 'No documents yet', add: 'Add a document' },
+  { page: '/t/harbor/admin/documents', read: (p) => p === `${T}/documents`, drawn: '.doc', empty: 'No documents yet', add: 'Add a document' },
   { page: '/t/harbor/admin/unanswered', read: (p) => p === `${T}/unanswered`, drawn: '.unanswered-question, .empty-list', empty: null },
   { page: '/t/harbor/admin/accommodations', read: (p) => p === `${T}/accommodations`, drawn: '.room', empty: 'No rooms yet', add: 'Add a room' },
   { page: '/t/harbor/admin/members', read: (p) => p === `${T}/members`, drawn: '.member-row', empty: null },
@@ -103,7 +103,7 @@ try {
   await page.viewport(1280);
 
   for (const list of LISTS) {
-    const name = list.page.replace('/t/harbor/admin', '') || 'knowledge base';
+    const name = list.page === '/t/harbor/admin/documents' ? 'knowledge base' : list.page.replace('/t/harbor/admin', '');
     rule = list;
 
     // Phase 2: held → skeleton; failed → alert + Retry; Retry → the list.
@@ -144,9 +144,9 @@ try {
 
   // 3c. Staff may not add a document: the empty state has no button.
   await cookies(staffCookie);
-  rule = LISTS.find((l) => l.page === '/t/harbor/admin');
+  rule = LISTS.find((l) => l.page === '/t/harbor/admin/documents');
   mode = 'empty';
-  await page.goto(`${BASE}/t/harbor/admin`);
+  await page.goto(`${BASE}/t/harbor/admin/documents`);
   await page.until("[...document.querySelectorAll('.empty-list strong')].some(s => s.textContent === 'No documents yet')", 20000);
   check((await page.eval("document.querySelector('.empty-list .empty-list-action')")) === null, '3c. knowledge base as staff: empty, and no add button');
 

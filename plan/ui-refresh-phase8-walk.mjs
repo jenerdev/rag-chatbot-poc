@@ -86,7 +86,7 @@ try {
       const shot = (name) => page.shot(join(dir, `${name}-${width}.png`));
 
       // 1. The knowledge base as an admin: the page action, the rows.
-      await as('nwadmin', '/admin', width);
+      await as('nwadmin', '/admin/documents', width);
       await page.until("!!document.querySelector('.doc') && !!document.querySelector('.page-actions')", 30000);
       await shot('kb');
       if (first) {
@@ -151,7 +151,7 @@ try {
       }
 
       // 5. A staff member reads, and gets no way to write.
-      await as('nwstaff', '/admin', width);
+      await as('nwstaff', '/admin/documents', width);
       await page.until("!!document.querySelector('.doc')", 30000);
       await shot('kb-staff');
       if (first) check(await page.eval("!document.querySelector('.page-actions') && !document.querySelector('.doc-head button[aria-label]') && /you can read the knowledge base/.test(document.body.innerText)"), '5. staff: no Add, no Edit or Delete, the read-only sentence');

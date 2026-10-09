@@ -1274,6 +1274,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-09 — the dashboard is the admin index (D-098 amended), on `feat/ui-refresh`
+- **Did:** `/t/<slug>/admin` resolves the tenant and redirects to
+  `/admin/dashboard`; the knowledge base moved to `/admin/documents`
+  (nav, the chat's empty-KB button, the dashboard's documents tile, the
+  nav test, eight walk/audit scripts). Observed on `pnpm dev`:
+  `/t/villa/admin` 307 → `/admin/dashboard`; `/admin/documents` 200;
+  `/t/no-such-tenant/admin` 404. Web typecheck exit 0, tests 85/85.
+  Walks and the axe audit not re-run.
+
 ### 2026-10-09 — no "Staff login" on the chat, on `feat/ui-refresh`
 - **Did:** `tenant-nav.tsx` offers "Staff login" on the public pages but
   the chat (book and reset keep it); staff reach `/t/<slug>/admin` by its

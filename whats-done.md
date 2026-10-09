@@ -8180,3 +8180,24 @@ and `/t/<slug>/admin` still shows its own login card. The Phase 2 walk's
 5c asserted the old link, so it now asserts no `/admin` link in the chat
 header. Observed: `tsc --noEmit` in apps/web exit 0; the walk was not
 re-run this session.
+
+---
+
+## 2026-10-09 — the dashboard is where /admin lands
+
+D-098's q1 had kept `/admin` as the knowledge base for its bookmarks; the
+user reversed it. `/admin` is now a server redirect to `/admin/dashboard`,
+after `getTenant()`, so an unknown or archived tenant still gets "No such
+workspace" (404) rather than a redirect that hints the slug pattern; the
+knowledge base is `/admin/documents`. Signed-out visitors to `/admin` see
+the dashboard's login card, the same form, so the login entry point did
+not move.
+
+Caught before running: the dashboard's "documents" tile linked to `base`,
+the bare `/admin`, and would have redirected back to the dashboard; it
+names `/documents` now. The Phase 2-3 walk's page label stripped the
+`/admin` prefix, which would have printed full paths once the prefix
+changed; it names the knowledge base explicitly.
+
+Observed on `pnpm dev`: 307 to `/t/villa/admin/dashboard`; `/admin/documents`
+200; `/t/no-such-tenant/admin` 404. `tsc --noEmit` exit 0; vitest 85/85.

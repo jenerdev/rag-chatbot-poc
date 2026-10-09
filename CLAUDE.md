@@ -224,7 +224,8 @@ apps/web/              Next.js 15, App Router
   app/page.tsx                   static root — no tenant list, no redirect
   app/t/[tenant]/layout.tsx      tenant theme (style prop) + tab title
   app/t/[tenant]/page.tsx        S-1 chat — Server Component, resolves the tenant
-  app/t/[tenant]/admin/page.tsx  S-2 knowledge base — same
+  app/t/[tenant]/admin/page.tsx  redirects to admin/dashboard (D-098 amended); 404 on an unknown tenant
+  app/t/[tenant]/admin/documents/page.tsx  S-2 knowledge base — same
   app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/accommodations/page.tsx  S-5 rooms — 404 unless the tenant books per_room

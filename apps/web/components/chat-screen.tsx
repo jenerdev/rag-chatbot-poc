@@ -370,7 +370,7 @@ export function ChatScreen({
                 </div>
               )}
               {emptyKb && (
-                <Link className="button empty-state-action" href={`/t/${slug}/admin`}>
+                <Link className="button empty-state-action" href={`/t/${slug}/admin/documents`}>
                   Go to the knowledge base
                 </Link>
               )}

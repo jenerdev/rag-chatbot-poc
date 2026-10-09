@@ -44,9 +44,9 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
 
   // Each staff page with the permission its screen's first read needs.
   const staff: [NavPage, string, string, boolean][] = [
-    // First (plan/dashboard.md § 7 q1): the page to land on; /admin keeps its URL.
+    // First (plan/dashboard.md § 7 q1): the page to land on; /admin redirects here.
     ['dashboard', 'Dashboard', '/admin/dashboard', can(role, 'dashboard:read')],
-    ['documents', 'Knowledge base', '/admin', can(role, 'documents:read')],
+    ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read')],
     ['unanswered', 'Unanswered', '/admin/unanswered', can(role, 'unanswered:read')],
     ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],
     ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read')],

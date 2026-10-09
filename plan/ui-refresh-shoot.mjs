@@ -29,7 +29,7 @@ const PAGES = [
   ['book', '/book', false],
   ['login', '/admin', false],
   ['dashboard', '/admin/dashboard', true],
-  ['documents', '/admin', true],
+  ['documents', '/admin/documents', true],
   ['unanswered', '/admin/unanswered', true],
   ['bookings', '/admin/bookings', true],
   ['rooms', '/admin/accommodations', true],

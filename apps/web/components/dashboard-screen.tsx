@@ -242,7 +242,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           <section className="card">
             <h2>Knowledge base</h2>
             <div className="stat-row">
-              <Link href={base} className="stat">
+              <Link href={`${base}/documents`} className="stat">
                 <strong>{data.knowledge.documents}</strong>
                 <span>document{data.knowledge.documents === 1 ? '' : 's'}</span>
               </Link>

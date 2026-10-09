@@ -20,7 +20,7 @@ import { openBrowser } from './ui-refresh-cdp.mjs';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
 const SLUGS = ['villa', 'harbor', 'northwind'];
-const STAFF = ['/admin/dashboard', '/admin', '/admin/unanswered', '/admin/bookings', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
+const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/bookings', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
 
 const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', SLUGS);
 const cookieOf = (r, name) => (r.headers.getSetCookie?.() ?? []).find((x) => x.startsWith(`${name}=`))?.split(';')[0]?.slice(name.length + 1);

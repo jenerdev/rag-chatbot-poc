@@ -142,11 +142,11 @@ try {
 
   // 4. The knowledge base: no search at 8, a search on titles at 10.
   fake['/api/t/harbor/documents'] = JSON.stringify(fakeDocuments(8));
-  await page.goto(`${BASE}/t/harbor/admin`);
+  await page.goto(`${BASE}/t/harbor/admin/documents`);
   await page.until("document.querySelectorAll('.doc').length > 0", 30000);
   check((await page.eval("document.querySelector('.list-search')")) === null, '4. 8 documents: no search');
   fake['/api/t/harbor/documents'] = JSON.stringify(fakeDocuments(10));
-  await page.goto(`${BASE}/t/harbor/admin`);
+  await page.goto(`${BASE}/t/harbor/admin/documents`);
   await page.until("document.querySelectorAll('.doc').length > 0", 30000);
   await page.eval(type('.list-search input', 'beach'));
   await sleep(200);
