@@ -20,9 +20,11 @@
 // from the server's getPublicUrl(), built from a path the server made.
 //
 // The look (plan/ui-refresh.md Phase 9): "Add a room" opens a drawer; each
-// room stays a card (its details, rates and photos are edited in place);
-// Retire and Remove photo ask in the dialog; a photo can be dropped on the
-// dashed tile as well as chosen.
+// room is an accordion row whose closed head is the room at a glance (photo,
+// guests, lowest rate, photo count, what it lacks), and whose open panel edits
+// its details, rates and photos in place, with Retire at the foot. Retired
+// rooms are listed after the offered ones. Retire and Remove photo ask in the
+// dialog; a photo can be dropped on the dashed tile as well as chosen.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Accommodation, BookingSummary, ImageSummary, SlotSummary } from '@rag/bookings';
@@ -83,27 +85,70 @@ interface RoomCardProps {
   limits: Pick<AccommodationsScreenProps, 'maxImageBytes' | 'maxImageEdge' | 'maxImagesPerUnit'>;
   /** The screen's confirmation dialog (components/dialogs.tsx). */
   ask: (question: Question) => Promise<string | null>;
+  /** Open or closed: kept by the screen, because a save rebuilds the card (its key). */
+  open: boolean;
+  onToggle: () => void;
 }
 
-function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits, ask }: RoomCardProps) {
+/** A room's inputs as the server last stored them: what "unsaved" is measured against. */
+function initialDetails(room: Accommodation) {
+  return {
+    name: room.name,
+    capacity: room.capacity === null ? '' : String(room.capacity),
+    standard: room.standardCapacity === null ? '' : String(room.standardCapacity),
+    extraRate: room.extraPersonRate === null ? '' : centavosToInput(room.extraPersonRate),
+    description: room.description ?? '',
+  };
+}
+
+function initialRates(room: Accommodation, slots: SlotSummary[]): Record<number, { weekday: string; weekend: string }> {
+  return Object.fromEntries(
+    slots.map((s) => {
+      const rate = room.rates.find((r) => r.slotId === s.id);
+      return [s.id, { weekday: rate ? centavosToInput(rate.weekdayPrice) : '', weekend: rate ? centavosToInput(rate.weekendPrice) : '' }];
+    }),
+  );
+}
+
+/** "2 included, up to 4 guests", the closed row's guest line. */
+function guestsLine(room: Accommodation): string {
+  if (room.capacity === null) return 'Any party size';
+  if (room.standardCapacity !== null && room.extraPersonRate !== null && room.standardCapacity < room.capacity) {
+    return `${room.standardCapacity} included, up to ${room.capacity} guests`;
+  }
+  return `Up to ${room.capacity} ${room.capacity === 1 ? 'guest' : 'guests'}`;
+}
+
+function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits, ask, open, onToggle }: RoomCardProps) {
   // A photo dragged over the drop tile.
   const [dragging, setDragging] = useState(false);
-  const [name, setName] = useState(room.name);
-  const [capacity, setCapacity] = useState(room.capacity === null ? '' : String(room.capacity));
+  const initial = initialDetails(room);
+  const [name, setName] = useState(initial.name);
+  const [capacity, setCapacity] = useState(initial.capacity);
   // plan/extra-guests.md: guests the rate covers, and the fee per guest above
   // them, typed in pesos and sent as centavos like every price.
-  const [standard, setStandard] = useState(room.standardCapacity === null ? '' : String(room.standardCapacity));
-  const [extraRate, setExtraRate] = useState(room.extraPersonRate === null ? '' : centavosToInput(room.extraPersonRate));
-  const [description, setDescription] = useState(room.description ?? '');
+  const [standard, setStandard] = useState(initial.standard);
+  const [extraRate, setExtraRate] = useState(initial.extraRate);
+  const [description, setDescription] = useState(initial.description);
   // One weekday and one weekend input per slot, as TEXT in pesos.
-  const [rates, setRates] = useState<Record<number, { weekday: string; weekend: string }>>(() =>
-    Object.fromEntries(
-      setup.slots.map((s) => {
-        const rate = room.rates.find((r) => r.slotId === s.id);
-        return [s.id, { weekday: rate ? centavosToInput(rate.weekdayPrice) : '', weekend: rate ? centavosToInput(rate.weekendPrice) : '' }];
-      }),
-    ),
+  const [rates, setRates] = useState(() => initialRates(room, setup.slots));
+
+  // Unsaved edits, compared with what the server stored. A closed row says so,
+  // because its inputs are out of sight; and a Save with nothing changed is off.
+  const detailsDirty =
+    name !== initial.name ||
+    capacity !== initial.capacity ||
+    standard !== initial.standard ||
+    extraRate !== initial.extraRate ||
+    description !== initial.description;
+  const storedRates = initialRates(room, setup.slots);
+  const ratesDirty = setup.slots.some(
+    (s) => rates[s.id]?.weekday !== storedRates[s.id]?.weekday || rates[s.id]?.weekend !== storedRates[s.id]?.weekend,
   );
+  // The lowest stored price, for the closed row: what the cheapest stay starts at.
+  const lowest = room.rates.length ? Math.min(...room.rates.flatMap((r) => [r.weekdayPrice, r.weekendPrice])) : null;
+  const panelId = `room-${room.id}-panel`;
+  const headId = `room-${room.id}-head`;
 
   // Runs one action with the screen's busy flag and notice, so every button
   // below reports the same way.
@@ -235,156 +280,204 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
   };
 
   return (
-    <section className={`card room${room.active ? '' : ' retired'}`}>
-      <div className="room-head">
-        <h2>
-          {room.name}
-          {!room.active && <span className="badge">Retired</span>}
-          {room.active && room.rates.length === 0 && (
-            <span className="badge warn">
-              <Icon name="alert" size={12} /> No rate yet
-            </span>
-          )}
-        </h2>
-        <button type="button" className="sm" disabled={busy} onClick={() => setActive(!room.active)}>
-          {room.active ? 'Retire' : 'Offer again'}
-        </button>
-      </div>
-
-      <form onSubmit={saveDetails}>
-        <div className="field-row">
-          <div className="field grow">
-            <label htmlFor={`name-${room.id}`}>Name</label>
-            <input type="text" id={`name-${room.id}`} required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="field narrow">
-            <label htmlFor={`standard-${room.id}`}>Included</label>
-            <input type="number" id={`standard-${room.id}`} min={1} step={1} value={standard} onChange={(e) => setStandard(e.target.value)} />
-          </div>
-          <div className="field narrow">
-            <label htmlFor={`capacity-${room.id}`}>Max guests</label>
-            <input type="number" id={`capacity-${room.id}`} min={1} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
-          </div>
-          <div className="field narrow">
-            <label htmlFor={`extra-${room.id}`}>Per extra guest</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              id={`extra-${room.id}`}
-              placeholder="no fee"
-              value={extraRate}
-              onChange={(e) => setExtraRate(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="small muted">
-          {room.standardCapacity !== null && room.extraPersonRate !== null
-            ? `The rate covers ${room.standardCapacity} guest(s); each guest above that adds ${formatMoney(room.extraPersonRate, setup.currency)}, up to ${room.capacity ?? 'any number of'} guests.`
-            : 'No extra-guest fee: the rate is the same for any party up to the maximum.'}
-        </div>
-        <div className="field">
-          <label htmlFor={`description-${room.id}`}>
-            Description <span className="muted">(staff only; guests read the documents)</span>
-          </label>
-          <textarea id={`description-${room.id}`} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
-        <div className="form-footer">
-          <button type="submit" disabled={busy}>
-            Save details
-          </button>
-        </div>
-      </form>
-
-      <form onSubmit={saveRates} className="rates">
-        <div className="rates-grid">
-          <span className="small muted">Slot</span>
-          <span className="small muted">Weekday ({setup.currency})</span>
-          <span className="small muted">Weekend ({setup.currency})</span>
-          {setup.slots.map((slot) => (
-            <div key={slot.id} className="rates-row">
-              <span>{slot.name}</span>
-              {(['weekday', 'weekend'] as const).map((kind) => (
-                <input
-                  key={kind}
-                  type="text"
-                  inputMode="decimal"
-                  aria-label={`${slot.name} ${kind} price`}
-                  placeholder="not offered"
-                  value={rates[slot.id]?.[kind] ?? ''}
-                  onChange={(e) => setRates((current) => ({ ...current, [slot.id]: { ...current[slot.id]!, [kind]: e.target.value } }))}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="form-footer">
-          <span className="small muted">
-            {room.rates.length === 0
-              ? 'No rate yet: this room cannot be booked.'
-              : room.rates.map((r) => `${r.slot} ${formatMoney(r.weekdayPrice, setup.currency)} / ${formatMoney(r.weekendPrice, setup.currency)}`).join(' · ')}
+    <div className={`room-item${room.active ? '' : ' retired'}${open ? ' open' : ''}`}>
+      {/* The WAI-ARIA accordion: a heading holding the button that opens its panel. */}
+      <h2 className="room-item-heading">
+        <button type="button" id={headId} className="room-toggle" aria-expanded={open} aria-controls={panelId} onClick={onToggle}>
+          <Icon name="chevron-right" size={16} className="room-chevron" />
+          <span className="room-thumb" aria-hidden="true">
+            {room.images[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a plain public URL, as below
+              <img src={room.images[0].url} alt="" />
+            ) : (
+              <Icon name="bed" size={18} />
+            )}
           </span>
-          <button type="submit" disabled={busy}>
-            Save rates
+          <span className="room-title">
+            <span className="room-name">{room.name}</span>
+            <span className="room-meta">
+              {guestsLine(room)}
+              {lowest !== null && <> · from {formatMoney(lowest, setup.currency)}</>}
+              {` · ${room.images.length} ${room.images.length === 1 ? 'photo' : 'photos'}`}
+            </span>
+          </span>
+          <span className="room-badges">
+            {(detailsDirty || ratesDirty) && <span className="badge accent">Unsaved changes</span>}
+            {!room.active && <span className="badge">Retired</span>}
+            {room.active && room.rates.length === 0 && (
+              <span className="badge warn">
+                <Icon name="alert" size={12} /> No rate yet
+              </span>
+            )}
+          </span>
+        </button>
+      </h2>
+
+      {/* Hidden, not unmounted: an edit survives closing the row. */}
+      <div id={panelId} className="room-panel" role="region" aria-labelledby={headId} hidden={!open}>
+        <form onSubmit={saveDetails} className="room-section">
+          <div className="room-section-head">
+            <h3>Details</h3>
+            <p className="small muted">
+              {room.standardCapacity !== null && room.extraPersonRate !== null
+                ? `The rate covers ${room.standardCapacity} guest(s); each guest above that adds ${formatMoney(room.extraPersonRate, setup.currency)}, up to ${room.capacity ?? 'any number of'} guests.`
+                : 'No extra-guest fee: the rate is the same for any party up to the maximum.'}
+            </p>
+          </div>
+          <div className="field-row">
+            <div className="field grow">
+              <label htmlFor={`name-${room.id}`}>Name</label>
+              <input type="text" id={`name-${room.id}`} required value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="field narrow">
+              <label htmlFor={`standard-${room.id}`}>Included</label>
+              <input type="number" id={`standard-${room.id}`} min={1} step={1} value={standard} onChange={(e) => setStandard(e.target.value)} />
+            </div>
+            <div className="field narrow">
+              <label htmlFor={`capacity-${room.id}`}>Max guests</label>
+              <input type="number" id={`capacity-${room.id}`} min={1} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+            </div>
+            <div className="field narrow">
+              <label htmlFor={`extra-${room.id}`}>Per extra guest</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                id={`extra-${room.id}`}
+                placeholder="no fee"
+                value={extraRate}
+                onChange={(e) => setExtraRate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor={`description-${room.id}`}>
+              Description <span className="muted">(staff only; guests read the documents)</span>
+            </label>
+            <textarea id={`description-${room.id}`} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div className="form-footer room-section-foot">
+            <button type="submit" className={detailsDirty ? 'primary' : undefined} disabled={busy || !detailsDirty}>
+              Save details
+            </button>
+          </div>
+        </form>
+
+        <form onSubmit={saveRates} className="room-section">
+          <div className="room-section-head">
+            <h3>Rates</h3>
+            <p className="small muted">
+              {room.rates.length === 0
+                ? 'No rate yet: this room cannot be booked. Leave a slot empty to not offer it.'
+                : `Per night, in ${setup.currency}. Leave a slot empty to not offer it. Existing bookings keep their price.`}
+            </p>
+          </div>
+          <div className="rates-grid">
+            <span className="small muted rates-col">Slot</span>
+            <span className="small muted rates-col">Weekday</span>
+            <span className="small muted rates-col">Weekend</span>
+            {setup.slots.map((slot) => (
+              <div key={slot.id} className="rates-row">
+                <span className="rates-slot">{slot.name}</span>
+                {(['weekday', 'weekend'] as const).map((kind) => (
+                  <label key={kind} className="rates-cell">
+                    {/* The column head, again, for a phone, where the row stacks. */}
+                    <span className="rates-cell-label small muted" aria-hidden="true">
+                      {kind === 'weekday' ? 'Weekday' : 'Weekend'}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      aria-label={`${slot.name} ${kind} price`}
+                      placeholder="not offered"
+                      value={rates[slot.id]?.[kind] ?? ''}
+                      onChange={(e) => setRates((current) => ({ ...current, [slot.id]: { ...current[slot.id]!, [kind]: e.target.value } }))}
+                    />
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="form-footer room-section-foot">
+            <button type="submit" className={ratesDirty ? 'primary' : undefined} disabled={busy || !ratesDirty}>
+              Save rates
+            </button>
+          </div>
+        </form>
+
+        <div className="room-section">
+          <div className="room-section-head">
+            <h3>Photos</h3>
+            <p className="small muted">
+              {room.images.length} of {limits.maxImagesPerUnit}. The first is the one guests see first; use the arrows to reorder.
+            </p>
+          </div>
+          <div className="photos">
+            {room.images.map((image, index) => (
+              <figure key={image.id} className="photo">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a plain public URL; next/image would need remotePatterns for the bucket */}
+                <img src={image.url} alt={`${room.name}, photo ${index + 1}`} />
+                <figcaption>
+                  <Tip label="Move left">
+                    <button type="button" className="ghost sm" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left">
+                      <Icon name="chevron-left" size={16} />
+                    </button>
+                  </Tip>
+                  <Tip label="Remove">
+                    <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void removePhoto(image)} aria-label={`Remove photo ${index + 1}`}>
+                      <Icon name="trash" size={16} />
+                    </button>
+                  </Tip>
+                  <Tip label="Move right">
+                    <button
+                      type="button"
+                      className="ghost sm"
+                      disabled={busy || index === room.images.length - 1}
+                      onClick={() => movePhoto(index, 1)}
+                      aria-label="Move right"
+                    >
+                      <Icon name="chevron-right" size={16} />
+                    </button>
+                  </Tip>
+                </figcaption>
+              </figure>
+            ))}
+            {room.images.length < limits.maxImagesPerUnit && (
+              <label
+                className={dragging ? 'photo-add dragging' : 'photo-add'}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                  const file = event.dataTransfer.files[0];
+                  if (file && !busy) uploadFile(file);
+                }}
+              >
+                {/* Visually hidden, not display:none: the tile is its label, and the keyboard reaches it. */}
+                <input type="file" className="visually-hidden" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={upload} />
+                <Icon name="image" size={22} />
+                <span className="photo-add-text">Add a photo</span>
+                <span className="small muted">or drop one here</span>
+              </label>
+            )}
+          </div>
+        </div>
+
+        <div className="room-retire">
+          <p className="small muted">
+            {room.active
+              ? 'Retiring stops new bookings for this room. Its existing bookings stay valid.'
+              : 'Retired: not offered for new bookings. Offer it again to take bookings.'}
+          </p>
+          <button type="button" className={room.active ? 'danger' : undefined} disabled={busy} onClick={() => setActive(!room.active)}>
+            {room.active ? 'Retire room' : 'Offer again'}
           </button>
         </div>
-      </form>
-
-      <div className="photos">
-        {room.images.map((image, index) => (
-          <figure key={image.id} className="photo">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a plain public URL; next/image would need remotePatterns for the bucket */}
-            <img src={image.url} alt={`${room.name}, photo ${index + 1}`} />
-            <figcaption>
-              <Tip label="Move left">
-                <button type="button" className="ghost sm" disabled={busy || index === 0} onClick={() => movePhoto(index, -1)} aria-label="Move left">
-                  <Icon name="chevron-left" size={16} />
-                </button>
-              </Tip>
-              <Tip label="Remove">
-                <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void removePhoto(image)} aria-label={`Remove photo ${index + 1}`}>
-                  <Icon name="trash" size={16} />
-                </button>
-              </Tip>
-              <Tip label="Move right">
-                <button
-                  type="button"
-                  className="ghost sm"
-                  disabled={busy || index === room.images.length - 1}
-                  onClick={() => movePhoto(index, 1)}
-                  aria-label="Move right"
-                >
-                  <Icon name="chevron-right" size={16} />
-                </button>
-              </Tip>
-            </figcaption>
-          </figure>
-        ))}
-        {room.images.length < limits.maxImagesPerUnit && (
-          <label
-            className={dragging ? 'photo-add dragging' : 'photo-add'}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              const file = event.dataTransfer.files[0];
-              if (file && !busy) uploadFile(file);
-            }}
-          >
-            {/* Visually hidden, not display:none: the tile is its label, and the keyboard reaches it. */}
-            <input type="file" className="visually-hidden" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={upload} />
-            <Icon name="image" size={22} />
-            <span className="photo-add-text">Add a photo</span>
-            <span className="small muted">
-              or drop one here · {room.images.length} of {limits.maxImagesPerUnit}
-            </span>
-          </label>
-        )}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -406,6 +499,15 @@ export function AccommodationsScreen({
   const [rooms, setRooms] = useState<Accommodation[] | null>(null);
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
+  // Which rooms are open. Several may be: comparing two rooms' rates is a real task.
+  const [openIds, setOpenIds] = useState<Set<number>>(() => new Set());
+  const toggle = (id: number) =>
+    setOpenIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // The new-room form, in a drawer.
   const [name, setName] = useState('');
@@ -471,12 +573,15 @@ export function AccommodationsScreen({
     setNotice(null);
     setBusy(true);
     try {
-      await call('/accommodations', {
+      const response = await call('/accommodations', {
         method: 'POST',
         // Left empty, the maximum is @rag/bookings' default (4), and so are
         // the standard (2) and the extra-guest fee (₱250).
         body: JSON.stringify({ name, ...(capacity === '' ? {} : { maxCapacity: Number(capacity) }), sortOrder: rooms?.length ?? 0 }),
       });
+      // Opened, so its rates are the next thing in view.
+      const added = (await response.json()) as Accommodation;
+      setOpenIds((current) => new Set(current).add(added.id));
       setNotice({ message: `Added ${name}. Give it a rate so it can be booked.`, kind: 'ok' });
       setName('');
       setCapacity('');
@@ -517,6 +622,30 @@ export function AccommodationsScreen({
       </>
     );
   }
+
+  const offered = rooms.filter((r) => r.active);
+  const retired = rooms.filter((r) => !r.active);
+  const unpriced = offered.filter((r) => r.rates.length === 0).length;
+  const allOpen = rooms.length > 0 && rooms.every((r) => openIds.has(r.id));
+  const card = (room: Accommodation) => (
+    // The key includes what the card's inputs were initialised from, so
+    // after a save the card is rebuilt from the server's values rather
+    // than keeping stale local text. Open or closed survives that: it is here.
+    <RoomCard
+      key={`${room.id}:${room.name}:${room.capacity}:${room.standardCapacity}:${room.extraPersonRate}:${room.description}:${JSON.stringify(room.rates)}`}
+      room={room}
+      setup={setup}
+      call={call}
+      busy={busy}
+      setBusy={setBusy}
+      onNotice={setNotice}
+      onChanged={() => void load()}
+      limits={{ maxImageBytes, maxImageEdge, maxImagesPerUnit }}
+      ask={ask}
+      open={openIds.has(room.id)}
+      onToggle={() => toggle(room.id)}
+    />
+  );
 
   const addRoomAction = (
     <button
@@ -579,23 +708,27 @@ export function AccommodationsScreen({
             </EmptyState>
           </section>
         )}
-        {rooms.map((room) => (
-          // The key includes what the card's inputs were initialised from, so
-          // after a save the card is rebuilt from the server's values rather
-          // than keeping stale local text.
-          <RoomCard
-            key={`${room.id}:${room.name}:${room.capacity}:${room.standardCapacity}:${room.extraPersonRate}:${room.description}:${JSON.stringify(room.rates)}`}
-            room={room}
-            setup={setup}
-            call={call}
-            busy={busy}
-            setBusy={setBusy}
-            onNotice={setNotice}
-            onChanged={() => void load()}
-            limits={{ maxImageBytes, maxImageEdge, maxImagesPerUnit }}
-            ask={ask}
-          />
-        ))}
+        {offered.length > 0 && (
+          <div className="room-list-head">
+            <span className="small muted">
+              {offered.length} offered{unpriced > 0 ? ` · ${unpriced} without a rate` : ''}
+            </span>
+            {rooms.length > 1 && (
+              <button type="button" className="ghost sm" onClick={() => setOpenIds(allOpen ? new Set() : new Set(rooms.map((r) => r.id)))}>
+                {allOpen ? 'Collapse all' : 'Expand all'}
+              </button>
+            )}
+          </div>
+        )}
+        {offered.map(card)}
+        {retired.length > 0 && (
+          <>
+            <h2 className="room-group-title">
+              Retired <span className="muted">· {retired.length}</span>
+            </h2>
+            {retired.map(card)}
+          </>
+        )}
       </StaffFrame>
     </>
   );

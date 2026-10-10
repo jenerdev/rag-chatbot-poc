@@ -183,14 +183,70 @@ h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis
 .quote.error { background: var(--danger-soft); color: var(--danger); }
 
 /* S-5, the Rooms screen. */
-.room-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: 10px; }
-.room-head h2 { margin: 0; }
+/* Each room is an accordion row: the closed head is the room at a glance, the
+   open panel its three sections and Retire at the foot. */
+.room-list-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+.room-group-title { margin: var(--space-6) 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--muted); }
+.room-item { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); margin-bottom: var(--space-2); transition: border-color var(--dur-fast) var(--ease); }
+.room-item:hover, .room-item.open { border-color: var(--line-strong); }
 /* A surface tint, not opacity (Phase 10): the "retired" badge carries it. */
-.room.retired { background: var(--surface-2); }
-.rates { border-top: 1px solid var(--line); padding-top: var(--space-3); margin-top: var(--space-1); }
-.rates-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 10px; align-items: center; margin-bottom: 10px; }
+.room-item.retired { background: var(--surface-2); }
+.room-item-heading { margin: 0; font-size: inherit; font-weight: inherit; }
+button.room-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+}
+button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
+.room-item.open button.room-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.room-chevron { flex: none; color: var(--faint); transition: transform var(--dur-fast) var(--ease); }
+.room-toggle[aria-expanded="true"] .room-chevron { transform: rotate(90deg); }
+.room-thumb { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--faint); overflow: hidden; }
+.room-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.room-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.room-name { font-size: var(--text-base); font-weight: 600; overflow-wrap: anywhere; }
+.room-meta { font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.room-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
+.room-panel { border-top: 1px solid var(--line); padding: 0 var(--space-5); }
+.room-section { padding: var(--space-5) 0; }
+.room-section + .room-section { border-top: 1px solid var(--line); }
+.room-section-head { margin-bottom: var(--space-3); }
+.room-section-head h3 { margin: 0 0 2px; font-size: var(--text-base); }
+.room-section-head p { margin: 0; }
+.room-section-foot { justify-content: flex-end; margin-top: var(--space-3); }
+.room-retire { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) 0 var(--space-5); border-top: 1px solid var(--line); }
+.room-retire p { margin: 0; }
+.rates-grid { display: grid; grid-template-columns: minmax(120px, 1fr) 1fr 1fr; gap: 6px 10px; align-items: center; }
 .rates-row { display: contents; }
-.photos { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: var(--space-3); margin-top: var(--space-1); }
+.rates-cell { display: block; margin: 0; }
+.rates-cell-label { display: none; }
+.photos { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 560px) {
+  button.room-toggle { flex-wrap: wrap; padding: var(--space-3); gap: var(--space-2) var(--space-3); }
+  .room-badges { flex-basis: 100%; justify-content: flex-start; padding-left: calc(16px + 56px + 2 * var(--space-3)); }
+  .room-badges:empty { display: none; }
+  .room-panel { padding: 0 var(--space-4); }
+  /* Included, Max guests and the fee share one row, not two and one. */
+  .room-panel .field-row > .field.narrow { flex: 1 1 80px; }
+  /* The rates stack: the slot's name, then its two prices side by side, each labelled. */
+  .rates-grid { grid-template-columns: 1fr 1fr; gap: var(--space-1) 10px; }
+  .rates-col { display: none; }
+  .rates-slot { grid-column: 1 / -1; font-weight: 600; margin-top: var(--space-2); }
+  .rates-cell-label { display: block; margin-bottom: 2px; }
+  .room-retire { flex-direction: column; align-items: stretch; }
+  .room-section-foot > button { flex: 1; }
+}
 .photo { margin: 0; width: 132px; }
 .photo img { display: block; width: 132px; height: 96px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .photo figcaption { display: flex; justify-content: space-between; font-size: var(--text-sm); }
@@ -500,7 +556,6 @@ details.folded[open] > summary { margin-bottom: var(--space-3); }
 select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(--space-2); font-size: var(--text-sm); }
 
 /* A room's name with its state; the photo tiles; the drop tile. */
-.room-head h2 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .photo figcaption { justify-content: center; gap: 2px; margin-top: var(--space-1); }
 .photo-add {
   display: flex;
