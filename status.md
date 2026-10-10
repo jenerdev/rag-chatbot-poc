@@ -273,6 +273,21 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   the plan's status, CLAUDE.md (a header section, the layout, the
   commands, rule 8's nine new callable definer functions, the counts:
   24 sql files, verify 158, bookings isolation 33), whats-done.md.
+- [x] UI follow-ups (2026-10-11, committed `fe4d1f6`): S-6 a four-step
+  stepper, the breakdown one addition per line, check-in/out times, the
+  confirmation screen with a payment-flow timeline (`paymentFlow()`);
+  S-13 both statuses together, Payment / Booking details tabs.
+- [x] Rooms (S-5) as an accordion (2026-10-11): the closed row is the
+  room at a glance, Unsaved changes on it, retired rooms last; axe 0 on
+  harbor, light and dark, 1280 and 390.
+- [x] D-110 (2026-10-11): `schema-stay-outcome.sql` (the 25th file; the
+  user ran it). A declined, expired or taken stay says why on S-13 and
+  takes no proof. verify **161/161**: 159–161 new; 126 amended (the note
+  is the guest's now); 64 books its own night a year out (the October
+  2026 nights had ended, so the type switch went through and broke every
+  check after it); 107, "the known roles check", now compares villa's
+  roles before and after (villa has a staff member, so "no staff" was
+  never the test).
 - [ ] Phase 8, owed: the axe audit over S-13 and S-14; **the user's
   browser walk**; then the merge.
 - [ ] Follow-up (not in the plan's phases): the staff calendar drawing
@@ -1496,6 +1511,17 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-11 — a stay that cannot go ahead (D-110), Rooms as an accordion
+- **Did:** `schema-stay-outcome.sql`: `stay_taken()`, the
+  `payments_refuse_taken` trigger, `guest_stay()` with `decision_note`,
+  `declined`, `taken` (the older definition guarded on `stay_taken()`,
+  trap 20). S-13 shows Declined / Expired / Dates no longer available with
+  the reason and no payment form. S-5 rooms as an accordion.
+- **Observed:** verify 161/161 (first full pass in this branch: 64 and
+  107 were the environment, not the code); bookings tests 119/119; web
+  typecheck clean; S-13's four states and S-5 screenshotted at 1280/390
+  with the browser answering (nothing written).
 
 ### 2026-10-09 — the calendar plan (planned, nothing built)
 - **Did:** `plan/calendar.md`: S-12, Day / Week / Month, one state per

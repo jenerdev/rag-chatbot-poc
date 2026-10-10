@@ -670,6 +670,13 @@ grant execute on function stay_payment(bigint, uuid) to authenticated, service_r
 --     also carries the stay's payment (stay_payment()), its submission
 --     history (amounts, method, dates, status, the rejection reason; never
 --     the proof's path or the reviewer), and how to pay (the settings).
+-- Guarded (trap 20): schema-stay-outcome.sql replaces this definition with
+-- three keys more. Once it has run (stay_taken() exists), re-running THIS
+-- file skips it.
+do $guard$
+begin
+  if to_regprocedure('public.stay_taken(bigint, uuid)') is null then
+    execute $ddl$
 create or replace function guest_stay(p_tenant_id bigint, p_reference text, p_contact text)
 returns jsonb
 language plpgsql
@@ -754,7 +761,10 @@ begin
   return v_out;
 end;
 $$;
-
+$ddl$;
+  end if;
+end
+$guard$;
 revoke all on function guest_stay(bigint, text, text) from public, anon;
 grant execute on function guest_stay(bigint, text, text) to authenticated, service_role;
 

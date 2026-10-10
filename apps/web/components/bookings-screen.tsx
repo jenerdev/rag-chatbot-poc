@@ -523,7 +523,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       const note = await ask({
         title: 'Cancel this booking?',
         body: `${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. The slot is free again once it is cancelled.`,
-        noteLabel: 'Reason',
+        noteLabel: 'Reason, shown to the guest',
         actionLabel: 'Cancel booking',
         backLabel: 'Keep it',
         danger: true,
@@ -592,7 +592,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       const note = await ask(
         action === 'confirm'
           ? { title: `Confirm ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}. Confirming books the dates; then contact the guest.`, noteLabel: 'Note', actionLabel: 'Confirm' }
-          : { title: `Decline ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}.`, noteLabel: 'Reason', actionLabel: 'Decline', danger: true },
+          : { title: `Decline ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Decline', danger: true },
       );
       if (note === null) return;
       setNotice(null);

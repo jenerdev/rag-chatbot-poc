@@ -8287,3 +8287,37 @@ meaning three things (D-105).
 **Owed:** the axe audit over S-13 and S-14; the user's browser walk;
 Phase 7 (email, OTP) after deployment; the calendar drawing held nights
 apart (they show as taken today).
+
+## 2026-10-11 — a stay that cannot go ahead says why, and takes no payment (D-110)
+
+**What was done:** the guest's one read, `guest_stay()`, now says why a
+stay ended (`decision_note`), whether it was declined (cancelled before it
+was ever confirmed) and whether its dates were taken by another stay since
+(`taken`, from `stay_taken()`). A trigger on `payments` refuses a proof for
+a taken stay; expired and cancelled stays were refused already. Manage
+booking shows the state and the reason, and no payment form.
+
+**Why it matters:** a request holds nothing (D-070), so a guest could be
+told to pay for dates that another booking had just been confirmed on, or
+for a request that was declined or had expired. The page now says which,
+and the database refuses the payment whatever the page shows.
+
+**What the observed values prove:**
+- verify 159: a pending stay on a night confirmed for another reads "A is
+  no longer free on Mon, 2 Aug 2027: another booking was confirmed for
+  it.", its proof is 55000 in the same words, and no payment row exists;
+  another guest's live hold reads "held for another guest"; the holder
+  itself is not taken (the positive twin, trap 12).
+- verify 160: declined vs cancelled is decided by whether the stay was
+  ever confirmed, and each carries its own note; a live stay's is null.
+- verify 161: past `pay_by` the stay reads expired with "Not paid in
+  time" before any sweep writes it, and takes no proof.
+- 161/161: the first full pass on this branch. Check 64 had started to
+  fail on 2026-10-11 because its "live" bookings were dated 2026-10-05
+  and -09, which had ended: the type switch went through, and the probe
+  tenant became whole-resort for every check after it. A check whose
+  premise is a date rots silently; it now books its own night a year out.
+
+**Traps it avoided:** re-running `schema-manage-booking.sql` would have
+restored the older `guest_stay()` (trap 20); that definition is now
+guarded on `stay_taken()`.

@@ -51,6 +51,12 @@ export interface GuestStay {
   change: ChangeTerms;
   /** Phase 6: every change request, oldest first */
   changes: GuestChange[];
+  /** schema-stay-outcome.sql: why a cancelled or expired stay ended (the staff's note, or "Not paid in time"); null while live */
+  decisionNote: string | null;
+  /** cancelled before it was ever confirmed: the guest reads "Declined" */
+  declined: boolean;
+  /** a pending stay whose dates another stay has taken since, in words; it takes no payment. Null otherwise */
+  taken: string | null;
 }
 
 export interface ChangeTerms {
@@ -180,6 +186,10 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
     payBy: optionalText(r.pay_by, 'pay_by'),
     reviewBy: optionalText(r.review_by, 'review_by'),
     heldUntil: optionalText(r.held_until, 'held_until'),
+    // Absent before schema-stay-outcome.sql has run: read as "nothing to say".
+    decisionNote: optionalText(r.decision_note, 'decision_note'),
+    declined: r.declined === true,
+    taken: optionalText(r.taken, 'taken'),
     payment: parsePayment(r.payment),
     payments: (Array.isArray(r.payments) ? r.payments : []).map((p, i) => {
       const x = p as Record<string, unknown>;

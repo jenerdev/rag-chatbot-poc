@@ -53,7 +53,31 @@ const BADGE: Record<GuestStatus, { label: string; tone: string }> = {
   expired: { label: 'Expired', tone: '' },
 };
 
+/**
+ * The badge for this stay: its status, except that a stay cancelled before it
+ * was ever confirmed reads "Declined", and a pending one whose dates were
+ * taken since says so, since it can no longer be confirmed.
+ */
+function stayBadge(stay: Found): { label: string; tone: string } {
+  if (stay.guestStatus === 'pending' && stay.taken) return { label: 'Dates no longer available', tone: 'danger' };
+  if (stay.guestStatus === 'cancelled' && stay.declined) return { label: 'Declined', tone: 'danger' };
+  return BADGE[stay.guestStatus];
+}
+
+/**
+ * Can this stay still take a payment? Live (pending or confirmed) and, while
+ * pending, its dates not taken by another stay. The database refuses the
+ * rest anyway (submit_payment(), payments_refuse_taken); this only stops the
+ * page offering a form that would be refused.
+ */
+function takesPayment(stay: Found): boolean {
+  return stay.status === 'confirmed' || (stay.status === 'pending' && !stay.taken);
+}
+
 function nextStep(stay: Found, businessName: string): string {
+  if (stay.guestStatus === 'pending' && stay.taken) {
+    return `${stay.taken} ${businessName} cannot confirm this request, so please do not pay for it. You can send a new request for other dates.`;
+  }
   switch (stay.guestStatus) {
     case 'pending': {
       const held = stay.heldUntil ? ` Your dates are held for you until ${instantLabel(stay.heldUntil, stay.timezone)}.` : ' Until they do, the dates are not held, and someone else may book them.';
@@ -65,9 +89,11 @@ function nextStep(stay: Found, businessName: string): string {
     case 'completed':
       return 'This stay has ended. Thank you for staying.';
     case 'cancelled':
-      return `This booking was cancelled. Contact ${businessName} if you think this is a mistake.`;
+      return stay.declined
+        ? `${businessName} declined this request. Please do not pay for it. You can send a new request from the booking page.`
+        : `This booking was cancelled. Contact ${businessName} if you think this is a mistake.`;
     case 'expired':
-      return `This request expired before it was confirmed. You can send a new one from the booking page.`;
+      return `This request expired before it was confirmed, so it takes no payment. You can send a new one from the booking page.`;
   }
 }
 
@@ -147,7 +173,13 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
   );
 
   if (stay) {
-    const badge = BADGE[stay.guestStatus];
+    const badge = stayBadge(stay);
+    const live = takesPayment(stay);
+    // A stay that can take no payment and never took one has nothing for a
+    // Payment tab or a payment badge ("Unpaid" on a declined stay misleads).
+    const showPayment = stay.payment.status !== 'not_tracked' && (live || stay.payments.length > 0);
+    // Why it ended: the staff's note, or "Not paid in time" for an expiry.
+    const reason = !live && stay.decisionNote ? stay.decisionNote : null;
     const p = stay.price;
     // Two tabs once the stay tracks a payment: what is owed and how to pay
     // it first, then what was booked (and how to change it). With no payment to
@@ -234,6 +266,8 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
         key={stay.payments.length}
         slug={slug}
         stay={stay}
+        live={live}
+        businessName={businessName}
         reference={reference}
         contact={contact}
         limits={limits}
@@ -254,7 +288,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
                   <span className="visually-hidden">Booking: </span>
                   {badge.label}
                 </span>
-                {stay.payment.status !== 'not_tracked' && (
+                {showPayment && (
                   <span className={`badge ${PAYMENT_TONE[stay.payment.status]}`}>
                     <span className="visually-hidden">Payment: </span>
                     {PAYMENT_WORDS[stay.payment.status]}
@@ -267,9 +301,16 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
               <strong className="reference">{stay.reference}</strong>
               <CopyButton text={stay.reference} what="reference" />
             </div>
-            <p className={stay.guestStatus === 'pending' ? 'notice warn' : 'notice'}>{nextStep(stay, businessName)}</p>
+            <div className={`notice manage-notice ${badge.tone === 'danger' ? 'error' : stay.guestStatus === 'pending' || stay.guestStatus === 'expired' ? 'warn' : ''}`}>
+              <p>{nextStep(stay, businessName)}</p>
+              {reason && (
+                <p>
+                  <strong>Reason:</strong> {reason}
+                </p>
+              )}
+            </div>
 
-            {stay.payment.status === 'not_tracked' ? (
+            {!showPayment ? (
               details
             ) : (
               <Tabs
@@ -387,6 +428,8 @@ function today(timezone: string): string {
 function PaymentPanel({
   slug,
   stay,
+  live,
+  businessName,
   reference,
   contact,
   limits,
@@ -394,13 +437,15 @@ function PaymentPanel({
 }: {
   slug: string;
   stay: Found;
+  /** takesPayment(stay): false for a cancelled, declined, expired or taken stay */
+  live: boolean;
+  businessName: string;
   reference: string;
   contact: string;
   limits: ManageBookingScreenProps['limits'];
   onSent: () => void;
 }) {
   const pay = stay.payment;
-  const live = stay.status === 'pending' || stay.status === 'confirmed';
   // What is still owed toward the confirmation amount, or toward the total
   // once that is met. Both are the database's numbers; this only picks one.
   const due = pay.required !== null && !pay.enough ? pay.required - pay.received : (pay.outstanding ?? 0);
@@ -467,8 +512,16 @@ function PaymentPanel({
       <h2 id="payment-title" className="visually-hidden">
         Payment
       </h2>
+      {!live && (
+        // A stay that can no longer go ahead: what was received, and who to
+        // ask about it, never a balance to pay.
+        <p className="notice">
+          This booking takes no payment.
+          {pay.received > 0 ? ` For the ${formatMoney(pay.received, stay.currency)} already received, contact ${businessName}.` : ''}
+        </p>
+      )}
       <div className="stay-lines">
-        {pay.required !== null && pay.price !== null && pay.required < pay.price && (
+        {live && pay.required !== null && pay.price !== null && pay.required < pay.price && (
           <div className="quote-line">
             <span>Needed to confirm</span>
             <span>{formatMoney(pay.required, stay.currency)}</span>
@@ -478,7 +531,7 @@ function PaymentPanel({
           <span>Received</span>
           <span>{formatMoney(pay.received, stay.currency)}</span>
         </div>
-        {pay.outstanding !== null && (
+        {live && pay.outstanding !== null && (
           <div className="quote-line quote-total">
             <strong>Balance</strong>
             <strong>{formatMoney(pay.outstanding, stay.currency)}</strong>
@@ -487,7 +540,7 @@ function PaymentPanel({
       </div>
 
       {pay.open && <p className="notice">Your proof of payment is being checked. You will see the result here.</p>}
-      {pay.status === 'rejected' && lastRejected?.rejectionReason && (
+      {live && pay.status === 'rejected' && lastRejected?.rejectionReason && (
         <p className="notice error">Your last proof was not accepted: {lastRejected.rejectionReason}</p>
       )}
 

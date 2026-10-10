@@ -59,6 +59,15 @@ describe('parseGuestStay', () => {
     expect(() => parseGuestStay({ ...raw, rooms: [{ unit: 'A' }] })).toThrow(/rooms\[0\]\.slot/);
     expect(() => parseGuestStay([raw])).toThrow(/not an object/);
   });
+
+  it('reads why a stay ended, and a taken one (schema-stay-outcome.sql); absent reads as nothing to say', () => {
+    const before = parseGuestStay(raw)!;
+    expect([before.decisionNote, before.declined, before.taken]).toEqual([null, false, null]);
+    const declined = parseGuestStay({ ...raw, status: 'cancelled', decision_note: 'Fully booked that weekend', declined: true, taken: null })!;
+    expect([declined.decisionNote, declined.declined]).toEqual(['Fully booked that weekend', true]);
+    const taken = parseGuestStay({ ...raw, taken: 'Garden Room is no longer free on Thu, 19 Nov 2026: another booking was confirmed for it.' })!;
+    expect(taken.taken).toMatch(/no longer free/);
+  });
 });
 
 describe('parseGuestStay: the payment (Phase 3)', () => {

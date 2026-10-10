@@ -893,12 +893,17 @@ async function bookingTypeChecks(probeId) {
       check(!error && !names.includes('Closed Room') && names.includes('Garden Room'), 'check_availability skips inactive units', error ? error.message : names);
     }
 
-    // 64. With live bookings, the type cannot change at all.
+    // 64. With live bookings, the type cannot change at all. "Live" is "not
+    //     ended", so the check books its own night a year out: the October
+    //     2026 nights above ended on 2026-10-10, and the switch then went
+    //     through and broke every check after it.
     {
+      const { data: future, error: futureError } = await supabase.from('bookings').insert(booking({ unit_id: unit['Garden Room'], booked_date: '2027-10-04' })).select('id');
       await supabase.from('units').update({ active: false }).eq('tenant_id', roomsId).in('id', [unit['Family Room'], unit['Unpriced Room']]);
       const { error } = await supabase.from('tenant_applications').update({ config: { timezone: 'Asia/Manila' } }).eq('tenant_id', roomsId);
-      check(error?.code === '23514' && /live booking/.test(error.message), 'a type switch is refused while bookings are live', error ? `${error.code} ${error.message}` : 'SWITCH SUCCEEDED');
+      check(!futureError && error?.code === '23514' && /live booking/.test(error.message), 'a type switch is refused while bookings are live', futureError ? `future booking: ${futureError.message}` : error ? `${error.code} ${error.message}` : 'SWITCH SUCCEEDED');
       await supabase.from('units').update({ active: true }).eq('tenant_id', roomsId).in('id', [unit['Family Room'], unit['Unpriced Room']]);
+      if (future?.length) await supabase.from('bookings').delete().in('id', future.map((b) => b.id));
     }
 
     // 69–74 are plan/extra-guests.md Phase 1: a standard capacity, the
@@ -1925,10 +1930,15 @@ async function rolesChecks() {
       const promoted = await as.owner.from('memberships').update({ role: 'admin' }).eq('tenant_id', probe.id).eq('user_id', ids.staff).select('role');
       const byStaff = await as.staff.from('memberships').update({ role: 'staff' }).eq('tenant_id', probe.id).eq('user_id', ids.owner).select('role');
       const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      // "Unchanged" is measured, before and after: villa's real members may
+      // include staff (it gained one), so "no staff" was never the test.
+      const villaRolesOf = async () => ((await supabase.from('memberships').select('user_id, role').eq('tenant_id', villaRow.id).order('user_id')).data ?? []).map((r) => `${r.user_id}:${r.role}`).join(',');
+      const villaBefore = await villaRolesOf();
       const acrossTenants = await as.owner.from('memberships').update({ role: 'staff' }).eq('tenant_id', villaRow.id).select('role');
-      const { data: villaRoles } = await supabase.from('memberships').select('role').eq('tenant_id', villaRow.id);
+      const villaAfter = await villaRolesOf();
+      const villaRoles = villaAfter.split(',').filter(Boolean).map((x) => ({ role: x.split(':')[1] }));
       check(
-        promoted.data?.length === 1 && promoted.data[0].role === 'admin' && byStaff.data?.length === 0 && acrossTenants.data?.length === 0 && villaRoles.every((r) => r.role !== 'staff'),
+        promoted.data?.length === 1 && promoted.data[0].role === 'admin' && byStaff.data?.length === 0 && acrossTenants.data?.length === 0 && villaBefore !== '' && villaAfter === villaBefore,
         'roles: an owner changes a role in its tenant only; staff changes nothing',
         `owner→ ${promoted.error ? promoted.error.message : promoted.data.length} row · staff→ ${byStaff.data?.length ?? byStaff.error?.code} · across tenants ${acrossTenants.data?.length ?? acrossTenants.error?.code} · villa still ${villaRoles.map((r) => r.role).join(',')}`,
       );
@@ -2269,7 +2279,9 @@ async function manageBookingChecks() {
       const keys = s ? Object.keys(s).sort().join(',') : '';
       check(
         !byEmail.error && s?.reference === ref1 && s.status === 'pending' && s.rooms?.length === 2 && s.nights === 1
-          && Number(s.price?.total) === 200000 && !('notes' in s) && !('guest_email' in s) && !('decision_note' in s)
+          // schema-stay-outcome.sql: decision_note is the guest's now (why a stay
+          // ended), and null while the stay is live; notes and contacts never.
+          && Number(s.price?.total) === 200000 && !('notes' in s) && !('guest_email' in s) && s.decision_note === null && s.taken === null && s.declined === false
           && !byPhone.error && byPhone.data?.reference === ref1,
         'manage: guest_stay finds a stay by reference + email or phone, guest-facing columns only',
         `email ${byEmail.error?.message ?? `${s?.status} ${s?.rooms?.length} rooms total ${s?.price?.total}`} · phone ${byPhone.error?.message ?? byPhone.data?.reference} · keys ${keys}`,
@@ -2938,6 +2950,73 @@ async function manageBookingChecks() {
         bare.error?.code === '23514' && !kept.error && kept.data?.length === 1 && kept.data[0].proof_path === null && kept.data[0].claimed_amount > 0,
         'manage: a proof path is cleared only with proof_removed_at (23514 without); the payment row stays',
         `bare ${bare.error?.code ?? 'CLEARED'} · kept ${kept.error?.message ?? JSON.stringify(kept.data)}`,
+      );
+    }
+
+    // 159–161 are schema-stay-outcome.sql: what the guest reads when a stay
+    // can no longer go ahead, and the refusal that matches it. Fresh Mondays
+    // in August 2027.
+    // 159. A pending stay whose dates are taken since: by a confirmed stay,
+    //      and by another guest's live hold. guest_stay() says so in words,
+    //      and its proof is refused (55000, the same words); no payment row.
+    {
+      await setPay('none');
+      const r = await requestStay('A', '2027-08-02');
+      const before = (await lookup(r.ref, r.email)).data;
+      const { error: blockError } = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.A, slot_id: slotRow.id, booked_date: '2027-08-02', guest_name: 'Confirmed elsewhere', guest_count: 1, status: 'confirmed' });
+      const after = (await lookup(r.ref, r.email)).data;
+      const proof = await proofFor(r);
+      const { count: paid } = await supabase.from('payments').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id).eq('group_id', r.group);
+      // A hold: an unheld request, then a second guest's request under on_request holds the night.
+      const unheld = await requestStay('B', '2027-08-09');
+      await setPay('on_request');
+      const holder = await requestStay('B', '2027-08-09');
+      const heldOut = (await lookup(unheld.ref, unheld.email)).data;
+      const holderSees = (await lookup(holder.ref, holder.email)).data;
+      await setPay('none');
+      check(
+        before?.taken === null && !blockError
+          && after?.status === 'pending' && /^A is no longer free on Mon, 2 Aug 2027: another booking was confirmed for it\.$/.test(after?.taken ?? '')
+          && proof.error?.code === '55000' && /no longer free.*takes no payment/.test(proof.error.message) && paid === 0
+          && !holder.error && /held for another guest/.test(heldOut?.taken ?? '') && holderSees?.taken === null,
+        "manage: a pending stay whose dates were confirmed for another reads 'taken' in words and its proof is refused (55000, no row); another guest's live hold reads 'held for another guest'; the holder itself is not taken",
+        `before ${before?.taken} · block ${blockError?.message ?? 'ok'} · after ${after?.status} "${after?.taken}" · proof ${proof.error?.code} "${proof.error?.message}" · rows ${paid} · hold ${holder.error?.message ?? 'ok'} "${heldOut?.taken}" · holder ${holderSees?.taken}`,
+      );
+    }
+
+    // 160. Declined is cancelled before it was ever confirmed; the note is
+    //      the guest's to read. A stay confirmed and then cancelled is not
+    //      declined, and a live stay has no note.
+    {
+      const d = await requestStay('A', '2027-08-16');
+      const live = (await lookup(d.ref, d.email)).data;
+      const decline = await staff.from('bookings').update({ status: 'cancelled', decision_note: 'probe: fully booked' }).eq('tenant_id', probe.id).eq('group_id', d.group).select('id');
+      const declined = (await lookup(d.ref, d.email)).data;
+      const c = await requestStay('B', '2027-08-16');
+      const confirm = await staff.from('bookings').update({ status: 'confirmed', decision_note: 'probe: paid at the desk' }).eq('tenant_id', probe.id).eq('group_id', c.group).select('id');
+      const cancel = await staff.from('bookings').update({ status: 'cancelled', decision_note: 'probe: guest asked' }).eq('tenant_id', probe.id).eq('group_id', c.group).select('id');
+      const cancelled = (await lookup(c.ref, c.email)).data;
+      check(
+        live?.decision_note === null && live.declined === false
+          && !decline.error && declined?.status === 'cancelled' && declined.declined === true && declined.decision_note === 'probe: fully booked'
+          && !confirm.error && !cancel.error && cancelled?.status === 'cancelled' && cancelled.declined === false && cancelled.decision_note === 'probe: guest asked',
+        'manage: a request cancelled before confirmation reads declined with its reason; one confirmed then cancelled reads cancelled with its reason; a live stay has none',
+        `live ${live?.decision_note}/${live?.declined} · declined ${decline.error?.message ?? `${declined?.status}/${declined?.declined}/"${declined?.decision_note}"`} · cancelled ${confirm.error?.message ?? cancel.error?.message ?? `${cancelled?.status}/${cancelled?.declined}/"${cancelled?.decision_note}"`}`,
+      );
+    }
+
+    // 161. Past its payment deadline, a stay reads expired with "Not paid in
+    //      time" before any sweep writes the word, and it is not "taken".
+    {
+      const e = await requestStay('A', '2027-08-23');
+      const { error: dueError } = await supabase.from('stays').update({ pay_by: new Date(Date.now() - 60_000).toISOString() }).eq('tenant_id', probe.id).eq('group_id', e.group);
+      const due = (await lookup(e.ref, e.email)).data;
+      const proof = await proofFor(e);
+      check(
+        !dueError && due?.status === 'expired' && due.decision_note === 'Not paid in time' && due.taken === null && due.declined === false
+          && proof.error?.code === '55000',
+        "manage: a stay past pay_by reads expired with 'Not paid in time', is neither taken nor declined, and takes no proof (55000)",
+        `${dueError?.message ?? 'ok'} · ${due?.status} "${due?.decision_note}" taken ${due?.taken} declined ${due?.declined} · proof ${proof.error?.code}`,
       );
     }
   } catch (error) {

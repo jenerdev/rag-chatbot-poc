@@ -3530,3 +3530,30 @@ statement is ONE event. The stay's History drawer reads it.
 
 **Measured:** verify 129–131; walk 4's history, seven steps in order with
 their actors; walk 6's change history.
+
+---
+
+## D-110 · A stay that can no longer go ahead says why, and takes no payment · **Added 2026-10-11 (schema-stay-outcome.sql)**
+
+**Decision:** `guest_stay()` gains three keys: `decision_note` (why a
+cancelled or expired stay ended: the staff's note, or "Not paid in time"),
+`declined` (cancelled before it was ever confirmed, read from
+`booking_events`) and `taken` (a PENDING stay whose dates another stay has
+since confirmed or holds, in words, from `stay_taken()`, which asks
+`booking_takes()`). A BEFORE INSERT trigger on `payments`,
+`payments_refuse_taken`, refuses a guest's proof for such a stay (55000,
+the same words), so `submit_payment()` is not redefined. Manage booking
+shows Declined / Expired / Dates no longer available with the reason, and
+offers no payment form for any stay that cannot take one (a Payment tab
+remains only when something was already paid, with no balance).
+
+**Amends D-096:** the decision note was staff-only. The guest now reads
+the note on a cancelled or expired stay, so the decline and cancel dialogs
+label it "Reason, shown to the guest". A live stay's note is never sent.
+
+**Why:** the request: an expired, declined or taken request must not
+invite a payment, and a declined one should say why. A request holds
+nothing (D-070), so "taken" is a real state, and staff could not confirm
+it anyway (`bookings_no_overlap`).
+
+**Measured:** verify 159–161 and 126 amended, 161/161.
