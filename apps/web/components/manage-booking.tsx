@@ -24,6 +24,7 @@ import type { GuestStatus, GuestStay, PaymentStatus } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { instantLabel } from '@/components/booking-page';
 import { Icon } from '@/components/icons';
+import { Tabs } from '@/components/tabs';
 import { TenantNav } from '@/components/tenant-nav';
 import { centavosToInput, formatMoney } from '@/lib/money';
 import { resizeImage } from '@/lib/resize-image';
@@ -68,6 +69,39 @@ function nextStep(stay: Found, businessName: string): string {
     case 'expired':
       return `This request expired before it was confirmed. You can send a new one from the booking page.`;
   }
+}
+
+/** "Sat, 24 Oct 2026" in the tenant's zone. */
+function dayLabel(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: timezone });
+}
+
+/** "14:00" in the tenant's zone. */
+function timeLabel(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
+}
+
+/** Copies a reference or an account number; the label says when it worked. */
+function CopyButton({ text, what }: { text: string; what: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="ghost sm"
+      aria-label={copied ? `Copied ${what}` : `Copy ${what}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch {
+          // No clipboard (an insecure origin, a refused permission): the text is on screen to copy by hand.
+        }
+      }}
+    >
+      <Icon name={copied ? 'check' : 'copy'} size={14} /> {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
 }
 
 export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
@@ -115,79 +149,137 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
   if (stay) {
     const badge = BADGE[stay.guestStatus];
     const p = stay.price;
+    // Two tabs once the stay tracks a payment: what is owed and how to pay
+    // it first, then what was booked (and how to change it). With no payment to
+    // track there is nothing for a second tab, so the details stand alone.
+    const details = (
+      <>
+        <section className="manage-section" aria-labelledby="dates-title">
+          <h2 id="dates-title">Your stay</h2>
+          <dl className="manage-facts">
+            <div>
+              <dt>Check-in</dt>
+              <dd>
+                {dayLabel(stay.startsAt, stay.timezone)}
+                <span className="small muted">{timeLabel(stay.startsAt, stay.timezone)}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Check-out</dt>
+              <dd>
+                {dayLabel(stay.endsAt, stay.timezone)}
+                <span className="small muted">{timeLabel(stay.endsAt, stay.timezone)}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Booked by</dt>
+              <dd>{stay.guestName}</dd>
+            </div>
+            {stay.nights > 0 && (
+              <div>
+                <dt>Length</dt>
+                <dd>
+                  {stay.nights} {stay.nights === 1 ? 'night' : 'nights'}
+                </dd>
+              </div>
+            )}
+          </dl>
+          <ul className="manage-rooms">
+            {stay.rooms.map((r) => (
+              <li key={`${r.unit}-${r.slot}-${r.guests}`}>
+                <Icon name="bed" size={16} />
+                <span className="grow">
+                  {r.unit} <span className="muted">· {r.slot}</span>
+                </span>
+                <span className="small muted">
+                  {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {p.total !== null && (
+          <section className="manage-section" aria-labelledby="price-title">
+            <h2 id="price-title">Price</h2>
+            <div className="stay-lines">
+              {p.extraGuests || p.surcharge || p.discount ? (
+                <>
+                  {p.base !== null && <Line label="Rate" amount={p.base} currency={stay.currency} />}
+                  {!!p.extraGuests && <Line label="Extra guests" amount={p.extraGuests} currency={stay.currency} />}
+                  {!!p.surcharge && <Line label="Holiday surcharge" amount={p.surcharge} currency={stay.currency} />}
+                  {!!p.discount && <Line label="Promo discount" amount={-p.discount} currency={stay.currency} discount />}
+                </>
+              ) : null}
+              <div className="quote-line quote-total">
+                <strong>Total</strong>
+                <strong>{formatMoney(p.total, stay.currency)}</strong>
+              </div>
+            </div>
+          </section>
+        )}
+        <ChangePanel
+          key={`change-${stay.changes.length}-${stay.changes.at(-1)?.status ?? ''}`}
+          slug={slug}
+          stay={stay}
+          reference={reference}
+          contact={contact}
+          onChanged={() => void lookUp()}
+          onAnother={another}
+        />
+      </>
+    );
+    const payment = (
+      <PaymentPanel
+        key={stay.payments.length}
+        slug={slug}
+        stay={stay}
+        reference={reference}
+        contact={contact}
+        limits={limits}
+        onSent={() => void lookUp()}
+      />
+    );
     return (
       <>
         {header}
         <main className="book-main">
-          <section className="card receipt" aria-labelledby="stay-title">
-            <h1 className="page-title" id="stay-title">
-              Your booking
-            </h1>
+          <section className="card receipt manage" aria-labelledby="stay-title">
+            <div className="manage-head">
+              <h1 className="page-title" id="stay-title">
+                Your booking
+              </h1>
+              <div className="manage-badges">
+                <span className={`badge ${badge.tone}`}>
+                  <span className="visually-hidden">Booking: </span>
+                  {badge.label}
+                </span>
+                {stay.payment.status !== 'not_tracked' && (
+                  <span className={`badge ${PAYMENT_TONE[stay.payment.status]}`}>
+                    <span className="visually-hidden">Payment: </span>
+                    {PAYMENT_WORDS[stay.payment.status]}
+                  </span>
+                )}
+              </div>
+            </div>
             <div className="receipt-reference">
               <span className="small muted">Reference</span>
               <strong className="reference">{stay.reference}</strong>
-              <span className={`badge ${badge.tone}`}>{badge.label}</span>
+              <CopyButton text={stay.reference} what="reference" />
             </div>
             <p className={stay.guestStatus === 'pending' ? 'notice warn' : 'notice'}>{nextStep(stay, businessName)}</p>
-            <div className="stay-summary">
-              <div className="stay-summary-title">
-                {stay.guestName}
-                {stay.nights > 1 ? ` · ${stay.nights} nights` : ''}
-              </div>
-              <div className="small muted">
-                From {instantLabel(stay.startsAt, stay.timezone)} to {instantLabel(stay.endsAt, stay.timezone)}
-              </div>
-            </div>
-            <div className="stay-lines">
-              {stay.rooms.map((r) => (
-                <div key={`${r.unit}-${r.slot}-${r.guests}`} className="quote-line">
-                  <span>
-                    {r.unit} · {r.slot}
-                  </span>
-                  <span>
-                    {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
-                  </span>
-                </div>
-              ))}
-              {p.total !== null && (
-                <>
-                  {p.extraGuests || p.surcharge || p.discount ? (
-                    <>
-                      {p.base !== null && <Line label="Rate" amount={p.base} currency={stay.currency} />}
-                      {!!p.extraGuests && <Line label="Extra guests" amount={p.extraGuests} currency={stay.currency} />}
-                      {!!p.surcharge && <Line label="Holiday surcharge" amount={p.surcharge} currency={stay.currency} />}
-                      {!!p.discount && <Line label="Promo discount" amount={-p.discount} currency={stay.currency} discount />}
-                    </>
-                  ) : null}
-                  <div className="quote-line quote-total">
-                    <strong>Total</strong>
-                    <strong>{formatMoney(p.total, stay.currency)}</strong>
-                  </div>
-                </>
-              )}
-            </div>
-            <PaymentPanel
-              key={stay.payments.length}
-              slug={slug}
-              stay={stay}
-              reference={reference}
-              contact={contact}
-              limits={limits}
-              onSent={() => void lookUp()}
-            />
-            <ChangePanel
-              key={`change-${stay.changes.length}-${stay.changes.at(-1)?.status ?? ''}`}
-              slug={slug}
-              stay={stay}
-              reference={reference}
-              contact={contact}
-              onChanged={() => void lookUp()}
-            />
-            <div className="form-footer">
-              <button type="button" onClick={another}>
-                Look up another booking
-              </button>
-            </div>
+
+            {stay.payment.status === 'not_tracked' ? (
+              details
+            ) : (
+              <Tabs
+                label="Your booking"
+                tabs={[
+                  { id: 'payment', label: 'Payment', panel: payment },
+                  { id: 'details', label: 'Booking details', panel: details },
+                ]}
+              />
+            )}
           </section>
         </main>
       </>
@@ -198,7 +290,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
     <>
       {header}
       <main className="book-main">
-        <section className="card receipt" aria-labelledby="manage-title">
+        <section className="card receipt manage manage-lookup" aria-labelledby="manage-title">
           <h1 className="page-title" id="manage-title">
             Manage your booking
           </h1>
@@ -269,6 +361,17 @@ const PAYMENT_WORDS: Record<PaymentStatus, string> = {
   partially_paid: 'Partly paid',
   paid: 'Paid',
   refunded: 'Refunded',
+};
+
+/** The payment's tint; the word beside it always says the same. */
+const PAYMENT_TONE: Record<PaymentStatus, string> = {
+  not_tracked: '',
+  unpaid: 'warn',
+  submitted: 'accent',
+  rejected: 'danger',
+  partially_paid: 'warn',
+  paid: 'ok',
+  refunded: '',
 };
 
 /** The tenant's date today, YYYY-MM-DD, for the "date paid" default. */
@@ -360,9 +463,9 @@ function PaymentPanel({
   const lastRejected = [...stay.payments].reverse().find((p) => p.kind === 'payment' && p.status === 'rejected');
 
   return (
-    <section className="manage-payment" aria-labelledby="payment-title">
-      <h2 id="payment-title">
-        Payment <span className="badge">{PAYMENT_WORDS[pay.status]}</span>
+    <section className="manage-section" aria-labelledby="payment-title">
+      <h2 id="payment-title" className="visually-hidden">
+        Payment
       </h2>
       <div className="stay-lines">
         {pay.required !== null && pay.price !== null && pay.required < pay.price && (
@@ -390,16 +493,23 @@ function PaymentPanel({
 
       {canPay && stay.pay && (
         <>
-          <h3>How to pay</h3>
-          <p className="small">
-            Pay {formatMoney(due, stay.currency)} by one of these, then send a photo or PDF of the receipt below.
-          </p>
+          <div className="pay-due">
+            <span className="small muted">{pay.required !== null && !pay.enough ? 'To pay now' : 'Balance to pay'}</span>
+            <strong>{formatMoney(due, stay.currency)}</strong>
+            {stay.payBy && <span className="small muted">by {instantLabel(stay.payBy, stay.timezone)}</span>}
+          </div>
+          <h3>1. Pay by one of these</h3>
           <ul className="pay-methods">
             {stay.pay.methods.map((m) => (
               <li key={m.label} className="pay-method">
                 <strong>{m.label}</strong>
                 {m.accountName && <span>{m.accountName}</span>}
-                {m.accountNumber && <span className="reference">{m.accountNumber}</span>}
+                {m.accountNumber && (
+                  <span className="pay-account">
+                    <span className="reference">{m.accountNumber}</span>
+                    <CopyButton text={m.accountNumber} what={`${m.label} account number`} />
+                  </span>
+                )}
                 {m.instructions && <span className="small muted">{m.instructions}</span>}
               </li>
             ))}
@@ -407,7 +517,7 @@ function PaymentPanel({
           {stay.pay.terms && <div className="instructions">{stay.pay.terms}</div>}
 
           <form onSubmit={send} className="proof-form" noValidate>
-            <h3>Send your proof of payment</h3>
+            <h3>2. Send a photo or PDF of the receipt</h3>
             <div className="field-row">
               <div className="field grow">
                 <label htmlFor="pay-method">Paid by</label>
@@ -501,13 +611,21 @@ function ChangePanel({
   reference,
   contact,
   onChanged,
+  onAnother,
 }: {
   slug: string;
   stay: Found;
   reference: string;
   contact: string;
   onChanged: () => void;
+  /** the page's way back to the look-up form; it shares the stay's action row */
+  onAnother: () => void;
 }) {
+  const another = (
+    <button type="button" className="manage-another" onClick={onAnother}>
+      Look up another booking
+    </button>
+  );
   const open = stay.changes.find((c) => c.status === 'pending') ?? null;
   const last = stay.changes.at(-1) ?? null;
   const [mode, setMode] = useState<'none' | 'cancel' | 'reschedule'>('none');
@@ -517,7 +635,9 @@ function ChangePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open && !stay.change.canCancel && !stay.change.canReschedule && !(last && last.status === 'rejected')) return null;
+  if (!open && !stay.change.canCancel && !stay.change.canReschedule && !(last && last.status === 'rejected')) {
+    return <div className="form-footer manage-footer">{another}</div>;
+  }
 
   async function call(path: string, body: object): Promise<Record<string, unknown> | null> {
     setBusy(true);
@@ -545,7 +665,7 @@ function ChangePanel({
   const money = (n: number) => formatMoney(n, stay.currency);
 
   return (
-    <section className="manage-payment" aria-labelledby="change-title">
+    <section className="manage-section" aria-labelledby="change-title">
       <h2 id="change-title">Change your booking</h2>
       {last?.status === 'rejected' && !open && last.decisionNote && (
         <p className="notice error">Your last request was not accepted: {last.decisionNote}</p>
@@ -562,10 +682,11 @@ function ChangePanel({
             <button type="button" disabled={busy} onClick={async () => { if (await call('change/withdraw', {})) onChanged(); }}>
               Withdraw this request
             </button>
+            {another}
           </div>
         </>
       ) : mode === 'none' ? (
-        <div className="form-footer">
+        <div className="form-footer manage-actions">
           {stay.change.canReschedule && (
             <button type="button" onClick={() => { setMode('reschedule'); setQuote(null); }}>
               Move to other dates
@@ -576,6 +697,7 @@ function ChangePanel({
               Cancel this booking
             </button>
           )}
+          {another}
         </div>
       ) : (
         <form
@@ -633,6 +755,7 @@ function ChangePanel({
           </div>
         </form>
       )}
+      {mode !== 'none' && !open && <div className="form-footer manage-footer">{another}</div>}
       {mode === 'none' && error && (
         <div className="notice error" role="alert">
           {error}

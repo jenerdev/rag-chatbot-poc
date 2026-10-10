@@ -17,7 +17,7 @@ import {
   MIN_REQUEST_NAME,
 } from './constants.js';
 import { BookingInputError } from './errors.js';
-import type { BookingType, BookingsConfig } from './types.js';
+import type { BookingType, BookingsConfig, PaymentFlow } from './types.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -363,6 +363,27 @@ export function pageSettings(raw: unknown): { instructions: string | null; guest
   const page = ((raw ?? {}) as Record<string, unknown>).booking_page as Record<string, unknown> | undefined;
   const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
   return { instructions: text(page?.instructions), guestHint: text(page?.guest_hint) };
+}
+
+/**
+ * How a request gets paid and confirmed, for the booking page's receipt to
+ * explain (manage-booking D-105 to D-107): null when the tenant takes no
+ * payment on the page. Policy only, no amount: what is owed is the
+ * database's (stay_required()), shown on Manage booking. The shape was
+ * checked when it was stored (tenant_applications_validate), so this only
+ * reads it; anything unexpected reads as absent.
+ */
+export function paymentFlow(raw: unknown): PaymentFlow | null {
+  const pay = ((raw ?? {}) as Record<string, unknown>).payments as Record<string, unknown> | undefined;
+  if (!pay || typeof pay !== 'object') return null;
+  const hours = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 168 ? v : null);
+  const fee = pay.fee as { kind?: unknown } | undefined;
+  return {
+    deposit: fee?.kind === 'fixed' || fee?.kind === 'percent',
+    payWithinHours: hours(pay.pay_within_hours),
+    reviewWithinHours: hours(pay.review_within_hours),
+    hold: pay.hold === 'on_proof' || pay.hold === 'on_request' ? pay.hold : 'none',
+  };
 }
 
 /** What a stored photo is, by its first bytes. Its name and Content-Type are only what the sender typed. */

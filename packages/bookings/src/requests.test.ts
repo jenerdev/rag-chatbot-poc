@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_BOOKING_ADVANCE_DAYS, MAX_REQUEST_ROWS, MAX_STAY_NIGHTS } from './constants.js';
 import { BookingInputError } from './errors.js';
-import { addDays, normaliseEmail, normalisePhone, pageSettings, parseRequest } from './validate.js';
+import { addDays, normaliseEmail, normalisePhone, pageSettings, parseRequest, paymentFlow } from './validate.js';
 
 const TODAY = '2026-09-28';
 const valid = {
@@ -136,5 +136,25 @@ describe('pageSettings', () => {
       guestHint: null,
     });
     expect(pageSettings({ timezone: 'Asia/Manila' })).toEqual({ instructions: null, guestHint: null });
+  });
+});
+
+describe('paymentFlow', () => {
+  it('is null when the tenant takes no payment on the page', () => {
+    expect(paymentFlow({ timezone: 'Asia/Manila' })).toBeNull();
+    expect(paymentFlow(null)).toBeNull();
+  });
+  it('reads the deposit, the two windows and the hold', () => {
+    expect(
+      paymentFlow({ payments: { methods: [], fee: { kind: 'percent', value: 3000 }, pay_within_hours: 24, review_within_hours: 12, hold: 'on_proof' } }),
+    ).toEqual({ deposit: true, payWithinHours: 24, reviewWithinHours: 12, hold: 'on_proof' });
+  });
+  it('the full price, no windows, no hold, when they are absent or odd', () => {
+    expect(paymentFlow({ payments: { methods: [], fee: { kind: 'full' }, pay_within_hours: 0, hold: 'sometimes' } })).toEqual({
+      deposit: false,
+      payWithinHours: null,
+      reviewWithinHours: null,
+      hold: 'none',
+    });
   });
 });

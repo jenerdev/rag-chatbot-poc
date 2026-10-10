@@ -16,15 +16,19 @@
 // Everything the server sends is a React child, so it is escaped, including
 // the tenant's own instructions text (CLAUDE.md § Conventions).
 //
-// The look (plan/ui-refresh.md Phase 5): three numbered sections (the stay,
-// the guests, the customer) and, beside them on a desktop, a summary that
-// stays in view with the server's price and the Send button. While a price
-// is being asked, the summary shows a placeholder, never the last price,
-// which may no longer be true. The promo field opens on request. The
-// receipt leads with the reference, copyable.
+// The look: a stepper of four steps (the stay, the guests, the customer, a
+// review), one shown at a time, and, beside them on a desktop, a summary
+// that stays in view with the server's price. Send is on the summary at the
+// review step only, so nothing is sent before the guest has seen it all.
+// Every step stays MOUNTED, hidden when not current, so going back keeps
+// what was typed. A step is reachable once every step before it is
+// complete; Continue says what is missing instead of only greying out.
+// While a price is being asked, the summary shows a placeholder, never the
+// last price, which may no longer be true. The promo field opens on request,
+// at the review. The receipt leads with the reference, copyable.
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { TenantNav } from '@/components/tenant-nav';
@@ -95,6 +99,42 @@ export function instantLabel(iso: string, timezone: string): string {
   });
 }
 
+/** An ISO instant's calendar date, in the tenant's timezone: "Thu, 19 Nov 2026". */
+function instantDate(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: timezone });
+}
+
+/** An ISO instant's wall-clock time, in the tenant's timezone: "2:00 PM", as timeLabel() writes it. */
+function instantTime(iso: string, timezone: string): string {
+  const hhmm = new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: timezone });
+  return timeLabel(hhmm);
+}
+
+/** Check-in and check-out, a row each, so the breakdown below need not repeat the dates. */
+function CheckTimes({ checkIn, checkOut }: { checkIn: { date: string; time: string }; checkOut: { date: string; time: string } }) {
+  return (
+    <dl className="check-times">
+      <div>
+        <dt>Check-in</dt>
+        <dd>
+          {checkIn.date} <span className="muted">· {checkIn.time}</span>
+        </dd>
+      </div>
+      <div>
+        <dt>Check-out</dt>
+        <dd>
+          {checkOut.date} <span className="muted">· {checkOut.time}</span>
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+/** "Thu" for a calendar date (UTC, as dateLabel() reads it). */
+function weekday(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+}
+
 type Sent = { receipt: RequestReceipt } | null;
 
 export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav }: BookingPageScreenProps) {
@@ -128,6 +168,9 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   const [quotePending, setQuotePending] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [step, setStep] = useState(0);
+  const headings = useRef<(HTMLHeadingElement | null)[]>([]);
+  const moved = useRef(false);
 
   // Only units priced for this slot are offered. Memoised: `rooms` below
   // depends on it, and the quote effect on `rooms`, so a new array every
@@ -188,11 +231,25 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     };
   }, [api, checkIn, nightCount, nightsValid, promoCode, rooms, roomsComplete, slotId]);
 
+  useEffect(() => {
+    if (!moved.current) return;
+    headings.current[step]?.focus();
+    // Bring the stepper back into view only when it has scrolled away (a
+    // long step on a phone); its scroll-margin clears the sticky header.
+    const stepper = document.querySelector('.stepper');
+    if (stepper && stepper.getBoundingClientRect().top < 0) stepper.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [step]);
+
   const end = slotEnd(slot.startTime, slot.duration);
   const checkOut = checkIn && end && nightsValid ? addDays(checkIn, nightCount - 1 + end.days) : null;
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
+    // Enter in a field submits the form: before the review, that is Continue.
+    if (step < 3) {
+      if (missing[step] === '') go(step + 1);
+      return;
+    }
     setError(null);
     setSending(true);
     try {
@@ -224,6 +281,8 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     setChosen({});
     setNotes('');
     setQuote({ quote: null, message: null });
+    setStep(0);
+    moved.current = false;
   }
 
   const header = (
@@ -232,18 +291,70 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     </BrandHeader>
   );
 
-  // After sending: the receipt, from the STORED rows.
+  // After sending: the receipt, from the STORED rows. A centred head (done,
+  // the reference to keep), then the honest warning, a timeline of what
+  // happens next with this step ticked, the stay, its price, the resort's
+  // own instructions, and the two ways on.
   if (sent) {
     const r = sent.receipt;
+    // One row per room and its guests: the first night's lines (every night books the same rooms).
+    const roomsBooked = r.lines.filter((l) => l.date === r.lines[0]?.date);
+    const manageHref = `/t/${slug}/manage?ref=${encodeURIComponent(r.reference)}`;
+    // What happens next, from the tenant's payment policy (D-105 to D-107).
+    // Words only, never an amount: what is owed is the database's, on Manage booking.
+    const pay = page.payment;
+    const hours = (h: number) => `${h} hour${h === 1 ? '' : 's'}`;
+    const timeline: { title: string; text: string }[] = pay
+      ? [
+          {
+            title: 'Request sent',
+            text: `Just now, with reference ${r.reference}.${pay.hold === 'on_request' ? ' Your dates are held while you pay.' : ''}`,
+          },
+          {
+            title: `Pay ${pay.deposit ? 'the deposit' : 'for your stay'}${pay.payWithinHours ? ` within ${hours(pay.payWithinHours)}` : ''}`,
+            text: `Open Manage booking with your reference to see the amount and the ways to pay.${
+              pay.payWithinHours ? ' If nothing is paid in time, the request expires.' : ''
+            }`,
+          },
+          {
+            title: 'Send your proof of payment',
+            text: `On the same page, upload a photo or PDF of the receipt.${pay.hold === 'on_proof' ? ' Your dates are then held while it is checked.' : ''}`,
+          },
+          {
+            title: `${businessName} checks your payment`,
+            text: `They match it against their account${pay.reviewWithinHours ? `, within ${hours(pay.reviewWithinHours)}` : ''}. If it cannot be accepted, Manage booking says why, and you can send another.`,
+          },
+          {
+            title: 'Your booking is confirmed',
+            text: `The dates are yours.${pay.deposit ? ' The rest of the price is paid as Manage booking shows.' : ''} Its status is on Manage booking any time.`,
+          },
+        ]
+      : [
+          { title: 'Request sent', text: `Just now, with reference ${r.reference}.` },
+          {
+            title: `${businessName} reviews it`,
+            text: 'They contact you by phone or email, quoting your reference, about the booking and how to pay.',
+          },
+          { title: 'Your booking is confirmed', text: 'Only then are the dates yours. Its status is on Manage booking any time.' },
+        ];
     return (
       <>
         {header}
         <main className="book-main">
-          <section className="card receipt">
-            <div className="auth-done">
-              <Icon name="check" size={22} />
+          <section className="card receipt confirm" aria-labelledby="confirm-title">
+            <div className="confirm-head">
+              <div className="auth-done">
+                <Icon name="check" size={22} />
+              </div>
+              <h1 className="page-title" id="confirm-title">
+                Request sent
+              </h1>
+              <p className="confirm-lede">
+                {businessName} has your request. Keep your reference: with your email or mobile number, it opens this booking
+                later.
+              </p>
             </div>
-            <h1 className="page-title">Request sent</h1>
+
             <div className="receipt-reference">
               <span className="small muted">Your reference</span>
               <strong className="reference">{r.reference}</strong>
@@ -257,35 +368,80 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 <Icon name={copied ? 'check' : 'copy'} size={14} /> {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
+
             <p className="notice warn">
-              <strong>This is a request, not a confirmation.</strong> The date is yours once {businessName} confirms it. Until
-              then, someone else may book it.
+              <strong>This is a request, not a confirmation.</strong> The date is yours once {businessName} confirms it.{' '}
+              {pay?.hold === 'on_request'
+                ? 'Your dates are held for you while you pay.'
+                : pay?.hold === 'on_proof'
+                  ? 'Until you send your proof of payment, someone else may book it.'
+                  : 'Until then, someone else may book it.'}
             </p>
-            <div className="stay-summary">
-              <div className="stay-summary-title">
+
+            <section className="confirm-section" aria-labelledby="next-title">
+              <h2 id="next-title">What happens next</h2>
+              <ol className="confirm-timeline">
+                {timeline.map((t, i) => (
+                  <li key={t.title} className={i === 0 ? 'done' : ''}>
+                    <span className="confirm-dot" aria-hidden="true">
+                      {i === 0 ? <Icon name="check" size={12} /> : i + 1}
+                    </span>
+                    <div>
+                      <strong>{t.title}</strong>
+                      <span className="small muted">{t.text}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              {pay && (
+                <Link className="button confirm-pay" href={manageHref}>
+                  <Icon name="tag" size={16} /> See the amount and how to pay
+                </Link>
+              )}
+            </section>
+
+            <section className="confirm-section" aria-labelledby="stay-title">
+              <h2 id="stay-title">
                 {r.slot}
-                {r.nights > 1 ? ` · ${r.nights + 1} days, ${r.nights} nights` : ''}
-              </div>
-              <div className="small muted">
-                From {instantLabel(r.startsAt, page.timezone)} to {instantLabel(r.endsAt, page.timezone)}
-              </div>
-            </div>
-            <Lines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
-            <h3>What happens next</h3>
-            <ol className="next-steps">
-              <li>{businessName} reviews your request.</li>
-              <li>They confirm it and contact you by phone or email, quoting your reference.</li>
-              <li>The date is yours once it is confirmed.</li>
-            </ol>
-            {r.instructions && <div className="instructions">{r.instructions}</div>}
-            <div className="form-footer">
-              {/* The reference only: the guest still types the email or number they booked with (plan Rule 4). */}
-              <Link className="button primary" href={`/t/${slug}/manage?ref=${encodeURIComponent(r.reference)}`}>
-                Manage this booking
-              </Link>
+                {r.nights > 1 ? <span className="muted"> · {r.nights} nights</span> : null}
+              </h2>
+              <CheckTimes
+                checkIn={{ date: instantDate(r.startsAt, page.timezone), time: instantTime(r.startsAt, page.timezone) }}
+                checkOut={{ date: instantDate(r.endsAt, page.timezone), time: instantTime(r.endsAt, page.timezone) }}
+              />
+              <ul className="confirm-rooms">
+                {roomsBooked.map((l) => (
+                  <li key={l.unitId}>
+                    <Icon name="bed" size={16} />
+                    <span className="grow">{l.unit}</span>
+                    <span className="small muted">
+                      {l.guests} {l.guests === 1 ? 'guest' : 'guests'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="confirm-section" aria-labelledby="price-title">
+              <h2 id="price-title">Price</h2>
+              <Lines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
+            </section>
+
+            {r.instructions && (
+              <section className="confirm-section" aria-labelledby="from-title">
+                <h2 id="from-title">From {businessName}</h2>
+                <div className="instructions">{r.instructions}</div>
+              </section>
+            )}
+
+            <div className="form-footer confirm-actions">
               <button type="button" onClick={startOver}>
                 Make another request
               </button>
+              {/* The reference only: the guest still types the email or number they booked with (plan Rule 4). */}
+              <Link className="button primary" href={manageHref}>
+                Manage this booking <Icon name="chevron-right" size={16} />
+              </Link>
             </div>
           </section>
         </main>
@@ -294,6 +450,84 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   }
 
   const canSend = !sending && !!quote.quote && quote.quote.available && !!name && !!phone && !!email;
+
+  // What each step still needs, in words; '' when it is complete. The
+  // server checks all of it again; this only decides when Continue is on.
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const missing = [
+    !checkIn
+      ? 'Choose a date to continue.'
+      : checkIn < page.today || checkIn > page.lastDate
+        ? `Choose a date up to ${dateLabel(page.lastDate)}.`
+        : !nightsValid
+          ? `Choose 1 to ${page.maxNights} night${page.maxNights === 1 ? '' : 's'}.`
+          : closedInStay
+            ? 'That stay includes a closed date.'
+            : '',
+    !roomsComplete
+      ? perRoom
+        ? rooms.length === 0
+          ? 'Choose a room to continue.'
+          : 'Enter the guests for each room.'
+        : 'Enter the number of guests.'
+      : quote.quote && !quote.quote.available
+        ? 'A night in this stay is already booked.'
+        : '',
+    !name.trim() || !phone.trim() ? 'Enter your name and mobile number.' : !emailOk ? 'Enter a valid email address.' : '',
+    '',
+  ];
+  // The furthest step the guest may open: the first one still incomplete.
+  const furthest = missing.findIndex((m) => m !== '');
+  const reachable = (i: number) => furthest === -1 || i <= furthest;
+  const go = (i: number) => {
+    if (!reachable(i)) return;
+    moved.current = true;
+    setStep(i);
+  };
+
+  const STEPS = ['Stay', perRoom ? 'Rooms' : 'Guests', 'Details', 'Review'];
+
+  /** Back and Continue under a step; Continue says what is missing rather than only greying out. */
+  const footer = (i: number) => (
+    <div className="form-footer step-footer">
+      {i > 0 && (
+        <button type="button" onClick={() => go(i - 1)}>
+          <Icon name="chevron-left" size={16} /> Back
+        </button>
+      )}
+      {i < STEPS.length - 1 && (
+        <>
+          {missing[i] && (
+            <span className="step-missing" aria-live="polite">
+              {missing[i]}
+            </span>
+          )}
+          {/* A submit button, so Enter in a field moves on too: send() turns a submit before the review into Continue. */}
+          <button type="submit" className="primary" disabled={missing[i] !== ''}>
+            Continue <Icon name="chevron-right" size={16} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  /** A step's heading: focused when the step opens, so a screen reader hears where it is. */
+  const heading = (i: number, id: string, text: string) => (
+    <h2
+      id={id}
+      tabIndex={-1}
+      ref={(el) => {
+        headings.current[i] = el;
+      }}
+    >
+      {text}
+    </h2>
+  );
+
+  const stayWords =
+    checkIn && end && nightsValid
+      ? `${dateLabel(checkIn)}, ${timeLabel(slot.startTime)} to ${checkOut ? dateLabel(checkOut) : ''}, ${timeLabel(end.time)}`
+      : '';
 
   return (
     <>
@@ -305,13 +539,31 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
           <Link href={`/t/${slug}/manage`}>Already sent one? Manage your booking.</Link>
         </p>
 
-        <form className="book-layout" onSubmit={send}>
+        <nav aria-label="Booking steps">
+          <ol className="stepper">
+            {STEPS.map((label, i) => (
+              <li key={label} className={i === step ? 'current' : i < step || (reachable(i) && missing[i] === '' && i < STEPS.length - 1) ? 'done' : ''}>
+                <button type="button" disabled={!reachable(i)} aria-current={i === step ? 'step' : undefined} onClick={() => go(i)}>
+                  <span className="stepper-num" aria-hidden="true">
+                    {i !== step && missing[i] === '' && reachable(i) && i < STEPS.length - 1 ? <Icon name="check" size={12} /> : i + 1}
+                  </span>
+                  <span className="stepper-label">
+                    <span className="visually-hidden">Step {i + 1}: </span>
+                    {label}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        {/* noValidate: the browser's own check would test the required fields of the HIDDEN steps and
+            refuse silently. Each step's `missing` decides Continue, and the server checks it all again. */}
+        <form className="book-layout" onSubmit={send} noValidate>
           <div className="book-steps">
             {/* 1 · the stay */}
-            <section className="card book-step" aria-labelledby="step-stay">
-              <h2 id="step-stay">
-                <span className="step-number">1</span> Your stay
-              </h2>
+            <section className="card book-step" aria-labelledby="step-stay" hidden={step !== 0}>
+              {heading(0, 'step-stay', 'Your stay')}
               <div className="field-row">
                 {page.slots.length > 1 && (
                   <div className="field">
@@ -368,19 +620,23 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   </div>
                 )}
               </div>
+              {stayWords && (
+                <p className="step-recap">
+                  <Icon name="calendar" size={16} /> {stayWords}
+                </p>
+              )}
               {closedDays.length > 0 && (
                 <div className="small muted">
                   Closed on {closedDays.slice(0, 6).map((c) => dateLabel(c.day)).join(', ')}
                   {closedDays.length > 6 ? `, and ${closedDays.length - 6} more date${closedDays.length === 7 ? '' : 's'}` : ''}.
                 </div>
               )}
+              {footer(0)}
             </section>
 
             {/* 2 · who and where */}
-            <section className="card book-step" aria-labelledby="step-guests">
-              <h2 id="step-guests">
-                <span className="step-number">2</span> {perRoom ? 'Rooms and guests' : 'Guests'}
-              </h2>
+            <section className="card book-step" aria-labelledby="step-guests" hidden={step !== 1}>
+              {heading(1, 'step-guests', perRoom ? 'Rooms and guests' : 'Guests')}
               {!perRoom && (
                 <>
                   <div className="field narrow-field">
@@ -461,13 +717,12 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   </div>
                 </>
               )}
+              {footer(1)}
             </section>
 
             {/* 3 · the customer */}
-            <section className="card book-step" aria-labelledby="step-details">
-              <h2 id="step-details">
-                <span className="step-number">3</span> Your details
-              </h2>
+            <section className="card book-step" aria-labelledby="step-details" hidden={step !== 2}>
+              {heading(2, 'step-details', 'Your details')}
               <div className="field-row">
                 <div className="field grow">
                   <label htmlFor="name">Name</label>
@@ -495,6 +750,64 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   Notes <span className="muted">(optional)</span>
                 </label>
                 <input type="text" id="notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </div>
+              {/* The honeypot: off-screen, not tabbable, not announced. */}
+              <div className="honeypot" aria-hidden="true">
+                <label htmlFor="website">Website</label>
+                <input type="text" id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+              </div>
+              {footer(2)}
+            </section>
+
+            {/* 4 · the review: everything chosen, each part one click from its step */}
+            <section className="card book-step" aria-labelledby="step-review" hidden={step !== 3}>
+              {heading(3, 'step-review', 'Review your request')}
+              <div className="review-list">
+                <div>
+                  <div className="review-label">Stay</div>
+                  <div className="review-value">
+                    <strong>
+                      {slot.name}
+                      {slot.nightly && nightCount > 1 ? ` · ${nightCount} nights` : ''}
+                    </strong>
+                    <span className="small muted">{stayWords}</span>
+                  </div>
+                  <button type="button" className="link" onClick={() => go(0)}>
+                    Edit<span className="visually-hidden"> the stay</span>
+                  </button>
+                </div>
+                <div>
+                  <div className="review-label">{perRoom ? 'Rooms' : 'Guests'}</div>
+                  <div className="review-value">
+                    {perRoom ? (
+                      rooms.map((r) => (
+                        <span key={r.unitId}>
+                          {units.find((u) => u.id === r.unitId)?.name} · {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
+                        </span>
+                      ))
+                    ) : (
+                      <span>
+                        {guests} {guests === '1' ? 'guest' : 'guests'}
+                      </span>
+                    )}
+                  </div>
+                  <button type="button" className="link" onClick={() => go(1)}>
+                    Edit<span className="visually-hidden"> the {perRoom ? 'rooms' : 'guests'}</span>
+                  </button>
+                </div>
+                <div>
+                  <div className="review-label">Contact</div>
+                  <div className="review-value">
+                    <span>{name}</span>
+                    <span className="small muted">
+                      {phone} · {email}
+                    </span>
+                    {notes && <span className="small muted">“{notes}”</span>}
+                  </div>
+                  <button type="button" className="link" onClick={() => go(2)}>
+                    Edit<span className="visually-hidden"> your details</span>
+                  </button>
+                </div>
               </div>
               {promoOpen ? (
                 <div className="field promo-field">
@@ -524,26 +837,23 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   Have a promo code?
                 </button>
               )}
-              {/* The honeypot: off-screen, not tabbable, not announced. */}
-              <div className="honeypot" aria-hidden="true">
-                <label htmlFor="website">Website</label>
-                <input type="text" id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
-              </div>
+              {footer(3)}
             </section>
           </div>
 
           {/* The summary: what is asked for and the SERVER's price, beside the form on a desktop. */}
           <aside className="card book-summary" aria-labelledby="summary-title">
             <h2 id="summary-title">Your request</h2>
-            {checkIn && end && nightsValid ? (
+            {stayWords ? (
               <div className="summary-stay">
                 <div className="summary-stay-title">
                   {slot.name}
                   {slot.nightly && nightCount > 1 ? ` · ${nightCount} nights` : ''}
                 </div>
-                <div className="small muted">
-                  {dateLabel(checkIn)}, {timeLabel(slot.startTime)} to {checkOut ? dateLabel(checkOut) : ''}, {timeLabel(end.time)}
-                </div>
+                <CheckTimes
+                  checkIn={{ date: dateLabel(checkIn), time: timeLabel(slot.startTime) }}
+                  checkOut={{ date: checkOut ? dateLabel(checkOut) : '', time: end ? timeLabel(end.time) : '' }}
+                />
               </div>
             ) : null}
 
@@ -576,11 +886,14 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
               )}
             </div>
 
-            {error && <div className="notice error">{error}</div>}
-
-            <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={!canSend}>
-              {sending ? 'Sending…' : 'Send request'}
-            </button>
+            {step === STEPS.length - 1 && (
+              <>
+                {error && <div className="notice error">{error}</div>}
+                <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={!canSend}>
+                  {sending ? 'Sending…' : 'Send request'}
+                </button>
+              </>
+            )}
             <p className="summary-note">
               A request holds nothing until {businessName} confirms it. Times are in {page.timezone}.
             </p>
@@ -614,25 +927,53 @@ function Lines({
   const multipleUnits = new Set(lines.map((l) => l.unitId)).size > 1;
   return (
     <div className="stay-lines">
-      {dates.map((date) =>
+      {dates.map((date, night) =>
         lines
           .filter((l) => l.date === date)
-          .map((l) => (
-            <div key={`${date}-${l.unitId}`} className="quote-line">
-              <span>
-                {dateLabel(date)}
-                {multipleUnits ? ` · ${l.unit}` : ''}
-                {l.holiday && <span className="holiday-badge">{l.holiday}</span>}
-              </span>
-              <span>
-                {formatMoney(l.basePrice, currency)}
-                {l.extraGuestPrice > 0 && ` + ${formatMoney(l.extraGuestPrice, currency)} extra guests`}
-                {l.surcharge > 0 && ` + ${formatMoney(l.surcharge, currency)} surcharge`}
-                {l.discount > 0 && ` − ${formatMoney(l.discount, currency)} promo`}
-                {l.extraGuestPrice > 0 || l.surcharge > 0 || l.discount > 0 ? ` = ${formatMoney(l.price, currency)}` : ''}
-              </span>
-            </div>
-          )),
+          .map((l) => {
+            // One group per night (and room): the rate on the first line, each
+            // addition or deduction on its own line under it, then the night's
+            // total, the server's `price`, only when something was added.
+            const extras = l.extraGuestPrice > 0 || l.surcharge > 0 || l.discount > 0;
+            return (
+              <div key={`${date}-${l.unitId}`} className="quote-night">
+                <div className="quote-line">
+                  {/* The dates are in Check-in / Check-out above: a night is named by its
+                      number and weekday (weekday and weekend rates differ), not its date again. */}
+                  <span>
+                    {dates.length > 1 ? `Night ${night + 1} · ${weekday(date)}` : multipleUnits ? '' : 'Rate'}
+                    {multipleUnits ? `${dates.length > 1 ? ' · ' : ''}${l.unit}` : ''}
+                    {l.holiday && <span className="holiday-badge">{l.holiday}</span>}
+                  </span>
+                  <span>{formatMoney(l.basePrice, currency)}</span>
+                </div>
+                {l.extraGuestPrice > 0 && (
+                  <div className="quote-line quote-sub">
+                    <span>Extra guests</span>
+                    <span>+{formatMoney(l.extraGuestPrice, currency)}</span>
+                  </div>
+                )}
+                {l.surcharge > 0 && (
+                  <div className="quote-line quote-sub">
+                    <span>Holiday surcharge</span>
+                    <span>+{formatMoney(l.surcharge, currency)}</span>
+                  </div>
+                )}
+                {l.discount > 0 && (
+                  <div className="quote-line quote-sub quote-discount">
+                    <span>Promo</span>
+                    <span>−{formatMoney(l.discount, currency)}</span>
+                  </div>
+                )}
+                {extras && (
+                  <div className="quote-line quote-sub quote-subtotal">
+                    <span>{multipleUnits ? 'Room total' : 'Night total'}</span>
+                    <span>{formatMoney(l.price, currency)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          }),
       )}
       {discount > 0 && (
         <div className="quote-line quote-discount">

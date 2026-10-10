@@ -352,9 +352,13 @@ dialog.drawer[open] { animation: drawer-in var(--dur) var(--ease); }
 
 /* --- tabs (components/tabs.tsx, plan/ui-components.md Phase 5) ----------
    A row of quiet labels on a hairline; the selected one underlined in the
-   accent. A phone scrolls the row sideways rather than wrapping it. */
-.tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-4); border-bottom: 1px solid var(--line); overflow-x: auto; }
-.tabs [role="tab"] { min-height: 40px; margin-bottom: -1px; padding: 0 var(--space-3); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); }
+   accent. A phone scrolls the row sideways rather than wrapping it.
+   The hairline is an inset shadow, not a border the tabs overlap with a
+   -1px margin: that 1px overflowed, and overflow-x: auto makes the row
+   scroll on y too, so it showed a vertical scrollbar. A tab's own border
+   paints over its parent's shadow. */
+.tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-4); box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; overflow-y: hidden; }
+.tabs [role="tab"] { min-height: 40px; padding: 0 var(--space-3); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); }
 .tabs [role="tab"]:hover:not(:disabled) { background: transparent; color: var(--ink); }
 .tabs [role="tab"][aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 .tab-panel:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: var(--radius-md); }

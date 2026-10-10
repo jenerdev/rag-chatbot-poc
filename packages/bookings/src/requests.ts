@@ -37,7 +37,7 @@ import type {
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { discountLines, optionalCode, promoForStay, promoMessage } from './promos.js';
-import { addDays, lastBookingDate, localDate, pageSettings, parseRequest } from './validate.js';
+import { addDays, lastBookingDate, localDate, pageSettings, parseRequest, paymentFlow } from './validate.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -105,6 +105,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
     maxNights: config.maxStayNights,
     instructions: settings.instructions,
     guestHint: settings.guestHint,
+    payment: paymentFlow(app.data.config),
     slots: slots.filter((s) => offered.has(s.id)),
     units: priced,
     calendar: await listCalendar(tenant, { from: today, to: lastDate }),

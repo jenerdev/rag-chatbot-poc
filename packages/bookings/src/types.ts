@@ -409,6 +409,8 @@ export interface BookingPage {
   maxNights: number;
   instructions: string | null;
   guestHint: string | null;
+  /** how a request is paid and confirmed (policy, no amounts); null when the tenant takes no payment on the page */
+  payment: PaymentFlow | null;
   slots: SlotSummary[];
   units: {
     id: number;
@@ -422,6 +424,18 @@ export interface BookingPage {
   }[];
   /** holiday and peak days from today to lastDate */
   calendar: CalendarDay[];
+}
+
+/** How a request gets paid and confirmed (manage-booking D-105 to D-107): policy only, never an amount. */
+export interface PaymentFlow {
+  /** true when a deposit (a fixed amount or a percentage) confirms the stay, false when the full price does */
+  deposit: boolean;
+  /** pay within this many hours of the request, or it expires; null = no deadline */
+  payWithinHours: number | null;
+  /** staff check a proof within this many hours; null = not stated */
+  reviewWithinHours: number | null;
+  /** D-106: when the dates are held for the guest */
+  hold: 'none' | 'on_proof' | 'on_request';
 }
 
 /** One unit on one night of a request or a quote. */

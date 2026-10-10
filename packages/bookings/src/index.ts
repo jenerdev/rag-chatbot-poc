@@ -114,7 +114,7 @@ export {
 export type { PaymentRow, PaymentSettings, Review, StayEvent } from './payment-review.js';
 export { closedDays } from './closed.js';
 export { calendarDayBookings, calendarDays, calendarSlots } from './occupancy.js';
-export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, sniffImageType, validateRange } from './validate.js';
+export { addDays, isIsoDate, lastBookingDate, localDate, normaliseEmail, normalisePhone, parseRequest, paymentFlow, sniffImageType, validateRange } from './validate.js';
 
 export type {
   Accommodation,
@@ -125,6 +125,7 @@ export type {
   PromoForStay,
   PromoKind,
   BookingPage,
+  PaymentFlow,
   BookingRequest,
   BookingStatus,
   CalendarDay,
