@@ -3077,6 +3077,51 @@ async function manageBookingChecks() {
         `${w.error?.message ?? w.ref} · ${set.error ? `${set.error.code} ${set.error.message}` : `UPDATED ${set.data.length}`}`,
       );
     }
+
+    // 165–167 are schema-staff-terms.sql (D-113): a staff stay born pending
+    // while the tenant takes payments is tracked like a web one; a walk-in
+    // is tracked with no deadline; one born confirmed (the tools' seeds) is
+    // not tracked.
+    {
+      await setPay('none');
+      const staffStay = async (day, walkIn, status = 'pending') => {
+        const group = randomUUID();
+        const r = await staff.from('bookings').insert([{
+          tenant_id: probe.id, unit_id: unit.A, slot_id: slotRow.id, booked_date: day, status, guest_count: 1,
+          guest_name: 'Terms Probe', guest_phone: '09170000165', guest_email: 'terms.probe@example.com', group_id: group, walk_in: walkIn,
+        }]).select('price');
+        const { data: s } = await supabase.from('stays').select('reference, required_amount, pay_by').eq('tenant_id', probe.id).eq('group_id', group).maybeSingle();
+        return { error: r.error, price: r.data?.[0]?.price, ...s };
+      };
+      const hours = (iso) => (iso ? (Date.parse(iso) - Date.now()) / 3_600_000 : null);
+
+      // 165. pending, not a walk-in: the amount and pay_by (24 h), and the
+      //      guest's own read says so.
+      const plain = await staffStay('2027-09-20', false);
+      const seen = plain.reference ? (await lookup(plain.reference, 'terms.probe@example.com')).data : null;
+      check(
+        !plain.error && plain.price > 0 && plain.required_amount === plain.price && Math.abs(hours(plain.pay_by) - 24) < 0.1 /* the database's clock, not this machine's */
+          && seen?.payment?.status === 'unpaid' && seen.pay_by !== null,
+        'staff terms: a pending staff stay is tracked like a web one (the full price due, pay_by in 24 h, the guest sees unpaid and a deadline)',
+        `${plain.error?.message ?? `price ${plain.price} required ${plain.required_amount} pay_by in ${hours(plain.pay_by)?.toFixed(2)} h`} · guest ${seen?.payment?.status} pay_by ${seen?.pay_by}`,
+      );
+
+      // 166. a walk-in: the amount, no deadline.
+      const walk = await staffStay('2027-09-27', true);
+      check(
+        !walk.error && walk.required_amount === walk.price && walk.pay_by === null,
+        'staff terms: a walk-in is tracked with no deadline (required set, pay_by null)',
+        `${walk.error?.message ?? `required ${walk.required_amount} of ${walk.price} · pay_by ${walk.pay_by}`}`,
+      );
+
+      // 167. born confirmed (what the tools seed): not tracked.
+      const seeded = await staffStay('2027-10-04', false, 'confirmed');
+      check(
+        !seeded.error && seeded.required_amount === null && seeded.pay_by === null,
+        'staff terms: a staff stay born confirmed is not tracked',
+        `${seeded.error?.message ?? `required ${seeded.required_amount} · pay_by ${seeded.pay_by}`}`,
+      );
+    }
   } catch (error) {
     check(false, 'manage: probe setup', error.message);
   } finally {

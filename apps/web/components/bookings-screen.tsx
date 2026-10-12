@@ -2,9 +2,9 @@
 
 // S-3 · Bookings. ONE list of stays, one row per reference (D-100): every web
 // request and staff booking that has not ended, or the last 90 days too, with
-// search, a status filter and (per_room) a room filter. Pending stays are
-// confirmed or declined here; a confirmed one is cancelled here, whole. Dates
-// at a glance are the Calendar's (S-12); this screen no longer draws a grid.
+// search, a status filter and (per_room) a room filter. A row opens the
+// stay's own page (S-15, D-114), where every action is taken; this list has
+// no buttons. Dates at a glance are the Calendar's (S-12).
 //
 // Rendered by app/t/[tenant]/admin/bookings/page.tsx, which has already
 // checked on the server that the tenant exists and has the bookings
@@ -26,11 +26,11 @@
 // night-by-night price (StayLines, the page's own), and a Walk in label.
 //
 // The look (plan/ui-refresh.md Phase 7): "New booking" is a side panel opened
-// beside the page title; every decision (confirm, decline, cancel) asks in a
-// dialog with an optional note (D-096); search and the filters narrow the
-// rows already loaded, on screen only.
+// beside the page title, and a stay booked there opens on its own page;
+// search and the filters narrow the rows already loaded, on screen only.
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   Accommodation,
@@ -48,7 +48,7 @@ import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
-import { Drawer, useConfirmDialog } from '@/components/dialogs';
+import { Drawer } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
@@ -137,28 +137,14 @@ function stayState(stay: BookingRequest, today: string): { label: string; tone: 
   }
 }
 
-/** One stay: when, who, what, the stored total, its badges, and what staff can do with it now. */
-function StayRow({
-  stay,
-  today,
-  currency,
-  busy,
-  onDecide,
-}: {
-  stay: BookingRequest;
-  today: string;
-  currency: string;
-  busy: boolean;
-  onDecide: (stay: BookingRequest, action: 'confirm' | 'decline' | 'cancel') => void;
-}) {
+/** One stay: when, who, what, the stored total and its badges. The whole row opens the stay's page (S-15). */
+function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today: string; currency: string; href: string }) {
   const pending = stay.status === 'pending';
   const state = stayState(stay, today);
   const checkOut = addDays(stay.checkIn, stay.nights);
-  // A confirmed stay can be cancelled until it is over; the server frees its nights.
-  const cancellable = stay.status === 'confirmed' && checkOut > today;
-  const live = pending || cancellable;
+  const live = pending || (stay.status === 'confirmed' && checkOut > today);
   return (
-    <div className={`booking stay-row${live ? '' : ' decided'}`}>
+    <Link href={href} className={`booking stay-row${live ? '' : ' decided'}`} aria-label={`${stay.reference}, ${stay.guestName}, ${state.label}`}>
       <div className="stay-when">
         <span className="stay-dates">
           {stay.nights > 1 ? `${dayLabel(stay.checkIn)} – ${dayLabel(checkOut)}` : dayLabel(stay.checkIn)}
@@ -203,25 +189,7 @@ function StayRow({
       </div>
       <div className="stay-end">
         {stay.total !== null && <strong className="stay-total">{formatMoney(stay.total, currency)}</strong>}
-        {live && (
-          <span className="booking-actions">
-            {pending ? (
-              <>
-                {/* D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21). */}
-                <button type="button" className="primary sm" disabled={busy || stay.clash || stay.closed} onClick={() => onDecide(stay, 'confirm')}>
-                  Confirm
-                </button>
-                <button type="button" className="sm" disabled={busy} onClick={() => onDecide(stay, 'decline')}>
-                  Decline
-                </button>
-              </>
-            ) : (
-              <button type="button" className="sm" disabled={busy} onClick={() => onDecide(stay, 'cancel')}>
-                Cancel
-              </button>
-            )}
-          </span>
-        )}
+        <Icon name="chevron-right" size={18} />
       </div>
       {pending && stay.clash && <div className="booking-notes request-clash">A night of this stay is already taken by another booking.</div>}
       {pending && stay.closed && (
@@ -235,12 +203,13 @@ function StayRow({
           {stay.status === 'cancelled' ? 'Cancelled' : stay.status === 'expired' ? 'Expired' : 'Confirmed'}: {stay.decisionNote}
         </div>
       )}
-    </div>
+    </Link>
   );
 }
 
 export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: BookingsScreenProps) {
   const api = `/api/t/${slug}`;
+  const router = useRouter();
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, from the session check. Hides the tabs a role cannot
   // open (the routes behind them refuse anyway, with a 403 that names why).
@@ -287,7 +256,6 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
 
   // The decisions' dialog (D-096's note), the New booking panel, and the
   // list's status filter, which only narrows what is drawn.
-  const { ask, dialog } = useConfirmDialog();
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'expired'>('all');
@@ -491,7 +459,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setNights('1');
         setWalkIn(false);
         setFormOpen(false);
-        void load();
+        // The new stay opens on its own page, where it is confirmed (D-114).
+        if (first?.reference) router.push(`/t/${slug}/admin/bookings/${first.reference}`);
+        else void load();
       } catch (error) {
         // A 409 lands here with the server's own sentence: "That slot on …
         // overlaps an existing booking.", or since D-099 the trigger's
@@ -502,52 +472,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         setBusy(false);
       }
     },
-    [api, date, guestEmail, guestName, guestPhone, load, nightCount, notes, perRoom, promoId, setNotice, setup, slotId, stayRooms, unauthorized, walkIn],
-  );
-
-  const decide = useCallback(
-    async (req: BookingRequest, action: 'confirm' | 'decline' | 'cancel') => {
-      const what = `${req.reference} for ${req.guestName}`;
-      const when = `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}${req.nights > 1 ? `, ${req.nights} nights` : ''}.`;
-      // D-096: the dialog is both the confirmation and the note.
-      const note = await ask(
-        action === 'confirm'
-          ? { title: `Confirm ${req.reference}?`, body: `${when} Confirming books the dates; then contact the guest.`, noteLabel: 'Note', actionLabel: 'Confirm' }
-          : action === 'cancel'
-            ? { title: `Cancel ${req.reference}?`, body: `${when} Every night is freed once it is cancelled.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
-            : { title: `Decline ${req.reference}?`, body: when, noteLabel: 'Reason, shown to the guest', actionLabel: 'Decline', danger: true },
-      );
-      if (note === null) return;
-      setNotice(null);
-      setBusy(true);
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${api}/bookings/requests/${req.groupId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, note }),
-        });
-        if (response.status === 401) return unauthorized();
-        if (!response.ok) throw new Error('failed');
-        setNotice({
-          message:
-            action === 'confirm'
-              ? `Confirmed ${what}. The dates are now booked; contact the guest at ${req.guestPhone ?? req.guestEmail}.`
-              : action === 'cancel'
-                ? `Cancelled ${what}. Its nights are free again.`
-                : `Declined ${what}.`,
-          kind: 'ok',
-        });
-        void load();
-      } catch (error) {
-        // A 409 arrives with the server's own sentence and is not rephrased.
-        setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
-        void load();
-      } finally {
-        setBusy(false);
-      }
-    },
-    [api, ask, load, unauthorized],
+    [api, date, guestEmail, guestName, guestPhone, load, nightCount, notes, perRoom, promoId, router, setNotice, setup, slotId, slug, stayRooms, unauthorized, walkIn],
   );
 
   // The list as drawn: status, room and search narrow what was loaded; then
@@ -608,8 +533,6 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   return (
     <>
       <StaffFrame {...frame} actions={newBooking}>
-        {dialog}
-
         <section className="card stays">
           <div className="range-head">
             <h2>Stays</h2>
@@ -666,7 +589,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           ) : (
             <>
               {visible.slice(0, shown).map((st) => (
-                <StayRow key={st.groupId} stay={st} today={setup.today} currency={setup.currency} busy={busy} onDecide={decide} />
+                <StayRow key={st.groupId} stay={st} today={setup.today} currency={setup.currency} href={`/t/${slug}/admin/bookings/${st.reference}`} />
               ))}
               {visible.length > shown && (
                 <div className="list-more">
@@ -882,7 +805,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   <input type="checkbox" checked={walkIn} onChange={(e) => setWalkIn(e.target.checked)} />
                   <span className="room-pick-text">
                     <span className="room-pick-name">Walk in</span>
-                    <span className="small muted">The guest is here in person. It still waits for Confirm, like any booking.</span>
+                    <span className="small muted">The guest is here in person, so there is no deadline to pay. Confirm it once they have paid.</span>
                   </span>
                 </label>
                 {/* A walk-in usually starts today; one click, never automatic. */}

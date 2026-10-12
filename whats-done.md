@@ -8440,3 +8440,126 @@ nights. Screenshots: harbor with three seeded stays at 1280 and 390 px; the
 
 **Traps it avoided:** the status filter overflowed a phone's width (the
 first 390 px shot was 414 px wide); it now scrolls inside its own box.
+
+## 2026-10-12 — staff stays are paid for; a walk-in has no deadline (D-113)
+
+**What was done:** a new statement trigger, `bookings_set_staff_terms`,
+sets a pending staff stay's amount due and pay-by deadline from the
+tenant's payment settings, exactly as `bookings_set_terms` does for web
+stays; a walk-in gets the amount and no deadline. No function was
+redefined. The drawer's Walk in hint now says there is no deadline.
+
+**Why it matters:** staff bookings were never tracked, so Manage booking
+showed no amount, no deadline and no countdown, and they never expired.
+
+**What the observed values prove:** verify 165 (a pending staff stay on a
+₱1,000.00 night: 100000 due, pay_by 24.00 h away, the guest's read says
+unpaid with a pay_by), 166 (a walk-in: 100000 due, pay_by null), 167 (born
+confirmed: nothing set). The first run of 165 failed on a deadline 24.00 h
+away by the database's clock, a hair over by this machine's; the check now
+allows 0.1 h either way.
+
+**Traps it avoided:** a twin trigger instead of a new `bookings_set_terms`,
+so re-running `schema-manage-booking.sql` cannot undo it (trap 20); seeds
+born confirmed stay untracked, so no tool fixture now needs a payment.
+
+## 2026-10-12 — every action on a stay is on its own page (D-114)
+
+**What was done:** a booking detail page (S-15) at
+`/t/<slug>/admin/bookings/<reference>`, built from one server read
+(`stayDetail()`): the stay's head (reference, status, source, walk-in,
+payment, guest, dates, total), a "What this booking needs" section with
+only the actions that apply, then Stay (rooms, the stored night-by-night
+price), Guest, Payment (needed, received, balance, deadlines, every proof
+and refund), Change requests and History. The Bookings list rows and the
+Payments queues became links to it; their buttons and drawers are gone.
+
+**Why it matters:** a decision is made with everything about the stay in
+view, in one place, and a button is never offered for something that does
+not apply.
+
+**What the observed values prove:** the browser walk (7/7): no button in
+any list row; a pending stay shows exactly Decline and Confirm; after
+Confirm through the dialog (with a note) the page reads Confirmed and
+offers only Cancel stay; a declined stay has no action section; a staff
+member sees Cancel stay; "No such booking" for an unknown reference; the
+390 px page is 390 px wide.
+
+**Not yet seen:** a proof review and a change request on the page; no stay
+holds a proof or a change request right now.
+
+## 2026-10-12 — the booking page, redesigned
+
+**What was done:** the page leads with the booking at a glance: status
+(Declined, not Cancelled, for a stay never confirmed: `declined` from the
+event log), guest, rooms and guests, check-in and check-out with their
+TIMES (`startsAt`/`endsAt` from the stored spans), the total and payment
+status, and, for a decided stay, how it ended with when and the note. The
+reference is the page title, with Copy and the way back beside it. "Next
+step" names each action ("Confirm or decline this booking", "Check the
+proof of payment", "Return the guest's money"); the guest's pay-by time is
+said there. Below: Price, Change requests and History as a newest-first
+timeline in plain words ("Declined: “fully booked”", not "pending →
+cancelled"), beside Contact (call and email buttons) and Payment (a
+progress bar beside the server's figures). On a phone the cards reorder:
+price, contact, payment, then history.
+
+**Why it matters:** the first version repeated the reference and the
+name, hid a declined stay's reason at the bottom, gave no times, and wrote
+the history in status codes.
+
+**What the observed values prove:** screenshots at 1280 and 390 px of a
+pending, a confirmed and a declined stay; the walk still 7/7; `statusWords`
+and `eventWords` tested (web 123).
+
+## 2026-10-12 — proofs of payment open in a popup, not a new tab
+
+**What was done:** a shared proof viewer: a thumbnail (the image, or a PDF
+tile) that opens a popup on the page, a modal `<dialog>` holding the image
+or the PDF in a frame, closed by ×, Escape or the backdrop. Staff see the
+stored proof in the booking's Review proof drawer; a guest sees the file
+they picked on Manage booking before sending it ("Check it shows the
+amount and the date"), from the browser's memory.
+
+**Why it matters:** staff had to open a new tab to see a proof and come
+back to verify it; a guest could not check what they were about to send.
+
+**What the observed values prove:** the walk (8/8) on alteza with a real
+booking-page request and a real proof: the guest's thumbnail and popup
+load the image; the staff drawer's thumbnail loads from the signed link;
+the popup is the topmost element above the drawer; Escape closes the popup
+and leaves the drawer open; no window is opened; no console error.
+
+**Traps it avoided:** (1) the drawer is a modal dialog in the top layer, so
+the popup had to be one too; a plain overlay would have stayed under it.
+(2) Escape closed both dialogs in the first runs: Chrome groups dialogs
+opened without user activation, and the walk's scripted `.click()` had
+none; with real mouse events they close one at a time. The viewer also
+stops its events from reaching the drawer through React. (3) The dev
+overlay's "2 Issues" was React refusing a `<dialog>` inside a `<p>`; the
+walk now fails on any console error.
+
+**Known limit:** a guest cannot see a proof again after sending it (the
+bucket is insert-only for guests, D-107); showing it would need a new,
+reviewed way to sign a guest's own file.
+
+## 2026-10-12 — Review the proof, redesigned
+
+**What was done:** the drawer is one decision in order: the proof large at
+the top (click for the popup); "The guest says" (amount, method, date,
+transaction, sent) beside "This booking" (needed to confirm, received so
+far, total, decide by); "Is the money in the account?" as two radio cards,
+Verify or Reject; then only the chosen side's fields: the amount found
+(₱-prefixed, prefilled from the claim) and "I checked the account", or the
+reason the guest reads, with four quick picks that fill it. The footer
+stays in view with Cancel and the decision's button(s), and says what is
+missing ("Tick the box once you have seen the money", "Write the reason
+the guest will read").
+
+**Why it matters:** one Note field meant two things, three buttons went
+grey without a reason, and the proof was a small thumbnail.
+
+**What the observed values prove:** the walk (12/12) rejected a real proof
+through the panel: Reject proof stayed disabled until a reason, the first
+quick pick filled "The money is not in the account.", and the stored row
+reads `rejected` with exactly that reason; no console error.

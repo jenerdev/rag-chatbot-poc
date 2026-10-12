@@ -27,6 +27,14 @@ const PATHS = {
       <path d="M13 7V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v6.5A1.5 1.5 0 005 13h2" />
     </>
   ),
+  // A handset, and an envelope: the guest's two contacts on a booking's page (D-114).
+  phone: <path d="M6.5 3.5H4.8a1.3 1.3 0 00-1.3 1.4c.6 6.2 5.4 11 11.6 11.6a1.3 1.3 0 001.4-1.3v-1.7l-3.2-1.3-1.6 1.6a9 9 0 01-4.6-4.6l1.6-1.6z" />,
+  mail: (
+    <>
+      <rect x="3" y="5" width="14" height="10" rx="1.5" />
+      <path d="M3.5 6l6.5 5 6.5-5" />
+    </>
+  ),
   search: (
     <>
       <circle cx="9" cy="9" r="5.5" />

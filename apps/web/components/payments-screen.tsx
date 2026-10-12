@@ -1,16 +1,15 @@
 'use client';
 
-// S-14 · Payments (plan/manage-booking.md Phase 4). Three tabs:
+// S-14 · Payments (plan/manage-booking.md Phase 4). Four tabs:
 //
-//   To verify   the proofs guests sent, oldest first. Open one to see the
-//               proof (a 5-minute signed link, asked for when the drawer
-//               opens), then VERIFY with the amount you found in the account
-//               and "I checked the account", or REJECT with the reason the
-//               guest reads. "Verify and confirm" does both in one database
-//               transaction when the amount is enough (plan § 1).
-//   All payments  the latest payments and refunds, decided or not; a stay's
-//               history and "Record a refund" open from any row.
+//   To verify   the proofs guests sent, oldest first.
+//   All payments  the latest payments and refunds, decided or not.
+//   Change requests  guests' requests to cancel or move a stay.
 //   Settings    the ways to pay, the fee, the terms (owners and admins).
+//
+// The first three are QUEUES (D-114): a row opens its booking's page
+// (S-15), where the proof is reviewed, the request decided and a refund
+// recorded. Nothing is acted on here but the settings.
 //
 // Every member reads (payments:read); only owners and admins decide or
 // change settings (payments:write, payments:settings, § 9 q4). The buttons a
@@ -19,12 +18,12 @@
 // No money is added up here: every figure is stay_payment()'s or a stored
 // row's. Amounts are typed as pesos and parsed by string (lib/money.ts).
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { ChangeRow, PaymentRow, PaymentSettings, StayEvent } from '@rag/bookings';
+import type { ChangeRow, PaymentRow, PaymentSettings } from '@rag/bookings';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
-import { Drawer } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
@@ -33,6 +32,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { centavosToInput, formatMoney, parseMoneyInput } from '@/lib/money';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { parsePercentInput, percentToInput } from '@/lib/percent';
+import { STAY_PAYMENT, when } from '@/lib/stay-words';
 
 export interface PaymentsScreenProps {
   slug: string;
@@ -45,38 +45,6 @@ export interface PaymentsScreenProps {
 }
 
 type Auth = 'checking' | 'out' | 'in';
-
-const STAY_PAYMENT: Record<string, string> = {
-  not_tracked: 'Not tracked',
-  unpaid: 'Unpaid',
-  submitted: 'Proof to check',
-  rejected: 'Proof rejected',
-  partially_paid: 'Partly paid',
-  paid: 'Paid',
-  refunded: 'Refunded',
-};
-
-function when(iso: string, timezone: string): string {
-  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: timezone });
-}
-
-/** One event of a stay's history, in words. */
-function eventWords(e: StayEvent, currency: string): string {
-  if (e.kind === 'created') return `Booked (${e.note === 'web' ? 'from the booking page' : 'by staff'}), ${e.to}`;
-  if (e.kind === 'status') return `${e.from} → ${e.to}${e.note ? `: ${e.note}` : ''}`;
-  if (e.kind === 'change') {
-    const [kind, status] = (e.to ?? '').split(':');
-    const what = kind === 'cancel' ? 'cancel' : `move${e.note && status === 'pending' ? ` to ${e.note}` : ''}`;
-    return status === 'pending' ? `Asked to ${what}` : `Request to ${kind === 'cancel' ? 'cancel' : 'move'} ${status}${status !== 'pending' && e.note ? `: ${e.note}` : ''}`;
-  }
-  const amount = e.amount !== null ? ` ${formatMoney(e.amount, currency)}` : '';
-  const [kind, status] = (e.to ?? '').split(':');
-  if (kind === 'refund') return `Refund recorded${amount}`;
-  if (status === 'submitted') return `Proof sent${amount}${e.note ? ` by ${e.note}` : ''}`;
-  if (status === 'verified') return `Payment verified${amount}`;
-  if (status === 'rejected') return `Proof rejected${e.note ? `: ${e.note}` : ''}`;
-  return `${e.from ?? ''} → ${e.to ?? ''}`;
-}
 
 interface SettingsDraft {
   methods: { kind: 'gcash' | 'bank' | 'other'; label: string; accountName: string; accountNumber: string; instructions: string }[];
@@ -123,26 +91,12 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   const [open, setOpen] = useState<PaymentRow[] | null>(null);
   const [all, setAll] = useState<PaymentRow[] | null>(null);
   const [changes, setChanges] = useState<ChangeRow[] | null>(null);
-  const [changeNote, setChangeNote] = useState<Record<number, string>>({});
   const [settings, setSettings] = useState<PaymentSettings | null | undefined>(undefined);
   const [draft, setDraft] = useState<SettingsDraft>(toDraft(null));
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
 
-  // The review drawer: one payment, its proof's signed link, the form.
-  const [selected, setSelected] = useState<PaymentRow | null>(null);
-  const [proof, setProof] = useState<string | null>(null);
-  const [amount, setAmount] = useState('');
-  const [checked, setChecked] = useState(false);
-  const [note, setNote] = useState('');
-  // The history drawer, and the refund form inside it.
-  const [historyOf, setHistoryOf] = useState<PaymentRow | null>(null);
-  const [history, setHistory] = useState<StayEvent[] | null>(null);
-  const [refund, setRefund] = useState({ amount: '', method: '', note: '' });
-
-  const drawerOpen = selected !== null || historyOf !== null;
-  const { notice, setNotice } = useNotice(drawerOpen);
-  const canWrite = role !== null && can(role, 'payments:write');
+  const { setNotice } = useNotice(false);
   const canSettings = role !== null && can(role, 'payments:settings');
 
   const unauthorized = useCallback(() => {
@@ -222,47 +176,6 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
     }
   }
 
-  async function openReview(p: PaymentRow) {
-    setSelected(p);
-    setProof(null);
-    setAmount(centavosToInput(p.claimedAmount));
-    setChecked(false);
-    setNote('');
-    setNotice(null);
-    if (p.hasProof) {
-      const r = await fetch(`${api}/payments/${p.id}/proof`).catch(() => null);
-      if (r?.ok) setProof(((await r.json()) as { url: string }).url);
-    }
-  }
-
-  async function review(action: 'verify' | 'reject', confirm = false) {
-    if (!selected) return;
-    const done =
-      action === 'reject'
-        ? `Rejected ${selected.reference}'s proof. The guest sees your reason.`
-        : confirm
-          ? `Verified and confirmed ${selected.reference}.`
-          : `Verified ${selected.reference}'s payment.`;
-    const result = await write('PATCH', `/payments/${selected.id}`, { action, amount, accountChecked: checked, note: note.trim() || null, confirm }, done);
-    if (result) setSelected(null);
-  }
-
-  async function openHistory(p: PaymentRow) {
-    setHistoryOf(p);
-    setHistory(null);
-    setRefund({ amount: '', method: '', note: '' });
-    setNotice(null);
-    const r = await fetch(`${api}/stays/${p.groupId}/history`).catch(() => null);
-    setHistory(r?.ok ? await r.json() : []);
-  }
-
-  async function saveRefund(event: React.FormEvent) {
-    event.preventDefault();
-    if (!historyOf) return;
-    const result = await write('POST', '/payments/refund', { groupId: historyOf.groupId, ...refund }, `Recorded a refund on ${historyOf.reference}.`);
-    if (result) setHistoryOf(null);
-  }
-
   async function saveSettings(event: React.FormEvent) {
     event.preventDefault();
     const value = draft.feeKind === 'fixed' ? parseMoneyInput(draft.feeValue) : draft.feeKind === 'percent' ? parsePercentInput(draft.feeValue) : 0;
@@ -316,6 +229,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
     );
   }
 
+  const bookingHref = (reference: string) => `/t/${slug}/admin/bookings/${reference}`;
   const row = (p: PaymentRow, showReview: boolean) => (
     <div key={p.id} className="list-row">
       <span className="list-row-lead">{when(p.createdAt, timezone)}</span>
@@ -334,14 +248,10 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
         {p.status === 'submitted' ? ' claimed' : ''}
       </span>
       <span className="list-row-actions">
-        {showReview && (
-          <button type="button" className="sm primary" onClick={() => void openReview(p)}>
-            Review
-          </button>
-        )}
-        <button type="button" className="sm" onClick={() => void openHistory(p)}>
-          History
-        </button>
+        {/* Every action on a stay is on its page (D-114). */}
+        <Link className={`button sm${showReview ? ' primary' : ''}`} href={bookingHref(p.reference)}>
+          {showReview ? 'Review on the booking' : 'Open booking'}
+        </Link>
       </span>
     </div>
   );
@@ -355,8 +265,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
     <section className="card">
       <h2>Proofs to verify</h2>
       <p className="small muted">
-        A screenshot proves nothing by itself. Check that the money is in the account, then type the amount you found.
-        {!canWrite && ' Only an owner or admin can verify or reject a proof.'}
+        Open a booking to see its proof and verify or reject it there. A screenshot proves nothing by itself: check the account first.
       </p>
       {open === null ? (
         <LoadState load={loadState} what="payments" onRetry={retry} />
@@ -521,14 +430,12 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
     </section>
   );
 
-  const enoughIfVerified = selected && selected.payment.required !== null;
-
   const changesPanel = (
     <section className="card">
       <h2>Change requests</h2>
       <p className="small muted">
-        Guests ask to cancel or move a stay from the Manage booking page. Nothing changes until you approve. A refund due is yours to pay
-        and then record (History, Record a refund).{!canWrite && ' Only an owner or admin can decide.'}
+        Guests ask to cancel or move a stay from the Manage booking page. Nothing changes until you approve it on the booking's page,
+        where a refund due is recorded too.
       </p>
       {changes === null ? (
         <LoadState load={loadState} what="change requests" onRetry={retry} />
@@ -555,40 +462,11 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
                   ? `${c.quotedDifference > 0 ? '+' : '−'}${formatMoney(Math.abs(c.quotedDifference), currency)}`
                   : 'same price'}
             </span>
-            {c.status === 'pending' && canWrite && (
-              <span className="list-row-actions">
-                <input
-                  aria-label={`Note for ${c.reference}`}
-                  placeholder="Note (required to reject)"
-                  maxLength={500}
-                  value={changeNote[c.id] ?? ''}
-                  onChange={(e) => setChangeNote({ ...changeNote, [c.id]: e.target.value })}
-                />
-                <button
-                  type="button"
-                  className="sm danger"
-                  disabled={busy || !(changeNote[c.id] ?? '').trim()}
-                  onClick={() => void write('PATCH', `/payments/changes/${c.id}`, { action: 'reject', note: changeNote[c.id] }, `Rejected ${c.reference}'s request. The guest sees your note.`)}
-                >
-                  Reject
-                </button>
-                <button
-                  type="button"
-                  className="sm primary"
-                  disabled={busy}
-                  onClick={() =>
-                    void write(
-                      'PATCH',
-                      `/payments/changes/${c.id}`,
-                      { action: 'approve', note: (changeNote[c.id] ?? '').trim() || null },
-                      c.kind === 'cancel' ? `Cancelled ${c.reference}. Record the refund once you have paid it.` : `Moved ${c.reference} to ${c.newCheckIn}.`,
-                    )
-                  }
-                >
-                  Approve
-                </button>
-              </span>
-            )}
+            <span className="list-row-actions">
+              <Link className={`button sm${c.status === 'pending' ? ' primary' : ''}`} href={bookingHref(c.reference)}>
+                {c.status === 'pending' ? 'Decide on the booking' : 'Open booking'}
+              </Link>
+            </span>
           </div>
         ))
       )}
@@ -597,143 +475,6 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
 
   return (
     <StaffFrame {...frame}>
-      <Drawer open={selected !== null} title={selected ? `Proof for ${selected.reference}` : 'Proof'} onClose={() => setSelected(null)}>
-        {selected && (
-          <>
-            <div className="stay-lines">
-              <div className="quote-line">
-                <span>Guest</span>
-                <span>{selected.guestName}</span>
-              </div>
-              <div className="quote-line">
-                <span>Claimed</span>
-                <span>
-                  {formatMoney(selected.claimedAmount, currency)} by {selected.method} on {selected.paidOn}
-                </span>
-              </div>
-              {selected.payerReference && (
-                <div className="quote-line">
-                  <span>Transaction</span>
-                  <span>{selected.payerReference}</span>
-                </div>
-              )}
-              {enoughIfVerified && (
-                <div className="quote-line">
-                  <span>Needed to confirm</span>
-                  <span>
-                    {formatMoney(selected.payment.required!, currency)} (received so far {formatMoney(selected.payment.received, currency)})
-                  </span>
-                </div>
-              )}
-            </div>
-            <p>
-              {selected.hasProof ? (
-                proof ? (
-                  <a className="button" href={proof} target="_blank" rel="noopener noreferrer">
-                    <Icon name="file" size={16} /> Open the proof (link lasts 5 minutes)
-                  </a>
-                ) : (
-                  <span className="small muted">Getting the proof…</span>
-                )
-              ) : (
-                <span className="small muted">No file.</span>
-              )}
-            </p>
-            {canWrite ? (
-              <form onSubmit={(e) => e.preventDefault()}>
-                <div className="field-row">
-                  <div className="field narrow">
-                    <label htmlFor="verified-amount">Amount found ({currency})</label>
-                    <input id="verified-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                  </div>
-                  <div className="field grow">
-                    <label htmlFor="review-note">
-                      Note <span className="muted">(required to reject; the guest reads it)</span>
-                    </label>
-                    <input id="review-note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
-                  </div>
-                </div>
-                <label className="check-line">
-                  <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} /> I checked the account and the money is there
-                </label>
-                <div className="form-footer">
-                  <button type="button" className="danger" disabled={busy || !note.trim()} onClick={() => void review('reject')}>
-                    Reject
-                  </button>
-                  <span className="form-actions">
-                    <button type="button" disabled={busy || !checked} onClick={() => void review('verify')}>
-                      Verify
-                    </button>
-                    {selected.stayStatus === 'pending' && (
-                      <button type="button" className="primary" disabled={busy || !checked} onClick={() => void review('verify', true)}>
-                        Verify and confirm
-                      </button>
-                    )}
-                  </span>
-                </div>
-                {notice?.kind === 'error' && (
-                  <div className="notice error drawer-notice" role="alert">
-                    {notice.message}
-                  </div>
-                )}
-              </form>
-            ) : (
-              <p className="small muted">Only an owner or admin can verify or reject a proof.</p>
-            )}
-          </>
-        )}
-      </Drawer>
-
-      <Drawer open={historyOf !== null} title={historyOf ? `History of ${historyOf.reference}` : 'History'} onClose={() => setHistoryOf(null)}>
-        {historyOf && (
-          <>
-            {history === null ? (
-              <div className="small muted">Loading…</div>
-            ) : history.length === 0 ? (
-              <p className="small muted">No events recorded. The log starts with manage booking; older bookings have no history.</p>
-            ) : (
-              <ol className="stay-history">
-                {history.map((e, i) => (
-                  <li key={i}>
-                    <span className="small muted">{when(e.at, timezone)}</span> <span className="badge">{e.actor}</span> {eventWords(e, currency)}
-                  </li>
-                ))}
-              </ol>
-            )}
-            {canWrite && historyOf.payment.received > 0 && (
-              <form onSubmit={saveRefund}>
-                <h3>Record a refund</h3>
-                <p className="small muted">For money you already returned. Nothing is sent from here. At most {formatMoney(historyOf.payment.received, currency)}.</p>
-                <div className="field-row">
-                  <div className="field narrow">
-                    <label htmlFor="refund-amount">Amount ({currency})</label>
-                    <input id="refund-amount" required inputMode="decimal" value={refund.amount} onChange={(e) => setRefund({ ...refund, amount: e.target.value })} />
-                  </div>
-                  <div className="field grow">
-                    <label htmlFor="refund-method">Returned by</label>
-                    <input id="refund-method" required maxLength={40} placeholder="GCash" value={refund.method} onChange={(e) => setRefund({ ...refund, method: e.target.value })} />
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="refund-note">Note</label>
-                  <input id="refund-note" required maxLength={500} value={refund.note} onChange={(e) => setRefund({ ...refund, note: e.target.value })} />
-                </div>
-                <div className="form-footer">
-                  <button type="submit" disabled={busy}>
-                    Record refund
-                  </button>
-                </div>
-                {notice?.kind === 'error' && (
-                  <div className="notice error drawer-notice" role="alert">
-                    {notice.message}
-                  </div>
-                )}
-              </form>
-            )}
-          </>
-        )}
-      </Drawer>
-
       <Tabs
         label="Payments"
         tabs={[

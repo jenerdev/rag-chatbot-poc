@@ -91,7 +91,7 @@ function writeError(error: { code?: string; message: string }, what: string): Er
  * The queue: `open` (proofs waiting, oldest first) or everything recent
  * (newest first). Each row carries its stay's reference, guest and money.
  */
-export async function listPayments(tenant: BookingTenant, which: 'open' | 'all'): Promise<PaymentRow[]> {
+export async function listPayments(tenant: BookingTenant, which: 'open' | 'all', groupId?: string): Promise<PaymentRow[]> {
   await expireDueStays(tenant);
   let query = tenant.db
     .from('payments')
@@ -100,6 +100,8 @@ export async function listPayments(tenant: BookingTenant, which: 'open' | 'all')
     .order('created_at', { ascending: which === 'open' })
     .limit(MAX_PAYMENT_ROWS);
   if (which === 'open') query = query.eq('status', 'submitted').eq('kind', 'payment');
+  // One stay's payments, for its detail page (D-114).
+  if (groupId !== undefined) query = query.eq('group_id', groupId);
   const { data: rows, error } = await query;
   if (error) throw new Error(`Could not load payments: ${error.message}`);
   if (rows.length === 0) return [];

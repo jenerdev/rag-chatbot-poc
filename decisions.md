@@ -3615,3 +3615,59 @@ it is declined, so the guest reads "Declined" (D-110).
 listed on its last night, not the day after; cancel on pending 404;
 confirm then cancel frees both nights, again 200; a second stay then
 confirms on them). Screenshots at 1280 and 390 px (no sideways scroll).
+
+---
+
+## D-113 · A staff stay is paid for like a web one; a walk-in has no deadline · **Added 2026-10-12 (schema-staff-terms.sql)**
+
+**Decision:** `bookings_set_staff_terms`, an AFTER INSERT statement trigger
+beside `bookings_set_terms` (which still does web stays), gives a staff
+stay born PENDING, while the tenant takes payments, the same
+`required_amount` and `pay_by` a web stay gets. A walk-in gets the amount
+and no `pay_by`. A staff stay born confirmed (the tools' seeds) stays
+untracked. Holds stay web-only.
+
+**Amends:** manage-booking's "a staff stay is not tracked". Now Manage
+booking shows the deadline and the countdown for a staff stay, it expires
+unpaid like a web one, and Confirm with nothing verified needs a note
+(§ 9 q3), a walk-in included ("paid cash at the desk").
+
+**Why:** the user's call (2026-10-12): staff-made bookings must be paid
+for too; a guest standing at the desk is not given a deadline.
+
+**Measured:** verify 165–167 pass (a pending staff stay: full price due,
+pay_by in 24 h, the guest reads unpaid with a deadline; a walk-in: due,
+no deadline; born confirmed: untracked). rooms, bookings isolation both
+ways, staff-cases and the stays walk pass.
+
+---
+
+## D-114 · Every action on a stay is on its own page · **Added 2026-10-12**
+
+**Decision:** `/t/<slug>/admin/bookings/<reference>` (S-15) shows one stay:
+its nights with the STORED prices, the guest, the payment and proofs,
+change requests and history, from ONE read, `stayDetail()`
+(`GET /api/t/<slug>/bookings/stay/<reference>`). It is the only place a
+stay is acted on: Confirm, Decline, Cancel stay, Review a proof (verify or
+reject), Approve or Reject a change request, Record a refund. Which of
+these appear is ONE pure function, `stayActions()` (`lib/stay-actions.ts`,
+tested): an action shows only when it applies now AND the member's role
+may take it; a pending stay that cannot be confirmed says why instead of
+offering Confirm; a decided or finished stay shows no action section. The
+Bookings list rows and the Payments queues (proofs, all payments, change
+requests) are links to this page; the Payments screen keeps Settings.
+After New booking, the new stay opens on its page.
+
+**Why:** the user's call (2026-10-12): actions belong on the booking, not
+in lists, and only the buttons that serve a purpose should show.
+
+**No new write:** every action uses the route that already made it
+(`PATCH /bookings/requests/[groupId]`, `PATCH /payments/[id]`,
+`PATCH /payments/changes/[id]`, `POST /payments/refund`); the routes and
+Postgres still refuse what does not apply (trap 21).
+
+**Measured:** `stayActions` 6 tests; `plan/stay-detail-walk.mjs` 7/7 in a
+browser (list rows hold no buttons; pending shows Decline + Confirm only;
+Confirm through the dialog leaves Cancel stay only; a declined stay shows
+no actions; an unknown reference says "No such booking"; staff see Cancel
+stay; no sideways scroll at 390 px).

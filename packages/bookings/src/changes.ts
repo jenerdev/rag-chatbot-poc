@@ -115,7 +115,7 @@ export interface ChangeRow {
 }
 
 /** Staff: the open requests (oldest first), or the latest of all. */
-export async function listChanges(tenant: BookingTenant, which: 'open' | 'all'): Promise<ChangeRow[]> {
+export async function listChanges(tenant: BookingTenant, which: 'open' | 'all', groupId?: string): Promise<ChangeRow[]> {
   await expireDueStays(tenant);
   let query = tenant.db
     .from('change_requests')
@@ -124,6 +124,8 @@ export async function listChanges(tenant: BookingTenant, which: 'open' | 'all'):
     .order('created_at', { ascending: which === 'open' })
     .limit(200);
   if (which === 'open') query = query.eq('status', 'pending');
+  // One stay's requests, for its detail page (D-114).
+  if (groupId !== undefined) query = query.eq('group_id', groupId);
   const { data: rows, error } = await query;
   if (error) throw new Error(`Could not load change requests: ${error.message}`);
   if (rows.length === 0) return [];

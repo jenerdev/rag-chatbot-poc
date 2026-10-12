@@ -56,6 +56,45 @@
 
 ## ▶ Next up (do this next)
 
+**Proofs of payment in a popup (2026-10-12).**
+- [x] `components/proof-viewer.tsx`: a thumbnail that opens a modal
+  `<dialog>` popup (image, or a PDF in a frame), above the review drawer;
+  never a new tab. On S-15's Review proof drawer (the stored proof, its
+  signed link) and on S-13 (the file the guest picked, from memory, before
+  sending). `plan/proof-viewer-walk.mjs` 8/8 on alteza (a real request and
+  proof, deleted after). Screenshots in `plan/ui-refresh/proof-viewer/`.
+- [x] Review the proof, redesigned (`components/review-proof.tsx`): the
+  proof large; "The guest says" beside "This booking"; a Verify / Reject
+  choice, each with only its own fields (amount found + "I checked the
+  account", or a required reason with four quick picks); a pinned footer
+  saying what is missing. Walk 12/12 (a real rejection through the panel).
+- Known limit: a guest cannot see a proof again after sending it; the
+  proof bucket is insert-only for guests by design (D-107).
+
+**Booking detail page, every action there (2026-10-12, D-114).**
+- [x] S-15 `/t/<slug>/admin/bookings/<reference>`: `stayDetail()` + one GET
+  route; actions by `stayActions()` (6 tests); the Bookings list and the
+  Payments queues link to it (Payments keeps Settings); New booking opens
+  the new stay. `plan/stay-detail-walk.mjs` 7/7; screenshots in
+  `plan/ui-refresh/stay-detail/`. Typecheck clean; tests pass (web 121).
+- [x] Redesigned (2026-10-12): the title is the reference with Copy and
+  "← Bookings"; the head shows status (Declined when it was never
+  confirmed), guest, rooms, check-in and check-out WITH times, the total
+  and payment status, and how a decided stay ended with its note; "Next
+  step" names each action; Price, Change requests and a History timeline
+  (newest first, in plain words) beside Contact (call/email) and Payment
+  (a progress bar); on a phone, contact and payment come before history.
+  Walk 7/7 again; web tests 123.
+- [ ] The user's look; a proof review and a change request through the page
+  (no stay with a proof exists now to walk it); the axe audit over S-15.
+
+**Staff stays are paid for; walk-ins have no deadline (2026-10-12, D-113).**
+- [x] `schema-staff-terms.sql` (the 27th file) run by Claude; verify
+  165–167 pass (164/166 overall: the two conversation checks, villa has
+  no chats); rooms, isolation both ways, staff-cases, stays walk pass.
+- [ ] The user's look: a staff booking (not walk-in) on alteza shows the
+  countdown on Manage booking; a walk-in shows none.
+
 **Bookings is a list of stays (2026-10-12, D-112).**
 - [x] The date grid and per-night rows are gone; one row per stay with
   search, status (with counts), room filter, "Show the last 90 days", Show

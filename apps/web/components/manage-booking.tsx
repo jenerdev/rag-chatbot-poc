@@ -19,10 +19,12 @@
 //
 // Everything from the server is a React child, so it is escaped.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GuestStatus, GuestStay, PaymentStatus } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { instantLabel } from '@/components/booking-page';
+import { CopyButton } from '@/components/copy-button';
+import { ProofThumb, proofKind } from '@/components/proof-viewer';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
 import { TenantNav } from '@/components/tenant-nav';
@@ -154,29 +156,6 @@ function dayLabel(iso: string, timezone: string): string {
 /** "14:00" in the tenant's zone. */
 function timeLabel(iso: string, timezone: string): string {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
-}
-
-/** Copies a reference or an account number; the label says when it worked. */
-function CopyButton({ text, what }: { text: string; what: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="ghost sm"
-      aria-label={copied ? `Copied ${what}` : `Copy ${what}`}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        } catch {
-          // No clipboard (an insecure origin, a refused permission): the text is on screen to copy by hand.
-        }
-      }}
-    >
-      <Icon name={copied ? 'check' : 'copy'} size={14} /> {copied ? 'Copied' : 'Copy'}
-    </button>
-  );
 }
 
 export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
@@ -507,6 +486,12 @@ function PaymentPanel({
   const [paidOn, setPaidOn] = useState(() => today(stay.timezone));
   const [payerReference, setPayerReference] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  // The picked file, shown back before it is sent: a blob: URL from this
+  // browser's memory (nothing is uploaded to show it), revoked when it changes.
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -665,6 +650,16 @@ function PaymentPanel({
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
+              {file && preview && (
+                <div className="proof-picked">
+                  <ProofThumb src={preview} kind={proofKind(file.type)} label="Your proof of payment" />
+                  <span className="small muted">
+                    {file.name}
+                    <br />
+                    Check it shows the amount and the date before you send it.
+                  </span>
+                </div>
+              )}
             </div>
             {error && (
               <div className="notice error" role="alert">
