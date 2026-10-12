@@ -15,6 +15,19 @@ export const STAY_PAYMENT: Record<string, string> = {
   refunded: 'Refunded',
 };
 
+/**
+ * A pending stay's status, named by what it waits for (stay_payment()): the
+ * guest's payment, staff checking a proof, or staff confirming a paid stay.
+ * A stay whose payment is not tracked is plain Pending. Shared by the list
+ * (S-3) and the stay's page (S-15), so both say the same word.
+ */
+export function pendingState(payment: { status: string; enough: boolean } | null): { label: string; tone: string } {
+  if (!payment || payment.status === 'not_tracked') return { label: 'Pending', tone: 'warn' };
+  if (payment.status === 'submitted') return { label: 'Proof to check', tone: 'warn' };
+  if (payment.enough) return { label: 'Paid, to confirm', tone: 'ok' };
+  return { label: 'Awaiting payment', tone: 'warn' };
+}
+
 export function when(iso: string, timezone: string): string {
   return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: timezone });
 }

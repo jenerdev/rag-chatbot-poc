@@ -87,7 +87,9 @@ export function ReviewProof({
         ? 'Enter the amount you found'
         : !checked
           ? 'Tick the box once you have seen the money'
-          : null
+          : note.trim() === ''
+            ? 'Write a note'
+            : null
       : reason.trim() === ''
         ? 'Write the reason the guest will read'
         : null;
@@ -99,7 +101,7 @@ export function ReviewProof({
             action,
             amount,
             accountChecked: checked,
-            note: note.trim() || null,
+            note: note.trim(),
             confirm,
           }
         : {
@@ -232,9 +234,9 @@ export function ReviewProof({
           </label>
           <div className="field">
             <label htmlFor="review-note">
-              Note <span className="muted">(optional)</span>
+              Note <span className="muted">(required)</span>
             </label>
-            <input id="review-note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
+            <input id="review-note" required maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
       ) : (
@@ -248,7 +250,7 @@ export function ReviewProof({
                 </button>
               ))}
             </div>
-            <textarea id="reject-reason" rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+            <textarea id="reject-reason" required rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
         </div>
       )}

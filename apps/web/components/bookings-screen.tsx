@@ -58,6 +58,7 @@ import { StayLines } from '@/components/stay-lines';
 import { CopyText } from '@/components/copy-button';
 import { ListSearch } from '@/components/list-search';
 import { PAGE_SIZE, matches } from '@/lib/search';
+import { pendingState } from '@/lib/stay-words';
 
 export interface BookingsScreenProps {
   slug: string;
@@ -130,7 +131,7 @@ function stayState(stay: BookingRequest, today: string): { label: string; tone: 
   const checkOut = addDays(stay.checkIn, stay.nights);
   switch (stay.status) {
     case 'pending':
-      return { label: 'Pending', tone: 'warn' };
+      return pendingState(stay.payment);
     case 'confirmed':
       return checkOut <= today ? { label: 'Completed', tone: '' } : stay.checkIn <= today ? { label: 'Staying', tone: 'ok' } : { label: 'Confirmed', tone: 'ok' };
     case 'expired':
@@ -226,13 +227,18 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
         {stay.total !== null && <strong className="stay-total">{formatMoney(stay.total, currency)}</strong>}
         <span className="booking-badges">
           <span className={`badge ${state.tone}`}>{state.label}</span>
-          {/* manage booking § 4: the payment, from stay_payment(), and the deadline. */}
-          {pending && stay.payment && (
-            <span className={`badge ${stay.payment.enough ? 'ok' : stay.payment.status === 'submitted' ? 'warn' : ''}`}>
-              {PAYMENT_LABEL[stay.payment.status] ?? stay.payment.status}
-              {stay.payment.payBy && !stay.payment.enough
-                ? ` · by ${new Date(stay.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
-                : ''}
+          {/* manage booking § 4: while awaiting payment, why (a rejected proof, a part paid) and the deadline.
+              The status badge already says Awaiting payment, Proof to check or Paid, to confirm. */}
+          {pending && stay.payment && !stay.payment.enough && stay.payment.status !== 'submitted' && stay.payment.status !== 'not_tracked' && (stay.payment.payBy || stay.payment.status !== 'unpaid') && (
+            <span className="badge">
+              {[
+                stay.payment.status === 'unpaid' ? null : (PAYMENT_LABEL[stay.payment.status] ?? stay.payment.status),
+                stay.payment.payBy
+                  ? `pay by ${new Date(stay.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           )}
         </span>

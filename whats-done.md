@@ -8766,3 +8766,42 @@ read the database back: the slot as 20:30 for 06:15:00, the promo as
 percent 1500 with code WALK15 and limit 3, the date as closed with no
 surcharge; each footer held its button until the form was complete; then
 everything it made was deleted (0 left behind). Web tests 130 (7 new).
+
+## 2026-10-13 — a pending stay says what it waits for
+
+**What was done:** `pendingState()` (`apps/web/lib/stay-words.ts`) turns
+`stay_payment()`'s status into a pending stay's status label: Awaiting
+payment (unpaid, partly paid or proof rejected), Proof to check (submitted),
+Paid, to confirm (enough), or Pending (not tracked). The Bookings list and
+the stay page share it, so both use the same word. The list's payment badge
+no longer repeats the status: it gives only the reason and the deadline. The
+stay page adds a line, "Waiting for the guest's payment, due by …".
+
+**Why it matters:** staff saw every web request as "Pending", whether it
+was waiting for the guest's money, for staff to check a proof, or only for
+a Confirm click. Those are three different jobs for three different people.
+
+**What the observed values prove:** among alteza's three pending stays,
+only ALT-7NFGC6 has a `required_amount` (510000) and a `pay_by`. The other
+two (one a walk-in) have none, so they correctly still read "Pending":
+nothing is tracked for them to wait on. Web typecheck exit 0;
+`stay-words.test.ts` 3 passed. Nothing was walked in a browser.
+
+## 2026-10-13 — every decision on a booking's page takes a note
+
+**What was done:** on S-15, Confirm, Decline, Cancel, approving or rejecting
+a change request, and Verify in the proof review now each require a note.
+Reject already required its reason. `useConfirmDialog()` gained an opt-in
+`noteRequired`. With it set, the label reads "(required)", the textarea is
+`required`, and the action button stays disabled until something
+non-blank is typed. Other screens that use the dialog are unchanged.
+ReviewProof (used only on S-15) adds "Write a note" to its list of what is
+missing.
+
+**What it does not do:** the server does not demand a note. A note is
+still optional on the PATCH routes, and SQL still asks for one only where
+D-096/D-107 did (confirming with nothing verified). A request made outside
+the page can still decide without a note.
+
+**Observed:** web typecheck exit 0; web tests 131 passed. Not walked in a
+browser.

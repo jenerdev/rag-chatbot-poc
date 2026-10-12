@@ -32,7 +32,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
 import { stayActions } from '@/lib/stay-actions';
-import { STAY_PAYMENT, eventWords, when } from '@/lib/stay-words';
+import { STAY_PAYMENT, eventWords, pendingState, when } from '@/lib/stay-words';
 
 export interface StayDetailScreenProps {
   slug: string;
@@ -58,7 +58,7 @@ function timeLabel(iso: string, timezone: string): string {
 
 /** The stay's status as staff read it: a confirmed stay is Staying, then Completed. */
 function statusBadge(stay: StayDetail): { label: string; tone: string } {
-  if (stay.status === 'pending') return { label: 'Pending', tone: 'warn' };
+  if (stay.status === 'pending') return pendingState(stay.payment);
   if (stay.status === 'confirmed') {
     if (stay.checkOut <= stay.today) return { label: 'Completed', tone: '' };
     return stay.checkIn <= stay.today ? { label: 'Staying', tone: 'ok' } : { label: 'Confirmed', tone: 'ok' };
@@ -227,12 +227,13 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, banne
         ? {
             title: `Confirm ${s.reference}?`,
             body: `${s.guestName}: ${stayWhen}. Confirming books the dates.`,
-            noteLabel: actions.confirmNeedsNote ? 'Note (required: no payment is verified yet, e.g. "Paid cash at the desk")' : 'Note',
+            noteLabel: actions.confirmNeedsNote ? 'Note: no payment is verified yet, e.g. "Paid cash at the desk"' : 'Note',
+            noteRequired: true,
             actionLabel: 'Confirm',
           }
         : action === 'cancel'
-          ? { title: `Cancel ${s.reference}?`, body: `${s.guestName}: ${stayWhen}. Every night is freed.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
-          : { title: `Decline ${s.reference}?`, body: `${s.guestName}: ${stayWhen}.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Decline', danger: true },
+          ? { title: `Cancel ${s.reference}?`, body: `${s.guestName}: ${stayWhen}. Every night is freed.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
+          : { title: `Decline ${s.reference}?`, body: `${s.guestName}: ${stayWhen}.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Decline', danger: true },
     );
     if (answer === null) return;
     const done =
@@ -250,8 +251,8 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, banne
     const what = kind === 'cancel' ? 'cancel this stay' : `move this stay to ${newCheckIn ? dayLabel(newCheckIn) : 'another date'}`;
     const answer = await ask(
       action === 'approve'
-        ? { title: `Approve the request to ${what}?`, body: kind === 'cancel' ? 'The stay is cancelled. Pay any refund due, then record it here.' : 'The stay moves to the new dates.', noteLabel: 'Note, shown to the guest', actionLabel: 'Approve' }
-        : { title: `Reject the request to ${what}?`, body: 'The stay stays as it is.', noteLabel: 'Reason, shown to the guest (required)', actionLabel: 'Reject', danger: true },
+        ? { title: `Approve the request to ${what}?`, body: kind === 'cancel' ? 'The stay is cancelled. Pay any refund due, then record it here.' : 'The stay moves to the new dates.', noteLabel: 'Note, shown to the guest', noteRequired: true, actionLabel: 'Approve' }
+        : { title: `Reject the request to ${what}?`, body: 'The stay stays as it is.', noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Reject', danger: true },
     );
     if (answer === null) return;
     await write(
@@ -351,6 +352,13 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, banne
         </div>
 
         {ended && <p className={`stay-outcome ${ended.tone}`}>{ended.words}</p>}
+        {/* A pending stay that waits for the guest says so, with the deadline. */}
+        {stay.status === 'pending' && badge.label === 'Awaiting payment' && (
+          <p className="stay-outcome warn">
+            Waiting for the guest&rsquo;s payment{stay.payBy ? `, due by ${when(stay.payBy, stay.timezone)}` : ''}.
+            {stay.payBy ? ' If nothing is paid by then, the request expires.' : ''}
+          </p>
+        )}
       </section>
 
       {/* What this stay needs now: every action that applies, one row each. Absent when nothing does. */}

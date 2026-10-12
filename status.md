@@ -1693,6 +1693,25 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — a pending stay says what it waits for
+- **Did:** `pendingState()` in `lib/stay-words.ts` (tested) names a pending
+  stay by `stay_payment()`: Awaiting payment, Proof to check, Paid, to
+  confirm, or plain Pending when payment is not tracked. The Bookings list
+  and the stay page (S-15) both use it; the list's second badge now carries
+  only the reason and the deadline ("Proof rejected · pay by …"), and S-15
+  adds "Waiting for the guest's payment, due by …".
+- **Observed:** alteza has 3 pending stays: ALT-7NFGC6 is tracked
+  (required 510000, pay_by set); ALT-FDV6J3 and the walk-in ALT-CVUJ6H have
+  `required_amount = null`, so they stay "Pending". Web typecheck exit 0;
+  `stay-words.test.ts` 3/3.
+- **Not done:** a browser walk of the two screens.
+- **Then:** every decision on the booking page (S-15) needs a note:
+  Confirm, Decline, Cancel, approve/reject a change, and Verify in the proof
+  review (Reject already did). `useConfirmDialog()` takes `noteRequired`
+  (opt-in, so other screens are unchanged); the action button is disabled
+  until a note is written. Browser-side only: the routes still accept no
+  note. Web typecheck exit 0, web tests 131/131.
+
 ### 2026-10-11 — a stay that cannot go ahead (D-110), Rooms as an accordion
 - **Did:** `schema-stay-outcome.sql`: `stay_taken()`, the
   `payments_refuse_taken` trigger, `guest_stay()` with `decision_note`,

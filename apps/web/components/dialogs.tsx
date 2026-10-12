@@ -18,8 +18,10 @@ export interface Question {
   title: string;
   /** What is being decided, in words: who, what, when. */
   body?: ReactNode;
-  /** A note field's label ("Reason", "Note"); none = no field. Always optional. */
+  /** A note field's label ("Reason", "Note"); none = no field. Optional unless noteRequired. */
   noteLabel?: string;
+  /** The action waits until a note is written (the booking page asks one for every decision). */
+  noteRequired?: boolean;
   actionLabel: string;
   /** The way out; "Back" unless the question reads better otherwise ("Keep it"). */
   backLabel?: string;
@@ -46,7 +48,7 @@ export function useConfirmDialog() {
   return { ask, dialog };
 }
 
-function ConfirmDialog({ title, body, noteLabel, actionLabel, backLabel = 'Back', danger, onDone }: Question & { onDone: (answer: string | null) => void }) {
+function ConfirmDialog({ title, body, noteLabel, noteRequired, actionLabel, backLabel = 'Back', danger, onDone }: Question & { onDone: (answer: string | null) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [note, setNote] = useState('');
   const titleId = useId();
@@ -79,7 +81,8 @@ function ConfirmDialog({ title, body, noteLabel, actionLabel, backLabel = 'Back'
         className="dialog-inner"
         onSubmit={(event) => {
           event.preventDefault();
-          finish(note);
+          if (noteRequired && note.trim() === '') return;
+          finish(note.trim());
         }}
       >
         <h2 id={titleId}>{title}</h2>
@@ -87,16 +90,16 @@ function ConfirmDialog({ title, body, noteLabel, actionLabel, backLabel = 'Back'
         {noteLabel && (
           <div className="field">
             <label htmlFor={noteId}>
-              {noteLabel} <span className="muted">(optional)</span>
+              {noteLabel} <span className="muted">{noteRequired ? '(required)' : '(optional)'}</span>
             </label>
-            <textarea id={noteId} rows={3} autoFocus value={note} onChange={(event) => setNote(event.target.value)} />
+            <textarea id={noteId} rows={3} autoFocus required={noteRequired} value={note} onChange={(event) => setNote(event.target.value)} />
           </div>
         )}
         <div className="dialog-actions">
           <button type="button" onClick={() => finish(null)}>
             {backLabel}
           </button>
-          <button type="submit" className={danger ? 'danger solid' : 'primary'} autoFocus={!noteLabel}>
+          <button type="submit" className={danger ? 'danger solid' : 'primary'} autoFocus={!noteLabel} disabled={noteRequired && note.trim() === ''}>
             {actionLabel}
           </button>
         </div>
