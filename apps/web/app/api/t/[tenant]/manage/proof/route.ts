@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MAX_PROOF_BYTES, submitProof } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
 import { MANAGE_NOT_FOUND } from '@/lib/manage';
+import { notifyAfter } from '@/lib/notify';
 import { parseMoneyInput } from '@/lib/money';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
@@ -60,5 +61,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
     file: new Uint8Array(await file.arrayBuffer()),
   });
   if (!result) return NextResponse.json({ error: MANAGE_NOT_FOUND }, { status: 404 });
+  // The owners and admins hear of a proof to verify (plan/notifications.md).
+  notifyAfter(tenant);
   return NextResponse.json(result, { status: 201 });
 });

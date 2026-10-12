@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requestChange } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
 import { MANAGE_NOT_FOUND } from '@/lib/manage';
+import { notifyAfter } from '@/lib/notify';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { changeRequestSchema, firstError } from '@/lib/schemas';
@@ -28,5 +29,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   const { reference, contact, kind, newCheckIn, reason, dryRun } = parsed.data;
   const result = await requestChange(tenant, { reference, contact, kind, newCheckIn: newCheckIn ?? null, reason: reason ?? null, dryRun: dryRun ?? false });
   if (!result) return NextResponse.json({ error: MANAGE_NOT_FOUND }, { status: 404 });
+  // A real request is news; a dry run (the guest reading the terms) is not.
+  if (!dryRun) notifyAfter(tenant);
   return NextResponse.json(result, { status: dryRun ? 200 : 201 });
 });

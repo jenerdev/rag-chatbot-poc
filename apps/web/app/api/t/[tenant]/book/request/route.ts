@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requestBooking } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
+import { notifyAfter } from '@/lib/notify';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { bookRequestSchema, firstError } from '@/lib/schemas';
@@ -37,5 +38,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
     return NextResponse.json({ error: 'Too many requests from here. Please try again in a few minutes.' }, { status: 429 });
   }
 
-  return NextResponse.json(await requestBooking(tenant, input), { status: 201 });
+  const made = await requestBooking(tenant, input);
+  // Staff hear of it (plan/notifications.md): after the response, never before.
+  notifyAfter(tenant);
+  return NextResponse.json(made, { status: 201 });
 });

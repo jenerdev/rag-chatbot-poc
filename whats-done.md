@@ -9107,3 +9107,29 @@ threading it through about sixteen staff screens was not worth it.
 on, against the same running server after a restart. It shows both halves
 of Rule 4: no key means a clear 503; a key means only push-service
 endpoints are stored.
+
+## 2026-10-13 — notifications Phase 5: the drain
+
+**What was done:** after a guest's web request, proof or change request is
+answered, `notifyAfter()` drains that tenant's outbox. It uses Next's
+`after()`, so the guest never waits on a push service, and a failure is
+logged, never returned to the guest. Each open staff tab's attention poll
+drains too, as the sweep for anything a failed drain left.
+
+**What the observed values prove:**
+- Two real Chrome profiles subscribed on Google's push service.
+- A guest's request went to both devices 3–4 s after the guest's response,
+  and Google accepted both.
+- A proof went to the owner's device and was never sent to the staff
+  member's.
+- The outbox recorded both as sent.
+- The closing run was all green: 693 unit tests, verify 183, both
+  isolation suites both ways, and the three chatbot snapshots byte-identical
+  (Rule 5).
+
+**What it could not prove, and how that was handled:** headless Chrome
+shows no notifications at all, even for a push handed straight to the
+worker. So the worker's source became a pure function, run in a test
+against a fake `self`. That test found a real bug: a push whose payload
+parses to `null` threw before showing anything. It now shows a fallback.
+Seeing the notification on a real screen is a manual check.

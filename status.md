@@ -1787,6 +1787,27 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   gone); the worker 200 text/javascript no-cache with SCOPE "/t/villa/",
   unknown tenant 404; the manifest theme #0f766e; the staff page links it,
   the chat does not.
+- **Phase 5, the drain:** `notifyAfter(tenant)` (`lib/notify.ts`, next/server
+  `after()`) runs `drainNotifications()` after the response in book/request,
+  manage/proof and manage/change (not a dry run), and in the attention poll as
+  the sweep. `service-worker.ts` holds the worker's source as a pure function
+  (tested against a fake `self`); `notify.test.ts` tests `pushMessage()` and the
+  drain with @rag/push mocked.
+- **Observed:** `plan/notifications-phase5-walk.mjs` 4/4 in two real Chrome
+  profiles on alteza: both subscribe on fcm.googleapis.com; a guest's request
+  is sent 3–4 s after the response to both devices, Google accepts both; a
+  proof is sent to the owner's device only; the outbox marks both sent.
+  Closing run: typecheck exit 0; tests 14+13+10+5+128+366+157; verify 183
+  PASS; both isolations PASS both ways; the three snapshots identical
+  (Rule 5); the Phase 1 and 4 walks pass again.
+- **Not proved here:** a notification ON SCREEN. Headless Chrome showed none,
+  either from Google (86 s) or from ServiceWorker.deliverPushMessage
+  (getNotifications() empty). The worker is unit-tested instead (which found
+  a real bug: a push whose payload parses to null threw; now guarded). The
+  on-screen check is manual, in a headed browser, and on phones in Phase 6.
+- **▶ Next:** the user's manual check in a headed Chrome; then Phase 6 (the
+  isolation additions, the static grep for VAPID_PRIVATE, the phone walk over
+  a tunnel) and Phase 7 (D-116, R-51, CLAUDE.md, eval once).
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name

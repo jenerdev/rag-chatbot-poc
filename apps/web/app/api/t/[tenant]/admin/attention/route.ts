@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { attentionCounts } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { hasApplication } from '@/lib/applications';
+import { notifyAfter } from '@/lib/notify';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -16,6 +17,9 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'dashboard:read');
-  const counts = (await hasApplication(tenant, 'bookings')) ? await attentionCounts(tenant) : { requests: 0, proofs: 0, changes: 0 };
+  const bookings = await hasApplication(tenant, 'bookings');
+  const counts = bookings ? await attentionCounts(tenant) : { requests: 0, proofs: 0, changes: 0 };
+  // The sweep (§ 7 q5): whatever a guest's drain left, a staff tab sends.
+  if (bookings) notifyAfter(tenant);
   return NextResponse.json(counts, { headers: { 'Cache-Control': 'no-store' } });
 });
