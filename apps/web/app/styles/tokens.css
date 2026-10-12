@@ -126,6 +126,9 @@
   /* 68%, measured (Phase 10's audit): at 60% muted text on villa's cream
      background was 4.36:1, under WCAG AA's 4.5:1. */
   --muted: color-mix(in srgb, var(--ink) 68%, var(--panel));
+  /* Muted text on a grey surface (--surface-3: the segmented control). --muted
+     is tuned against --panel; on --surface-3 northwind's measured 4.48:1. */
+  --muted-on-surface: color-mix(in srgb, var(--ink) 78%, var(--panel));
   /* For icons, borders and placeholders only, never for text: it is under 4.5:1. */
   --faint: color-mix(in srgb, var(--ink) 40%, var(--panel));
   --line: color-mix(in srgb, var(--ink) 10%, var(--panel));

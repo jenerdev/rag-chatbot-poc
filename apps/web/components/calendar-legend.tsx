@@ -53,7 +53,7 @@ export function CalendarLegend() {
         <li>
           {/* How a date is counted, on request: it was a sentence under the key on every visit. */}
           <Tip label="Counted over today’s rooms and slots. A stay that began the day before counts on this date too, booked or pending." describe>
-            <button type="button" className="ghost sm cal-key-info" aria-label="How dates are counted">
+            <button type="button" className="ghost sm cal-key-info">
               <Icon name="help" size={14} /> How it is counted
             </button>
           </Tip>

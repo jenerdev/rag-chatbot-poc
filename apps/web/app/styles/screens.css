@@ -753,7 +753,8 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 .cal-week-day .cal-markers { top: 4px; right: 4px; }
 .cal-week-weekday { color: var(--muted); }
 .cal-week-date { font-size: var(--text-lg); line-height: 1.2; font-variant-numeric: tabular-nums; }
-.weekend-col .cal-week-weekday { color: var(--accent-text); font-weight: 600; }
+/* Ink, not the accent: accent text on a date's tint fell under 4.5:1 in dark mode (harbor). Bold marks the weekend. */
+.weekend-col .cal-week-weekday { color: var(--ink); font-weight: 600; }
 .cal-week-room-head th { padding: var(--space-3) var(--space-2) var(--space-1); text-align: left; font-size: var(--text-sm); font-weight: 600; border-top: 1px solid var(--line); }
 .cal-week-room:first-of-type .cal-week-room-head th { border-top: 0; }
 .cal-week-slot { padding: 3px var(--space-2); text-align: left; font-size: var(--text-xs); font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -889,7 +890,7 @@ button.toggle.on { border-color: var(--accent); background: var(--accent-soft); 
 /* The groups fit a desktop row; on a phone they scroll inside their own box, never the page. */
 .stays-groups { display: flex; max-width: 100%; overflow-x: auto; margin-bottom: var(--space-4); }
 .stays-groups button { flex: none; }
-.segment-count { margin-left: var(--space-1); font-variant-numeric: tabular-nums; color: var(--muted); }
+.segment-count { margin-left: var(--space-1); font-variant-numeric: tabular-nums; color: var(--muted-on-surface); }
 .segment-count.attention { padding: 0 6px; border-radius: var(--radius-full); background: var(--warn-soft); color: var(--ink); }
 .stay-group + .stay-group { margin-top: var(--space-6); }
 .stay-group > h3 { display: flex; align-items: baseline; gap: var(--space-2); margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; }
@@ -1097,6 +1098,8 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
 .callout { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; border-color: var(--warn-line); background: var(--warn-soft); }
 .callout > svg { flex: none; color: var(--ink); }
 .callout p { flex: 1 1 260px; margin: 0; }
+/* --muted is tuned against --panel; on the warn tint it measured 4.48:1 (northwind). */
+.callout .muted { color: var(--muted-on-surface); }
 .kb-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .kb-head h2 { margin: 0; }
 .kb-intro { margin: var(--space-1) 0 var(--space-3); }

@@ -1,13 +1,13 @@
 // The month view's grid (plan/calendar.md § 4.2–4.3, D-103). Pure: props in,
 // no fetch, no state. A <table> (weekday headers a screen reader announces
-// with each cell) with ONE button per date; the button's aria-label is the
-// whole date in a sentence (calendar-labels.ts), so the colour, the short
-// word and the markers inside it are for the eye and hidden from the
-// accessibility tree. Tab moves through the dates; no arrow-key model (§ 7 q6).
+// with each cell) with ONE button per date; the button's aria-label is what
+// the cell shows, then the whole date in a sentence (buttonName(),
+// calendar-labels.ts), so the colour, the short word and the markers inside
+// it are for the eye and hidden from the accessibility tree. Tab moves through the dates; no arrow-key model (§ 7 q6).
 
 import type { OccupancyDay } from '@rag/bookings';
 import { Icon } from './icons';
-import { cellText, dayMarker, sentence } from '@/lib/calendar-labels';
+import { buttonName, cellText, dayMarker } from '@/lib/calendar-labels';
 
 const WEEKDAYS = [
   ['Mon', 'Monday'],
@@ -78,18 +78,25 @@ export function MonthGrid({
                   <button
                     type="button"
                     className={dayClasses(day, today, day.day.startsWith(month) ? '' : 'other-month')}
-                    aria-label={sentence(day, today)}
+                    aria-label={buttonName(
+                      [Number(day.day.slice(8)), cellText(day), (marker || day.state === 'closed') && day.label ? day.label : null, day.pending > 0 ? day.pending : null],
+                      day,
+                      today,
+                    )}
                     onClick={() => onPick(day.day)}
                   >
                     <span className="cal-num" aria-hidden="true">
                       {Number(day.day.slice(8))}
                     </span>
+                    {/* The spaces between the parts make the visible text "16 Open", which the name leads with (buttonName). */}
+                    {' '}
                     {cellText(day) && (
                       <span className="cal-word" aria-hidden="true">
                         {cellText(day)}
                       </span>
                     )}
-                    {(marker || day.state === 'closed') && (day.label ? <span className="cal-label" aria-hidden="true">{day.label}</span> : null)}
+                    {' '}
+                    {(marker || day.state === 'closed') && (day.label ? <span className="cal-label" aria-hidden="true">{day.label}</span> : null)}{' '}
                     <span className="cal-markers" aria-hidden="true">
                       <DayMarkers day={day} />
                     </span>

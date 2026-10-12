@@ -27,7 +27,7 @@ import { StaffFrame } from '@/components/staff-frame';
 import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
 import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
-import { STATE_WORD, cellText, dayMarker, longDate, pendingWords, sentence } from '@/lib/calendar-labels';
+import { STATE_WORD, buttonName, cellText, dayMarker, longDate, pendingWords } from '@/lib/calendar-labels';
 import { VIEWS, monthOptions, step, type CalendarView } from '@/lib/calendar-range';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -333,18 +333,19 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
             </th>
             {data.days.map((day) => (
               <th key={day.day} scope="col" className={colClass(day.day)}>
-                <button type="button" className={dayClasses(day, data.today, 'cal-week-day')} aria-label={sentence(day, data.today)} onClick={() => onPick(day.day)}>
+                <button type="button" className={dayClasses(day, data.today, 'cal-week-day')} aria-label={buttonName([short(day.day, { weekday: 'short' }), short(day.day, { day: 'numeric' }), cellText(day), day.pending > 0 ? day.pending : null], day, data.today)} onClick={() => onPick(day.day)}>
                   <span className="cal-week-weekday" aria-hidden="true">
                     {short(day.day, { weekday: 'short' })}
-                  </span>
+                  </span>{' '}
                   <strong className="cal-week-date" aria-hidden="true">
                     {short(day.day, { day: 'numeric' })}
-                  </strong>
+                  </strong>{' '}
                   {cellText(day) && (
                     <span className="cal-word" aria-hidden="true">
                       {cellText(day)}
                     </span>
                   )}
+                  {' '}
                   <span className="cal-markers" aria-hidden="true">
                     <DayMarkers day={day} />
                   </span>

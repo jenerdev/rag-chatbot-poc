@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OccupancyDay } from '@rag/bookings';
-import { cellText, dayMarker, sentence } from './calendar-labels';
+import { buttonName, cellText, dayMarker, sentence } from './calendar-labels';
 
 const day = (patch: Partial<OccupancyDay>): OccupancyDay => ({
   day: '2026-10-16',
@@ -59,5 +59,14 @@ describe('sentence', () => {
 
   it('counts requests in the plural', () => {
     expect(sentence(day({ pending: 2 }), '2026-10-01')).toBe('Friday 16 October 2026: available, 2 pending requests');
+  });
+});
+
+describe('buttonName', () => {
+  it('leads with what the cell shows, so the visible words are in the name (WCAG 2.5.3)', () => {
+    expect(buttonName([16, 'Open', null, null], day({}), '2026-10-01')).toBe('16 Open. Friday 16 October 2026: available');
+    expect(buttonName(['Fri', '16', '3 of 8', 1], day({ state: 'partial', taken: 3, pending: 1 }), '2026-10-01')).toBe(
+      'Fri 16 3 of 8 1. Friday 16 October 2026: partly booked, 3 of 8 taken, 1 pending request',
+    );
   });
 });

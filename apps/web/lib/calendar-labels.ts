@@ -76,3 +76,16 @@ export function sentence(day: OccupancyDay, today: string): string {
   if (!day.bookable && day.state !== 'closed') parts.push(day.day < today ? 'in the past' : 'beyond the booking window');
   return `${head}: ${parts.join(', ')}`;
 }
+
+/**
+ * A date button's accessible name: the words the cell SHOWS, then the
+ * sentence. WCAG 2.5.3 (label in name): someone using voice control says
+ * what they see ("click 16 Open"), so the visible text must be in the name,
+ * in order; the audit flagged every cell whose sentence lacked "Open",
+ * "3 of 8" or "Full". `shown` is the cell's visible parts, in order; empty
+ * parts are skipped.
+ */
+export function buttonName(shown: (string | number | null | undefined)[], day: OccupancyDay, today: string): string {
+  const visible = shown.filter((part) => part !== null && part !== undefined && part !== '').join(' ');
+  return visible ? `${visible}. ${sentence(day, today)}` : sentence(day, today);
+}

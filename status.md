@@ -1693,6 +1693,25 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — the a11y audit back to 0
+- **Did:** the audit (192 states) had 2 serious violations. (1)
+  label-content-name-mismatch on every calendar date with a word: the
+  aria-label sentence lacked the visible "Open" / "3 of 8" / "Full".
+  `buttonName()` (calendar-labels.ts, tested) leads the name with the
+  visible parts, and a space now separates the cell's spans (axe read
+  "13Open" without it). The key's info button lost an aria-label that
+  differed from its text. (2) color-contrast: `.segmented` text on
+  `--surface-3` was 4.48:1 on northwind, so `--muted-on-surface` (ink 78%)
+  is new in tokens.css; harbor's dark weekend weekday name is ink, not accent.
+- **Observed:** the quick audit (dashboard, unanswered, calendar ×3, 108
+  states) went 2 → 1 → 0 at the cells, then the key button was fixed.
+  Web typecheck exit 0, tests 132/132. The full run then found ONE more,
+  the knowledge base's unanswered callout (`.callout .muted` on the warn
+  tint, 4.48:1, northwind; it shows only when questions are open), fixed
+  with the same token: the documents pages re-audited at 0 (64 states).
+  Calendar shots: 1280/390, no sideways scroll, no console errors, layout
+  unchanged.
+
 ### 2026-10-13 — the platform index, redesigned
 - **Did:** `/platform`'s list (`platform-screen.tsx`): a page title with
   New tenant; four total tiles over live tenants (live, conversations 30d

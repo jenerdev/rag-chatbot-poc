@@ -8828,3 +8828,32 @@ routes are unchanged.
 **Observed:** `plan/platform-shots.mjs` (light and dark, 1280 and 390 px)
 shows a document width equal to the viewport at both widths and no console
 errors. Web typecheck exit 0.
+
+## 2026-10-13 — the accessibility audit back to 0
+
+**What was done:** two serious findings in `ui-refresh-a11y.mjs`, both from
+earlier commits.
+- **Label in name (WCAG 2.5.3).** A calendar date's button was named by its
+  sentence, "Friday 16 October 2026: available", while it showed "16 Open".
+  Someone using voice control says what they see, so the visible words must
+  be in the name. `buttonName()` puts them first ("16 Open. Friday 16
+  October 2026: available"), in the month and week views both.
+  - **The trap:** the spans inside the cell had no whitespace between them,
+    so axe read the visible text as "13Open". The probe showed it; a
+    `{' '}` between the parts fixed it, and the flex layout ignores
+    whitespace-only text.
+  - The legend's "How it is counted" button lost its different aria-label.
+- **Contrast.** `--muted` is tuned against `--panel`. On the segmented
+  control's `--surface-3`, northwind's theme measured 4.48:1, so there is a
+  new token, `--muted-on-surface` (ink 78%), for that text. The week view's
+  weekend weekday name was accent text on the date's tint, under 4.5:1 in
+  harbor's dark mode; it is now ink, still bold.
+
+**Observed:** the narrowed audit went from 132 date cells failing, to 16
+nodes (the key button). The full run (192 states) then showed one more:
+the knowledge base's unanswered callout, muted text on the warn tint,
+4.48:1 on northwind. It appears only when a tenant has open questions, so
+the first run never drew it. It uses the same token now, and the documents
+pages re-audited at 0 (64 states). Calendar shots at 1280 and 390 px:
+layout unchanged, no console errors. Web typecheck exit 0, tests 132
+passed.
