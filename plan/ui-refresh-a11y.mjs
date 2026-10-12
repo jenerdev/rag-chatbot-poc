@@ -23,7 +23,7 @@ const BASE = process.argv[2] ?? 'http://localhost:3000';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AXE = readFileSync(join(HERE, 'ui-refresh', 'axe', 'axe.min.js'), 'utf8');
 const SLUGS = ['villa', 'harbor', 'northwind'];
-const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/bookings', '/admin/calendar', '/admin/calendar?view=week', '/admin/calendar?view=day', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
+const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/conversations', '/admin/bookings', '/admin/calendar', '/admin/calendar?view=week', '/admin/calendar?view=day', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
 
 const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', SLUGS);
 const stamp = Date.now();
@@ -91,6 +91,15 @@ try {
         await open(`${BASE}/t/${slug}/admin`, "!!document.querySelector('.auth-card')", `${slug} login @${width}`);
         await page.send('Network.setCookie', { name: 'rag_admin', value: cookies[slug], url: `${BASE}/api/t/${slug}/`, path: `/api/t/${slug}` });
         for (const path of STAFF) await open(`${BASE}/t/${slug}${path}`, "!!document.querySelector('.staff-sidebar') || !!document.querySelector('main h1, main h2')", `${slug} ${path} @${width}`);
+      }
+      // S-16a (D-115): one transcript, the newest of harbor's chats (90 days).
+      await page.send('Network.setCookie', { name: 'rag_admin', value: cookies.harbor, url: `${BASE}/api/t/harbor/`, path: '/api/t/harbor' });
+      await page.goto(`${BASE}/t/harbor/admin/conversations?days=90`);
+      if (await page.until("!!document.querySelector('.conversation-row-link')", 30000)) {
+        await page.click('.conversation-row-link');
+        await page.until("!!document.querySelector('.transcript')", 30000);
+        await new Promise((r) => setTimeout(r, 400));
+        await audit(`harbor transcript @${width}`);
       }
       // The modal states: a drawer (New booking) and a dialog (Decline), as harbor's owner.
       await page.send('Network.setCookie', { name: 'rag_admin', value: cookies.harbor, url: `${BASE}/api/t/harbor/`, path: '/api/t/harbor' });

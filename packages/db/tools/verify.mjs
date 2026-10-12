@@ -1631,6 +1631,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await rolesChecks();
       await calendarChecks();
       await manageBookingChecks();
+      await conversationChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);
@@ -3134,6 +3135,143 @@ async function manageBookingChecks() {
     for (const id of [userId, ...probeUsers].filter(Boolean)) {
       const { error: userError } = await supabase.auth.admin.deleteUser(id);
       if (userError) console.log(`WARN  could not delete a manage-probe user: ${userError.message}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 168–172: conversation_list() (plan/conversations.md Phase 1, D-115). A
+// throwaway `conversations-probe` tenant with one staff member and four
+// conversations whose place in the list is known by hand:
+//
+//   A  2 turns, 1 refusal, says "harbour lantern", last message 2 h ago   listed
+//   B  1 turn, answered, last message 1 h ago                             listed, first
+//   C  no messages (a failed first turn leaves one)                       never listed
+//   D  1 turn, 60 days ago                                                only at 90 days
+//
+// Every refusal has its positive twin (trap 12): a chat token is refused and
+// the staff token gets exactly A and B; another tenant's id is refused.
+async function conversationChecks() {
+  const { data: probe, error: probeError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'conversations-probe', business_name: 'conversations probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (probeError) {
+    check(false, 'conversations: create the conversations-probe tenant', probeError.message);
+    return;
+  }
+  let userId = null;
+  try {
+    const { data: user, error: userError } = await supabase.auth.admin.createUser({
+      email: `conversations-probe-${Date.now()}@example.com`,
+      password: randomBytes(24).toString('base64url'),
+      email_confirm: true,
+    });
+    if (userError) throw new Error(`create user: ${userError.message}`);
+    userId = user.user.id;
+    const { error: memberError } = await supabase.from('memberships').insert({ user_id: userId, tenant_id: probe.id, role: 'staff' });
+    if (memberError) throw new Error(`membership: ${memberError.message}`);
+
+    const ago = (hours) => new Date(Date.now() - hours * 3600_000).toISOString();
+    const conv = {};
+    for (const name of ['A', 'B', 'C', 'D']) {
+      const { data, error } = await supabase.from('conversations').insert({ tenant_id: probe.id }).select('id').single();
+      if (error) throw new Error(`conversation ${name}: ${error.message}`);
+      conv[name] = data.id;
+    }
+    const row = (name, role, content, hours) => ({ tenant_id: probe.id, conversation_id: conv[name], role, content, created_at: ago(hours) });
+    const { error: seedError } = await supabase.from('messages').insert([
+      row('A', 'user', 'Is the harbour lantern lit at night?', 3),
+      row('A', 'assistant', "I don't know based on the documents I have.", 3),
+      row('A', 'user', 'And on Sundays?', 2),
+      row('A', 'assistant', 'Yes, every Sunday.', 2),
+      row('B', 'user', 'What time is check-in?', 1),
+      row('B', 'assistant', 'Check-in is at 2 PM.', 1),
+      row('D', 'user', 'An old question', 60 * 24),
+      row('D', 'assistant', 'An old answer.', 60 * 24),
+    ]);
+    if (seedError) throw new Error(`messages: ${seedError.message}`);
+
+    const staff = asToken(staffToken(probe.id, userId));
+    const list = (args) => staff.rpc('conversation_list', { p_tenant_id: probe.id, ...args });
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+
+    // 168. A chat token is refused (42501), and so is another tenant's id on
+    //      the staff token; the positive twin is 169.
+    {
+      const chatCall = await asToken(chatToken(probe.id)).rpc('conversation_list', { p_tenant_id: probe.id });
+      const foreign = await staff.rpc('conversation_list', { p_tenant_id: villaRow?.id ?? -1 });
+      check(
+        chatCall.error?.code === '42501' && foreign.error?.code === '42501',
+        'conversations: a chat token refused; another tenant\'s id refused on a staff token',
+        `chat ${chatCall.error?.code ?? 'ANSWERED'} · foreign ${foreign.error?.code ?? 'ANSWERED'}`,
+      );
+    }
+
+    // 169. The staff token gets exactly A and B, newest first, with the counts
+    //      and first questions seeded: not C (empty), not D (60 days ago).
+    {
+      const { data, error } = await list({ p_days: 30 });
+      const rows = data?.rows ?? [];
+      const [b, a] = rows;
+      check(
+        !error && data.total === 2 && data.more === false && data.days === 30 && data.timezone === 'Asia/Manila'
+          && rows.length === 2 && b?.id === conv.B && a?.id === conv.A
+          && a.turns === 2 && a.refusals === 1 && a.firstQuestion === 'Is the harbour lantern lit at night?'
+          && b.turns === 1 && b.refusals === 0,
+        'conversations: the staff token lists exactly the two chats in the window, newest first, with their counts and first questions',
+        error?.message ?? `total ${data.total} · ${rows.map((r) => `${Object.keys(conv).find((k) => conv[k] === r.id)} ${r.turns}/${r.refusals}`).join(', ')}`,
+      );
+    }
+
+    // 170. Filters: a search finds the conversation that says it, in any
+    //      message; `%` is a character, not a pattern; "only refused" is A.
+    {
+      const found = await list({ p_query: 'LANTERN' });
+      const answer = await list({ p_query: 'every sunday' });
+      const percent = await list({ p_query: '%' });
+      const refused = await list({ p_refused: true });
+      const ids = (r) => (r.data?.rows ?? []).map((x) => x.id).join(',');
+      check(
+        ids(found) === conv.A && ids(answer) === conv.A && percent.data?.total === 0 && ids(refused) === conv.A,
+        'conversations: search matches any message case-insensitively, `%` is literal, and "only refused" keeps the chat with a refusal',
+        `lantern ${found.data?.total} · sunday ${answer.data?.total} · % ${percent.data?.total} · refused ${refused.data?.total}`,
+      );
+    }
+
+    // 171. The keyset: a page of one says there is more, the next page from
+    //      its last row is the other chat, and nothing repeats.
+    {
+      const first = await list({ p_limit: 1 });
+      const last = first.data?.rows?.[0];
+      const second = await list({ p_limit: 1, p_before_at: last?.lastAt, p_before_id: last?.id });
+      check(
+        first.data?.more === true && first.data?.total === 2 && last?.id === conv.B
+          && second.data?.more === false && second.data?.rows?.length === 1 && second.data.rows[0].id === conv.A,
+        'conversations: keyset paging, a page of one then the next, no repeat',
+        `page 1 ${first.data?.rows?.length} more ${first.data?.more} · page 2 ${second.data?.rows?.length} more ${second.data?.more}`,
+      );
+    }
+
+    // 172. The window: 90 days brings D in; a days value outside 7/30/90 is 30.
+    {
+      const wide = await list({ p_days: 90 });
+      const odd = await list({ p_days: 45 });
+      check(
+        wide.data?.total === 3 && wide.data?.days === 90 && odd.data?.total === 2 && odd.data?.days === 30,
+        'conversations: 90 days lists the 60-day-old chat too; an unknown window is 30 days',
+        `90 → ${wide.data?.total} · 45 → ${odd.data?.days} days, ${odd.data?.total}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'conversations: probe setup', error.message);
+  } finally {
+    const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
+    if (error) console.log(`WARN  could not delete the conversations-probe tenant: ${error.message}`);
+    if (userId) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(userId);
+      if (userError) console.log(`WARN  could not delete the conversations-probe user: ${userError.message}`);
     }
   }
 }

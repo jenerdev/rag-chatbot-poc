@@ -188,6 +188,8 @@ export interface IngestResult {
 /** One question the documents could not answer, as the S-4 staff screen lists it. `id` is the refusal's message id. */
 export interface UnansweredQuestion {
   id: number;
+  /** The conversation it was asked in, for the link to its transcript (S-16a, D-115). Staff only. */
+  conversationId: string;
   question: string;
   askedAt: string;
   /** When staff marked it resolved (D-045), or null while it is open. */

@@ -22,7 +22,7 @@ export interface NavFeatures {
   book: boolean;
 }
 
-export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'documents' | 'unanswered' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
 
 export interface NavItem {
   page: NavPage;
@@ -48,6 +48,8 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
     ['dashboard', 'Dashboard', '/admin/dashboard', can(role, 'dashboard:read')],
     ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read')],
     ['unanswered', 'Unanswered', '/admin/unanswered', can(role, 'unanswered:read')],
+    // S-16 (plan/conversations.md, D-115): every chat, every tenant.
+    ['conversations', 'Conversations', '/admin/conversations', can(role, 'conversations:read')],
     ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],
     // S-12 (plan/calendar.md, D-103): a view of the same bookings, so the same permission.
     ['calendar', 'Calendar', '/admin/calendar', features.bookings && can(role, 'bookings:read')],
@@ -72,6 +74,7 @@ const GROUP_OF: Readonly<Partial<Record<NavPage, NavGroup>>> = {
   dashboard: 'Overview',
   documents: 'Content',
   unanswered: 'Content',
+  conversations: 'Content',
   bookings: 'Bookings',
   calendar: 'Bookings',
   payments: 'Bookings',

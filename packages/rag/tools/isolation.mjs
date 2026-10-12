@@ -24,7 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import { mintPlatformToken, scopedClient } from '@rag/db';
 import { asOperator, supabase as service } from '@rag/db/service';
-import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, tenantDashboard, NO_ANSWER } from '../dist/index.js';
+import { loadTenant, listDocuments, getChunks, deleteDocument, answerQuestion, getMessages, ingestDocument, listUnanswered, resolveUnanswered, reopenUnanswered, getDocument, updateDocument, executeTool, tenantDashboard, listConversations, getTranscript, NO_ANSWER } from '../dist/index.js';
 let fail = 0;
 const check = (ok, label, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}  — ${detail}`); if (!ok) fail++; };
 const filtersOnly = process.argv.includes('--filters-only');
@@ -157,6 +157,28 @@ if (!filtersOnly) {
     dv.chat.openUnanswered === tv.open && dv.knowledge.documents === tv.docs && dh.chat.openUnanswered === th.open && dh.knowledge.documents === th.docs && (tv.docs !== th.docs || tv.open !== th.open),
     "the dashboard counts each tenant's own rows: villa's and harbor's figures equal their own truth and differ from each other",
     `villa open ${dv.chat.openUnanswered}/${tv.open} docs ${dv.knowledge.documents}/${tv.docs} · harbor open ${dh.chat.openUnanswered}/${th.open} docs ${dh.knowledge.documents}/${th.docs}`,
+  );
+}
+
+// 24. Conversations (D-115): villa's transcript of the chat above is villa's
+//     alone. Harbor's staff, on its operator token (RLS) or the service
+//     client (filters only), neither lists it nor reads it; northwind's chat
+//     context reads no transcript of it; villa's staff do both, two messages,
+//     a question and an answer (the positive twin, trap 12).
+{
+  const harborStaff = filtersOnly ? harbor : await asOperator(harbor);
+  const [lV, lH, tV, tH, tN] = await Promise.all([
+    listConversations(villaAdmin, { days: 7 }),
+    listConversations(harborStaff, { days: 90 }),
+    getTranscript(villaAdmin, aV.conversationId),
+    getTranscript(harborStaff, aV.conversationId),
+    getTranscript(nw, aV.conversationId),
+  ]);
+  check(
+    lV.rows.some((c) => c.id === aV.conversationId) && !lH.rows.some((c) => c.id === aV.conversationId)
+      && tV?.messages.map((m) => m.kind).join(',') === 'question,answer' && tH === null && tN === null,
+    'conversations: villa lists and reads its own chat; harbor and northwind get nothing',
+    `villa list ${lV.rows.length} (has it: ${lV.rows.some((c) => c.id === aV.conversationId)}) · harbor list ${lH.rows.length} · villa transcript ${tV?.messages.length} · harbor ${tH} · northwind ${tN}`,
   );
 }
 console.log(fail ? `\n${fail} FAILED` : '\nALL ISOLATION CHECKS PASS');

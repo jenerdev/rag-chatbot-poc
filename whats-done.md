@@ -8883,3 +8883,82 @@ screen.
 
 **Observed:** web typecheck exit 0. Not yet walked in a browser.
 
+
+## 2026-10-13 — Conversations: staff read every chat (D-115)
+
+**What was done:** `plan/conversations.md`, Phases 0–6, on
+`feat/conversations`, every § 7 recommendation taken by the user's
+instruction.
+- `sql/schema-conversations.sql` (the 28th file, run by Claude):
+  `conversation_list()`, `security invoker`, ONE statement that groups a
+  tenant's messages into one row per conversation (first question, turns,
+  refusals, first and last message), filtered by window, search and
+  only-refused, keyset-paged, with the filtered count. It refuses any
+  caller that is not a member of that tenant.
+- `@rag/pipeline` `conversations.ts`: `listConversations()` over it, and
+  `getTranscript()`, which names every message question, answer, refusal,
+  failed or interrupted, and says for a refusal whether Unanswered has it
+  resolved. `UnansweredQuestion` gained `conversationId`.
+- Web: `conversations:read` for every member; routes under
+  `/api/t/<slug>/admin/conversations[/<id>]`; S-16 (the list, filters in
+  the URL, server-side debounced search, Show more) and S-16a (the
+  transcript, `ReplyText` for the assistant, "Not answered" plus the words
+  the visitor saw, `?m=` focus); a Conversations item under Content with
+  its own icon; links from Unanswered rows and the dashboard's count.
+- Removed: `GET /api/t/<slug>/conversations/[id]/messages`, the one open
+  transcript read.
+
+**Why it matters:** staff saw refusals one question at a time and counts
+on the dashboard, but never a conversation: not the follow-up that went
+wrong, not the guest who asked three times, not an answered chat at all.
+
+**What the observed values prove:**
+- verify **172/172**. 168: a chat token and another tenant's id get 42501.
+  Its positive twin 169: the staff token lists exactly the two seeded chats
+  in the window, B then A, with 1/0 and 2/1 turns/refusals and A's first
+  question, and leaves out the empty conversation and the 60-day-old one.
+  170: "LANTERN" and "every sunday" find A, `%` finds 0 (it is a character,
+  not a pattern), only-refused is A. 171: a page of one says `more`, the
+  next page from its last row is the other chat. 172: 90 days brings the
+  old chat in, and 45 days is read as 30. The two baseline failures
+  (villa had no chats) pass now that villa has chats.
+- Pipeline isolation **24/24** on tokens and **22/22** on filters alone.
+  Check 24: villa's staff list and read the chat the suite just had; harbor's
+  staff do neither; northwind's context reads no transcript of it.
+- `plan/conversations-walk.mjs` **12/12** as a STAFF member: 401 signed
+  out; the list with the refusal counted and no villa chat; search and
+  only-refused; the transcript's kinds; a villa id, a malformed id and the
+  removed route all 404; Unanswered's `conversationId`; in Chrome, the
+  badge, the current sidebar item, the search narrowing to one row with the
+  URL keeping it, Back carrying the search, the table drawn as 4 cells, the
+  refusal focused at `?m=`, Unanswered's link, and a document width equal
+  to the viewport at 1280 and 390, light and dark. Nothing left behind.
+- The three prompt and tool snapshots byte-identical, before and after.
+- `conversation_list()` on a staff token over 90 days: median 114–122 ms
+  against a 107–127 ms floor for `app_role()` (one row), so the query is
+  lost in the PostgREST round trip at 8–36 messages a tenant. No trigram
+  index (§ 7 q6).
+- `pnpm eval` **56/61** (`original 8/10 · tool 9/9 · lang 8/10 · date
+  11/11 · rooms 13/13 · book 4/5 · price 3/3`). Repeated three times each:
+  `leak-2` and `book-for-me-harbor` fail 3 of 3, the same two failures
+  analysed on 2026-10-12 (the villa control refusing; the room offered
+  without naming the page); `lang-taglish` passes 3 of 3, `lang-tagalog-2`
+  1 of 3. No prompt text, tool text or chat write path changed.
+
+**Traps avoided:** a `stable` plpgsql function cannot write a temp table,
+so the first draft became one CTE statement before it was ever run. The
+failure markers are written in `conversations.ts`, not imported, so
+answer.ts's write path stays untouched (plan Rule 4). The walk's first
+run failed check 7 because next dev compiled the new page for longer than
+the 30 s wait; nothing was wrong with the page.
+
+**Accessibility:** `plan/conversations-a11y.mjs` (new) runs axe with the
+full audit's rules over the four pages this branch touched, as harbor's
+owner, light and dark, 1280 and 375: **16 states, 0 violations**. The full
+`ui-refresh-a11y.mjs` (with the two new states added to it) was stopped
+after about 45 minutes, still on northwind's login page: the dev server was
+answering in 11 s a page. Stopping it skipped its cleanup, so its two probe
+users (stamp 1791826807135) were deleted by hand. Three older pairs of
+`ui-a11y-*` users from earlier runs (2026-10-05 and two from 2026-10-12)
+are still in Supabase Auth; they were not this session's, so they were left.
+A full run is owed before merge.

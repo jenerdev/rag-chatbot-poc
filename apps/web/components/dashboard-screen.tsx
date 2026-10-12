@@ -248,10 +248,10 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           <section className="card">
             <h2>Chat, {windowLabel}</h2>
             <div className="stat-row">
-              <div className="stat">
+              <Link href={`${base}/conversations${data.days === 30 ? '' : `?days=${data.days}`}`} className="stat">
                 <strong>{data.chat.conversations}</strong>
                 <span>conversations</span>
-              </div>
+              </Link>
               <div className="stat">
                 <strong>{data.chat.visitorMessages}</strong>
                 <span>visitor messages</span>

@@ -30,6 +30,7 @@ const POSTGRES: Record<Permission, Role[]> = {
   'payments:settings': ADMIN_ONLY, // set_payment_settings() refuses unless app_is_admin()
   'unanswered:read': ANY_MEMBER, // unanswered_resolutions_read → app_is_staff()
   'unanswered:write': ANY_MEMBER, // unanswered_resolutions_insert/delete → app_is_staff()
+  'conversations:read': ANY_MEMBER, // conversation_list() refuses unless app_is_staff() (schema-conversations.sql)
   'members:manage': OWNER_ONLY, // memberships_owner_insert/update/delete
 };
 

@@ -18,6 +18,7 @@
 //   applications.ts  which applications (bookings, …) a tenant has switched on
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
 //   unanswered.ts  the questions the documents could not answer, for staff
+//   conversations.ts  every chat of a tenant, listed and read back, for staff (D-115)
 //   platform.ts    what a super user does to tenants: list, create, edit, archive, applications
 //   members.ts     who administers a tenant and as what, for owners and the platform alike
 
@@ -79,6 +80,8 @@ export {
 } from './platform.js';
 export type { NewTenant, PlatformContext, TenantDetail, TenantPatch, TenantSummary } from './platform.js';
 export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
+export { CONVERSATION_DAYS, CONVERSATION_PAGE_SIZE, conversationDays, getTranscript, listConversations, messageKind } from './conversations.js';
+export type { ConversationDays, ConversationPage, ConversationSummary, MessageKind, Transcript, TranscriptMessage } from './conversations.js';
 export { DASHBOARD_DAYS, dashboardDays, platformDashboard, tenantDashboard } from './dashboard.js';
 export type { PlatformPulse, TenantDashboard } from './dashboard.js';
 export type { Member } from './members.js';

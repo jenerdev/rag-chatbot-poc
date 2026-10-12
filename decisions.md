@@ -3671,3 +3671,63 @@ browser (list rows hold no buttons; pending shows Decline + Confirm only;
 Confirm through the dialog leaves Cancel stay only; a declined stay shows
 no actions; an unknown reference says "No such booking"; staff see Cancel
 stay; no sideways scroll at 390 px).
+
+---
+
+## D-115 · Staff read every chat, one transcript at a time · **Added 2026-10-13 (schema-conversations.sql)**
+
+**Decision:** `/t/<slug>/admin/conversations` (S-16) lists the tenant's
+chats, newest activity first, 25 a page by keyset, searchable over every
+message, over 7, 30 or 90 days, with "only with an unanswered question";
+`/t/<slug>/admin/conversations/<id>` (S-16a) shows one transcript as it was
+STORED, read-only. The list is ONE `security invoker` function,
+`conversation_list()` (`sql/schema-conversations.sql`, the 28th file),
+which refuses any caller that is not a member of that tenant
+(`app_is_staff()`), as `tenant_dashboard()` does: a chat token may read
+every message of its tenant by policy. The transcript is
+`getTranscript()`, two filtered reads on the staff token. A new
+permission, `conversations:read`, is given to every member, like
+Unanswered (plan § 7 q1). The routes are under `/api/t/<slug>/admin/`.
+
+A refusal is the NO_ANSWER marker (D-047), drawn as "Not answered" with the
+tenant's English fallback beside it ("The visitor saw: …"), since the
+reply language is not stored; answer.ts's two failure shapes are named
+"Request failed" and "Interrupted". Assistant text goes through
+`ReplyText` (D-091). Times are in the tenant's zone, not the browser's
+(trap 9). Unanswered rows link to the transcript at their refusal
+(`?m=`), so `UnansweredQuestion` now carries `conversationId` (staff
+only); the dashboard's conversation count links to the list.
+
+**Removed:** `GET /api/t/<slug>/conversations/[id]/messages`, the one
+OPEN transcript read (any transcript to anyone holding its uuid). Nothing
+in the UI called it; `getMessages()` stays for isolation and eval (§ 7 q5).
+
+**Not done, on purpose:** no sources or tool calls are stored per turn
+(§ 7 q3); no delete and no retention sweep (§ 7 q4, R-50); the platform
+reads no transcript (§ 7 q2: its token has no tenant claim, D-076); no
+trigram index (§ 7 q6, measured below). The chatbot is untouched: no
+prompt text, no tool text, no change to what a turn saves.
+
+**Why:** the user's call (2026-10-13): staff could see a refusal one
+question at a time (Unanswered) and counts (the dashboard), but not a
+conversation, an answered one included.
+
+**Measured:** verify **172/172** (168–172: a chat token and a foreign id
+refused; the staff token lists exactly the two chats in the window with
+their counts; search, `%` literal, only-refused; keyset paging; the
+90-day window); pipeline isolation **24/24** on tokens and **22/22** on
+filters alone (24: villa lists and reads its own chat, harbor and
+northwind get nothing); `plan/conversations-walk.mjs` **12/12** as a
+STAFF member, over HTTP and in a browser, no sideways scroll at 390 px;
+the three prompt and tool snapshots byte-identical. On a staff token,
+`conversation_list()` over 90 days takes a median 114–122 ms against a
+107–127 ms floor (`app_role()`, one row) through PostgREST
+(`plan/conversations-timing.mjs`): the query is lost in the round trip.
+Axe 0 violations over 16 page states (`plan/conversations-a11y.mjs`).
+`pnpm eval` 56/61, all of it the known set: `leak-2` and
+`book-for-me-harbor` 3 of 3 on repeat, as recorded on 2026-10-12 (trap 24).
+
+**Reverse if:** a tenant's search on a staff token passes 100 ms above
+that floor (add `pg_trgm` on `messages.content`), or staff need to see
+what an answer was built from (store sources per turn: a write-path
+change and a plan of its own).

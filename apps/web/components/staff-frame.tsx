@@ -35,6 +35,7 @@ const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   dashboard: 'chart',
   documents: 'file',
   unanswered: 'help',
+  conversations: 'messages',
   bookings: 'calendar',
   calendar: 'calendar-grid',
   rooms: 'bed',

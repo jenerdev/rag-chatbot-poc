@@ -72,10 +72,13 @@ export async function listUnanswered(
   for (const refusal of refusals) {
     const question = questions.find((q) => q.conversation_id === refusal.conversation_id && q.id < refusal.id);
     if (!question) continue;
-    // Mapped field by field, never spread (CLAUDE.md rule 7's habit): the
-    // conversation id stays on the server.
+    // Mapped field by field, never spread (CLAUDE.md rule 7's habit). The
+    // conversation id goes to staff only (the route is admin-only), so a row
+    // can open its transcript on S-16a (D-115); it is no key to anything a
+    // staff member could not already read there.
     unanswered.push({
       id: refusal.id,
+      conversationId: refusal.conversation_id,
       question: question.content,
       askedAt: refusal.created_at,
       // An array of at most one: PostgREST embeds it to-many (database.types.ts).

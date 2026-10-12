@@ -336,6 +336,9 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
                     <span className="unanswered-when">
                       Asked {askedLabel(q.askedAt)}
                       {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
+                      {' · '}
+                      {/* S-16a (D-115): the whole chat, scrolled to this refusal. */}
+                      <Link href={`/t/${slug}/admin/conversations/${q.conversationId}?m=${q.id}`}>View conversation</Link>
                     </span>
                   </div>
                   {tab === 'open' && canAnswer && (

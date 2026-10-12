@@ -13,7 +13,7 @@
 // The DATABASE's view of this table is two functions, and they must agree:
 //   app_is_admin()  = owner | admin  → every *:write except bookings and unanswered,
 //                                       and the rooms, holidays and slots reads
-//   app_is_staff()  = any member     → bookings, unanswered, session, every other read
+//   app_is_staff()  = any member     → bookings, unanswered, conversations, session, every other read
 // permissions.test.ts pins the two views to each other, by hand, permission
 // by permission. A permission only one wall knows about is a bug (plan Rule 2).
 
@@ -51,12 +51,14 @@ export const PERMISSIONS = [
   'unanswered:read',
   /** resolve and reopen */
   'unanswered:write',
+  /** S-16 Conversations (D-115): every chat's transcript; any member, like Unanswered (§ 7 q1); conversation_list() asks app_is_staff() again */
+  'conversations:read',
   /** the Members screen: list, add an existing account, change a role, remove */
   'members:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'payments:read', 'unanswered:read', 'unanswered:write'];
+const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'payments:read', 'unanswered:read', 'unanswered:write', 'conversations:read'];
 const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write', 'payments:write', 'payments:settings'];
 const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
 

@@ -219,6 +219,21 @@
 > Since D-113 (`schema-staff-terms.sql`, the 27th file) a staff stay born
 > pending is paid for like a web one (amount due and pay-by deadline, the
 > countdown on S-13, expiry); a walk-in owes the amount with no deadline.
+>
+> **Staff read every chat** since 2026-10-13 (D-115,
+> [`plan/conversations.md`](./plan/conversations.md), Phases 0–6, walk
+> included). S-16 `/t/<slug>/admin/conversations` lists a tenant's chats
+> (search over every message, 7/30/90 days, only-unanswered, keyset pages)
+> from ONE `security invoker` function, `conversation_list()`
+> (`sql/schema-conversations.sql`, the 28th file), which refuses a
+> non-member itself, because a chat token may read every message by
+> policy. S-16a `/admin/conversations/<id>` is one transcript as STORED,
+> read-only: a refusal drawn as "Not answered" with the fallback the visitor
+> saw, times in the tenant's zone. `conversations:read` is every member's.
+> The open `/conversations/[id]/messages` route is GONE. Unanswered rows
+> link in (`conversationId`, staff only). Transcripts are kept
+> indefinitely (R-50). The chatbot is untouched: the three baselines are
+> byte-identical.
 
 ## What this is
 
@@ -262,6 +277,8 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
   app/t/[tenant]/admin/bookings/[reference]/page.tsx  S-15 one booking (D-114): EVERY action on a stay is here; lists link to it
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
+  app/t/[tenant]/admin/conversations/page.tsx  S-16 conversations (D-115) — every member (conversations:read), every tenant; filters in the URL
+  app/t/[tenant]/admin/conversations/[id]/page.tsx  S-16a one transcript, read-only; ?m= scrolls to a message; the route is /api/t/[tenant]/admin/conversations/[id]
   app/t/[tenant]/admin/accommodations/page.tsx  S-5 rooms — 404 unless the tenant books per_room
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
   app/t/[tenant]/book/page.tsx   S-6 the customer booking page — PUBLIC; 404 unless the tenant has a priced unit
@@ -278,7 +295,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (the list of stays, D-112), accommodations-screen, unanswered-screen, booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos and a lightbox, D-094), admin-screen, bookings-screen (the list of stays, D-112), accommodations-screen, unanswered-screen, conversations-screen and transcript-screen (S-16, D-115), booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
@@ -294,6 +311,7 @@ apps/web/              Next.js 15, App Router
   lib/env.ts             fail-fast config (D-023)
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser
   lib/money.ts           centavos ↔ pesos, by string, never × 100 — browser-safe
+  lib/conversation-words.ts  S-16's filters ↔ the URL, times in the TENANT's zone — pure, tested
   lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
@@ -307,11 +325,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (27 files; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (28 files; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     161 checks (159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     172 checks (168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -341,11 +359,12 @@ packages/
     src/tables.ts          pipeTable(): the ONE writer of a table into a reply (D-091); the browser's parser draws exactly this shape
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
     tools/prompt-eval.mjs  the battery, 61 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-* + 3 price-*), three tenants; seeds its own bookings
+    src/conversations.ts   listConversations (over conversation_list()) and getTranscript, for staff: every message named question, answer, refusal, failed or interrupted (D-115)
     src/unanswered.ts      listUnanswered / resolve / reopen, one or many (the S-4 checkboxes): the questions answered with NO_ANSWER, for staff (D-045)
     src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
     src/members.ts         list (with emails), add an existing account, change a role, remove — shared by owners and the platform
     src/dashboard.ts       the dashboard's typed shapes over tenant_dashboard() and platform_dashboard(), the parser, the days clamp (D-098)
-    tools/isolation.mjs    23 cross-tenant checks through the pipeline (21 and 22, RLS only: a platform token reads nothing, and gets 403 from a tenant's dashboard; 23: each tenant's dashboard counts equal its own truth)
+    tools/isolation.mjs    24 cross-tenant checks through the pipeline (21 and 22, RLS only: a platform token reads nothing, and gets 403 from a tenant's dashboard; 23: each tenant's dashboard counts equal its own truth; 24: a chat is listed and read by its own tenant's staff only)
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -367,11 +386,11 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 161 checks, no API key needed
+pnpm --filter @rag/db verify    # 172 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
-pnpm --filter @rag/pipeline isolation   # 23 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
-pnpm --filter @rag/pipeline isolation -- --filters-only   # 21 of them, code filters alone (RLS bypassed)
+pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
+pnpm --filter @rag/pipeline isolation -- --filters-only   # 22 of them, code filters alone (RLS bypassed)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
 pnpm --filter @rag/bookings isolation   # 33 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 33, code filters alone
@@ -382,6 +401,7 @@ pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 d
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) six login and three role cases, needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/conversations-walk.mjs)   # 12 checks of S-16 as a STAFF member, HTTP and browser, screenshots in plan/conversations/walk/; needs pnpm dev; conversations-a11y.mjs is axe over its four pages (16 states)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/unanswered-bulk-walk.mjs)   # 11 HTTP checks of resolving several unanswered questions at once, needs pnpm dev; unanswered-bulk-browser-walk.mjs the same 12 in a browser
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/tenant-management-phase4-walk.mjs)   # the platform and members routes over HTTP, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin

@@ -56,6 +56,24 @@
 
 ## ▶ Next up (do this next)
 
+**Conversations: staff read every chat (2026-10-13, D-115).**
+- [x] S-16 `/admin/conversations` and S-16a `/admin/conversations/<id>`, on
+  `conversation_list()` (`schema-conversations.sql`, the 28th file, run by
+  Claude); `conversations:read` for every member; Unanswered links in;
+  the open `/conversations/[id]/messages` route removed. verify 172/172,
+  pipeline isolation 24/24 and 22/22, walk 12/12 as staff, snapshots
+  byte-identical, web tests 140, pipeline tests 366. Eval 56/61: the
+  known set (antecedent; leak-2 and book-for-me-harbor 3 of 3 on repeat,
+  the same failures recorded 2026-10-12; lang-taglish 3/3 and
+  lang-tagalog-2 1/3 on repeat).
+- [x] Axe: `plan/conversations-a11y.mjs`, 16 page states (Conversations, a
+  transcript, Unanswered, Dashboard; light/dark; 1280/375), 0 violations.
+  The full `ui-refresh-a11y.mjs` (now with both new states) was stopped
+  after ~45 min at northwind's login: dev answered in 11 s a page under
+  load. Its own probe users were deleted by hand. Owed: one full run.
+- [ ] The bundle grep (CLAUDE.md rule 2) needs `next build`: stop `pnpm dev` first (trap 16).
+- [ ] The user's look at S-16 and a transcript; then commit and merge `feat/conversations`.
+
 **Rooms, Holidays, Slots and Promos, with their drawers, redesigned (2026-10-12).**
 - [x] One drawer pattern: an intro line, hints, choices as cards (holiday
   kind; promo discount and how a guest gets it; Nightly), a live sentence
@@ -1725,6 +1743,27 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   with the same token: the documents pages re-audited at 0 (64 states).
   Calendar shots: 1280/390, no sideways scroll, no console errors, layout
   unchanged.
+
+### 2026-10-13 — Conversations built (D-115)
+- **Did:** every § 7 recommendation taken; Phases 0–6 of
+  `plan/conversations.md` on `feat/conversations` (see Next up).
+- **Observed:** `conversation_list()` on a staff token, median 114–122 ms
+  against a 107–127 ms `app_role()` floor: no index needed (§ 7 q6).
+  The walk's first run failed 7 on next dev compiling the new page
+  (over 30 s); the second run 12/12.
+- **Next:** the bundle grep (dev stopped), one full axe run, the user's look.
+
+### 2026-10-13 — the Conversations plan, written
+- **Did:** `plan/conversations.md`: S-16, a staff list of a tenant's chats
+  and a page per transcript, over one staff-gated `security invoker`
+  function (`conversation_list()`, the 28th SQL file), no table change, no
+  chatbot change. Six phases; § 7 has six open questions, each with a
+  recommendation. The record will be D-115 and R-50.
+- **Observed:** `messages_read` lets ANY tenant token read every message,
+  the chat token included, so the function must refuse a non-staff caller
+  itself; `GET /conversations/[id]/messages` is open and nothing in the UI
+  calls it (§ 7 q5).
+- **Next:** answer § 7, then Phase 0.
 
 ### 2026-10-13 — the platform index, redesigned
 - **Did:** `/platform`'s list (`platform-screen.tsx`): a page title with

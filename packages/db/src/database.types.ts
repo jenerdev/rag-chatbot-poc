@@ -816,6 +816,19 @@ export interface Database {
     };
     Views: Record<never, never>;
     Functions: {
+      /** schema-conversations.sql (D-115): one page of the tenant's chats in one JSON; refuses a non-member */
+      conversation_list: {
+        Args: {
+          p_tenant_id: number;
+          p_days?: number;
+          p_query?: string | null;
+          p_refused?: boolean;
+          p_before_at?: string | null;
+          p_before_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: Json;
+      };
       /** schema-dashboard.sql (D-098): the tenant's page in one JSON; refuses a non-member; `bookings.money` null unless admin */
       tenant_dashboard: {
         Args: { p_tenant_id: number; p_days?: number };

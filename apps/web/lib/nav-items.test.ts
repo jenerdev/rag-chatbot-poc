@@ -16,20 +16,20 @@ describe('navItems', () => {
   });
 
   it('shows staff the daily work, and no admin-only page', () => {
-    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Bookings', 'Calendar', 'Payments']);
+    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments']);
   });
 
   it('adds rooms and holidays for an admin, but not members', () => {
-    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos']);
+    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos']);
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos', 'Members']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Bookings', 'Calendar', 'Payments', 'Holidays', 'Slots', 'Promos', 'Members']);
-    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Knowledge base', 'Unanswered', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Holidays', 'Slots', 'Promos', 'Members']);
+    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Members']);
   });
 
   it('links each page under the tenant', () => {
@@ -39,6 +39,7 @@ describe('navItems', () => {
       '/t/harbor/admin/dashboard',
       '/t/harbor/admin/documents',
       '/t/harbor/admin/unanswered',
+      '/t/harbor/admin/conversations',
       '/t/harbor/admin/bookings',
       '/t/harbor/admin/calendar',
       '/t/harbor/admin/payments',
@@ -59,7 +60,7 @@ describe('groupNavItems', () => {
 
   it("sections an owner's harbor links, Chat and Book apart", () => {
     expect(sections(HARBOR, 'owner')).toEqual({
-      groups: ['Overview: Dashboard', 'Content: Knowledge base, Unanswered', 'Bookings: Bookings, Calendar, Payments, Rooms, Holidays, Slots, Promos', 'Team: Members'],
+      groups: ['Overview: Dashboard', 'Content: Knowledge base, Unanswered, Conversations', 'Bookings: Bookings, Calendar, Payments, Rooms, Holidays, Slots, Promos', 'Team: Members'],
       publicItems: ['Chat', 'Book'],
     });
   });

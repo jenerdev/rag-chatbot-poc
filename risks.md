@@ -740,6 +740,18 @@ by contacting the resort. Email waits for deployment and a sender domain.
 
 ---
 
+## R-50 · Chat transcripts are guest PII, kept indefinitely · **Accepted 2026-10-13 (D-115)**
+
+Visitors type names, phone numbers and dates into the chat, and every turn
+is saved. Since D-115 every member of a tenant can read every transcript on
+S-16, as they could already read each refused question on Unanswered.
+Nothing deletes a transcript: there is no retention sweep and no delete
+button (a delete would also cascade away Unanswered's history). The open
+uuid-keyed transcript route was removed at the same time. A retention
+policy is a decision for before real guests, like R-48's.
+
+---
+
 ## Explicitly still missing after tenancy
 
 Not risks of the build as it stands, but things a real multi-tenant product

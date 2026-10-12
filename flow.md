@@ -311,7 +311,9 @@ return 404, with no redirect.
 | `GET` | `/t/<slug>` | chat page | `app/t/[tenant]/page.tsx` → `ChatScreen` | public |
 | `GET` | `/t/<slug>/admin` | knowledge base page | `app/t/[tenant]/admin/page.tsx` → `AdminScreen` | public page, admin data |
 | `POST` | `/api/t/<slug>/chat` | ask — SSE or JSON | `answerQuestionStream` / `answerQuestion` | open |
-| `GET` | `/api/t/<slug>/conversations/:id/messages` | reload a transcript (404 if not this tenant's) | `getMessages` | open |
+| `GET` | `/t/<slug>/admin/conversations`, `…/conversations/:id` | S-16 the chats / S-16a one transcript, read-only (D-115) | `ConversationsScreen` / `TranscriptScreen` | public page, staff data |
+| `GET` | `/api/t/<slug>/admin/conversations` | one page of chats: `?days=7\|30\|90&q=&refused=1&before=&beforeId=`, from `conversation_list()`, which refuses a non-member itself | `listConversations` | admin (any member) |
+| `GET` | `/api/t/<slug>/admin/conversations/:id` | one transcript, every message named; 404 if not this tenant's. (The OPEN `/conversations/:id/messages` was removed, D-115.) | `getTranscript` | admin (any member) |
 | `GET` | `/t/<slug>/admin/reset` | set a password from an invite or reset link | `app/t/[tenant]/admin/reset/page.tsx` → `ResetPassword` | public |
 | `POST` / `GET` / `DELETE` | `/api/t/<slug>/admin/session` | log in (email + password) / status / log out | `lib/admin-auth.ts` | open |
 | `POST` | `/api/t/<slug>/admin/password-reset`, `…/admin/password` | email a reset link / set the new password | `@rag/db` `staff-auth.ts` | open |
@@ -380,7 +382,7 @@ decline the whole group; `bookings_no_overlap` decides a clash at confirm.
 - The member's ROLE (`memberships.role`, read from the row on every
   request) must hold the permission, from the one table in
   `lib/permissions.ts`: owner everything; admin the knowledge base, rooms,
-  holidays and bookings; staff bookings and unanswered, the knowledge base
+  holidays and bookings; staff bookings, unanswered and conversations, the knowledge base
   read-only; every role the dashboard. Otherwise a 403 that names both.
 - The handler then runs on a **staff** token, so Postgres reads the same
   row again on every write (`app_role()` under `app_is_admin()` and
