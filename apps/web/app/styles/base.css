@@ -215,7 +215,8 @@ button[aria-busy="true"]::before {
 
 /* A segmented control: one choice of a few, aria-pressed on the chosen one
    (the dashboard's window; plan/ui-refresh.md Phase 6). */
-.segmented { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-md); background: var(--surface-3); }
+.segmented { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-md); background: var(--surface-3); 
+    margin-bottom: var(--space-3);}
 .segmented button { min-height: 28px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; box-shadow: none; color: var(--muted-on-surface); font-size: var(--text-xs); }
 .segmented button:hover:not(:disabled) { background: transparent; color: var(--ink); }
 .segmented button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-1); font-weight: 600; }
