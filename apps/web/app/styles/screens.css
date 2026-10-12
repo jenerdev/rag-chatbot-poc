@@ -5,12 +5,28 @@
 
 /* --- admin (S-2; plan/ui-refresh.md Phase 8) ------------------------------ */
 
-/* The editor, in the drawer: tall, in the reading face. */
-.doc-form #content { min-height: 48vh; resize: vertical; font-size: var(--text-sm); line-height: 1.6; }
+/* The editor, in the drawer (redesigned 2026-10-12): a one-line intro,
+   each field with its hint, the text with a file loader and a live meter,
+   two disclosures (how it will be split, writing tips), then the drawer's
+   pinned footer saying what is still missing. */
+.doc-form-intro { margin: 0 0 var(--space-4); }
+.doc-form .hint { margin-top: var(--space-1); }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1); }
+.label-row label { margin: 0; }
+.file-pick { display: inline-flex; align-items: center; gap: var(--space-1); cursor: pointer; font-weight: 500; }
+.file-pick:focus-within { box-shadow: 0 0 0 3px var(--ring); }
+.doc-form #content { min-height: 34vh; resize: vertical; font-size: var(--text-sm); line-height: 1.6; }
+.content-meter { display: flex; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-1); font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.content-meter.over { color: var(--danger); font-weight: 600; }
 .estimate.over { color: var(--danger); font-weight: 600; }
-/* In the drawer: the count on its own line, Cancel and the action together on the right. */
-.doc-form .form-footer { justify-content: flex-end; }
-.doc-form .form-footer .estimate { flex-basis: 100%; margin-right: 0; }
+.doc-disclosure { margin-bottom: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.doc-disclosure summary { cursor: pointer; font-size: var(--text-sm); font-weight: 600; }
+.doc-disclosure[open] summary { margin-bottom: var(--space-2); }
+.doc-disclosure ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); }
+.doc-disclosure > p { margin: 0 0 var(--space-2); }
+.chunk-preview { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); max-height: 40vh; overflow-y: auto; }
+.chunk-preview li { display: grid; gap: 2px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-2); }
+.chunk-preview-text { font-size: var(--text-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .doc {
   border: 1px solid var(--line);
@@ -984,4 +1000,47 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
 .contact-row { display: flex; gap: var(--space-1); min-width: 0; }
 .stay-contact > * { min-width: 0; }
 .contact-row .button { flex: 1; min-width: 0; }
+
+/* The dashboard, regrouped (2026-10-12): "Needs attention" lists only what
+   waits, each row a link with its count; "All clear" when nothing does. A
+   chart with nothing in it is a sentence (.chart-empty). */
+.attention h2, .today h2 { margin: 0 0 var(--space-3); }
+.todo-list { display: grid; }
+.todo-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-2); border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; border-radius: var(--radius-md); }
+.todo-row:first-child { border-top: 0; }
+.todo-row:hover { background: var(--surface-2); }
+.todo-row:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.todo-row > svg { color: var(--muted); }
+.todo-count { display: flex; align-items: center; justify-content: center; height: 36px; border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.todo-row.urgent .todo-count { background: var(--danger-soft); color: var(--danger); }
+.todo-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.todo-what { font-weight: 600; }
+.all-clear { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--ok); font-weight: 500; }
+.today-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.today-head h2 { margin: 0; }
+.today-counts { display: flex; gap: var(--space-4); color: var(--muted); font-size: var(--text-sm); }
+.today-counts strong { color: var(--ink); font-size: var(--text-lg); font-variant-numeric: tabular-nums; margin-right: 2px; }
+.today > p, .today > h3 { margin-top: var(--space-3); }
+.chart-empty { margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); text-align: center; }
+
+/* The knowledge base: what the documents miss (a callout to S-4), then the
+   list with one summary line. */
+.callout { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; border-color: var(--warn-line); background: var(--warn-soft); }
+.callout > svg { flex: none; color: var(--ink); }
+.callout p { flex: 1 1 260px; margin: 0; }
+.kb-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.kb-head h2 { margin: 0; }
+.kb-intro { margin: var(--space-1) 0 var(--space-3); }
+
+/* Unanswered: how to close a gap, in three steps; each row's two actions. */
+.steps-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0 0 var(--space-4); padding: 0; list-style: none; counter-reset: step; }
+.steps-strip li { counter-increment: step; display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--text-sm); color: var(--muted); }
+.steps-strip li::before { content: counter(step); margin-right: var(--space-2); vertical-align: 1px; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--panel); border: 1px solid var(--line-strong); color: var(--ink); font-size: var(--text-xs); font-weight: 600; }
+.steps-strip strong { color: var(--ink); }
+.unanswered > .button, .unanswered > button { flex: none; }
+@media (max-width: 720px) {
+  .steps-strip { grid-template-columns: minmax(0, 1fr); }
+  .unanswered { flex-wrap: wrap; }
+  .unanswered-text { flex-basis: calc(100% - 40px); }
+}
 

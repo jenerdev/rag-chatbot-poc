@@ -27,6 +27,8 @@ const PATHS = {
       <path d="M13 7V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v6.5A1.5 1.5 0 005 13h2" />
     </>
   ),
+  // Two arrows round: reload a list (Unanswered's Refresh).
+  refresh: <path d="M16 4v4h-4M4 16v-4h4M15.3 8A6 6 0 004.6 7.5M4.7 12a6 6 0 0010.7.5" />,
   // A handset, and an envelope: the guest's two contacts on a booking's page (D-114).
   phone: <path d="M6.5 3.5H4.8a1.3 1.3 0 00-1.3 1.4c.6 6.2 5.4 11 11.6 11.6a1.3 1.3 0 001.4-1.3v-1.7l-3.2-1.3-1.6 1.6a9 9 0 01-4.6-4.6l1.6-1.6z" />,
   mail: (

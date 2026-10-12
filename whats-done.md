@@ -8609,3 +8609,55 @@ decision today or ended weeks ago; the status hid among five badges.
 (pending → Needs a decision, checking in today → Staying now with
 "Arrives today", Saturday → Upcoming). The stay-detail walk passed three
 runs in a row once its dialog step waited for the dialog to settle.
+
+## 2026-10-12 — the dashboard, the knowledge base and Unanswered, redesigned
+
+**What was done:** the dashboard's six equal to-do tiles (five reading 0)
+became one "Needs attention" card listing only what waits, the urgent first
+(proofs, change requests, clashes), each a link with its count and what to
+do, or "All clear"; Today is one line of counts; a chart with nothing in it
+is a sentence; Bookings and Revenue sit side by side. The knowledge base
+says when questions go unanswered (a callout to S-4), has one summary line
+("8 documents · 30 chunks · newest 28 Sept 2026") and dates like the rest
+of the app. Unanswered shows the three steps to close a gap, the count in
+its tab, a Refresh icon, and "Add answer" on each question, which opens the
+knowledge base's form holding the question as its title and a
+"Question: … / Answer: " start.
+
+**Why it matters:** the one figure that needed eyes (5 unanswered) sat
+among zeros; empty charts read as broken; nothing led from a gap to the
+place it is closed.
+
+**What the observed values prove:** `plan/pages-shots.mjs` on villa with
+eight seeded chats (five refused): the dashboard lists exactly "5
+questions the assistant could not answer"; "Add answer" on "How far is
+the beach?" opened the form with that title and cleaned the address; no
+console error; every page exactly 1280 or 390 px wide. The existing
+Unanswered bulk walk passed 12/12 twice on harbor seeds (it failed once
+when run right after the edits, while the dev server recompiled; the
+committed screen passed on the same seeds).
+
+## 2026-10-12 — the Add a document drawer, redesigned
+
+**What was done:** the drawer opens with one line on what the assistant
+does with a document; Title and Source each say what they are for;
+Content has "Load a text file" (a .txt or .md file's text, read in this
+browser, also filling an empty Title and Source), a live meter (characters
+against the limit, the chunk estimate), and below it "How it will be
+split", which runs the same `chunkText()` the server runs (the package has
+no I/O, so the browser runs it) on a deferred copy of the text, only while
+open. "Tips for answers guests get right" holds four lines of advice. The
+footer stays in view and says what is still missing ("Add a title", "Add
+the content", "N characters over the limit") or "Ready to add."; Add waits
+for it.
+
+**Why it matters:** a staff member could not see how their text would be
+cut before embedding it, and the only feedback was a jargon line beside
+the buttons.
+
+**What the observed values prove:** the walk loaded villa's own
+directions document through the file picker (Title and Source filled from
+the file name), the preview listed 3 chunks (956, 968 and 815 characters),
+and saving stored exactly 3 chunks: the preview is the server's split,
+not an estimate. The probe document was deleted, so villa's corpus is as
+the battery expects.

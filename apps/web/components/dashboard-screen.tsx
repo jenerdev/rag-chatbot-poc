@@ -8,9 +8,11 @@
 // withholds (null) by role; every count that is a to-do links to the screen
 // that does it. The charts are inline SVG (bar-chart.tsx), no library.
 //
-// The look (plan/ui-refresh.md Phase 6): the to-dos first, as tiles that are
-// links (a count that needs eyes is red and says so with an icon, never by
-// colour alone); the window as a segmented control; the rest in cards.
+// The look (plan/ui-refresh.md Phase 6, regrouped 2026-10-12): the to-dos
+// first, as ONE "Needs attention" card that lists only what is waiting, each
+// a link to the screen that does it, or says "All clear"; a count is never
+// shown as a zero tile beside the one that matters. A chart with nothing in
+// it is a sentence, not an empty plot. The window is a segmented control.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -20,7 +22,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { BarChart, SplitBar } from '@/components/bar-chart';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
@@ -49,19 +51,32 @@ function dayWithWeekday(date: string): string {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
-/** A to-do count: a link to the screen that resolves it. */
-function Tile({ href, label, value, hint, warn }: { href: string; label: string; value: number; hint?: string; warn?: boolean }) {
+/** One to-do waiting: its count, what it is, and a link to the screen that does it. */
+interface Todo {
+  href: string;
+  count: number;
+  /** singular and plural, e.g. ['booking request waits', 'booking requests wait'] */
+  words: [string, string];
+  hint: string;
+  urgent?: boolean;
+}
+
+function TodoRow({ todo }: { todo: Todo }) {
   return (
-    <Link href={href} className={warn ? 'stat-tile warn' : 'stat-tile'}>
-      <span className="stat-tile-label">
-        {warn && <Icon name="alert" size={14} />}
-        {label}
+    <Link href={todo.href} className={`todo-row${todo.urgent ? ' urgent' : ''}`}>
+      <strong className="todo-count">{todo.count}</strong>
+      <span className="todo-text">
+        <span className="todo-what">{todo.count === 1 ? todo.words[0] : todo.words[1]}</span>
+        <span className="small muted">{todo.hint}</span>
       </span>
-      <strong className="stat-tile-value">{value}</strong>
-      {hint && <span className="stat-tile-hint">{hint}</span>}
-      <Icon name="chevron-right" size={16} className="stat-tile-go" />
+      <Icon name="chevron-right" size={16} />
     </Link>
   );
+}
+
+/** A chart with nothing to draw is a sentence instead (an empty plot reads as broken). */
+function ChartOr({ bars, empty, children }: { bars: { value: number }[]; empty: string; children: React.ReactNode }) {
+  return bars.some((b) => b.value > 0) ? <>{children}</> : <p className="small muted chart-empty">{empty}</p>;
 }
 
 export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, currency }: DashboardScreenProps) {
@@ -149,6 +164,19 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
   const b = data.bookings;
   const money = (centavos: number) => formatMoney(centavos, currency);
   const windowLabel = `last ${data.days} days`;
+  // Only what waits, the urgent first: money and guests before housekeeping.
+  const todos: Todo[] = [
+    ...(b
+      ? [
+          { href: `${base}/payments`, count: b.attention.proofsToVerify, words: ['proof of payment to verify', 'proofs of payment to verify'], hint: 'Check the account, then verify or reject.', urgent: true },
+          { href: `${base}/payments`, count: b.attention.changeRequests, words: ['guest asks to cancel or move', 'guests ask to cancel or move'], hint: 'Approve or reject on the booking.', urgent: true },
+          { href: `${base}/bookings`, count: b.attention.clashing, words: ['pending stay would clash', 'pending stays would clash'], hint: 'A night is already taken. Decline it, or free the night.', urgent: true },
+          { href: `${base}/bookings`, count: b.attention.pendingRequests, words: ['booking request waits', 'booking requests wait'], hint: 'From the booking page: confirm or decline.' },
+          { href: `${base}/bookings`, count: b.attention.pendingStaff, words: ['staff booking is unconfirmed', 'staff bookings are unconfirmed'], hint: 'Made here, not confirmed yet.' },
+        ]
+      : []),
+    { href: `${base}/unanswered`, count: data.chat.openUnanswered, words: ['question the assistant could not answer', 'questions the assistant could not answer'], hint: 'Add the answers to the knowledge base.' },
+  ].filter((t) => t.count > 0) as Todo[];
 
   return (
     <>
@@ -166,41 +194,38 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           </div>
         </div>
 
-        <section className="stat-tiles" aria-label="Needs attention">
-          {b && (
-            <>
-              <Tile href={`${base}/bookings`} label="Requests waiting" value={b.attention.pendingRequests} />
-              <Tile href={`${base}/bookings`} label="Staff bookings unconfirmed" value={b.attention.pendingStaff} />
-              <Tile href={`${base}/payments`} label="Proofs to verify" value={b.attention.proofsToVerify} warn={b.attention.proofsToVerify > 0} />
-              <Tile href={`${base}/payments`} label="Change requests" value={b.attention.changeRequests} warn={b.attention.changeRequests > 0} />
-              <Tile
-                href={`${base}/bookings`}
-                label="Would clash on Confirm"
-                hint="A night already confirmed, or wanted by another pending stay"
-                value={b.attention.clashing}
-                warn={b.attention.clashing > 0}
-              />
-            </>
+        {/* The to-dos: only what waits, each a link; "All clear" when nothing does. */}
+        <section className="card attention" aria-labelledby="attention-title">
+          <h2 id="attention-title">Needs attention</h2>
+          {todos.length === 0 ? (
+            <p className="all-clear">
+              <Icon name="check" size={16} /> All clear: nothing is waiting for you.
+            </p>
+          ) : (
+            <div className="todo-list">
+              {todos.map((t) => (
+                <TodoRow key={t.words[1]} todo={t} />
+              ))}
+            </div>
           )}
-          <Tile href={`${base}/unanswered`} label="Unanswered questions" value={data.chat.openUnanswered} warn={data.chat.openUnanswered > 0} />
         </section>
 
         {b && (
-          <section className="card">
-            <h2>Today</h2>
-            <div className="stat-row">
-              <div className="stat">
-                <strong>{b.today.checkIns}</strong>
-                <span>check-in{b.today.checkIns === 1 ? '' : 's'}</span>
-              </div>
-              <div className="stat">
-                <strong>{b.today.checkOuts}</strong>
-                <span>check-out{b.today.checkOuts === 1 ? '' : 's'}</span>
-              </div>
+          <section className="card today">
+            <div className="today-head">
+              <h2>Today</h2>
+              <span className="today-counts">
+                <span>
+                  <strong>{b.today.checkIns}</strong> check-in{b.today.checkIns === 1 ? '' : 's'}
+                </span>
+                <span>
+                  <strong>{b.today.checkOuts}</strong> check-out{b.today.checkOuts === 1 ? '' : 's'}
+                </span>
+              </span>
             </div>
             {b.today.next7.length > 0 ? (
               <>
-                <h3 className="small muted">Next 7 days, confirmed</h3>
+                <h3 className="small muted">Arriving in the next 7 days, confirmed</h3>
                 <ul className="dashboard-list">
                   {b.today.next7.map((n, i) => (
                     <li key={i}>
@@ -214,9 +239,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
                 </ul>
               </>
             ) : (
-              <EmptyState icon="calendar" title="No arrivals this week" compact>
-                No confirmed check-ins in the next 7 days.
-              </EmptyState>
+              <p className="small muted">No confirmed arrivals in the next 7 days.</p>
             )}
           </section>
         )}
@@ -238,7 +261,9 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
                 <span>refusals ({data.chat.refusalRate} %)</span>
               </div>
             </div>
-            <BarChart title={`Conversations per day, ${windowLabel}`} bars={data.chat.perDay.map((d) => ({ label: dayLabel(d.day), value: d.conversations }))} />
+            <ChartOr bars={data.chat.perDay.map((d) => ({ value: d.conversations }))} empty={`No conversations in the ${windowLabel}.`}>
+              <BarChart title={`Conversations per day, ${windowLabel}`} bars={data.chat.perDay.map((d) => ({ label: dayLabel(d.day), value: d.conversations }))} />
+            </ChartOr>
           </section>
 
           <section className="card">
@@ -256,6 +281,13 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
             <p className="small muted">
               {data.knowledge.newest ? `Newest: "${data.knowledge.newest.title}", ${dayLabel(data.knowledge.newest.createdAt.slice(0, 10))}.` : 'No documents yet.'}
             </p>
+            {data.chat.openUnanswered > 0 && (
+              <p className="small">
+                <Link href={`${base}/unanswered`}>
+                  {data.chat.openUnanswered} question{data.chat.openUnanswered === 1 ? '' : 's'} the documents could not answer
+                </Link>
+              </p>
+            )}
             <h3 className="small muted">Team</h3>
             <p className="small">
               {data.team.owners} owner{data.team.owners === 1 ? '' : 's'} · {data.team.admins} admin{data.team.admins === 1 ? '' : 's'} · {data.team.staff} staff
@@ -263,6 +295,8 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           </section>
         </div>
 
+        {/* Bookings and money side by side on a desktop: the same window, read together. */}
+        <div className={b?.money ? 'dashboard-grid' : undefined}>
         {b && (
           <section className="card">
             <h2>Bookings, {windowLabel}</h2>
@@ -280,13 +314,40 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
                 <span>cancelled</span>
               </div>
             </div>
-            <SplitBar a={b.window.web} b={b.window.staff} labelA="From the booking page" labelB="By staff" />
-            <BarChart
-              title={`Confirmed stays per week, the last ${b.stays.weeks} weeks (by the night's date)`}
-              bars={b.stays.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.stays }))}
-            />
+            {b.window.web + b.window.staff > 0 && <SplitBar a={b.window.web} b={b.window.staff} labelA="From the booking page" labelB="By staff" />}
+            <ChartOr bars={b.stays.perWeek.map((w) => ({ value: w.stays }))} empty={`No confirmed nights in the last ${b.stays.weeks} weeks.`}>
+              <BarChart
+                title={`Confirmed stays per week, the last ${b.stays.weeks} weeks (by the night's date)`}
+                bars={b.stays.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.stays }))}
+              />
+            </ChartOr>
           </section>
         )}
+
+        {b?.money && (
+          <section className="card">
+            <h2>Revenue, {windowLabel}</h2>
+            <div className="stat-row">
+              <div className="stat">
+                <strong>{money(b.money.confirmed)}</strong>
+                <span>confirmed</span>
+              </div>
+              <div className="stat">
+                <strong>{money(b.money.pending)}</strong>
+                <span>pending, awaiting a decision</span>
+              </div>
+              <div className="stat">
+                <strong>{money(b.money.discounts)}</strong>
+                <span>discounts given</span>
+              </div>
+            </div>
+            <ChartOr bars={b.money.perWeek.map((w) => ({ value: w.confirmed }))} empty={`No confirmed revenue in the last ${b.stays.weeks} weeks.`}>
+              <BarChart title={`Confirmed revenue per week, the last ${b.stays.weeks} weeks`} unit="pesos" currency={currency} bars={b.money.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.confirmed }))} />
+            </ChartOr>
+            <p className="small muted">Every amount is the stored price of the nights in the window, net of discounts.</p>
+          </section>
+        )}
+        </div>
 
         {b?.occupancy && (
           <section className="card">
@@ -299,7 +360,9 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
                 </span>
               </div>
             </div>
-            <BarChart title="Occupancy per week, next 30 days" unit="percent" bars={b.occupancy.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.percent }))} />
+            <ChartOr bars={b.occupancy.perWeek.map((w) => ({ value: w.percent }))} empty="Nothing booked in the next 30 days yet.">
+              <BarChart title="Occupancy per week, next 30 days" unit="percent" bars={b.occupancy.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.percent }))} />
+            </ChartOr>
           </section>
         )}
 
@@ -324,27 +387,6 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
           </section>
         )}
 
-        {b?.money && (
-          <section className="card">
-            <h2>Revenue, {windowLabel}</h2>
-            <div className="stat-row">
-              <div className="stat">
-                <strong>{money(b.money.confirmed)}</strong>
-                <span>confirmed</span>
-              </div>
-              <div className="stat">
-                <strong>{money(b.money.pending)}</strong>
-                <span>pending, awaiting a decision</span>
-              </div>
-              <div className="stat">
-                <strong>{money(b.money.discounts)}</strong>
-                <span>discounts given</span>
-              </div>
-            </div>
-            <BarChart title={`Confirmed revenue per week, the last ${b.stays.weeks} weeks`} unit="pesos" currency={currency} bars={b.money.perWeek.map((w) => ({ label: dayLabel(w.weekOf), value: w.confirmed }))} />
-            <p className="small muted">Every amount is the stored price of the nights in the window, net of discounts.</p>
-          </section>
-        )}
       </StaffFrame>
     </>
   );

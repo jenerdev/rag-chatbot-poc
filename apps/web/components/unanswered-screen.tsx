@@ -16,9 +16,12 @@
 // selection is of the rows on screen, so it is cleared whenever they change:
 // a new tab, a reload, a new search.
 //
-// The look (plan/ui-refresh.md Phase 8): the two tabs are a segmented
-// control; each question is a row with when it was asked under it; an empty
-// Open tab reads as the good news it is.
+// The look (plan/ui-refresh.md Phase 8, refined 2026-10-12): the two tabs are
+// a segmented control with the count; the way to close a gap is three short
+// steps, not a paragraph; each question is a row with when it was asked, and
+// "Add answer" opens the knowledge base's form already holding the question
+// (for a member who may write documents); an empty Open tab reads as the
+// good news it is.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UnansweredQuestion } from '@rag/pipeline';
@@ -31,7 +34,9 @@ import { ListSearch } from '@/components/list-search';
 import { notify } from '@/components/toast';
 import { PAGE_SIZE, matches } from '@/lib/search';
 import type { NavFeatures } from '@/lib/nav-items';
-import { isRole, type Role } from '@/lib/permissions';
+import { can, isRole, type Role } from '@/lib/permissions';
+import { Tip } from '@/components/tooltip';
+import Link from 'next/link';
 
 export interface UnansweredScreenProps {
   slug: string;
@@ -187,6 +192,9 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
   }, [api, unauthorized]);
 
   const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'unanswered' as const, title: 'Unanswered questions', session: { auth, role, onLogout: logout } };
+  // "Add answer" is for a member who may write documents; the others resolve only.
+  const canAnswer = role !== null && can(role, 'documents:write');
+  const answerHref = (question: string) => `/t/${slug}/admin/documents?question=${encodeURIComponent(question)}`;
 
   if (auth !== 'in') {
     return (
@@ -212,21 +220,33 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
           <div className="range-head">
             <div className="segmented" role="group" aria-label="Show">
               <button type="button" aria-pressed={tab === 'open'} onClick={() => setTab('open')}>
-                Open
+                Open{tab === 'open' && questions ? <span className="segment-count">{questions.length}</span> : null}
               </button>
               <button type="button" aria-pressed={tab === 'resolved'} onClick={() => setTab('resolved')}>
-                Resolved
+                Resolved{tab === 'resolved' && questions ? <span className="segment-count">{questions.length}</span> : null}
               </button>
             </div>
-            <button type="button" className="ghost sm" onClick={() => void load()}>
-              Refresh
-            </button>
+            <Tip label="Refresh">
+              <button type="button" className="ghost sm" aria-label="Refresh the list" onClick={() => void load()}>
+                <Icon name="refresh" size={16} />
+              </button>
+            </Tip>
           </div>
-          <p className="small muted">
-            {tab === 'open'
-              ? 'Questions the assistant could not answer from the documents (the visitor saw your “no answer” message). Add the answer to the knowledge base, check it in chat, then mark the question resolved. Partly answered questions are not listed.'
-              : 'Questions marked resolved. Reopen one if the assistant still cannot answer it.'}
-          </p>
+          {tab === 'open' ? (
+            <ol className="steps-strip" aria-label="How to close a gap">
+              <li>
+                <strong>Add the answer</strong> to the knowledge base
+              </li>
+              <li>
+                <strong>Ask it in Chat</strong> to check the assistant answers now
+              </li>
+              <li>
+                <strong>Mark it resolved</strong> here
+              </li>
+            </ol>
+          ) : (
+            <p className="small muted">Reopen a question if the assistant still cannot answer it.</p>
+          )}
           {questions === null ? (
             <LoadState load={loadState} what="questions" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : questions.length === 0 ? (
@@ -318,6 +338,11 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
                       {q.resolvedAt && ` · resolved ${askedLabel(q.resolvedAt)}`}
                     </span>
                   </div>
+                  {tab === 'open' && canAnswer && (
+                    <Link className="button sm" href={answerHref(q.question)}>
+                      <Icon name="plus" size={14} /> Add answer
+                    </Link>
+                  )}
                   <button type="button" className="sm" aria-busy={busyId === q.id || undefined} disabled={busyId !== null || bulkBusy} onClick={() => void toggleResolved(q)}>
                     {tab === 'open' ? (
                       <>

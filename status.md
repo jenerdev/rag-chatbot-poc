@@ -56,6 +56,24 @@
 
 ## ▶ Next up (do this next)
 
+**Add a document drawer, redesigned (2026-10-12).**
+- [x] An intro line, a hint per field, "Load a text file" (.txt/.md, read
+  in the browser), a live character and chunk meter, "How it will be split"
+  (the real chunkText() chunks), writing tips, and a pinned footer saying
+  what is missing. `plan/doc-form-walk.mjs` 7/7 on villa: the preview's 3
+  chunks are the 3 the server stored; the probe document deleted after.
+
+**Dashboard, knowledge base and Unanswered, redesigned (2026-10-12).**
+- [x] Dashboard: one "Needs attention" card listing only what waits (or
+  "All clear"); a compact Today; an empty chart is a sentence; Bookings
+  and Revenue side by side. Knowledge base: a callout to Unanswered when
+  questions are open, a summary line, en-GB dates, and `?question=` opens
+  the form pre-filled. Unanswered: three steps instead of a paragraph, the
+  count in the tab, a Refresh icon, "Add answer" per question (documents
+  writers). `plan/pages-shots.mjs` (seeds villa chats, deletes them):
+  Add answer PASS, no console error, no sideways scroll; the Unanswered
+  bulk walk 12/12 twice (once failed mid-recompile right after edits).
+
 **Bookings list, redesigned (2026-10-12).**
 - [x] Grouped by what each stay needs (Needs a decision, Staying now,
   Upcoming, Ended), counted, the group bar narrowing to one; one toolbar
