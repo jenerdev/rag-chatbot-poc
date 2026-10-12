@@ -363,14 +363,56 @@ export async function requestBooking(
   };
 }
 
+/** A loaded row's span, the `during` tstzrange, as milliseconds; null if absent. */
+interface SpanRow {
+  group_id: string | null;
+  unit_id: number;
+  during: string | null;
+  status: string;
+  held: boolean | null;
+  held_until: string | null;
+}
+
+/** '["2026-10-16 06:00:00+00","2026-10-17 04:00:00+00")' → [start, end) in ms. */
+export function parseSpan(during: string | null): [number, number] | null {
+  if (!during) return null;
+  const parts = during.replace(/^[[(]|[\])]$/g, '').split(',').map((x) => x.trim().replace(/^"|"$/g, ''));
+  if (parts.length !== 2) return null;
+  // Postgres writes "2026-10-16 06:00:00+00"; Date wants "2026-10-16T06:00:00+00:00".
+  const iso = (x: string) => Date.parse(x.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00'));
+  const start = iso(parts[0]!);
+  const end = iso(parts[1]!);
+  return Number.isNaN(start) || Number.isNaN(end) ? null : [start, end];
+}
+
+/** The rows that take their night now: booking_takes() in code (confirmed, or held and not lapsed). */
+export function takingRows<T extends SpanRow>(rows: T[], now: number): T[] {
+  return rows.filter((r) => r.status === 'confirmed' || (r.held === true && r.held_until !== null && Date.parse(r.held_until) > now));
+}
+
+/** Does any of a stay's rows overlap a taking row of ANOTHER stay on the same unit? Its own hold never counts. */
+export function clashes(own: SpanRow[], groupId: string, takers: SpanRow[]): boolean {
+  return own.some((r) => {
+    const mine = parseSpan(r.during);
+    if (!mine) return false;
+    return takers.some((t) => {
+      if (t.group_id === groupId || t.unit_id !== r.unit_id) return false;
+      const theirs = parseSpan(t.during);
+      return theirs !== null && theirs[0] < mine[1] && mine[0] < theirs[1];
+    });
+  });
+}
+
 /**
  * Every stay, a web request or a staff booking (D-100), whose first night is
  * on or after `from` (default: today), one per group, newest first, any
  * status. STAFF ONLY: guest data.
  *
- * `clash` says a night is now CONFIRMED for another booking of the same unit,
- * so confirming would be refused. It is read from check_availability, which
- * counts confirmed rows only; a pending request itself never counts.
+ * `clash` says a night of a pending stay is TAKEN by another stay of the same
+ * unit (confirmed, or held for another guest and not lapsed: booking_takes()),
+ * so confirming would be refused. It is read from the rows loaded here, never
+ * from check_availability: since holds (D-106) that read counts a held night
+ * as taken, and a held request's OWN hold made it clash with itself.
  */
 export async function listRequests(tenant: BookingTenant, range: { from?: unknown } = {}): Promise<BookingRequest[]> {
   const { timezone } = await requireConfig(tenant);
@@ -381,7 +423,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .select('id, group_id, reference, source, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
+    .select('id, group_id, reference, source, unit_id, slot_id, booked_date, during, held, held_until, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
     .eq('tenant_id', tenant.id)
     // D-100: every source. A staff booking is a group with a reference too and
     // waits for the same decision; the row says which door it came through.
@@ -410,20 +452,12 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
     .filter((g) => g.checkIn >= from);
   if (requests.length === 0) return [];
 
-  // One availability read for the whole span, not one per request.
   const last = requests.reduce((max, g) => (g.rows[g.rows.length - 1]!.booked_date > max ? g.rows[g.rows.length - 1]!.booked_date : max), from);
-  const spanDays = Math.round((Date.parse(`${last}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
-  const taken = new Set<string>();
   const closed = await closedDays(tenant, from, last);
-  // check_availability refuses a range over 366 days; requests stay inside it
-  // (365 days ahead), but a very old "from" could not, so it is chunked.
-  for (let start = 0; start <= spanDays; start += 300) {
-    const p_from = addDays(from, start);
-    const p_to = addDays(from, Math.min(start + 299, spanDays));
-    const { data: rows, error: availError } = await tenant.db.rpc('check_availability', { p_tenant_id: tenant.id, p_from, p_to });
-    if (availError) throw new Error(`Could not check availability: ${availError.message}`);
-    for (const r of rows) if (r.status === 'taken') taken.add(`${r.booked_date}|${r.unit}|${r.slot}`);
-  }
+  // The rows that take a night, from every loaded group: a stay that could
+  // overlap a listed one starts at most MAX_STAY_NIGHTS before it, which is
+  // the window loaded above.
+  const takers = takingRows(data, Date.now());
 
   const list = requests
     .map(({ groupId, rows, checkIn }) => {
@@ -455,7 +489,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
         bookingIds: rows.map((r) => r.id),
         total: rows.every((r) => r.price !== null) ? rows.reduce((sum, r) => sum + (r.price ?? 0), 0) : null,
         // Only a pending request can clash; a confirmed one IS the taken night.
-        clash: status === 'pending' && rows.some((r) => taken.has(`${r.booked_date}|${unitName.get(r.unit_id)}|${slot}`)),
+        clash: status === 'pending' && clashes(rows, groupId, takers),
         closed: status === 'pending' && rows.some((r) => closed.has(r.booked_date)),
       };
     })

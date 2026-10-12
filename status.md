@@ -288,8 +288,23 @@ requests, `booking_events`. Supersedes `plan/payments.md`.
   check after it); 107, "the known roles check", now compares villa's
   roles before and after (villa has a staff member, so "no staff" was
   never the test).
+- [x] Fix (2026-10-11): the Requests list said a HELD request clashed
+  with itself ("A night of this request is already confirmed for another
+  booking" on ALT-F3CUFK, alteza, hold on_request). `listRequests()` read
+  `clash` from check_availability, which since D-106 counts a held night
+  as taken, its own included. It now compares the loaded rows: another
+  stay's confirmed or live-held night on the same unit, overlapping
+  spans, never its own group. Live: ALT-F3CUFK and ALT-CN4F6K clash
+  false; harbor's HAR-4YXGRU (a confirmed HAR-KU3HG5 on its night) clash
+  true. Tests 123/123 (4 new); rooms all pass; bookings isolation 33/33
+  both ways.
 - [ ] Phase 8, owed: the axe audit over S-13 and S-14; **the user's
-  browser walk**; then the merge.
+  browser walk**. Owed on `master` now.
+- [x] Merged `feat/manage-booking` into `master` (2026-10-12, by the
+  user's word, before the audit and walk above). Test data cleared the
+  same day, by the user's word: every booking (44; stays 38, payments 3,
+  events 19 with them), 3 orphan proofs, every conversation (5,380;
+  13,220 messages, 96 resolutions).
 - [ ] Follow-up (not in the plan's phases): the staff calendar drawing
   held nights apart (they show as taken today).
 

@@ -8321,3 +8321,22 @@ and the database refuses the payment whatever the page shows.
 **Traps it avoided:** re-running `schema-manage-booking.sql` would have
 restored the older `guest_stay()` (trap 20); that definition is now
 guarded on `stay_taken()`.
+
+## 2026-10-11 — a held request no longer clashes with itself
+
+**What was done:** the staff Requests list computes `clash` from the rows
+it already loads (another stay's confirmed night, or another guest's live
+hold, on the same unit with an overlapping span) instead of from
+check_availability.
+
+**Why it matters:** since holds (D-106) check_availability reads a held
+night as taken, so every held request was flagged "already confirmed for
+another booking" and its Confirm was disabled, by its own hold. Seen on
+ALT-F3CUFK. The Bookings list (confirmed rows only) and the dashboard's
+count (which excludes the stay's own group) did not have the fault.
+
+**What the observed values prove:** over HTTP as a temporary staff
+member, alteza's held requests read clash false, and harbor's HAR-4YXGRU,
+whose night HAR-KU3HG5 holds confirmed, reads clash true: the positive
+twin (trap 12).
+

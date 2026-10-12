@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_BOOKING_ADVANCE_DAYS, MAX_REQUEST_ROWS, MAX_STAY_NIGHTS } from './constants.js';
 import { BookingInputError } from './errors.js';
+import { clashes, parseSpan, takingRows } from './requests.js';
 import { addDays, normaliseEmail, normalisePhone, pageSettings, parseRequest, paymentFlow } from './validate.js';
 
 const TODAY = '2026-09-28';
@@ -156,5 +157,47 @@ describe('paymentFlow', () => {
       reviewWithinHours: null,
       hold: 'none',
     });
+  });
+});
+
+describe('clashes: a pending stay against the nights other stays take', () => {
+  const night = (group: string, unit: number, status: string, extra: Partial<{ held: boolean; held_until: string | null; during: string }> = {}) => ({
+    group_id: group,
+    unit_id: unit,
+    during: '["2026-10-16 06:00:00+00","2026-10-17 04:00:00+00")',
+    status,
+    held: false,
+    held_until: null as string | null,
+    ...extra,
+  });
+  const now = Date.parse('2026-10-10T18:00:00Z');
+  const future = '2026-10-11T09:13:46.062571+00:00';
+
+  it('parses a stored span, half-open', () => {
+    expect(parseSpan('["2026-10-16 06:00:00+00","2026-10-17 04:00:00+00")')).toEqual([Date.parse('2026-10-16T06:00:00Z'), Date.parse('2026-10-17T04:00:00Z')]);
+    expect(parseSpan(null)).toBeNull();
+  });
+
+  it("never clashes with its OWN hold (ALT-F3CUFK's case)", () => {
+    const own = [night('me', 1, 'pending', { held: true, held_until: future }), night('me', 2, 'pending', { held: true, held_until: future })];
+    expect(clashes(own, 'me', takingRows(own, now))).toBe(false);
+  });
+
+  it("clashes with another stay's confirmed night, or its live hold, on the same unit", () => {
+    const own = [night('me', 1, 'pending')];
+    expect(clashes(own, 'me', takingRows([night('other', 1, 'confirmed')], now))).toBe(true);
+    expect(clashes(own, 'me', takingRows([night('other', 1, 'pending', { held: true, held_until: future })], now))).toBe(true);
+  });
+
+  it('does not clash with a lapsed hold, a plain pending, another unit, or the next night', () => {
+    const own = [night('me', 1, 'pending')];
+    const others = [
+      night('a', 1, 'pending', { held: true, held_until: '2026-10-10T00:00:00Z' }),
+      night('b', 1, 'pending'),
+      night('c', 2, 'confirmed'),
+      // checks in at 14:00 the day this one checks out at 12:00: no overlap
+      night('d', 1, 'confirmed', { during: '["2026-10-17 06:00:00+00","2026-10-18 04:00:00+00")' }),
+    ];
+    expect(clashes(own, 'me', takingRows(others, now))).toBe(false);
   });
 });
