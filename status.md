@@ -1693,6 +1693,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — the platform's New tenant is a drawer
+- **Did:** the create form opens in a `Drawer` over the tenant list (the
+  same component as Promos, Slots, Rooms), not as a page of its own.
+  `selected` lost its `'new'` value; `creating` opens the drawer, and a
+  `key` empties the form after a create, which opens the new tenant's
+  page as before. The form's create mode uses the drawer's markup:
+  `.setup-form`, the refusal as `.drawer-notice` beside the slug, and a
+  `.drawer-footer` with Cancel.
+- **Walk:** `ui-components-phase2-3-walk.mjs` check 3b now asks for an
+  OPEN drawer on /platform too: `#tenant-slug` is in the page while the
+  drawer is closed, so the old check would pass without the click.
+- **Observed:** web `tsc --noEmit` exit 0. The browser walk was not run.
+- **Next:** the a11y audit and the 3b walk against `pnpm dev`.
+
 ### 2026-10-13 — the a11y audit back to 0
 - **Did:** the audit (192 states) had 2 serious violations. (1)
   label-content-name-mismatch on every calendar date with a word: the

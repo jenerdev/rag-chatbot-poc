@@ -108,6 +108,7 @@ export function TenantForm({
   selfUserId,
   onSaved,
   onUnauthorized,
+  onCancel,
 }: {
   api: string;
   /** null = create mode. */
@@ -115,9 +116,11 @@ export function TenantForm({
   selfUserId: string | null;
   onSaved: (tenant: TenantDetail) => void;
   onUnauthorized: () => void;
+  /** Create mode: the drawer's Cancel. */
+  onCancel?: () => void;
 }) {
-  // Creating, the form is the whole page: its refusal stays under it, beside
-  // the slug that is usually the cause. Editing, every message is a toast.
+  // Creating, the form is a drawer: its refusal stays in it, beside the slug
+  // that is usually the cause. Editing, every message is a toast.
   const { notice, setNotice } = useNotice(!tenant);
   const [busy, setBusy] = useState(false);
 
@@ -162,46 +165,53 @@ export function TenantForm({
     }
   }
 
+  // Creating, the form is the platform's drawer (platform-screen.tsx): its
+  // title is the drawer's, so the form brings no card and no heading.
   if (!tenant) {
     return (
-      <section className="card">
-        <h2>New tenant</h2>
-        <p className="small muted">
+      <form
+        className="setup-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void send('POST', '/tenants', { slug: slug.trim(), businessName: businessName.trim(), assistantName: assistantName.trim() }, 'Created.');
+        }}
+      >
+        <p className="small muted setup-intro">
           The slug is the address, <code>/t/&lt;slug&gt;</code>, and cannot change later. Everything else is edited after
           saving.
         </p>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void send('POST', '/tenants', { slug: slug.trim(), businessName: businessName.trim(), assistantName: assistantName.trim() }, 'Created.');
-          }}
-        >
-          <div className="field">
-            <label htmlFor="tenant-slug">Slug</label>
-            <input id="tenant-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="harbor-inn" pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]" required autoFocus />
-            <span className="small muted">3–32 lower-case letters, digits and hyphens.</span>
+        <div className="field">
+          <label htmlFor="tenant-slug">Slug</label>
+          <input id="tenant-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="harbor-inn" pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]" required autoComplete="off" />
+          <p className="hint small muted">3–32 lower-case letters, digits and hyphens.</p>
+        </div>
+        <div className="field">
+          <label htmlFor="tenant-business">Business name</label>
+          <input id="tenant-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} maxLength={100} required autoComplete="off" />
+        </div>
+        <div className="field">
+          <label htmlFor="tenant-assistant">Assistant name</label>
+          <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required autoComplete="off" />
+        </div>
+        {notice && (
+          <div className="notice error drawer-notice" role="alert">
+            {notice.message}
           </div>
-          <div className="field">
-            <label htmlFor="tenant-business">Business name</label>
-            <input id="tenant-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} maxLength={100} required />
-          </div>
-          <div className="field">
-            <label htmlFor="tenant-assistant">Assistant name</label>
-            <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
-          </div>
-          {notice && (
-            <div className="notice error" role="alert">
-              {notice.message}
-            </div>
-          )}
-          <div className="form-footer">
+        )}
+        <div className="drawer-footer">
+          <div className="drawer-footer-total">
             <span className="small muted">A new tenant has no members and no applications yet.</span>
-            <button type="submit" className="primary" disabled={busy}>
-              {busy ? 'Creating…' : 'Create tenant'}
-            </button>
           </div>
-        </form>
-      </section>
+          {onCancel && (
+            <button type="button" disabled={busy} onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
+            {busy ? 'Creating…' : 'Create tenant'}
+          </button>
+        </div>
+      </form>
     );
   }
 

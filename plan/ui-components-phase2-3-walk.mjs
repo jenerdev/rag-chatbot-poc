@@ -129,13 +129,12 @@ try {
       const shown = await page.until(`[...document.querySelectorAll('.empty-list strong')].some(s => s.textContent === ${JSON.stringify(list.empty)})`, 20000);
       const button = await page.eval(`(() => { const e = [...document.querySelectorAll('.empty-list')].find(e => e.querySelector('strong')?.textContent === ${JSON.stringify(list.empty)}); return e?.querySelector('.empty-list-action button')?.textContent.trim() ?? null; })()`);
       check(shown && (list.add ? button?.endsWith(list.add) : button === null), `3. ${name}: empty, "${list.empty}"${list.add ? ` with "${list.add}"` : ', no button'}`, button ?? 'no button');
-      if (list.add && list.page !== '/platform') {
+      // The platform's New tenant is a drawer too since 2026-10-13: #tenant-slug
+      // is in the page while it is closed, so only an OPEN drawer proves the click.
+      if (list.add) {
         await page.eval(`[...document.querySelectorAll('.empty-list-action button')][0].click()`);
         check(await page.until("!!document.querySelector('dialog.drawer[open]')", 3000), `3b. ${name}: the empty state's button opens the drawer`);
         await page.key('Escape', 'Escape', 27);
-      } else if (list.page === '/platform') {
-        await page.eval(`[...document.querySelectorAll('.empty-list-action button')][0].click()`);
-        check(await page.until("!!document.querySelector('#tenant-slug')", 3000), '3b. platform: the empty state\'s button opens the new-tenant form');
       }
       if (list.page === '/t/harbor/admin/promos') await page.shot(join(OUT, 'promos-empty-1280.png'));
       mode = 'pass';

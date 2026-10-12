@@ -14,6 +14,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
 import { TenantForm } from '@/components/tenant-form';
+import { Drawer } from '@/components/dialogs';
 import { Toaster } from '@/components/toast';
 
 type Auth = 'checking' | 'out' | 'in';
@@ -25,8 +26,12 @@ export function PlatformScreen() {
   const [tenants, setTenants] = useState<TenantSummary[] | null>(null);
   const [pulse, setPulse] = useState<PlatformPulse[] | null>(null);
   const [loadState, setLoadState] = useState<Load>(LOADING);
-  /** null = the list; 'new' = the create form; a number = that tenant's form. */
-  const [selected, setSelected] = useState<number | 'new' | null>(null);
+  /** null = the list; a number = that tenant's form. */
+  const [selected, setSelected] = useState<number | null>(null);
+  // The create form is a drawer over the list. It stays mounted while closed,
+  // so what was typed survives closing it; `createKey` empties it after a create.
+  const [creating, setCreating] = useState(false);
+  const [createKey, setCreateKey] = useState(0);
   const [detail, setDetail] = useState<TenantDetail | null>(null);
   const [detailLoad, setDetailLoad] = useState<Load>(LOADING);
   // Bumped by Retry: the detail load is an effect (it cancels on a new selection), so it re-runs on this.
@@ -57,6 +62,7 @@ export function PlatformScreen() {
     setTenants(null);
     setSelected(null);
     setDetail(null);
+    setCreating(false);
   }, []);
 
   const loadTenants = useCallback(async () => {
@@ -116,7 +122,7 @@ export function PlatformScreen() {
   }, [unauthorized]);
 
   const newTenant = (
-    <button type="button" className="primary" onClick={() => setSelected('new')}>
+    <button type="button" className="primary" onClick={() => setCreating(true)}>
       <Icon name="plus" size={16} /> New tenant
     </button>
   );
@@ -125,7 +131,7 @@ export function PlatformScreen() {
     <header>
       <h1 className="brand">
         <span>Platform</span>
-        <span className="brand-subtitle">{selected === null ? 'Tenants' : selected === 'new' ? 'New tenant' : detail?.businessName ?? '…'}</span>
+        <span className="brand-subtitle">{selected === null ? 'Tenants' : detail?.businessName ?? '…'}</span>
       </h1>
       <nav>
         {auth === 'in' && selected !== null && (
@@ -177,26 +183,6 @@ export function PlatformScreen() {
     );
   }
 
-  if (selected === 'new') {
-    return (
-      <>
-        {top}
-        <main>
-          <TenantForm
-            api={API}
-            tenant={null}
-            selfUserId={userId}
-            onUnauthorized={unauthorized}
-            onSaved={(saved) => {
-              void loadTenants();
-              setSelected(saved.id);
-            }}
-          />
-        </main>
-      </>
-    );
-  }
-
   if (typeof selected === 'number') {
     return (
       <>
@@ -236,6 +222,23 @@ export function PlatformScreen() {
     <>
       {top}
       <main className="platform-main">
+        <Drawer open={creating} title="New tenant" onClose={() => setCreating(false)}>
+          <TenantForm
+            key={createKey}
+            api={API}
+            tenant={null}
+            selfUserId={userId}
+            onUnauthorized={unauthorized}
+            onCancel={() => setCreating(false)}
+            onSaved={(saved) => {
+              setCreating(false);
+              setCreateKey((n) => n + 1);
+              void loadTenants();
+              setSelected(saved.id);
+            }}
+          />
+        </Drawer>
+
         <div className="page-head">
           <div>
             <h1 className="page-title">Tenants</h1>

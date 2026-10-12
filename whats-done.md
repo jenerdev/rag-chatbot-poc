@@ -8857,3 +8857,29 @@ the first run never drew it. It uses the same token now, and the documents
 pages re-audited at 0 (64 states). Calendar shots at 1280 and 390 px:
 layout unchanged, no console errors. Web typecheck exit 0, tests 132
 passed.
+
+## 2026-10-13 — the platform's New tenant is a drawer
+
+**What:** "New tenant" on /platform opens a side drawer over the list and
+no longer replaces the page. The fields are the same three (slug, business
+name, assistant name), and so is the route (`POST /api/platform/tenants`).
+After a create, the drawer closes and the new tenant's form opens, as it
+did before.
+
+**Why:** every other "add" on the staff screens is a drawer (D-101, D-102).
+The platform was the one place where adding something took you off the
+list.
+
+**How:** `Drawer` from `components/dialogs.tsx` stays mounted while it is
+closed, so what you type survives closing it. A `key` that changes after a
+successful create is what empties it. `useNotice(!tenant)` already kept a
+create-mode refusal in the form, so it is drawn as the `.drawer-notice` the
+other drawers use.
+
+**Trap avoided:** a walk check that looked for `#tenant-slug` would pass
+with no click at all, because a mounted drawer keeps its fields in the DOM.
+Check 3b now asks for `dialog.drawer[open]`, as it does on every other
+screen.
+
+**Observed:** web typecheck exit 0. Not yet walked in a browser.
+
