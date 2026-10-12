@@ -24,6 +24,7 @@ import { CalendarLegend } from '@/components/calendar-legend';
 import { DayMarkers, MonthGrid, dayClasses } from '@/components/month-grid';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
+import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
 import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { STATE_WORD, cellText, dayMarker, longDate, pendingWords, sentence } from '@/lib/calendar-labels';
@@ -384,7 +385,7 @@ function BookingCard({ booking: b, day, slot }: { booking: DayBooking; day: stri
       <div className="cal-booking-head">
         <strong>{b.guestName}</strong>
         <span className={`badge ${b.status === 'confirmed' ? 'ok' : 'accent'}`}>{b.status}</span>
-        {b.reference && <span className="muted small">ref {b.reference}</span>}
+        {b.reference && <CopyText text={b.reference} what="reference" className="muted small request-ref" />}
         {b.clash && (
           <span className="badge danger">
             <Icon name="alert" size={14} /> would clash on Confirm
@@ -410,7 +411,9 @@ function BookingCard({ booking: b, day, slot }: { booking: DayBooking; day: stri
           <>
             <dt>Phone</dt>
             <dd>
-              <a href={`tel:${b.guestPhone}`}>{b.guestPhone}</a>
+              <CopyText text={b.guestPhone} what="mobile number">
+                <a href={`tel:${b.guestPhone}`}>{b.guestPhone}</a>
+              </CopyText>
             </dd>
           </>
         )}
@@ -418,7 +421,9 @@ function BookingCard({ booking: b, day, slot }: { booking: DayBooking; day: stri
           <>
             <dt>Email</dt>
             <dd>
-              <a href={`mailto:${b.guestEmail}`}>{b.guestEmail}</a>
+              <CopyText text={b.guestEmail} what="email">
+                <a href={`mailto:${b.guestEmail}`}>{b.guestEmail}</a>
+              </CopyText>
             </dd>
           </>
         )}

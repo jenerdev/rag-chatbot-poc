@@ -69,13 +69,23 @@ try {
 
   // 1. The list: rows are links, no buttons inside them.
   await page.goto(`${BASE}/t/${SLUG}/admin/bookings?from=${day(219)}`);
-  await page.until(`!!document.querySelector('a.stay-row[href$="${pending.ref}"]')`, 30000);
-  const inRows = await page.eval("document.querySelectorAll('.stay-row button').length");
-  check(inRows === 0, '1. the list rows are links with no buttons in them', `${inRows} buttons`);
+  await page.until(`!!document.querySelector('a.stay-row-link[href$="${pending.ref}"]')`, 30000);
+  // Copy buttons only: no action button lives in a list row (D-114).
+  const inRows = await page.eval("[...document.querySelectorAll('.stay-row button')].filter(b => !b.classList.contains('copy-icon')).length");
+  check(inRows === 0, '1. the list rows open the booking and hold no action buttons', `${inRows} buttons`);
   await page.shot(join(OUT, 'list-1280.png'));
 
+  // 1b. Copy: a real click on a row's reference icon copies it, and does not open the booking.
+  await page.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'], origin: BASE }).catch(() => null);
+  const icon = `.stay-row:has(a.stay-row-link[href$="${pending.ref}"]) .request-ref .copy-icon`;
+  const box = await page.eval(`(() => { const r = document.querySelector(${JSON.stringify(icon)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
+  await sleep(400);
+  const copied = await page.eval(`(async () => ({ label: document.querySelector(${JSON.stringify(icon)})?.getAttribute('aria-label'), clip: await navigator.clipboard.readText().catch(() => null), path: location.pathname }))()`);
+  check(/^Copied/.test(copied.label ?? '') && copied.clip === pending.ref && copied.path.endsWith('/admin/bookings'), '1b. a copy icon in a row copies the reference and stays on the list', JSON.stringify(copied));
+
   // 2. Pending: Decline and Confirm; no Cancel, no refund.
-  await page.eval(`document.querySelector('a.stay-row[href$="${pending.ref}"]').click()`);
+  await page.eval(`document.querySelector('a.stay-row-link[href$="${pending.ref}"]').click()`);
   await page.until("!!document.querySelector('.stay-actions')", 30000);
   const p = await page.eval(buttons);
   check(JSON.stringify(p) === JSON.stringify(['Decline', 'Confirm']), '2. pending: Decline and Confirm only (opened from the list)', JSON.stringify(p));

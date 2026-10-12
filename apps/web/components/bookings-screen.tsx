@@ -53,6 +53,7 @@ import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StayLines } from '@/components/stay-lines';
+import { CopyText } from '@/components/copy-button';
 import { ListSearch } from '@/components/list-search';
 import { PAGE_SIZE, matches } from '@/lib/search';
 
@@ -137,14 +138,19 @@ function stayState(stay: BookingRequest, today: string): { label: string; tone: 
   }
 }
 
-/** One stay: when, who, what, the stored total and its badges. The whole row opens the stay's page (S-15). */
+/**
+ * One stay: when, who, what, the stored total and its badges. The whole card
+ * opens the stay's page (S-15): the guest's name is the link, stretched over
+ * the card (a::after), so the copy buttons inside can sit above it. A button
+ * inside a link is not valid HTML, and a screen reader hears one link.
+ */
 function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today: string; currency: string; href: string }) {
   const pending = stay.status === 'pending';
   const state = stayState(stay, today);
   const checkOut = addDays(stay.checkIn, stay.nights);
   const live = pending || (stay.status === 'confirmed' && checkOut > today);
   return (
-    <Link href={href} className={`booking stay-row${live ? '' : ' decided'}`} aria-label={`${stay.reference}, ${stay.guestName}, ${state.label}`}>
+    <div className={`booking stay-row${live ? '' : ' decided'}`}>
       <div className="stay-when">
         <span className="stay-dates">
           {stay.nights > 1 ? `${dayLabel(stay.checkIn)} – ${dayLabel(checkOut)}` : dayLabel(stay.checkIn)}
@@ -155,18 +161,16 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
         </span>
       </div>
       <div className="stay-who">
-        <span className="booking-guest">{stay.guestName}</span>
+        <Link href={href} className="booking-guest stay-row-link" aria-label={`${stay.guestName}, ${stay.reference}, ${state.label}`}>
+          {stay.guestName}
+        </Link>
         <span className="booking-meta">
-          {[
-            stay.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', '),
-            stay.guestPhone,
-            stay.guestEmail,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          <span>{stay.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', ')}</span>
+          {stay.guestPhone && <CopyText text={stay.guestPhone} what="mobile number" />}
+          {stay.guestEmail && <CopyText text={stay.guestEmail} what="email" />}
         </span>
         <span className="booking-badges">
-          <span className="badge request-ref">{stay.reference}</span>
+          <CopyText text={stay.reference} what="reference" className="badge request-ref" />
           <span className={`badge ${state.tone}`}>{state.label}</span>
           {/* D-100: which door it came through. */}
           <span className={stay.source === 'web' ? 'badge accent' : 'badge'}>{stay.source === 'web' ? 'Web' : 'By staff'}</span>
@@ -203,7 +207,7 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
           {stay.status === 'cancelled' ? 'Cancelled' : stay.status === 'expired' ? 'Expired' : 'Confirmed'}: {stay.decisionNote}
         </div>
       )}
-    </Link>
+    </div>
   );
 }
 

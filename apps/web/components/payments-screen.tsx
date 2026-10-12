@@ -25,6 +25,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { useNotice } from '@/components/toast';
+import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
@@ -235,7 +236,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
       <span className="list-row-lead">{when(p.createdAt, timezone)}</span>
       <span className="list-row-main">
         <span className="list-row-title">
-          {p.reference} · {p.guestName}
+          <CopyText text={p.reference} what="reference" className="request-ref" /> · {p.guestName}
         </span>
         <span className="badge">{p.kind === 'refund' ? 'Refund' : p.method}</span>
         <span className={`badge ${p.status === 'verified' ? 'ok' : p.status === 'rejected' ? 'danger' : 'warn'}`}>
@@ -447,7 +448,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
             <span className="list-row-lead">{when(c.createdAt, timezone)}</span>
             <span className="list-row-main">
               <span className="list-row-title">
-                {c.reference} · {c.guestName}
+                <CopyText text={c.reference} what="reference" className="request-ref" /> · {c.guestName}
               </span>
               <span className={c.kind === 'cancel' ? 'badge danger' : 'badge accent'}>
                 {c.kind === 'cancel' ? 'Cancel' : `Move ${c.checkIn ?? ''} → ${c.newCheckIn ?? ''}`}

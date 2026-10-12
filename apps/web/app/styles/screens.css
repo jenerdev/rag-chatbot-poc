@@ -804,10 +804,16 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 .segment-count { margin-left: var(--space-1); font-variant-numeric: tabular-nums; color: var(--muted); }
 .stay-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); align-items: start; margin: var(--space-2) 0 0; }
 .stay-row > .booking-notes { grid-column: 2 / -1; margin-top: 0; }
-/* The row is a link to the stay's page (D-114): the whole row, one Tab stop. */
-a.stay-row { color: var(--ink); text-decoration: none; transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease); }
-a.stay-row:hover { border-color: var(--line-strong); background: var(--surface-2); }
-a.stay-row:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* The row opens the stay's page (D-114): the guest's name is the link, its
+   ::after stretched over the whole card; the copy buttons sit above it. */
+.stay-row { position: relative; transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease); }
+.stay-row:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.stay-row-link { color: var(--ink); text-decoration: none; }
+.stay-row-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.stay-row:has(.stay-row-link:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+.stay-row-link:focus-visible { outline: none; }
+.stay-row .copy-icon { position: relative; z-index: 1; }
+.stay-who .booking-meta { display: flex; flex-wrap: wrap; gap: 0 var(--space-3); }
 .stay-end > svg { color: var(--muted); }
 .stay-when { display: flex; flex-direction: column; gap: 2px; }
 .stay-dates { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -947,4 +953,19 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
   .review-proof-facts, .review-options { grid-template-columns: minmax(0, 1fr); }
   .proof-thumb.large { height: 220px; }
 }
+
+/* Copy beside a value (copy-button.tsx): a small icon button after the text,
+   muted until hovered or focused; a check for two seconds once copied. */
+.copy-text { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.copy-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; box-shadow: none; color: var(--muted); }
+.copy-icon:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.copy-icon:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+/* The icon sits at the end of a line, often at the screen's edge: its tip
+   opens leftwards from the icon, so even hidden it never widens the page. */
+.copy-text .tip-text { left: auto; right: 0; transform: none; }
+.badge.copy-text { gap: var(--space-1); padding-right: 2px; }
+.badge .copy-icon { width: 20px; height: 20px; min-height: 20px; }
+.contact-row { display: flex; gap: var(--space-1); min-width: 0; }
+.stay-contact > * { min-width: 0; }
+.contact-row .button { flex: 1; min-width: 0; }
 

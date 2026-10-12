@@ -23,7 +23,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
-import { CopyButton } from '@/components/copy-button';
+import { CopyButton, CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
 import { StayLines } from '@/components/stay-lines';
 import { ReviewProof, type ReviewDecision } from '@/components/review-proof';
@@ -509,15 +509,20 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, banne
           <section className="card stay-card-contact">
             <h3>Contact</h3>
             <div className="stay-contact">
+              {/* Call or write with the button; copy with the icon beside it. */}
               {stay.guestPhone && (
-                <a className="button sm" href={`tel:${stay.guestPhone}`}>
-                  <Icon name="phone" size={14} /> {stay.guestPhone}
-                </a>
+                <CopyText text={stay.guestPhone} what="mobile number" className="contact-row">
+                  <a className="button sm" href={`tel:${stay.guestPhone}`}>
+                    <Icon name="phone" size={14} /> {stay.guestPhone}
+                  </a>
+                </CopyText>
               )}
               {stay.guestEmail && (
-                <a className="button sm" href={`mailto:${stay.guestEmail}`}>
-                  <Icon name="mail" size={14} /> {stay.guestEmail}
-                </a>
+                <CopyText text={stay.guestEmail} what="email" className="contact-row">
+                  <a className="button sm" href={`mailto:${stay.guestEmail}`}>
+                    <Icon name="mail" size={14} /> {stay.guestEmail}
+                  </a>
+                </CopyText>
               )}
             </div>
             <p className="small muted">Booked {when(stay.createdAt, stay.timezone)}{stay.promoName ? ` · promo ${stay.promoName}` : ''}</p>

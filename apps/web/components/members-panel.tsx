@@ -16,6 +16,7 @@
 // the role a compact picker, Remove a labelled icon that asks in the dialog.
 
 import { useCallback, useEffect, useState } from 'react';
+import { CopyText } from '@/components/copy-button';
 import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
@@ -115,7 +116,7 @@ export function MembersPanel({
               </span>
               <span className="member-who">
                 <span className="member-email">
-                  {m.email}
+                  <CopyText text={m.email} what="email" />
                   {selfUserId === m.userId && <span className="badge accent">You</span>}
                 </span>
                 <span className="member-since">Member since {new Date(m.createdAt).toLocaleDateString()}</span>

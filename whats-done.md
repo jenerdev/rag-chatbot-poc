@@ -8563,3 +8563,28 @@ grey without a reason, and the proof was a small thumbnail.
 through the panel: Reject proof stayed disabled until a reason, the first
 quick pick filled "The money is not in the account.", and the stored row
 reads `rejected` with exactly that reason; no console error.
+
+## 2026-10-12 — copy on every value worth pasting
+
+**What was done:** one shared copy behaviour: `CopyButton` ("Copy" beside a
+headline value) and `CopyText` (the value, then a small copy icon with a
+"Copy reference" tip and a "Copied" check for two seconds). It is on every
+reference (Bookings rows, a booking's title, Calendar, the Payments queues,
+Manage booking, the receipt), mobile number and email (Bookings rows, a
+booking's Contact, Calendar), member email (Members, the platform), the
+transaction number in Review the proof, and account numbers on Manage
+booking. A copy never opens or navigates what it sits in.
+
+**Why it matters:** staff paste references into chats and search a bank or
+GCash history by transaction number; selecting a monospace reference by
+hand is fiddly, more so on a phone.
+
+**What the observed values prove:** the stay-detail walk clicked a row's
+reference icon with a real mouse event: the clipboard held `HAR-XBW2WU`,
+the label read "Copied reference", and the page stayed on the list.
+
+**Traps it avoided:** (1) a button inside a link is invalid HTML, so each
+Bookings row is now a stretched link (the guest's name, its ::after over
+the card) with the copy icons above it. (2) The copy icons' tips, centred
+on icons at the screen's edge, widened a 390 px page to 410 px even while
+hidden; they open leftwards now (the walk's sideways-scroll check caught it).

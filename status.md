@@ -56,6 +56,18 @@
 
 ## ▶ Next up (do this next)
 
+**Copy on every value worth pasting (2026-10-12).**
+- [x] `CopyText` (value + icon) beside `CopyButton` in `copy-button.tsx`:
+  references (Bookings rows, the booking page title, Calendar, Payments
+  queues, Manage booking, the booking page's receipt), mobile numbers and
+  emails (Bookings rows, the booking page's Contact, Calendar), member
+  emails (Members, the platform), the transaction number (Review the
+  proof), account numbers (Manage booking). Bookings rows became a
+  stretched link (the guest's name) so a copy button can sit inside.
+  Walks: stay-detail 8/8 (a real copy from a row, still on the list),
+  proof-viewer 12/12. Calendar, Members and Payments not yet seen in a
+  browser.
+
 **Proofs of payment in a popup (2026-10-12).**
 - [x] `components/proof-viewer.tsx`: a thumbnail that opens a modal
   `<dialog>` popup (image, or a PDF in a frame), above the review drawer;
