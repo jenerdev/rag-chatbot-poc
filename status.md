@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+**Bookings list, redesigned (2026-10-12).**
+- [x] Grouped by what each stay needs (Needs a decision, Staying now,
+  Upcoming, Ended), counted, the group bar narrowing to one; one toolbar
+  row (search, room, a "Past 90 days" toggle); cards with a date tile, the
+  guest and reference, "Arrives today" / "Leaves tomorrow", when and what,
+  the contacts, and on the right the stored total, status and payment;
+  notes and decisions left to the booking page. Walk 8/8, three runs in a
+  row (step 3 hardened: it typed before the dialog settled, 1 run in 3).
+
 **Copy on every value worth pasting (2026-10-12).**
 - [x] `CopyText` (value + icon) beside `CopyButton` in `copy-button.tsx`:
   references (Bookings rows, the booking page title, Calendar, Payments

@@ -8588,3 +8588,24 @@ Bookings row is now a stretched link (the guest's name, its ::after over
 the card) with the copy icons above it. (2) The copy icons' tips, centred
 on icons at the screen's edge, widened a 390 px page to 410 px even while
 hidden; they open leftwards now (the walk's sideways-scroll check caught it).
+
+## 2026-10-12 — the Bookings list, redesigned
+
+**What was done:** the list groups stays by what they need: Needs a
+decision (marked on the card's edge, with the one-line reminder that a
+pending booking holds nothing), Staying now, Upcoming, Ended, each counted,
+with the group bar narrowing to one. A card leads with a date tile (month,
+day, weekday) to scan down, then the guest and reference, the day's event
+("Arrives today", "Leaves tomorrow"), "Thu 15 – Sat 17 Oct · 2 nights ·
+Night · Garden Room · 2 guests", the contacts with copy, and on the right
+the stored total, the status and, while pending, the payment. Search,
+room and a "Past 90 days" toggle share one toolbar row.
+
+**Why it matters:** every stay looked the same, whether it needed a
+decision today or ended weeks ago; the status hid among five badges.
+
+**What the observed values prove:** screenshots of harbor at 1280 and
+390 px with three seeded stays land one in each of the first three groups
+(pending → Needs a decision, checking in today → Staying now with
+"Arrives today", Saturday → Upcoming). The stay-detail walk passed three
+runs in a row once its dialog step waited for the dialog to settle.

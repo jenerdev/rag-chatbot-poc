@@ -94,7 +94,12 @@ try {
   // 3. Confirm through the dialog: a note, then the page shows Confirmed and offers Cancel.
   await page.eval("[...document.querySelectorAll('.stay-actions button')].find(b => b.textContent.trim() === 'Confirm').click()");
   await page.until("!!document.querySelector('dialog.dialog[open] textarea, dialog.dialog[open] input')", 5000);
+  // Wait for the dialog to settle (it animates in and moves focus), or the
+  // typed note can land before the field takes it: 1 run in 3 confirmed
+  // nothing, with "Confirm" still offered.
+  await sleep(400);
   await page.type('dialog.dialog[open] textarea, dialog.dialog[open] input', 'walk: paid at the desk');
+  await page.until("(document.querySelector('dialog.dialog[open] textarea, dialog.dialog[open] input')?.value ?? '').length > 0", 3000);
   await page.eval("[...document.querySelectorAll('dialog.dialog[open] button')].find(b => b.textContent.trim() === 'Confirm').click()");
   const after = await page.until(`(${buttons}).join() === 'Cancel stay'`, 15000);
   const badge = await page.eval("[...document.querySelectorAll('.stay-head .badge')].map(b => b.textContent.trim()).join(',')");

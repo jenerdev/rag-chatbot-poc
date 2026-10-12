@@ -1,10 +1,12 @@
 'use client';
 
-// S-3 · Bookings. ONE list of stays, one row per reference (D-100): every web
-// request and staff booking that has not ended, or the last 90 days too, with
-// search, a status filter and (per_room) a room filter. A row opens the
-// stay's own page (S-15, D-114), where every action is taken; this list has
-// no buttons. Dates at a glance are the Calendar's (S-12).
+// S-3 · Bookings. ONE list of stays, one card per reference (D-100): every
+// web request and staff booking that has not ended, or the last 90 days too.
+// Grouped by what each needs: Needs a decision, Staying now, Upcoming, Ended
+// (counted; the group bar narrows to one), with search and (per_room) a room
+// filter. A card opens the stay's own page (S-15, D-114), where every action
+// is taken; the only buttons in a card copy a value. Dates at a glance are
+// the Calendar's (S-12).
 //
 // Rendered by app/t/[tenant]/admin/bookings/page.tsx, which has already
 // checked on the server that the tenant exists and has the bookings
@@ -138,75 +140,104 @@ function stayState(stay: BookingRequest, today: string): { label: string; tone: 
   }
 }
 
+/** Where a stay sits in the list: what it needs from staff, then when it is. */
+type StayGroup = 'decide' | 'staying' | 'upcoming' | 'ended';
+const GROUPS: { key: StayGroup; title: string; hint: string }[] = [
+  { key: 'decide', title: 'Needs a decision', hint: 'Confirm or decline. A pending booking holds nothing: the first one confirmed gets the dates.' },
+  { key: 'staying', title: 'Staying now', hint: '' },
+  { key: 'upcoming', title: 'Upcoming', hint: '' },
+  { key: 'ended', title: 'Ended', hint: '' },
+];
+
+function groupOf(stay: BookingRequest, today: string): StayGroup {
+  if (stay.status === 'pending') return 'decide';
+  if (stay.status !== 'confirmed') return 'ended';
+  const checkOut = addDays(stay.checkIn, stay.nights);
+  if (checkOut <= today) return 'ended';
+  return stay.checkIn <= today ? 'staying' : 'upcoming';
+}
+
+/** "Thu 15 – Sat 17 Oct" for a stay of several nights; one date for one. */
+function spanLabel(checkIn: string, nights: number): string {
+  if (nights <= 1) return dayLabel(checkIn);
+  const out = addDays(checkIn, nights);
+  const fmt = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
+  const sameMonth = checkIn.slice(0, 7) === out.slice(0, 7);
+  return `${fmt(checkIn, sameMonth ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', day: 'numeric', month: 'short' })} – ${fmt(out, { weekday: 'short', day: 'numeric', month: 'short' })}`;
+}
+
 /**
- * One stay: when, who, what, the stored total and its badges. The whole card
- * opens the stay's page (S-15): the guest's name is the link, stretched over
- * the card (a::after), so the copy buttons inside can sit above it. A button
- * inside a link is not valid HTML, and a screen reader hears one link.
+ * One stay, scannable: a date tile (the check-in), the guest with the
+ * reference, when and what, the contacts; on the right the stored total,
+ * its status and payment. The whole card opens the stay's page (S-15): the
+ * guest's name is the link, stretched over the card (a::after), so the copy
+ * buttons inside can sit above it (a button inside a link is not valid HTML,
+ * and a screen reader hears one link). Notes and decisions are on the page.
  */
 function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today: string; currency: string; href: string }) {
   const pending = stay.status === 'pending';
   const state = stayState(stay, today);
   const checkOut = addDays(stay.checkIn, stay.nights);
-  const live = pending || (stay.status === 'confirmed' && checkOut > today);
+  const group = groupOf(stay, today);
+  const day = new Date(`${stay.checkIn}T00:00:00Z`);
+  const part = (o: Intl.DateTimeFormatOptions) => day.toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
+  const guests = stay.units.reduce((sum, u) => sum + (u.guests ?? 0), 0);
+  // The day's events staff act on: who arrives today, who leaves today.
+  const today_ = stay.status !== 'cancelled' && stay.status !== 'expired' && stay.checkIn === today ? 'Arrives today' : group === 'staying' && checkOut === addDays(today, 1) ? 'Leaves tomorrow' : null;
   return (
-    <div className={`booking stay-row${live ? '' : ' decided'}`}>
-      <div className="stay-when">
-        <span className="stay-dates">
-          {stay.nights > 1 ? `${dayLabel(stay.checkIn)} – ${dayLabel(checkOut)}` : dayLabel(stay.checkIn)}
-        </span>
-        <span className="small muted">
-          {stay.slot}
-          {stay.nights > 1 ? ` · ${stay.nights} nights` : ''}
-        </span>
+    <div className={`stay-row stay-row-${group}`}>
+      <div className="date-tile" aria-hidden="true">
+        <span>{part({ month: 'short' })}</span>
+        <strong>{part({ day: 'numeric' })}</strong>
+        <span>{part({ weekday: 'short' })}</span>
       </div>
-      <div className="stay-who">
-        <Link href={href} className="booking-guest stay-row-link" aria-label={`${stay.guestName}, ${stay.reference}, ${state.label}`}>
-          {stay.guestName}
-        </Link>
-        <span className="booking-meta">
-          <span>{stay.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', ')}</span>
+      <div className="stay-row-body">
+        <div className="stay-row-top">
+          <Link href={href} className="stay-row-link" aria-label={`${stay.guestName}, ${stay.reference}, ${state.label}, ${spanLabel(stay.checkIn, stay.nights)}`}>
+            {stay.guestName}
+          </Link>
+          <CopyText text={stay.reference} what="reference" className="badge request-ref" />
+          {today_ && <span className="badge accent">{today_}</span>}
+          {stay.walkIn && <span className="badge">Walk in</span>}
+          {stay.source === 'web' && <span className="badge">Booking page</span>}
+        </div>
+        <div className="stay-row-meta">
+          <span className="stay-row-when">
+            {spanLabel(stay.checkIn, stay.nights)}
+            {stay.nights > 1 ? ` · ${stay.nights} nights` : ''} · {stay.slot}
+          </span>
+          <span>
+            {stay.units.map((u) => u.unit).join(', ')}
+            {guests > 0 ? ` · ${guests} guest${guests === 1 ? '' : 's'}` : ''}
+          </span>
+        </div>
+        <div className="stay-row-contact">
           {stay.guestPhone && <CopyText text={stay.guestPhone} what="mobile number" />}
           {stay.guestEmail && <CopyText text={stay.guestEmail} what="email" />}
-        </span>
+        </div>
+        {pending && (stay.clash || stay.closed) && (
+          <p className="stay-row-warning">
+            <Icon name="alert" size={14} />
+            {stay.closed ? 'A night is on a closed date.' : 'A night is already taken by another booking.'}
+          </p>
+        )}
+      </div>
+      <div className="stay-row-end">
+        {stay.total !== null && <strong className="stay-total">{formatMoney(stay.total, currency)}</strong>}
         <span className="booking-badges">
-          <CopyText text={stay.reference} what="reference" className="badge request-ref" />
           <span className={`badge ${state.tone}`}>{state.label}</span>
-          {/* D-100: which door it came through. */}
-          <span className={stay.source === 'web' ? 'badge accent' : 'badge'}>{stay.source === 'web' ? 'Web' : 'By staff'}</span>
-          {stay.walkIn && <span className="badge">Walk in</span>}
           {/* manage booking § 4: the payment, from stay_payment(), and the deadline. */}
           {pending && stay.payment && (
             <span className={`badge ${stay.payment.enough ? 'ok' : stay.payment.status === 'submitted' ? 'warn' : ''}`}>
               {PAYMENT_LABEL[stay.payment.status] ?? stay.payment.status}
               {stay.payment.payBy && !stay.payment.enough
-                ? ` · pay by ${new Date(stay.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
+                ? ` · by ${new Date(stay.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
                 : ''}
-            </span>
-          )}
-          {pending && (stay.clash || stay.closed) && (
-            <span className="badge danger">
-              <Icon name="alert" size={12} /> {stay.closed ? 'Closed date' : 'Clash'}
             </span>
           )}
         </span>
       </div>
-      <div className="stay-end">
-        {stay.total !== null && <strong className="stay-total">{formatMoney(stay.total, currency)}</strong>}
-        <Icon name="chevron-right" size={18} />
-      </div>
-      {pending && stay.clash && <div className="booking-notes request-clash">A night of this stay is already taken by another booking.</div>}
-      {pending && stay.closed && (
-        <div className="booking-notes request-clash">A night of this stay is on a closed date. Decline it, or reopen the date on the Holidays screen.</div>
-      )}
-      {/* Typed notes are a React child, so they are escaped. */}
-      {stay.notes && <div className="booking-notes">{stay.notes}</div>}
-      {/* D-096: what staff wrote when they decided it. */}
-      {stay.decisionNote && (
-        <div className="booking-notes decision-note">
-          {stay.status === 'cancelled' ? 'Cancelled' : stay.status === 'expired' ? 'Expired' : 'Confirmed'}: {stay.decisionNote}
-        </div>
-      )}
+      <Icon name="chevron-right" size={18} className="stay-row-chevron" />
     </div>
   );
 }
@@ -262,7 +293,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // list's status filter, which only narrows what is drawn.
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'expired'>('all');
+  const [groupFilter, setGroupFilter] = useState<'all' | StayGroup>('all');
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -479,17 +510,29 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     [api, date, guestEmail, guestName, guestPhone, load, nightCount, notes, perRoom, promoId, router, setNotice, setup, slotId, slug, stayRooms, unauthorized, walkIn],
   );
 
-  // The list as drawn: status, room and search narrow what was loaded; then
-  // by check-in, the soonest first. Counts per status for the filter's labels.
-  const visible = useMemo(() => {
-    if (!stays) return [];
+  // The list as drawn: room and search narrow what was loaded; each stay
+  // falls in one group (what it needs, then when it is), and the group
+  // filter narrows to one. In a group: the soonest first; Ended, the latest.
+  const matching = useMemo(() => {
+    if (!stays || !setup) return [];
     return stays
-      .filter((st) => statusFilter === 'all' || st.status === statusFilter)
       .filter((st) => roomFilter === null || st.units.some((u) => u.unitId === roomFilter))
-      .filter((st) => matches([st.reference, st.guestName, st.guestPhone ?? '', st.guestEmail ?? '', st.units.map((u) => u.unit).join(' ')].join(' '), search))
-      .sort((a, b) => (a.checkIn === b.checkIn ? (a.createdAt < b.createdAt ? -1 : 1) : a.checkIn < b.checkIn ? -1 : 1));
-  }, [roomFilter, search, statusFilter, stays]);
-  const countOf = (status: 'pending' | 'confirmed' | 'cancelled' | 'expired') => stays?.filter((st) => st.status === status).length ?? 0;
+      .filter((st) => matches([st.reference, st.guestName, st.guestPhone ?? '', st.guestEmail ?? '', st.units.map((u) => u.unit).join(' ')].join(' '), search));
+  }, [roomFilter, search, setup, stays]);
+  const countOf = (g: StayGroup) => (setup ? matching.filter((st) => groupOf(st, setup.today) === g).length : 0);
+  const visible = useMemo(() => {
+    if (!setup) return [];
+    const order = GROUPS.map((g) => g.key);
+    return matching
+      .filter((st) => groupFilter === 'all' || groupOf(st, setup.today) === groupFilter)
+      .sort((x, y) => {
+        const gx = groupOf(x, setup.today);
+        const gy = groupOf(y, setup.today);
+        if (gx !== gy) return order.indexOf(gx) - order.indexOf(gy);
+        const byDate = x.checkIn === y.checkIn ? (x.createdAt < y.createdAt ? -1 : 1) : x.checkIn < y.checkIn ? -1 : 1;
+        return gx === 'ended' ? -byDate : byDate;
+      });
+  }, [groupFilter, matching, setup]);
 
   // Active units only: a retired room is not offered in the form or shown as
   // a chip. Villa has one, so none of the per-unit UI appears for it.
@@ -550,15 +593,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
             </div>
           </div>
           <div className="stays-toolbar">
-            <ListSearch value={search} onChange={(v) => { setSearch(v); setShown(PAGE_SIZE); }} label="Search reference, guest, phone, email" />
-            <div className="segmented" role="group" aria-label="Show stays">
-              {(['all', 'pending', 'confirmed', 'cancelled', 'expired'] as const).map((f) => (
-                <button key={f} type="button" aria-pressed={statusFilter === f} onClick={() => { setStatusFilter(f); setShown(PAGE_SIZE); }}>
-                  {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : f === 'expired' ? 'Expired' : 'Cancelled'}
-                  {f !== 'all' && countOf(f) > 0 && <span className="segment-count">{countOf(f)}</span>}
-                </button>
-              ))}
-            </div>
+            <ListSearch value={search} onChange={(v) => { setSearch(v); setShown(PAGE_SIZE); }} label="Search name, reference, phone, email" />
             {perRoom && (
               <select aria-label="Show room" value={roomFilter ?? ''} onChange={(e) => { setRoomFilter(e.target.value === '' ? null : Number(e.target.value)); setShown(PAGE_SIZE); }}>
                 <option value="">All rooms</option>
@@ -570,13 +605,22 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                 ))}
               </select>
             )}
-            <label className="check-line stays-past">
-              <input type="checkbox" checked={showPast} onChange={(e) => { setShowPast(e.target.checked); setShown(PAGE_SIZE); }} /> Show the last {PAST_DAYS} days
-            </label>
+            <button type="button" className={showPast ? 'toggle on' : 'toggle'} aria-pressed={showPast} onClick={() => { setShowPast((v) => !v); setShown(PAGE_SIZE); }}>
+              <Icon name="calendar" size={14} /> Past {PAST_DAYS} days
+            </button>
           </div>
-          <p className="small muted">
-            {from > setup.today ? `Stays running on or after ${dayLabel(from)}. ` : ''}A pending stay does not hold its dates: the first one you confirm gets them.
-          </p>
+          <div className="segmented stays-groups" role="group" aria-label="Show">
+            <button type="button" aria-pressed={groupFilter === 'all'} onClick={() => { setGroupFilter('all'); setShown(PAGE_SIZE); }}>
+              All <span className="segment-count">{matching.length}</span>
+            </button>
+            {GROUPS.map((g) => (
+              <button key={g.key} type="button" aria-pressed={groupFilter === g.key} onClick={() => { setGroupFilter(g.key); setShown(PAGE_SIZE); }}>
+                {g.title}
+                <span className={`segment-count${g.key === 'decide' && countOf('decide') > 0 ? ' attention' : ''}`}>{countOf(g.key)}</span>
+              </button>
+            ))}
+          </div>
+          {from > setup.today && <p className="small muted">Stays running on or after {dayLabel(from)}.</p>}
 
           {stays === null ? (
             <LoadState load={loadState} what="stays" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
@@ -587,14 +631,26 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               </EmptyState>
             ) : (
               <EmptyState icon="search" title="No stays match" compact>
-                Change the search or the filters.
+                {groupFilter !== 'all' ? 'Nothing in this group. Choose All, or change the search.' : 'Change the search or the room.'}
               </EmptyState>
             )
           ) : (
             <>
-              {visible.slice(0, shown).map((st) => (
-                <StayRow key={st.groupId} stay={st} today={setup.today} currency={setup.currency} href={`/t/${slug}/admin/bookings/${st.reference}`} />
-              ))}
+              {GROUPS.map((g) => {
+                const rows = visible.slice(0, shown).filter((st) => groupOf(st, setup.today) === g.key);
+                if (rows.length === 0) return null;
+                return (
+                  <section key={g.key} className={`stay-group stay-group-${g.key}`} aria-labelledby={`group-${g.key}`}>
+                    <h3 id={`group-${g.key}`}>
+                      {g.title} <span className="muted">{countOf(g.key)}</span>
+                    </h3>
+                    {g.hint && <p className="small muted">{g.hint}</p>}
+                    {rows.map((st) => (
+                      <StayRow key={st.groupId} stay={st} today={setup.today} currency={setup.currency} href={`/t/${slug}/admin/bookings/${st.reference}`} />
+                    ))}
+                  </section>
+                );
+              })}
               {visible.length > shown && (
                 <div className="list-more">
                   <span>
