@@ -8805,3 +8805,26 @@ the page can still decide without a note.
 
 **Observed:** web typecheck exit 0; web tests 131 passed. Not walked in a
 browser.
+
+## 2026-10-13 — the platform index, redesigned
+
+**What was done:** `/platform` lists every tenant once. The old page had a
+Pulse table and then the tenant list, the same four tenants twice. In the
+table, names wrapped over three lines and the last column was cut off at
+1280 px. On a phone it became a stack of eight-row cards about 1,100 px
+long. The page now has, in order:
+- a title with New tenant;
+- four tiles totalled over live tenants, with Open unanswered and Requests
+  waiting tinted warn when above 0;
+- a search and a Live / Archived / All filter;
+- the list itself: each row is the tenant's name (which opens its form),
+  its applications, slug, assistant, members and created month, then its
+  own 30-day figures, with the two that wait on someone tinted, then Open
+  and Edit.
+
+Archived tenants are dimmed by colour (D-101). The Pulse data and the
+routes are unchanged.
+
+**Observed:** `plan/platform-shots.mjs` (light and dark, 1280 and 390 px)
+shows a document width equal to the viewport at both widths and no console
+errors. Web typecheck exit 0.

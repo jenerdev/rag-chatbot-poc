@@ -1693,6 +1693,20 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — the platform index, redesigned
+- **Did:** `/platform`'s list (`platform-screen.tsx`): a page title with
+  New tenant; four total tiles over live tenants (live, conversations 30d
+  with refusals, open unanswered, requests waiting; the last two warn when
+  above 0); search plus Live / Archived / All; ONE tenant list whose rows
+  carry their own Pulse figures (the separate Pulse table is gone, and it
+  had clipped "Confirmed stays" at 1280). Booking figures only for booking
+  tenants, with an empty gap so the columns line up. Phone: 2×2 tiles and a
+  3-column figure grid. The tenant form is unchanged.
+  `plan/platform-shots.mjs` shoots it (light/dark, 1280/390);
+  `ui-refresh-a11y.mjs` now waits on `.tenant-row`.
+- **Observed:** page width 1280/390 at both widths (no sideways scroll), no
+  console errors, web typecheck exit 0.
+
 ### 2026-10-13 — a pending stay says what it waits for
 - **Did:** `pendingState()` in `lib/stay-words.ts` (tested) names a pending
   stay by `stay_payment()`: Awaiting payment, Proof to check, Paid, to

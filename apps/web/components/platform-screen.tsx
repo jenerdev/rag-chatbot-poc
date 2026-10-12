@@ -11,6 +11,8 @@ import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
 import { Icon } from '@/components/icons';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { LoginForm, describeFailure } from '@/components/admin-login';
+import { ListSearch } from '@/components/list-search';
+import { matches } from '@/lib/search';
 import { TenantForm } from '@/components/tenant-form';
 import { Toaster } from '@/components/toast';
 
@@ -29,6 +31,9 @@ export function PlatformScreen() {
   const [detailLoad, setDetailLoad] = useState<Load>(LOADING);
   // Bumped by Retry: the detail load is an effect (it cancels on a new selection), so it re-runs on this.
   const [detailTry, setDetailTry] = useState(0);
+  // The list's search and view: they narrow what was loaded, on screen only.
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState<'live' | 'archived' | 'all'>('live');
 
   const askSession = useCallback(async () => {
     try {
@@ -130,7 +135,7 @@ export function PlatformScreen() {
         )}
         {auth === 'in' && (
           <button type="button" className="link" onClick={logout}>
-            Log out
+            <Icon name="logout" size={16} /> <span className="narrow-hidden">Log out</span>
           </button>
         )}
       </nav>
@@ -216,113 +221,172 @@ export function PlatformScreen() {
     );
   }
 
+  // The index: the totals, then ONE list of tenants, each row carrying its own
+  // Pulse figures (D-098) beside its name, so a tenant is read once, not twice.
+  const pulseOf = new Map((pulse ?? []).map((p) => [p.tenantId, p]));
+  const live = (tenants ?? []).filter((t) => !t.archivedAt);
+  const archived = (tenants ?? []).filter((t) => t.archivedAt);
+  const livePulse = (pulse ?? []).filter((p) => p.archivedAt === null);
+  const total = (key: 'conversations30d' | 'refusals30d' | 'openUnanswered' | 'pendingRequests') => livePulse.reduce((sum, p) => sum + p[key], 0);
+  const shown = (view === 'live' ? live : view === 'archived' ? archived : tenants ?? [])
+    .filter((t) => matches([t.businessName, t.slug, t.assistantName, ...t.applications].join(' '), search))
+    .sort((a, b) => a.businessName.localeCompare(b.businessName));
+
   return (
     <>
       {top}
-      <main>
-        {/* The Pulse strip (D-098): every live tenant's counts in one table; archived ones folded. Counts only, no content, no money (plan § 2.4). */}
-        {pulse && pulse.length > 0 && (
-          <section className="card">
-            <h2>Pulse, last 30 days</h2>
-            {/* Focusable, so a keyboard can scroll it sideways when it is wider than the card (Phase 10's audit). */}
-            <div className="reply-table pulse" tabIndex={0} role="region" aria-label="Pulse, last 30 days">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tenant</th>
-                    <th className="amount">Members</th>
-                    <th className="amount">Documents</th>
-                    <th className="amount">Conversations</th>
-                    <th className="amount">Refusals</th>
-                    <th className="amount">Open unanswered</th>
-                    <th className="amount">Requests waiting</th>
-                    <th className="amount">Confirmed stays</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pulse
-                    .filter((p) => p.archivedAt === null)
-                    .map((p) => (
-                      <tr key={p.tenantId}>
-                        <td data-label="Tenant">{p.businessName}</td>
-                        <td data-label="Members" className="amount">{p.members}</td>
-                        <td data-label="Documents" className="amount">{p.documents}</td>
-                        <td data-label="Conversations" className="amount">{p.conversations30d}</td>
-                        <td data-label="Refusals" className="amount">{p.refusals30d}</td>
-                        <td data-label="Open unanswered" className="amount">{p.openUnanswered}</td>
-                        <td data-label="Requests waiting" className="amount">{p.pendingRequests}</td>
-                        <td data-label="Confirmed stays" className="amount">{p.confirmedStays30d}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-            {pulse.some((p) => p.archivedAt !== null) && (
-              <details className="small muted">
-                <summary>{pulse.filter((p) => p.archivedAt !== null).length} archived</summary>
-                <ul>
-                  {pulse
-                    .filter((p) => p.archivedAt !== null)
-                    .map((p) => (
-                      <li key={p.tenantId}>
-                        {p.businessName} · archived {p.archivedAt?.slice(0, 10)}
-                      </li>
-                    ))}
-                </ul>
-              </details>
-            )}
-          </section>
-        )}
-        <section className="card">
-          <div className="range-head">
-            <h2>Tenants{tenants ? ` (${tenants.length})` : ''}</h2>
-            {newTenant}
+      <main className="platform-main">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Tenants</h1>
+            <p className="page-lede">
+              Each tenant is a workspace at <code>/t/&lt;slug&gt;</code> with its own documents, assistant and theme.
+            </p>
           </div>
-          <p className="small muted">
-            Each tenant is a workspace at <code>/t/&lt;slug&gt;</code> with its own documents, assistant and theme. Archived
-            tenants answer 404 everywhere but here.
-          </p>
-          {tenants === null ? (
-            <LoadState load={loadState} what="tenants" onRetry={() => { setLoadState(LOADING); void loadTenants(); }} />
-          ) : tenants.length === 0 ? (
-            <EmptyState icon="home" title="No tenants yet" action={newTenant} />
-          ) : (
-            <div>
-              {tenants.map((t) => (
-                <div key={t.id} className="member-row">
-                  <span className="member-avatar" aria-hidden="true">
-                    {t.businessName.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="member-who">
-                    <span className="member-email">
-                      {t.businessName}
-                      {t.archivedAt && <span className="badge">Archived</span>}
-                      {t.applications.map((a) => (
-                        <span key={a} className="badge accent">
-                          {a}
-                        </span>
-                      ))}
-                    </span>
-                    <span className="member-since">
-                      /t/{t.slug} · {t.assistantName} · {t.members} member{t.members === 1 ? '' : 's'}
-                    </span>
-                  </span>
-                  <span className="list-row-actions">
-                    {!t.archivedAt && (
-                      <a className="button ghost sm" href={`/t/${t.slug}`} target="_blank" rel="noreferrer">
-                        Open
-                      </a>
-                    )}
-                    <button type="button" className="sm" onClick={() => setSelected(t.id)}>
-                      Edit
-                    </button>
-                  </span>
-                </div>
+          {newTenant}
+        </div>
+
+        {/* The totals over live tenants, from the Pulse (counts only, no content, no money: plan § 2.4). Left out if it failed. */}
+        {tenants && pulse && (
+          <div className="stat-tiles platform-totals">
+            <div className="stat-tile static">
+              <span className="stat-tile-label">
+                <Icon name="home" size={14} /> Live tenants
+              </span>
+              <span className="stat-tile-value">{live.length}</span>
+              <span className="stat-tile-hint">{archived.length > 0 ? `${archived.length} archived` : 'None archived'}</span>
+            </div>
+            <div className="stat-tile static">
+              <span className="stat-tile-label">
+                <Icon name="chat" size={14} /> Conversations
+              </span>
+              <span className="stat-tile-value">{total('conversations30d')}</span>
+              <span className="stat-tile-hint">last 30 days · {total('refusals30d')} refused</span>
+            </div>
+            <div className={`stat-tile static${total('openUnanswered') > 0 ? ' attention' : ''}`}>
+              <span className="stat-tile-label">
+                <Icon name="help" size={14} /> Open unanswered
+              </span>
+              <span className="stat-tile-value">{total('openUnanswered')}</span>
+              <span className="stat-tile-hint">questions the assistant could not answer</span>
+            </div>
+            <div className={`stat-tile static${total('pendingRequests') > 0 ? ' attention' : ''}`}>
+              <span className="stat-tile-label">
+                <Icon name="calendar" size={14} /> Requests waiting
+              </span>
+              <span className="stat-tile-value">{total('pendingRequests')}</span>
+              <span className="stat-tile-hint">booking requests staff have not decided</span>
+            </div>
+          </div>
+        )}
+
+        <section className="card platform-tenants">
+          <div className="platform-toolbar">
+            <ListSearch value={search} onChange={setSearch} label="Search name, slug, assistant" />
+            <div className="segmented" role="group" aria-label="Show">
+              {(
+                [
+                  ['live', 'Live', live.length],
+                  ['archived', 'Archived', archived.length],
+                  ['all', 'All', tenants?.length ?? 0],
+                ] as const
+              ).map(([key, label, count]) => (
+                <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>
+                  {label} <span className="segment-count">{count}</span>
+                </button>
               ))}
             </div>
+          </div>
+
+          {tenants === null ? (
+            <LoadState load={loadState} what="tenants" rows={4} onRetry={() => { setLoadState(LOADING); void loadTenants(); }} />
+          ) : tenants.length === 0 ? (
+            <EmptyState icon="home" title="No tenants yet" action={newTenant}>
+              A tenant is a business with its own chat, documents and staff.
+            </EmptyState>
+          ) : shown.length === 0 ? (
+            <EmptyState icon="search" title={search ? 'No tenants match' : view === 'archived' ? 'Nothing archived' : 'No live tenants'} compact>
+              {search ? 'Change the search, or choose All.' : 'Choose another view.'}
+            </EmptyState>
+          ) : (
+            <ul className="tenant-list">
+              {shown.map((t) => (
+                <TenantRow key={t.id} tenant={t} pulse={pulseOf.get(t.id) ?? null} onEdit={() => setSelected(t.id)} />
+              ))}
+            </ul>
           )}
         </section>
       </main>
     </>
+  );
+}
+
+/** One figure in a tenant's row: the count, its caption; `attention` when it waits on someone. */
+function Figure({ value, label, attention }: { value: number; label: string; attention?: boolean }) {
+  return (
+    <div className={attention && value > 0 ? 'tenant-figure attention' : 'tenant-figure'}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * A tenant: its mark, its name (which opens the form) with what is switched
+ * on, where it lives and who answers there; its figures from the Pulse; the
+ * way to its chat. Booking figures only for a tenant with bookings.
+ */
+function TenantRow({ tenant: t, pulse: p, onEdit }: { tenant: TenantSummary; pulse: PlatformPulse | null; onEdit: () => void }) {
+  const bookings = t.applications.includes('bookings');
+  const since = new Date(t.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  return (
+    <li className={t.archivedAt ? 'tenant-row archived' : 'tenant-row'}>
+      <span className="member-avatar" aria-hidden="true">
+        {t.businessName.charAt(0).toUpperCase()}
+      </span>
+      <div className="tenant-who">
+        <div className="tenant-name">
+          <button type="button" className="link tenant-open" onClick={onEdit}>
+            {t.businessName}
+          </button>
+          {t.archivedAt && <span className="badge">Archived {t.archivedAt.slice(0, 10)}</span>}
+          {t.applications.map((a) => (
+            <span key={a} className="badge accent">
+              {a}
+            </span>
+          ))}
+        </div>
+        <span className="tenant-meta">
+          /t/{t.slug} · {t.assistantName} · {t.members} member{t.members === 1 ? '' : 's'} · since {since}
+        </span>
+      </div>
+      {p && (
+        <dl className="tenant-figures" aria-label={`${t.businessName}, last 30 days`}>
+          <Figure value={p.documents} label="Documents" />
+          <Figure value={p.conversations30d} label="Chats" />
+          <Figure value={p.refusals30d} label="Refused" />
+          <Figure value={p.openUnanswered} label="Unanswered" attention />
+          {bookings ? (
+            <>
+              <Figure value={p.pendingRequests} label="Requests" attention />
+              <Figure value={p.confirmedStays30d} label="Stays" />
+            </>
+          ) : (
+            // Two empty cells keep the columns in line with the booking tenants' rows.
+            <div className="tenant-figure-gap" aria-hidden="true" />
+          )}
+        </dl>
+      )}
+      <span className="list-row-actions">
+        {!t.archivedAt && (
+          <a className="button ghost sm" href={`/t/${t.slug}`} target="_blank" rel="noreferrer" aria-label={`Open the chat of ${t.businessName} in a new tab`}>
+            <Icon name="chat" size={14} /> Open
+          </a>
+        )}
+        <button type="button" className="sm" onClick={onEdit} aria-label={`Edit ${t.businessName}`}>
+          <Icon name="edit" size={14} /> Edit
+        </button>
+      </span>
+    </li>
   );
 }

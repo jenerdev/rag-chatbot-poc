@@ -109,8 +109,8 @@ try {
       }
       // The platform.
       await page.send('Network.setCookie', { name: 'rag_platform', value: platformCookie, url: `${BASE}/api/platform/`, path: '/api/platform' });
-      await open(`${BASE}/platform`, "!!document.querySelector('.member-row')", `platform list @${width}`);
-      await page.eval("[...document.querySelectorAll('.member-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
+      await open(`${BASE}/platform`, "!!document.querySelector('.tenant-row')", `platform list @${width}`);
+      await page.eval("[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
       await page.until("!!document.querySelector('#theme-accent')", 15000);
       await new Promise((r) => setTimeout(r, 600));
       await audit(`platform tenant form @${width}`);
