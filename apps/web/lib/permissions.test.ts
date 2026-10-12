@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PERMISSIONS, ROLES, ROLE_PERMISSIONS, can, isRole, type Permission, type Role } from './permissions';
+import { readFileSync } from 'node:fs';
+import { NOTIFY_PERMISSION, PERMISSIONS, ROLES, ROLE_PERMISSIONS, can, isRole, type Permission, type Role } from './permissions';
 import { COLOUR, parseTheme, themeVars } from './theme';
 
 // The two walls must agree (plan/tenant-management.md Rule 2, § 3.2). This
@@ -71,5 +72,25 @@ describe('theme', () => {
     const { theme, problems } = parseTheme({ accent: '#0f766e', bg: '', ink: 'blue', font: 'x' });
     expect(theme).toEqual({ accent: '#0f766e' });
     expect(problems).toEqual(['Text must be a colour like #0f766e or #fff.', 'Unknown theme key "font".']);
+  });
+});
+
+describe('NOTIFY_PERMISSION', () => {
+  // notify_claim() in SQL decides who hears each kind (Rule 3). Read its
+  // body and compare: request and change go to every role, a proof to the
+  // roles the function names. If either side moves, this fails.
+  const sql = readFileSync(new URL('../../../packages/db/sql/schema-notifications.sql', import.meta.url), 'utf8');
+  const claim = sql.slice(sql.indexOf('create or replace function public.notify_claim'), sql.indexOf('create or replace function public.notify_done'));
+
+  it('sends a proof to exactly the roles notify_claim() names', () => {
+    const named = /o\.kind = 'proof' and m\.role in \(([^)]*)\)/.exec(claim)?.[1] ?? '';
+    const sqlRoles = [...named.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort();
+    expect(sqlRoles).toEqual(ROLES.filter((r) => can(r, NOTIFY_PERMISSION.proof)).sort());
+  });
+
+  it('sends a request and a change to every role, as notify_claim() does', () => {
+    expect(claim).toContain("o.kind in ('request', 'change')");
+    expect(ROLES.filter((r) => can(r, NOTIFY_PERMISSION.request))).toEqual([...ROLES]);
+    expect(ROLES.filter((r) => can(r, NOTIFY_PERMISSION.change))).toEqual([...ROLES]);
   });
 });

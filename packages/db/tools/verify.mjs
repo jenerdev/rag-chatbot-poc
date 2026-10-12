@@ -19,6 +19,8 @@
 // tokens. They need TENANT_SIGNING_JWK in .env, and create and delete their
 // own probe user in Supabase Auth.
 //
+// 173–183 are notifications Phase 2 (schema-notifications.sql, D-116).
+//
 // Run:  pnpm --filter @rag/db verify
 
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -1632,6 +1634,7 @@ if (chunk && typeof chunk.tenant_id === 'number') {
       await calendarChecks();
       await manageBookingChecks();
       await conversationChecks();
+      await notificationChecks();
     } finally {
       const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
       if (error) console.log(`WARN  could not delete the verify-probe tenant: ${error.message}`);
@@ -3272,6 +3275,268 @@ async function conversationChecks() {
     if (userId) {
       const { error: userError } = await supabase.auth.admin.deleteUser(userId);
       if (userError) console.log(`WARN  could not delete the conversations-probe user: ${userError.message}`);
+    }
+  }
+}
+
+// 173–183 are notifications Phase 2 (plan/notifications.md § 3,
+// schema-notifications.sql). A probe tenant with bookings and a payment
+// policy, an owner and a staff member, each with one fake subscription (an
+// FCM-shaped endpoint nobody will ever POST to here, and RFC 8291's device
+// keys). Every event comes through a GUEST door on a chat token
+// (request_booking, submit_payment, request_change): a service-key write is
+// actor "system", which is not news (§ 2b.7). Each refusal has its twin.
+async function notificationChecks() {
+  const { data: probe, error: probeError } = await supabase
+    .from('tenants')
+    .insert({ slug: 'notify-probe', business_name: 'notify probe', assistant_name: 'Probe' })
+    .select('id')
+    .single();
+  if (probeError) {
+    check(false, 'notify: create the notify-probe tenant', probeError.message);
+    return;
+  }
+  const users = [];
+  let proofPath = null;
+  try {
+    const method = { kind: 'gcash', label: 'GCash', account_name: 'Probe', account_number: '0917 000 0000' };
+    const app = await supabase.from('tenant_applications').insert({
+      tenant_id: probe.id,
+      application_key: 'bookings',
+      config: { timezone: 'Asia/Manila', booking_type: 'per_room', payments: { methods: [method], fee: { kind: 'full' } } },
+    });
+    if (app.error) throw new Error(`application: ${app.error.message}`);
+    const { data: units, error: unitError } = await supabase
+      .from('units')
+      .insert([
+        { tenant_id: probe.id, name: 'A', capacity: 2, sort_order: 1, active: true },
+        { tenant_id: probe.id, name: 'B', capacity: 2, sort_order: 2, active: true },
+      ])
+      .select('id, name');
+    if (unitError) throw new Error(`units: ${unitError.message}`);
+    const unit = Object.fromEntries(units.map((u) => [u.name, u.id]));
+    // Overnight: a stay of several nights needs one (request_booking()).
+    const { data: slot, error: slotError } = await supabase.from('slots').insert({ tenant_id: probe.id, name: 'Night', start_time: '14:00', duration: '22 hours', nightly: true }).select('id').single();
+    if (slotError) throw new Error(`slot: ${slotError.message}`);
+    const rates = await supabase.from('unit_rates').insert(['A', 'B'].map((u) => ({ tenant_id: probe.id, unit_id: unit[u], slot_id: slot.id, weekday_price: 100000, weekend_price: 150000 })));
+    if (rates.error) throw new Error(`rates: ${rates.error.message}`);
+
+    const member = async (role) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `notify-${role}-${Date.now()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(`user: ${error.message}`);
+      users.push(data.user.id);
+      const m = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: probe.id, role });
+      if (m.error) throw new Error(`membership: ${m.error.message}`);
+      return data.user.id;
+    };
+    const ownerId = await member('owner');
+    const staffId = await member('staff');
+    const owner = asToken(staffToken(probe.id, ownerId));
+    const staff = asToken(staffToken(probe.id, staffId));
+    const chat = asToken(chatToken(probe.id));
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+
+    const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+    const endpoint = (who) => `https://fcm.googleapis.com/fcm/send/verify-${who}-${randomUUID()}`;
+    const outbox = async () => (await supabase.from('notification_outbox').select('id, kind, reference, first_night, nights, claimed_at, sent_at').eq('tenant_id', probe.id).order('id')).data ?? [];
+    const claim = async (client = owner, tenantId = probe.id) => client.rpc('notify_claim', { p_tenant_id: tenantId });
+
+    // 173. A member adds their own device (user_id filled from the token);
+    //      naming another member, another tenant, or a bad endpoint is refused.
+    let ownerSub;
+    let staffSub;
+    {
+      const mine = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('owner'), ...KEYS }).select('id, user_id, kinds').single();
+      ownerSub = mine.data?.id;
+      const theirs = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, user_id: staffId, endpoint: endpoint('forged'), ...KEYS });
+      const foreign = await owner.from('push_subscriptions').insert({ tenant_id: villaRow.id, endpoint: endpoint('foreign'), ...KEYS });
+      const http = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: 'http://fcm.googleapis.com/x', ...KEYS });
+      const s = await staff.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('staff'), ...KEYS }).select('id').single();
+      staffSub = s.data?.id;
+      check(
+        !mine.error && mine.data.user_id === ownerId && mine.data.kinds.join() === 'request,proof,change' && !s.error
+          && theirs.error?.code === '42501' && foreign.error?.code === '42501' && http.error?.code === '23514',
+        "notify: a member adds their own device (user filled in, every kind); another member's, another tenant's or an http endpoint is refused",
+        `own ${mine.error?.message ?? 'ok'} · forged ${theirs.error?.code} · foreign ${foreign.error?.code} · http ${http.error?.code}`,
+      );
+    }
+
+    // 174. Each member reads only their own device, and cannot delete another's
+    //      (0 rows; the row is still there); their own delete works (twin).
+    {
+      const staffSees = await staff.from('push_subscriptions').select('id');
+      const ownerSees = await owner.from('push_subscriptions').select('id');
+      const tryDelete = await staff.from('push_subscriptions').delete().eq('id', ownerSub).select('id');
+      const stillThere = await supabase.from('push_subscriptions').select('id').eq('id', ownerSub);
+      const spare = await staff.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('spare'), ...KEYS }).select('id').single();
+      const ownDelete = await staff.from('push_subscriptions').delete().eq('id', spare.data?.id).select('id');
+      check(
+        staffSees.data?.length === 1 && staffSees.data[0].id === staffSub && ownerSees.data?.length === 1 && ownerSees.data[0].id === ownerSub
+          && (tryDelete.data ?? []).length === 0 && stillThere.data?.length === 1 && ownDelete.data?.length === 1,
+        "notify: each member reads only their own device; another's delete removes 0 rows (it is still there); their own removes 1",
+        `staff sees ${staffSees.data?.length} · owner sees ${ownerSees.data?.length} · cross delete ${(tryDelete.data ?? []).length} · own delete ${ownDelete.data?.length}`,
+      );
+    }
+
+    // 175. A web request, two rooms for two nights: ONE outbox row, the stay's
+    //      reference, its first night, 2 nights. A staff stay: none.
+    const request = async (day, email) => {
+      const { data, error } = await chat.rpc('request_booking', {
+        p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.A, unit.B], p_guests: [1, 1], p_check_in: day, p_nights: 2,
+        p_name: 'Notify Probe', p_phone: '0918 222 3333', p_email: email, p_notes: null,
+      });
+      if (error) throw new Error(`request_booking: ${error.message}`);
+      return data[0].reference;
+    };
+    const webRef = await request('2027-06-07', 'notify.web@example.com');
+    {
+      const rows = await outbox();
+      const staffStay = await owner.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.A, slot_id: slot.id, booked_date: '2027-06-21', guest_name: 'Staff Stay', guest_count: 1 });
+      const afterStaff = await outbox();
+      check(
+        rows.length === 1 && rows[0].kind === 'request' && rows[0].reference === webRef && rows[0].first_night === '2027-06-07' && rows[0].nights === 2
+          && !staffStay.error && afterStaff.length === 1,
+        'notify: a web request for two rooms and two nights is ONE outbox row with its reference and dates; a staff stay adds none',
+        `${rows.map((r) => `${r.kind} ${r.reference} ${r.first_night} ×${r.nights}`).join(' | ')} · staff stay ${staffStay.error?.message ?? 'ok'} → ${afterStaff.length}`,
+      );
+    }
+
+    // 176. A chat token reads no subscription and no outbox row (the twin:
+    //      service_role sees both); notify_claim refuses another tenant's id.
+    {
+      const subs = await chat.from('push_subscriptions').select('id');
+      const box = await chat.from('notification_outbox').select('id');
+      const staffBox = await owner.from('notification_outbox').select('id');
+      const foreign = await claim(chat, villaRow.id);
+      const serviceSubs = await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id);
+      check(
+        (subs.data ?? []).length === 0 && (box.data ?? []).length === 0 && (staffBox.data ?? []).length === 0 && foreign.error?.code === '42501'
+          && serviceSubs.data?.length === 2 && (await outbox()).length === 1,
+        "notify: a chat token reads 0 devices and 0 outbox rows, staff 0 outbox rows (service sees 2 and 1); notify_claim on another tenant is 42501",
+        `chat subs ${subs.error?.code ?? (subs.data ?? []).length} · chat outbox ${box.error?.code ?? (box.data ?? []).length} · staff outbox ${staffBox.error?.code ?? (staffBox.data ?? []).length} · foreign ${foreign.error?.code}`,
+      );
+    }
+
+    // 177. The claim, on a CHAT token (the guest's request runs the drain):
+    //      the request goes to both members' devices, with nothing but the
+    //      named fields; a second claim returns nothing (claimed).
+    {
+      const first = await claim(chat);
+      const second = await claim(chat);
+      const rows = first.data ?? [];
+      check(
+        !first.error && rows.length === 2 && new Set(rows.map((r) => r.subscription_id)).size === 2 && rows.every((r) => r.kind === 'request' && r.reference === webRef)
+          && Object.keys(rows[0]).sort().join() === 'auth,endpoint,first_night,kind,nights,outbox_id,p256dh,reference,subscription_id'
+          && !second.error && (second.data ?? []).length === 0,
+        'notify: a chat token claims the request for both devices (named fields only); a second claim gets nothing',
+        `first ${first.error?.message ?? rows.length} · second ${second.error?.message ?? (second.data ?? []).length}`,
+      );
+      // ok from both: sent.
+      const done = await chat.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const box = (await outbox())[0];
+      const subs = await supabase.from('push_subscriptions').select('last_ok_at').eq('tenant_id', probe.id);
+      check(
+        !done.error && box.sent_at !== null && (subs.data ?? []).every((s) => s.last_ok_at !== null),
+        'notify: notify_done with ok for both marks the row sent and both devices answered',
+        `${done.error?.message ?? 'ok'} · sent ${box.sent_at !== null}`,
+      );
+    }
+
+    // 178. A proof goes to the OWNER only: a staff role has no payments:write.
+    {
+      // The guest's upload first, as the page does (insert-only for a chat token).
+      proofPath = `${probe.id}/incoming/${randomUUID()}.png`;
+      const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      const upload = await chat.storage.from('payment-proofs').upload(proofPath, PNG, { contentType: 'image/png', upsert: false });
+      if (upload.error) throw new Error(`proof upload: ${upload.error.message}`);
+      const pay = await chat.rpc('submit_payment', {
+        p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_proof_path: proofPath, p_method: 'GCash',
+        p_claimed_amount: 100000, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
+      });
+      const rows = (await claim(staff)).data ?? [];
+      const box = (await outbox()).filter((r) => r.kind === 'proof');
+      check(
+        !pay.error && box.length === 1 && rows.length === 1 && rows[0].kind === 'proof' && rows[0].subscription_id === ownerSub,
+        "notify: a guest's proof is one outbox row, claimed for the owner's device only (staff has no payments:write)",
+        `pay ${pay.error?.message ?? 'ok'} · proof rows ${box.length} · recipients ${rows.map((r) => (r.subscription_id === ownerSub ? 'owner' : 'staff')).join(',')}`,
+      );
+      await staff.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+    }
+
+    // 179. A change request reaches both; "gone" deletes that device, "retry"
+    //      releases the row, which the next claim takes again (owner only now).
+    {
+      const asked = await chat.rpc('request_change', { p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_kind: 'cancel', p_new_check_in: null, p_reason: 'Probe', p_dry_run: false });
+      const rows = (await claim(owner)).data ?? [];
+      const results = rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: r.subscription_id === staffSub ? 'gone' : 'retry' }));
+      const done = await owner.rpc('notify_done', { p_results: results });
+      const staffGone = (await supabase.from('push_subscriptions').select('id').eq('id', staffSub)).data?.length === 0;
+      const box = (await outbox()).find((r) => r.kind === 'change');
+      const again = (await claim(owner)).data ?? [];
+      check(
+        !asked.error && rows.length === 2 && rows.every((r) => r.kind === 'change') && !done.error && staffGone
+          && box?.sent_at === null && box?.claimed_at === null && again.length === 1 && again[0].subscription_id === ownerSub,
+        'notify: a change request reaches both; gone deletes that device, retry releases the row and the next claim takes it again',
+        `asked ${asked.error?.message ?? 'ok'} · first ${rows.length} · staff device deleted ${staffGone} · released ${box?.claimed_at === null} · again ${again.length}`,
+      );
+      await owner.rpc('notify_done', { p_results: again.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+    }
+
+    // 180. A device that chose only proofs is not told of requests; a row
+    //      with nobody to tell is marked sent at the claim.
+    {
+      await supabase.from('push_subscriptions').delete().eq('id', ownerSub);
+      const picky = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('picky'), kinds: ['proof'], ...KEYS }).select('id').single();
+      const ref = await request('2027-07-05', 'notify.second@example.com');
+      const rows = (await claim(owner)).data ?? [];
+      const box = (await outbox()).find((r) => r.reference === ref);
+      check(
+        !picky.error && rows.length === 0 && box?.kind === 'request' && box.sent_at !== null,
+        'notify: a proofs-only device gets no request; a row nobody may hear is sent at the claim, not claimed again',
+        `picky ${picky.error?.message ?? 'ok'} · claimed ${rows.length} · sent ${box?.sent_at !== null}`,
+      );
+    }
+
+    // 181. notify_done touches only the token's tenant: villa's token cannot
+    //      mark this probe's row (it stays unsent).
+    {
+      const ref = await request('2027-08-02', 'notify.third@example.com');
+      await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('again'), ...KEYS });
+      const rows = (await claim(owner)).data ?? [];
+      const forged = await asToken(chatToken(villaRow.id)).rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const box = (await outbox()).find((r) => r.reference === ref);
+      check(
+        rows.length === 1 && !forged.error && box?.sent_at === null,
+        "notify: another tenant's token calling notify_done changes nothing here (the row stays unsent)",
+        `claimed ${rows.length} · forged ${forged.error?.code ?? 'no error'} · sent ${box?.sent_at !== null}`,
+      );
+    }
+
+    // 182. Removing a member removes their devices, at once.
+    {
+      const before = (await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id).eq('user_id', ownerId)).data?.length ?? 0;
+      // A second owner first: the keep-an-owner trigger refuses removing the last.
+      const spareOwner = await member('owner');
+      const removed = await supabase.from('memberships').delete().eq('tenant_id', probe.id).eq('user_id', ownerId);
+      const after = (await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id).eq('user_id', ownerId)).data?.length ?? 0;
+      check(
+        before >= 1 && !removed.error && after === 0 && spareOwner,
+        "notify: removing a member deletes their devices with the membership",
+        `before ${before} · removed ${removed.error?.message ?? 'ok'} · after ${after}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'notify: probe setup', error.message);
+  } finally {
+    const { error } = await supabase.from('tenants').delete().eq('id', probe.id);
+    if (error) console.log(`WARN  could not delete the notify-probe tenant: ${error.message}`);
+    if (proofPath) {
+      const { data: gone } = await supabase.storage.from('payment-proofs').remove([proofPath]);
+      if ((gone ?? []).length !== 1) console.log(`WARN  the notify-probe proof was not removed: ${proofPath}`);
+    }
+    for (const id of users) {
+      const { error: userError } = await supabase.auth.admin.deleteUser(id);
+      if (userError) console.log(`WARN  could not delete a notify-probe user: ${userError.message}`);
     }
   }
 }

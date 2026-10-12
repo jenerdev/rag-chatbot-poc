@@ -9023,3 +9023,41 @@ user gesture. Chrome kept the AudioContext `suspended`, and the walk heard
 nothing. A person's click is trusted, so the walk now clicks with
 `Input.dispatchMouseEvent`. `chime()` also resumes a context that is still
 starting, instead of giving up.
+
+## 2026-10-13 — notifications Phase 2: the outbox and the subscriptions in SQL
+
+**What was done:** `schema-notifications.sql` (the 29th file). A device's
+push subscription is a row tied to the member's membership by foreign key:
+remove the member and their devices go, and a member reads and deletes
+only their own. An AFTER INSERT trigger on `booking_events` writes one
+`notification_outbox` row for each of three events:
+- a guest's web request;
+- a proof sent;
+- a change asked.
+
+The event log stays the one source (Rule 1): no route has to remember to
+send anything. Two definer functions drain the outbox:
+- `notify_claim()` checks the tenant is the token's. It claims up to 50
+  rows with `skip locked`, joins them to the devices of members whose role
+  may act on them NOW, and marks rows with nobody to tell as sent.
+- `notify_done()` records what each push service answered: ok, gone
+  (deletes the device), or retry (releases the row).
+
+**Why a definer:** the drain runs on a guest's chat token. That token may
+not read anyone's subscriptions, and the service key is forbidden in
+`apps/` (rule 2). A claimed row is consumed, and the keys are useless
+without the VAPID private key, so the function cannot be used to list
+devices.
+
+**What the observed values prove:** eleven checks in `verify.mjs`, each
+refusal next to its allowed twin.
+- A two-room, two-night web request is one outbox row; a staff stay is
+  none.
+- A proof reaches the owner's device and not the staff member's
+  (`payments:write`).
+- A device that chose only proofs is not told of requests.
+- A second claim gets nothing.
+- Another tenant's token changes nothing.
+
+`NOTIFY_PERMISSION` in `permissions.ts` is checked by a unit test that
+reads `notify_claim()`'s role list from the SQL file.

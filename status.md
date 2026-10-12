@@ -1735,6 +1735,26 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **Learned:** the CDP harness's `click()` is `element.click()`, not a user
   gesture, so Chrome kept the AudioContext suspended (0 oscillators). The
   walk clicks with `Input.dispatchMouseEvent`, a trusted click, as a person's is.
+- **Phase 2, SQL:** `schema-notifications.sql`, the 29th file, applied by
+  Claude (node `pg` from the scratchpad on DATABASE_URL; a second run is a
+  no-op). `push_subscriptions` (FK to memberships, `user_id default
+  auth.uid()`, RLS own-rows only, no update), `notification_outbox` (no
+  token policy), the trigger `booking_events_notify` (guest `created`
+  pending · `payment:submitted` · `<kind>:pending`), `notify_claim()` and
+  `notify_done()` (definers, the 13th and 14th; the claim retires unsent rows
+  older than 24 h). `NOTIFY_PERMISSION` in permissions.ts, tested against
+  the SQL's role list.
+- **Observed:** verify OK with 173–183 (11 new): own device in / another's
+  refused 42501, http 23514; cross delete 0 rows, own 1; a 2-room 2-night web
+  request = ONE outbox row (ref, 2027-06-07, ×2), a staff stay none; chat 0
+  devices, outbox 42501 for chat and staff; claim on a chat token → 2
+  devices, again → 0; a proof → owner only; change → gone deletes a device,
+  retry releases and is re-claimed; a proofs-only device gets no request;
+  another tenant's notify_done changes nothing; removing a member removes
+  their devices. permissions tests 28/28.
+- **Fixed on the way:** the probe slot needed `nightly: true` (several
+  nights), and `submit_payment()` needs a real uploaded proof (`''` is
+  refused: "did not arrive"); the probe uploads one and removes it.
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name

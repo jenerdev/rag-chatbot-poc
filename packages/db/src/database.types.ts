@@ -813,9 +813,80 @@ export interface Database {
         };
         Relationships: [];
       };
+      /**
+       * schema-notifications.sql (D-116): one row per (tenant, member, device),
+       * a Web Push subscription. A member reads, adds and deletes only their
+       * own, in the token's tenant; no update (re-subscribe = delete + insert).
+       */
+      push_subscriptions: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          kinds: ('request' | 'proof' | 'change')[];
+          user_agent: string | null;
+          created_at: string;
+          last_ok_at: string | null;
+          failures: number;
+        };
+        Insert: {
+          tenant_id: number;
+          /** defaults to auth.uid(): the token's own user */
+          user_id?: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          kinds?: ('request' | 'proof' | 'change')[];
+          user_agent?: string | null;
+        };
+        Update: Record<never, never>;
+        Relationships: [];
+      };
+      /** schema-notifications.sql (D-116): written by a trigger on booking_events, read by notify_claim(); no token policy */
+      notification_outbox: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          event_id: number;
+          kind: 'request' | 'proof' | 'change';
+          reference: string;
+          first_night: string | null;
+          nights: number | null;
+          created_at: string;
+          claimed_at: string | null;
+          sent_at: string | null;
+          attempts: number;
+        };
+        Insert: Record<never, never>;
+        Update: Record<never, never>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
+      /** schema-notifications.sql (D-116): the drain's read; claims this tenant's unsent rows, joined to who may hear them now */
+      notify_claim: {
+        Args: { p_tenant_id: number };
+        Returns: {
+          outbox_id: number;
+          kind: string;
+          reference: string;
+          first_night: string | null;
+          nights: number | null;
+          subscription_id: number;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        }[];
+      };
+      /** schema-notifications.sql (D-116): what each push service said, per subscription */
+      notify_done: {
+        Args: { p_results: Json };
+        Returns: undefined;
+      };
       /** schema-conversations.sql (D-115): one page of the tenant's chats in one JSON; refuses a non-member */
       conversation_list: {
         Args: {

@@ -73,6 +73,14 @@ export function can(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
+/**
+ * Who a push of each kind reaches (plan/notifications.md Rule 3): the
+ * permission a member needs to ACT on it. notify_claim() asks the same in
+ * SQL, from the membership row at send time; permissions.test.ts reads that
+ * function and checks the two agree.
+ */
+export const NOTIFY_PERMISSION = { request: 'bookings:write', change: 'bookings:write', proof: 'payments:write' } as const satisfies Record<string, Permission>;
+
 /** Is this string one of the three roles? For the session response, which the browser must not trust blindly. */
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
