@@ -6,6 +6,7 @@
 // page still asks requireAdmin() for the permission named below. Hiding a
 // button is never the guard.
 
+import { attentionFor, type Attention } from './attention';
 import { can, type Role } from './permissions';
 
 /**
@@ -29,6 +30,8 @@ export interface NavItem {
   label: string;
   href: string;
   primary?: boolean;
+  /** what waits there (plan/notifications.md Phase 1): Bookings' requests and changes, Payments' proofs */
+  badge?: number;
 }
 
 /**
@@ -36,7 +39,7 @@ export interface NavItem {
  * page this role may open. `role` null means "not logged in" (or not yet
  * known): the public pages only.
  */
-export function navItems(slug: string, features: NavFeatures, role: Role | null): NavItem[] {
+export function navItems(slug: string, features: NavFeatures, role: Role | null, attention?: Attention | null): NavItem[] {
   const base = `/t/${slug}`;
   const items: NavItem[] = [{ page: 'chat', label: 'Chat', href: base }];
   if (features.book) items.push({ page: 'book', label: 'Book', href: `${base}/book`, primary: true });
@@ -61,8 +64,13 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null)
     ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read')],
     ['members', 'Members', '/admin/members', can(role, 'members:manage')],
   ];
+  // The counts that wait, on the page where they are dealt with; a zero is no badge.
+  const waiting = attention ? attentionFor(attention, role) : null;
+  const badgeOf: Partial<Record<NavPage, number>> = { bookings: waiting?.bookings, payments: waiting?.payments };
   for (const [page, label, path, allowed] of staff) {
-    if (allowed) items.push({ page, label, href: `${base}${path}` });
+    if (!allowed) continue;
+    const badge = badgeOf[page];
+    items.push(badge ? { page, label, href: `${base}${path}`, badge } : { page, label, href: `${base}${path}` });
   }
   return items;
 }

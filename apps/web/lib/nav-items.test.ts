@@ -77,3 +77,24 @@ describe('groupNavItems', () => {
     }
   });
 });
+
+describe('navItems badges', () => {
+  const counts = { requests: 2, proofs: 1, changes: 1 };
+  const badges = (role: Parameters<typeof navItems>[2], attention?: typeof counts | null) =>
+    navItems('t', HARBOR, role, attention).filter((i) => i.badge).map((i) => [i.label, i.badge]);
+
+  it('puts requests and changes on Bookings, proofs on Payments', () => {
+    expect(badges('owner', counts)).toEqual([['Bookings', 3], ['Payments', 1]]);
+    expect(badges('staff', counts)).toEqual([['Bookings', 3], ['Payments', 1]]);
+  });
+
+  it('shows no badge for a zero, before the first read, or to a visitor', () => {
+    expect(badges('owner', { requests: 0, proofs: 0, changes: 0 })).toEqual([]);
+    expect(badges('owner', null)).toEqual([]);
+    expect(badges(null, counts)).toEqual([]);
+  });
+
+  it('never badges a page the tenant does not have', () => {
+    expect(navItems('t', NORTHWIND, 'owner', counts).filter((i) => i.badge)).toEqual([]);
+  });
+});

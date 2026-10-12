@@ -495,3 +495,13 @@ button.danger.solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* What waits on staff (plan/notifications.md Phase 1): a count on the
+   sidebar link where it is dealt with, and on the phone's menu button.
+   White on the fill colour, never the bare colour (dark mode darkens it). */
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; margin-left: auto; padding: 0 6px; border-radius: var(--radius-full); background: var(--danger-fill); color: var(--on-accent); font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.staff-topbar button[aria-controls="staff-sidebar"] { position: relative; }
+.nav-badge.menu-badge { position: absolute; top: 0; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; }
+.sidebar-notify { display: flex; flex-direction: column; gap: 2px; padding: var(--space-1) 0; }
+.sound-toggle { justify-content: flex-start; gap: var(--space-2); color: var(--muted); }
+.sound-toggle[aria-pressed="true"] { color: var(--ink); }

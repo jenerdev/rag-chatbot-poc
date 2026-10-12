@@ -124,6 +124,8 @@ const PATHS = {
     </>
   ),
   alert: <path d="M10 3.5l7.5 13h-15zM10 8.5V12M10 14.2v.1" />,
+  bell: <path d="M10 3.5A4.5 4.5 0 005.5 8v3L4 13.5h12L14.5 11V8A4.5 4.5 0 0010 3.5zM8.3 15.5a1.8 1.8 0 003.4 0" />,
+  'bell-off': <path d="M10 3.5A4.5 4.5 0 005.5 8v3L4 13.5h12L14.5 11V8A4.5 4.5 0 0010 3.5zM8.3 15.5a1.8 1.8 0 003.4 0M3.5 3.5l13 13" />,
   // The staff calendar (plan/calendar.md, D-103): its nav link, and the two
   // date markers that sit on top of a cell's background.
   'calendar-grid': (

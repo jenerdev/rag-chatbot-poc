@@ -20,12 +20,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { SoundToggle, useAttention, useSound } from './attention';
 import { BrandHeader } from './brand-header';
 import { Icon, type IconName } from './icons';
 import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
 import { groupNavItems, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/permissions';
+import { attentionFor, titleWithCount } from '@/lib/attention';
 
 const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   chat: 'chat',
@@ -69,6 +71,16 @@ export interface StaffFrameProps {
 export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  // What waits on staff (plan/notifications.md Phase 1): polled while signed
+  // in on a tenant with bookings, the only one with anything to wait on.
+  const sound = useSound();
+  const attention = useAttention(slug, session.role, session.auth === 'in' && features.bookings, sound.on);
+  const waiting = attention ? attentionFor(attention, session.role).total : 0;
+  // "(2) Bookings · Villa" while two wait; the title as it was when none do, and on the way out.
+  useEffect(() => {
+    document.title = titleWithCount(document.title, waiting);
+  }, [waiting, current]);
+  useEffect(() => () => void (document.title = titleWithCount(document.title, 0)), []);
   const drawer = useRef<HTMLElement>(null);
 
   const returnFocus = useRef(false);
@@ -130,8 +142,8 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
     );
   }
 
-  const { groups, publicItems } = groupNavItems(navItems(slug, features, session.role));
-  const link = (item: { page: NavPage; label: string; href: string }) => (
+  const { groups, publicItems } = groupNavItems(navItems(slug, features, session.role, attention));
+  const link = (item: { page: NavPage; label: string; href: string; badge?: number }) => (
     <Link
       key={item.page}
       href={item.href}
@@ -141,6 +153,14 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
     >
       <Icon name={ICON_OF[item.page]} size={18} />
       <span>{item.label}</span>
+      {item.badge ? (
+        <>
+          <span className="nav-badge" aria-hidden="true">
+            {item.badge}
+          </span>
+          <span className="visually-hidden">, {item.badge} waiting</span>
+        </>
+      ) : null}
     </Link>
   );
 
@@ -167,6 +187,11 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
         </nav>
         <div className="sidebar-footer">
           {publicItems.map(link)}
+          {features.bookings && (
+            <div className="sidebar-notify">
+              <SoundToggle on={sound.on} awake={sound.awake} onToggle={sound.toggle} />
+            </div>
+          )}
           <div className="sidebar-account">
             {session.role && <span className="badge accent">{ROLE_LABELS[session.role]}</span>}
             <button type="button" className="ghost sm" onClick={session.onLogout}>
@@ -186,12 +211,17 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
             ref={menuButton}
             type="button"
             className="ghost"
-            aria-label="Open menu"
+            aria-label={waiting > 0 ? `Open menu, ${waiting} waiting` : 'Open menu'}
             aria-controls="staff-sidebar"
             aria-expanded={open}
             onClick={() => setOpen(true)}
           >
             <Icon name="menu" />
+            {waiting > 0 && (
+              <span className="nav-badge menu-badge" aria-hidden="true">
+                {waiting}
+              </span>
+            )}
           </button>
           <span className="staff-topbar-title">{businessName}</span>
         </div>

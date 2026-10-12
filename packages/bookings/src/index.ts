@@ -29,6 +29,7 @@
 //   payments.ts    a guest's proof of payment: checked, uploaded, submitted (manage booking)
 //   payment-review.ts  staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
 //   changes.ts     cancel and reschedule requests: the guest asks, staff decide (manage booking)
+//   attention.ts   what waits on staff now, three counts for the sidebar (notifications)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -98,6 +99,8 @@ export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGu
 export { expireDueStays } from './deadlines.js';
 export { decideChange, listChanges, requestChange, withdrawChange } from './changes.js';
 export type { ChangeInput, ChangeQuote, ChangeRow } from './changes.js';
+export { attentionCounts } from './attention.js';
+export type { AttentionCounts } from './attention.js';
 export type { ChangeTerms, GuestChange, GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
 export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, PROOF_BUCKET, PROOF_RETENTION_DAYS, sniffProofType, submitProof } from './payments.js';
 export type { ProofInput, ProofType } from './payments.js';

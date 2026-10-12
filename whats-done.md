@@ -8994,3 +8994,32 @@ were repointed from `.member-row` to `.tenant-row` (renamed in 107d6fb).
 The a11y audit of the public and platform pages ended at 0 violations
 (52 states). It had flagged heading-order (h1 → h3) until the section
 titles became h2. Typecheck exit 0; no sideways scroll at 1280 and 390 px.
+
+## 2026-10-13 — notifications Phase 1: staff hear a request in the app
+
+**What was done:** `plan/notifications.md` Phases 0 and 1, on
+`feat/notifications`. While any staff page is open and visible, it asks
+`GET /api/t/<slug>/admin/attention` every 30 s for three counts:
+- web requests waiting, counted from the rows by the dashboard's own rule;
+- proofs to verify, from `manage_attention()`;
+- change requests waiting, from `manage_attention()`.
+
+It shows them as a badge on Bookings and on Payments, as a count on the
+phone's menu button, and as "(n)" in the tab title. A rise raises a toast
+and, if this device has Sound on, a two-tone chime made by an
+`OscillatorNode` (no audio file). A hidden tab stops asking.
+
+**Why polling:** § 7 q1. Realtime would put a staff token in the browser,
+which no Client Component holds here. No new SQL either.
+
+**What the observed values prove:** the walk sent a real web request from
+a cookie-less client. The signed-in staff tab showed the badge rise 0 → 1
+29 s later, which is within one poll. The title and the toast said it, and
+the chime's oscillators rose from 2 to 4. The first read announced nothing
+(`risen(null, …)`), so opening a page with old requests does not ring.
+
+**The trap it found:** a headless click through `element.click()` is not a
+user gesture. Chrome kept the AudioContext `suspended`, and the walk heard
+nothing. A person's click is trusted, so the walk now clicks with
+`Input.dispatchMouseEvent`. `chime()` also resumes a context that is still
+starting, instead of giving up.

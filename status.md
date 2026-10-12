@@ -1711,6 +1711,31 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — notifications Phases 0–1 (`feat/notifications`)
+- **Phase 0, baseline (before anything moved):** tests 13+14+5+124+366+140,
+  typecheck exit 0, verify OK, pipeline isolation PASS both ways, bookings
+  isolation PASS both ways, rooms PASS, the three snapshots identical
+  (northwind-prompt-post-emoji, villa-tools-post-villa-prices,
+  harbor-tools-tables-phase0). The a11y count was NOT taken: the user asked
+  to skip the audit mid-run (its last full count, earlier today, was 0).
+- **Phase 1, in the app:** `attentionCounts()` (@rag/bookings: requests from
+  the rows by the dashboard's rule, proofs and changes from
+  `manage_attention()`), `GET /api/t/[tenant]/admin/attention`
+  (`dashboard:read`, zeros without bookings), `lib/attention.ts` (badges per
+  role, the "(n)" title, the words a rise is said in; tested), `navItems()`
+  badges (tested), `components/attention.tsx` (30 s poll paused while hidden,
+  a toast and an OscillatorNode chime on a rise, the per-device Sound
+  toggle), the badges and the menu count in `StaffFrame`, icons `bell` /
+  `bell-off`.
+- **Observed:** `plan/notifications-phase1-walk.mjs` 8/8: the attention route
+  401 / three counts; the toggle chimes (2 oscillators); a guest's web request
+  → badge 0 → 1 after 29 s, title "(1) Villa Amihan Private Resort", toast
+  "New booking request", 2 more oscillators; cleaned. Typecheck exit 0 (13
+  tasks), web tests 150/150.
+- **Learned:** the CDP harness's `click()` is `element.click()`, not a user
+  gesture, so Chrome kept the AudioContext suspended (0 oscillators). The
+  walk clicks with `Input.dispatchMouseEvent`, a trusted click, as a person's is.
+
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name
   with Live/Archived, slug · assistant · members · since, Open chat; the
