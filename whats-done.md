@@ -8962,3 +8962,35 @@ users (stamp 1791826807135) were deleted by hand. Three older pairs of
 `ui-a11y-*` users from earlier runs (2026-10-05 and two from 2026-10-12)
 are still in Supabase Auth; they were not this session's, so they were left.
 A full run is owed before merge.
+
+## 2026-10-13 — the platform's tenant form, redesigned
+
+**What was done:** the edit mode of `tenant-form.tsx`, the screen a super
+user opens from `/platform`. Profile had been one 1,900 px column:
+- the colours were bare text fields, with the same placeholder on all five;
+- "Text" stretched alone across the whole row;
+- six question fields were stacked one per row;
+- the only Save was at the very bottom.
+
+Each tab is now a settings page: each section's name and purpose on the
+left, its fields on the right.
+- **Theme:** a colour picker beside each text field (the text stays the
+  value, so #rgb still works), a hatched swatch when a colour is the
+  default, and a reset on each row. The preview sits beside the colours.
+- **Save bar:** it stays in view and says "Unsaved changes" by comparing
+  the PATCH body with the saved tenant's, through one function, so a save
+  clears it. It offers Discard.
+- **Applications:** weekend days are seven toggles. The old placeholder
+  showed "6,7", but `rate_kind()` defaults to Fri–Sun (5,6,7), and the
+  hint now says so.
+- **Archive:** a danger card.
+- **The head:** back to Tenants, the name and its state, and Open chat.
+
+**What did not change:** the seven keys Save sends, every field id, the
+four tab labels, and the members panel (shared with the owners' screen).
+
+**Observed:** the Phase 5 tabs walk passed 9 of 9, after three older walks
+were repointed from `.member-row` to `.tenant-row` (renamed in 107d6fb).
+The a11y audit of the public and platform pages ended at 0 violations
+(52 states). It had flagged heading-order (h1 → h3) until the section
+titles became h2. Typecheck exit 0; no sideways scroll at 1280 and 390 px.

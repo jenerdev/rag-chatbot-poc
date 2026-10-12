@@ -134,11 +134,6 @@ export function PlatformScreen() {
         <span className="brand-subtitle">{selected === null ? 'Tenants' : detail?.businessName ?? '…'}</span>
       </h1>
       <nav>
-        {auth === 'in' && selected !== null && (
-          <button type="button" className="button" onClick={() => setSelected(null)}>
-            ← All tenants
-          </button>
-        )}
         {auth === 'in' && (
           <button type="button" className="link" onClick={logout}>
             <Icon name="logout" size={16} /> <span className="narrow-hidden">Log out</span>
@@ -187,20 +182,26 @@ export function PlatformScreen() {
     return (
       <>
         {top}
-        <main>
+        <main className="platform-main tenant-edit">
           {detail ? (
             <TenantForm
               api={API}
               tenant={detail}
               selfUserId={userId}
               onUnauthorized={unauthorized}
+              onBack={() => setSelected(null)}
               onSaved={(saved) => {
                 setDetail(saved);
                 void loadTenants();
               }}
             />
           ) : (
-            <LoadState load={detailLoad} what="tenant" rows={4} onRetry={() => setDetailTry((n) => n + 1)} />
+            <>
+              <button type="button" className="link back-link" onClick={() => setSelected(null)}>
+                <Icon name="chevron-left" size={16} /> Tenants
+              </button>
+              <LoadState load={detailLoad} what="tenant" rows={4} onRetry={() => setDetailTry((n) => n + 1)} />
+            </>
           )}
         </main>
       </>

@@ -102,6 +102,73 @@ function suggestionsOf(value: unknown): string[] {
   return Array.from({ length: MAX_SUGGESTED_QUESTIONS }, (_, i) => saved[i] ?? '');
 }
 
+/** ISO weekdays, as the config stores them: 1 = Monday … 7 = Sunday. */
+const ISO_DAYS = [
+  [1, 'Mon', 'Monday'],
+  [2, 'Tue', 'Tuesday'],
+  [3, 'Wed', 'Wednesday'],
+  [4, 'Thu', 'Thursday'],
+  [5, 'Fri', 'Friday'],
+  [6, 'Sat', 'Saturday'],
+  [7, 'Sun', 'Sunday'],
+] as const;
+
+/** "5,6,7" → [5, 6, 7]: the form keeps the field a string, as before. */
+function weekendOf(value: string): number[] {
+  return value
+    .split(',')
+    .map((d) => Number(d.trim()))
+    .filter((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+}
+
+/** #rgb or #rrggbb → #rrggbb for the colour picker; anything else → null. */
+function hex6(value: string | undefined): string | null {
+  if (!value) return null;
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(value)) return `#${[...value.slice(1)].map((c) => c + c).join('')}`.toLowerCase();
+  return null;
+}
+
+interface ProfileFields {
+  businessName: string;
+  assistantName: string;
+  logoUrl: string;
+  bannerUrl: string;
+  theme: Theme;
+  fallbacks: Record<Languages, string>;
+  suggestions: string[];
+}
+
+function profileFieldsOf(tenant: TenantDetail): ProfileFields {
+  return {
+    businessName: tenant.businessName,
+    assistantName: tenant.assistantName,
+    logoUrl: tenant.logoUrl ?? '',
+    bannerUrl: tenant.bannerUrl ?? '',
+    theme: themeOf(tenant.theme),
+    fallbacks: fallbacksOf(tenant.fallbackMessages),
+    suggestions: suggestionsOf(tenant.suggestedQuestions),
+  };
+}
+
+/** The PATCH body: the same seven keys as always. Also what "unsaved" compares. */
+function profileBodyOf(f: ProfileFields) {
+  const theme: Theme = {};
+  for (const k of THEME_KEY_LIST) if (f.theme[k]) theme[k] = f.theme[k];
+  const fb: Partial<Record<Languages, string>> = {};
+  for (const l of LANGUAGES) if (f.fallbacks[l].trim()) fb[l] = f.fallbacks[l].trim();
+  const questions = f.suggestions.map((q) => q.trim()).filter(Boolean);
+  return {
+    businessName: f.businessName.trim(),
+    assistantName: f.assistantName.trim(),
+    logoUrl: f.logoUrl.trim() || null,
+    bannerUrl: f.bannerUrl.trim() || null,
+    theme,
+    fallbackMessages: Object.keys(fb).length ? fb : null,
+    suggestedQuestions: questions.length ? questions : null,
+  };
+}
+
 export function TenantForm({
   api,
   tenant,
@@ -109,6 +176,7 @@ export function TenantForm({
   onSaved,
   onUnauthorized,
   onCancel,
+  onBack,
 }: {
   api: string;
   /** null = create mode. */
@@ -118,6 +186,8 @@ export function TenantForm({
   onUnauthorized: () => void;
   /** Create mode: the drawer's Cancel. */
   onCancel?: () => void;
+  /** Edit mode: back to the tenant list. */
+  onBack?: () => void;
 }) {
   // Creating, the form is a drawer: its refusal stays in it, beside the slug
   // that is usually the cause. Editing, every message is a toast.
@@ -139,6 +209,7 @@ export function TenantForm({
   const preview = useMemo(() => themeVars(theme), [theme]);
   const contrast = useMemo(() => contrastProblems(theme), [theme]);
   const { ask, dialog } = useConfirmDialog();
+  const profileFields: ProfileFields = { businessName, assistantName, logoUrl, bannerUrl, theme, fallbacks, suggestions };
 
   /** One request; the tenant the route hands back becomes the form's tenant. */
   async function send(method: string, path: string, body: object | undefined, done: string) {
@@ -216,234 +287,324 @@ export function TenantForm({
   }
 
   const id = tenant.id;
-  // Four tabs (plan/ui-components.md Phase 5): the page was one long stack of
-  // five cards. Profile is the ONE form with its ONE Save, all in one tab,
-  // so a Save never posts fields from a panel nobody can see (trap 6).
-  const profile = (
-    <section className="card">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (badColours.length) return setNotice({ message: `${badColours.map((k) => THEME_LABELS[k]).join(', ')}: a colour is #rgb or #rrggbb.`, kind: 'error' });
-          const themeOut: Theme = {};
-          for (const k of THEME_KEY_LIST) if (theme[k]) themeOut[k] = theme[k];
-          const fb: Partial<Record<Languages, string>> = {};
-          for (const l of LANGUAGES) if (fallbacks[l].trim()) fb[l] = fallbacks[l].trim();
-          const questions = suggestions.map((q) => q.trim()).filter(Boolean);
-          void send(
-            'PATCH',
-            `/tenants/${id}`,
-            {
-              businessName: businessName.trim(),
-              assistantName: assistantName.trim(),
-              logoUrl: logoUrl.trim() || null,
-              bannerUrl: bannerUrl.trim() || null,
-              theme: themeOut,
-              fallbackMessages: Object.keys(fb).length ? fb : null,
-              suggestedQuestions: questions.length ? questions : null,
-            },
-            'Saved.',
-          );
-        }}
-      >
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="tenant-business">Business name</label>
-            <input id="tenant-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} maxLength={100} required />
-          </div>
-          <div className="field">
-            <label htmlFor="tenant-assistant">Assistant name</label>
-            <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
-          </div>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="tenant-logo">Logo URL (https)</label>
-            <input id="tenant-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" />
-          </div>
-          <div className="field">
-            <label htmlFor="tenant-banner">Banner URL (https)</label>
-            <input id="tenant-banner" type="url" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} placeholder="https://…" />
-          </div>
-        </div>
+  const saved = profileFieldsOf(tenant);
+  const profileDirty = JSON.stringify(profileBodyOf(profileFields)) !== JSON.stringify(profileBodyOf(saved));
+  const savedBookings = bookingsFieldsOf(tenant.applicationConfigs.bookings);
+  const bookingsDirty = !bookingsOn || JSON.stringify(bookingsConfigOf(bookings)) !== JSON.stringify(bookingsConfigOf(savedBookings));
+  const weekend = weekendOf(bookings.weekendDays);
 
-        <h3>Theme</h3>
-        <p className="small muted">Five colours, #rgb or #rrggbb. An emptied field is the default look.</p>
-        <div className="field-row">
-          {THEME_KEY_LIST.map((key: ThemeKey) => (
-            <div className="field" key={key}>
-              <label htmlFor={`theme-${key}`}>{THEME_LABELS[key]}</label>
+  function discardProfile() {
+    setBusinessName(saved.businessName);
+    setAssistantName(saved.assistantName);
+    setLogoUrl(saved.logoUrl);
+    setBannerUrl(saved.bannerUrl);
+    setTheme(saved.theme);
+    setFallbacks(saved.fallbacks);
+    setSuggestions(saved.suggestions);
+  }
+
+  // Four tabs (plan/ui-components.md Phase 5). Profile is the ONE form with
+  // its ONE Save, all in one tab, so a Save never posts fields from a panel
+  // nobody can see (trap 6). Each tab is a settings page: a section's name
+  // and what it does on the left, its fields on the right.
+  const profile = (
+    <form
+      className="card settings"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (badColours.length) return setNotice({ message: `${badColours.map((k) => THEME_LABELS[k]).join(', ')}: a colour is #rgb or #rrggbb.`, kind: 'error' });
+        void send('PATCH', `/tenants/${id}`, profileBodyOf(profileFields), 'Saved.');
+      }}
+    >
+      <section className="settings-section" aria-labelledby="sec-identity">
+        <div className="settings-about">
+          <h2 id="sec-identity">Identity</h2>
+          <p>The names on the chat and the staff screens, and the images in the header.</p>
+        </div>
+        <div className="settings-fields">
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="tenant-business">Business name</label>
+              <input id="tenant-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} maxLength={100} required />
+            </div>
+            <div className="field">
+              <label htmlFor="tenant-assistant">Assistant name</label>
+              <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
+            </div>
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="tenant-logo">Logo URL</label>
+              <input id="tenant-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" />
+              <p className="hint">https only. Square works best.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="tenant-banner">Banner URL</label>
+              <input id="tenant-banner" type="url" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} placeholder="https://…" />
+              <p className="hint">https only. Shown wide, behind the header.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="sec-theme">
+        <div className="settings-about">
+          <h2 id="sec-theme">Theme</h2>
+          <p>Five colours, #rgb or #rrggbb. An empty field keeps the default look.</p>
+        </div>
+        <div className="settings-fields theme-layout">
+          <div className="colour-fields">
+            {THEME_KEY_LIST.map((key: ThemeKey) => (
+              <div className="field" key={key}>
+                <label htmlFor={`theme-${key}`}>{THEME_LABELS[key]}</label>
+                <div className="colour-input">
+                  {/* The picker and the text are one value; the text is the field, so #rgb still works. */}
+                  <input
+                    type="color"
+                    className={hex6(theme[key]) ? 'colour-swatch' : 'colour-swatch unset'}
+                    aria-label={`Pick ${THEME_LABELS[key].toLowerCase()}`}
+                    value={hex6(theme[key]) ?? '#ffffff'}
+                    onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                  />
+                  <input
+                    id={`theme-${key}`}
+                    value={theme[key] ?? ''}
+                    placeholder="Default"
+                    spellCheck={false}
+                    autoComplete="off"
+                    onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                    aria-invalid={badColours.includes(key)}
+                  />
+                  {/* Its place is kept when there is nothing to reset, so the five rows line up. */}
+                  {theme[key] ? (
+                    <button type="button" className="icon-button ghost sm colour-reset" aria-label={`Reset ${THEME_LABELS[key].toLowerCase()} to the default`} onClick={() => setTheme({ ...theme, [key]: '' })}>
+                      <Icon name="close" size={14} />
+                    </button>
+                  ) : (
+                    <span className="colour-reset" aria-hidden="true" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="theme-preview-col">
+            <span className="field-label">Preview</span>
+            {/* The preview: the real page's mechanism, custom properties through `style`, and nothing else. */}
+            <div className="tenant-root tenant-preview" data-scheme={pinsLightScheme(preview) ? 'light' : undefined} style={preview}>
+              <div className="card">
+                <div className="turn user">
+                  <div className="bubble">Is the pool open on Sundays?</div>
+                </div>
+                <p className="small">
+                  <strong>{assistantName || 'Assistant'}:</strong> Yes, from 8 AM to 6 PM.
+                </p>
+                <button type="button" className="primary">
+                  Book
+                </button>{' '}
+                <button type="button">Sample</button>
+              </div>
+            </div>
+            {contrast.length > 0 ? (
+              <div className="notice warn" role="status">
+                <strong>Hard to read:</strong>
+                <ul className="contrast-list">
+                  {contrast.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="hint met" role="status">
+                <Icon name="check" size={14} /> Every text colour passes the 4.5:1 contrast check.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="sec-fallback">
+        <div className="settings-about">
+          <h2 id="sec-fallback">When the documents cannot answer</h2>
+          <p>What the chat says instead, in the reply&apos;s language. Empty uses the built-in words.</p>
+        </div>
+        <div className="settings-fields">
+          {LANGUAGES.map((l) => (
+            <div className="field" key={l}>
+              <label htmlFor={`fallback-${l}`}>{LANGUAGE_LABELS[l]}</label>
+              <textarea id={`fallback-${l}`} rows={3} maxLength={500} value={fallbacks[l]} onChange={(e) => setFallbacks({ ...fallbacks, [l]: e.target.value })} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="sec-questions">
+        <div className="settings-about">
+          <h2 id="sec-questions">Suggested questions</h2>
+          <p>
+            Buttons on a new chat; a click asks at once. Up to {MAX_SUGGESTED_QUESTIONS}, {MAX_SUGGESTED_QUESTION_LENGTH} characters each,
+            in this order.
+          </p>
+        </div>
+        <div className="settings-fields question-grid">
+          {suggestions.map((q, i) => (
+            <div className="field" key={i}>
+              <label htmlFor={`suggestion-${i}`}>Question {i + 1}</label>
               <input
-                id={`theme-${key}`}
-                value={theme[key] ?? ''}
-                placeholder="#0f766e"
-                onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
-                aria-invalid={badColours.includes(key)}
+                id={`suggestion-${i}`}
+                value={q}
+                maxLength={MAX_SUGGESTED_QUESTION_LENGTH}
+                placeholder={i === 0 ? 'What rooms do you have?' : ''}
+                onChange={(e) => setSuggestions(suggestions.map((s, j) => (j === i ? e.target.value : s)))}
               />
             </div>
           ))}
         </div>
-        {/* The preview: the real page's mechanism, custom properties through `style`, and nothing else. */}
-        <div className="tenant-root tenant-preview" data-scheme={pinsLightScheme(preview) ? 'light' : undefined} style={preview}>
-          <div className="card">
-            <div className="turn user">
-              <div className="bubble">Is the pool open on Sundays?</div>
-            </div>
-            <p className="small">
-              <strong>{assistantName || 'Assistant'}:</strong> Yes, from 8 AM to 6 PM.
-            </p>
-            <button type="button" className="primary">
-              Book
-            </button>{' '}
-            <button type="button">Sample</button>
-          </div>
-        </div>
-        {contrast.length > 0 ? (
-          <div className="notice warn" role="status">
-            <strong>Hard to read:</strong>
-            <ul className="contrast-list">
-              {contrast.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <p className="hint met" role="status">
-            <Icon name="check" size={14} /> Every text colour passes the 4.5:1 contrast check.
-          </p>
-        )}
+      </section>
 
-        <h3>When the documents cannot answer</h3>
-        <p className="small muted">What the chat says instead, per reply language. Empty = the built-in default (D-047, D-048).</p>
-        {LANGUAGES.map((l) => (
-          <div className="field" key={l}>
-            <label htmlFor={`fallback-${l}`}>{LANGUAGE_LABELS[l]}</label>
-            <textarea id={`fallback-${l}`} rows={2} maxLength={500} value={fallbacks[l]} onChange={(e) => setFallbacks({ ...fallbacks, [l]: e.target.value })} />
-          </div>
-        ))}
-
-        <h3>Suggested questions</h3>
-        <p className="small muted">
-          Shown as buttons on a new, empty chat; a click asks the question at once. Up to {MAX_SUGGESTED_QUESTIONS}, each at
-          most {MAX_SUGGESTED_QUESTION_LENGTH} characters, in this order. Empty = none (D-089).
-        </p>
-        {suggestions.map((q, i) => (
-          <div className="field" key={i}>
-            <label htmlFor={`suggestion-${i}`}>Question {i + 1}</label>
-            <input
-              id={`suggestion-${i}`}
-              value={q}
-              maxLength={MAX_SUGGESTED_QUESTION_LENGTH}
-              placeholder={i === 0 ? 'What rooms do you have?' : ''}
-              onChange={(e) => setSuggestions(suggestions.map((s, j) => (j === i ? e.target.value : s)))}
-            />
-          </div>
-        ))}
-
-        <div className="form-footer">
-          <span className="small muted">
-            {tenant.archivedAt ? `Archived since ${new Date(tenant.archivedAt).toLocaleString()}.` : 'Live.'}
-          </span>
-          <button type="submit" className="primary" disabled={busy}>
-            {busy ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </form>
-    </section>
+      <SaveBar dirty={profileDirty} busy={busy} onDiscard={discardProfile} label="Save" />
+    </form>
   );
 
   const applications = (
-    <section className="card">
-      <h2>Applications</h2>
-      <p className="small muted">
-        Bookings gives the tenant a bookings screen, the <code>check_availability</code> tool and, once a unit has a rate,
-        the public booking page. Switching it off is refused while a booking has not ended; the rooms and bookings stay.
-      </p>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void send('PUT', `/tenants/${id}/applications/bookings`, { config: bookingsConfigOf(bookings) }, bookingsOn ? 'Bookings config saved.' : 'Bookings switched on.');
-        }}
-      >
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="bk-tz">Timezone</label>
-            <input id="bk-tz" value={bookings.timezone} onChange={(e) => setBookings({ ...bookings, timezone: e.target.value })} required />
+    <form
+      className="card settings"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void send('PUT', `/tenants/${id}/applications/bookings`, { config: bookingsConfigOf(bookings) }, bookingsOn ? 'Bookings config saved.' : 'Bookings switched on.');
+      }}
+    >
+      <div className="app-head">
+        <span className="app-icon" aria-hidden="true">
+          <Icon name="calendar" size={20} />
+        </span>
+        <div className="app-head-text">
+          <h2>
+            Bookings <span className={bookingsOn ? 'badge ok' : 'badge'}>{bookingsOn ? 'On' : 'Off'}</span>
+          </h2>
+          <p className="small muted">
+            A bookings screen for staff, the chat&apos;s <code>check_availability</code> tool and, once a unit has a rate, the public
+            booking page. Slots, rooms and rates are set on the tenant&apos;s own screens.
+          </p>
+        </div>
+        {bookingsOn && (
+          <button
+            type="button"
+            className="sm"
+            disabled={busy}
+            onClick={async () => {
+              const sure = await ask({
+                title: 'Switch bookings off?',
+                body: 'Refused while a booking has not ended. Rooms and bookings stay, and switching it on again brings them back.',
+                actionLabel: 'Switch off',
+              });
+              if (sure !== null) void send('DELETE', `/tenants/${id}/applications/bookings`, undefined, 'Bookings switched off.');
+            }}
+          >
+            Switch off
+          </button>
+        )}
+      </div>
+
+      <section className="settings-section" aria-labelledby="sec-calendar">
+        <div className="settings-about">
+          <h2 id="sec-calendar">Calendar and money</h2>
+          <p>&ldquo;Today&rdquo; is the tenant&apos;s, in this timezone. Per room cannot be switched while bookings are live.</p>
+        </div>
+        <div className="settings-fields">
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="bk-tz">Timezone</label>
+              <input id="bk-tz" value={bookings.timezone} onChange={(e) => setBookings({ ...bookings, timezone: e.target.value })} required />
+            </div>
+            <div className="field">
+              <label htmlFor="bk-type">Books as</label>
+              <select id="bk-type" value={bookings.bookingType} onChange={(e) => setBookings({ ...bookings, bookingType: e.target.value as BookingsFields['bookingType'] })}>
+                <option value="whole_resort">Whole resort (one property)</option>
+                <option value="per_room">Per room</option>
+              </select>
+            </div>
+            <div className="field narrow">
+              <label htmlFor="bk-currency">Currency</label>
+              <input id="bk-currency" value={bookings.currency} onChange={(e) => setBookings({ ...bookings, currency: e.target.value })} placeholder="PHP" maxLength={3} />
+            </div>
           </div>
           <div className="field">
-            <label htmlFor="bk-type">Books as</label>
-            <select id="bk-type" value={bookings.bookingType} onChange={(e) => setBookings({ ...bookings, bookingType: e.target.value as BookingsFields['bookingType'] })}>
-              <option value="whole_resort">Whole resort (one property)</option>
-              <option value="per_room">Per room</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="bk-currency">Currency</label>
-            <input id="bk-currency" value={bookings.currency} onChange={(e) => setBookings({ ...bookings, currency: e.target.value })} placeholder="PHP" maxLength={3} />
+            <span className="field-label" id="bk-weekend-label">
+              Weekend days
+            </span>
+            <div className="day-picks" role="group" aria-labelledby="bk-weekend-label">
+              {ISO_DAYS.map(([n, name, full]) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={weekend.includes(n)}
+                  aria-label={full}
+                  onClick={() => setBookings({ ...bookings, weekendDays: (weekend.includes(n) ? weekend.filter((d) => d !== n) : [...weekend, n]).sort().join(',') })}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <p className="hint">The weekend rate applies on these days. None picked = Fri, Sat and Sun, the default.</p>
           </div>
         </div>
-        <div className="field-row">
+      </section>
+
+      <section className="settings-section" aria-labelledby="sec-limits">
+        <div className="settings-about">
+          <h2 id="sec-limits">Limits</h2>
+          <p>The longest stay, and how far ahead a date can be booked. Empty uses the default.</p>
+        </div>
+        <div className="settings-fields">
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="bk-nights">Longest stay, nights</label>
+              <input id="bk-nights" type="number" min={1} max={60} value={bookings.maxStayNights} onChange={(e) => setBookings({ ...bookings, maxStayNights: e.target.value })} placeholder="14" />
+            </div>
+            <div className="field">
+              <label htmlFor="bk-days">Booking horizon, days</label>
+              <input id="bk-days" type="number" min={1} max={730} value={bookings.maxAdvanceDays} onChange={(e) => setBookings({ ...bookings, maxAdvanceDays: e.target.value })} placeholder="365" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="sec-page">
+        <div className="settings-about">
+          <h2 id="sec-page">Booking page</h2>
+          <p>Words the customer reads on the tenant&apos;s public booking page.</p>
+        </div>
+        <div className="settings-fields">
           <div className="field">
-            <label htmlFor="bk-weekend">Weekend days (ISO, 1–7)</label>
-            <input id="bk-weekend" value={bookings.weekendDays} onChange={(e) => setBookings({ ...bookings, weekendDays: e.target.value })} placeholder="6,7" />
+            <label htmlFor="bk-instructions">After sending a request</label>
+            <textarea id="bk-instructions" rows={5} maxLength={2000} value={bookings.instructions} onChange={(e) => setBookings({ ...bookings, instructions: e.target.value })} />
+            <p className="hint">Shown under &ldquo;From {tenant.businessName}&rdquo; on the receipt. Plain text; nothing is filled in.</p>
           </div>
           <div className="field">
-            <label htmlFor="bk-nights">Max stay, nights</label>
-            <input id="bk-nights" type="number" min={1} max={60} value={bookings.maxStayNights} onChange={(e) => setBookings({ ...bookings, maxStayNights: e.target.value })} placeholder="14" />
-          </div>
-          <div className="field">
-            <label htmlFor="bk-days">Booking horizon, days</label>
-            <input id="bk-days" type="number" min={1} max={730} value={bookings.maxAdvanceDays} onChange={(e) => setBookings({ ...bookings, maxAdvanceDays: e.target.value })} placeholder="365" />
+            <label htmlFor="bk-hint">Beside the guest count</label>
+            <input id="bk-hint" maxLength={200} value={bookings.guestHint} onChange={(e) => setBookings({ ...bookings, guestHint: e.target.value })} placeholder="Do not count children aged 3 and below." />
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="bk-instructions">Booking page: what a customer reads after sending a request</label>
-          <textarea id="bk-instructions" rows={3} maxLength={2000} value={bookings.instructions} onChange={(e) => setBookings({ ...bookings, instructions: e.target.value })} />
-        </div>
-        <div className="field">
-          <label htmlFor="bk-hint">Booking page: hint by the guest count</label>
-          <input id="bk-hint" maxLength={200} value={bookings.guestHint} onChange={(e) => setBookings({ ...bookings, guestHint: e.target.value })} />
-        </div>
-        <div className="form-footer">
-          <span className="small muted">
-            {bookingsOn ? 'Bookings is on.' : 'Bookings is off.'} Slots, rooms and rates are set on the tenant&apos;s own screens or by script.
-          </span>
-          <span>
-            {bookingsOn && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={async () => {
-                  const sure = await ask({
-                    title: 'Switch bookings off?',
-                    body: 'Refused while a booking has not ended. Rooms and bookings stay, and switching it on again brings them back.',
-                    actionLabel: 'Switch off',
-                  });
-                  if (sure !== null) void send('DELETE', `/tenants/${id}/applications/bookings`, undefined, 'Bookings switched off.');
-                }}
-              >
-                Switch off
-              </button>
-            )}{' '}
-            <button type="submit" className="primary" disabled={busy}>
-              {busy ? 'Saving…' : bookingsOn ? 'Save config' : 'Switch on'}
-            </button>
-          </span>
-        </div>
-      </form>
-    </section>
+      </section>
+
+      <SaveBar dirty={bookingsDirty} busy={busy} onDiscard={bookingsOn ? () => setBookings(savedBookings) : undefined} label={bookingsOn ? 'Save config' : 'Switch on'} />
+    </form>
   );
 
   const archive = (
-    <section className="card">
-      <h2>{tenant.archivedAt ? 'Archived' : 'Archive'}</h2>
-      <p className="small muted">
-        Archived, the tenant answers 404 everywhere: its chat, its admin, its booking page. Nothing is deleted, and this
-        can be undone. Deleting for good is a command-line step (<code>tenant:remove</code>), because it takes guest
-        data and documents with it.
-      </p>
-      <div className="form-footer">
-        <span />
+    <section className={tenant.archivedAt ? 'card settings-archive' : 'card settings-archive danger-zone'}>
+      <div className="app-head">
+        <span className="app-icon" aria-hidden="true">
+          <Icon name={tenant.archivedAt ? 'refresh' : 'alert'} size={20} />
+        </span>
+        <div className="app-head-text">
+          <h2>{tenant.archivedAt ? `Archived since ${new Date(tenant.archivedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Archive this tenant'}</h2>
+          <p className="small muted">
+            Archived, the tenant answers 404 everywhere: its chat, its admin, its booking page. Nothing is deleted, and it can be
+            undone. Deleting for good is a command-line step (<code>tenant:remove</code>), because it takes guest data and
+            documents with it.
+          </p>
+        </div>
         {tenant.archivedAt ? (
           <button type="button" className="primary" disabled={busy} onClick={() => void send('DELETE', `/tenants/${id}/archive`, undefined, 'Unarchived: the tenant resolves again.')}>
             Unarchive
@@ -451,6 +612,7 @@ export function TenantForm({
         ) : (
           <button
             type="button"
+            className="danger"
             disabled={busy}
             onClick={async () => {
               const sure = await ask({
@@ -469,12 +631,36 @@ export function TenantForm({
     </section>
   );
 
+  const since = new Date(tenant.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
   return (
     <>
       {dialog}
-      <h2 className="tenant-head">
-        {tenant.businessName} <span className="small muted">/t/{tenant.slug}</span>
-      </h2>
+      <div className="tenant-edit-head">
+        {onBack && (
+          <button type="button" className="link back-link" onClick={onBack}>
+            <Icon name="chevron-left" size={16} /> Tenants
+          </button>
+        )}
+        <div className="tenant-edit-title">
+          <span className="member-avatar tenant-edit-mark" aria-hidden="true">
+            {tenant.businessName.charAt(0).toUpperCase()}
+          </span>
+          <div className="tenant-edit-name">
+            <h1 className="page-title">
+              {tenant.businessName}{' '}
+              <span className={tenant.archivedAt ? 'badge' : 'badge ok'}>{tenant.archivedAt ? 'Archived' : 'Live'}</span>
+            </h1>
+            <p className="tenant-meta">
+              /t/{tenant.slug} · {tenant.assistantName} · {tenant.members} member{tenant.members === 1 ? '' : 's'} · since {since}
+            </p>
+          </div>
+          {!tenant.archivedAt && (
+            <a className="button" href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer">
+              <Icon name="chat" size={16} /> Open chat
+            </a>
+          )}
+        </div>
+      </div>
       <Tabs
         label={`${tenant.businessName} settings`}
         tabs={[
@@ -485,5 +671,36 @@ export function TenantForm({
         ]}
       />
     </>
+  );
+}
+
+/**
+ * The bottom of a settings form, kept in view while it scrolls: whether
+ * anything is unsaved, Discard, and the ONE submit. Save stays enabled when
+ * nothing changed (a re-save is harmless), but says so.
+ */
+function SaveBar({ dirty, busy, onDiscard, label }: { dirty: boolean; busy: boolean; onDiscard?: () => void; label: string }) {
+  return (
+    <div className={dirty ? 'save-bar dirty' : 'save-bar'}>
+      <span className="save-bar-state" role="status">
+        {dirty ? (
+          <>
+            <span className="save-dot" aria-hidden="true" /> Unsaved changes
+          </>
+        ) : (
+          <>
+            <Icon name="check" size={14} /> Everything is saved
+          </>
+        )}
+      </span>
+      {dirty && onDiscard && (
+        <button type="button" disabled={busy} onClick={onDiscard}>
+          Discard
+        </button>
+      )}
+      <button type="submit" className="primary" disabled={busy}>
+        {busy ? 'Saving…' : label}
+      </button>
+    </div>
   );
 }

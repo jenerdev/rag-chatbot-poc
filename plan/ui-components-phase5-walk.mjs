@@ -72,8 +72,8 @@ try {
   for (const width of [1280, 375]) {
     await page.viewport(width);
     await page.goto(`${BASE}/platform`);
-    await page.until("!!document.querySelector('.member-row')", 30000);
-    await page.eval("[...document.querySelectorAll('.member-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
+    await page.until("!!document.querySelector('.tenant-row')", 30000);
+    await page.eval("[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
     await page.until("!!document.querySelector('#theme-accent') && !!document.querySelector('[role=tab]')", 15000);
     if (width === 375) {
       const wide = await page.eval('document.documentElement.scrollWidth');

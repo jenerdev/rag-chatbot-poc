@@ -48,6 +48,23 @@ try {
       const w = await page.eval('document.documentElement.scrollWidth');
       console.log(`${scheme} ${width}: page ${w}px wide`);
     }
+    // The edit form of one tenant (villa: bookings on): each tab at 1280, Profile at 390 too.
+    for (const width of [1280, 390]) {
+      await page.viewport(width);
+      await page.goto(`${BASE}/platform`);
+      await page.until("!!document.querySelector('.tenant-row')", 30000);
+      await page.eval("[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/villa')).querySelector('button').click()");
+      await page.until("!!document.querySelector('[role=tablist]')", 30000);
+      await sleep(800);
+      const tabs = width === 1280 ? await page.eval("[...document.querySelectorAll('[role=tab]')].map(t => t.textContent.trim())") : ['Profile'];
+      for (const [i, tab] of tabs.entries()) {
+        await page.eval(`[...document.querySelectorAll('[role=tab]')][${i}].click()`);
+        await sleep(500);
+        await page.shot(join(OUT, `tenant-${tab.toLowerCase().replace(/[^a-z]+/g, '-')}-${SUFFIX}-${scheme}-${width}.png`));
+      }
+      const w = await page.eval('document.documentElement.scrollWidth');
+      console.log(`${scheme} form ${width}: page ${w}px wide`);
+    }
     console.log(errors.length ? `console errors:\n  ${errors.join('\n  ')}` : `${scheme}: no console errors`);
     browser.close();
     browser = null;

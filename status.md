@@ -1711,6 +1711,30 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-10-13 — the platform's tenant form (edit) redesigned
+- **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name
+  with Live/Archived, slug · assistant · members · since, Open chat; the
+  header's "All tenants" button is gone); each tab a settings page (a
+  section's name and purpose left, fields right; one column below 860 px).
+  Theme: a colour picker beside each text field, a hatched swatch for
+  "default", a reset per colour, the preview beside the colours. Suggested
+  questions in two columns. A sticky save bar says "Unsaved changes"
+  (compared on the PATCH body itself) with Discard. Applications: weekend
+  days as seven toggles; the old placeholder said "6,7" but the SQL default
+  is Fri–Sun (5,6,7), which the hint now says. Archive is a danger card.
+  The PATCH still sends the same seven keys; every field id is kept.
+- **Also:** three older walks still waited on `.member-row` on /platform
+  (renamed `.tenant-row` in 107d6fb); repointed. `platform-shots.mjs`
+  shoots the form's tabs.
+- **Observed:** `ui-components-phase5-walk.mjs` 9/9 PASS (tabs, keys, the
+  seven-key Save, one PATCH, 375 px); the a11y audit on the public and
+  platform pages 0 violations (52 states, after section headings became
+  h2: heading-order had flagged h1 → h3); typecheck exit 0; no sideways
+  scroll at 1280/390, no console errors.
+- **Noticed:** villa's Members lists leftover `ui-a11y-owner-…@example.com`
+  accounts: `ui-refresh-a11y.mjs` makes them owners and its cleanup does
+  not remove them (likely the keep-an-owner trigger). Not fixed yet.
+
 ### 2026-10-13 — the platform's New tenant is a drawer
 - **Did:** the create form opens in a `Drawer` over the tenant list (the
   same component as Promos, Slots, Rooms), not as a page of its own.

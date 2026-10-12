@@ -57,7 +57,7 @@ const LISTS = [
   { page: '/t/harbor/admin/members', read: (p) => p === `${T}/members`, drawn: '.member-row', empty: null },
   { page: '/t/harbor/admin/bookings', read: (p) => p === `${T}/bookings/requests`, drawn: '.day', empty: null }, // [] hides the Requests section; its empty state is for all-decided lists
   { page: '/t/harbor/admin/dashboard', read: (p) => p === `${T}/dashboard`, drawn: '.stat-tile', empty: null },
-  { page: '/platform', read: (p) => p === '/api/platform/tenants', drawn: '.member-row', empty: 'No tenants yet', add: 'New tenant' },
+  { page: '/platform', read: (p) => p === '/api/platform/tenants', drawn: '.tenant-row', empty: 'No tenants yet', add: 'New tenant' },
 ];
 
 let browser;

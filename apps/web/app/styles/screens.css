@@ -1250,3 +1250,74 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
 .transcript .assistant-body .transcript-meta time { color: var(--muted); font-weight: 400; }
 .transcript-refusal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--text-sm); }
 .transcript-note { margin: 0; font-size: var(--text-sm); }
+
+/* --- the platform's tenant form, edit mode ----------------------------------
+   A head (back, the tenant, Open chat), the tabs, and each tab a settings
+   page: a section's name and purpose on the left, its fields on the right,
+   one column below 860 px. The save bar stays in view while the form scrolls. */
+main.tenant-edit { max-width: 1040px; }
+button.link.back-link { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0; margin-bottom: var(--space-3); color: var(--muted); text-decoration: none; font-size: var(--text-sm); }
+button.link.back-link:hover:not(:disabled) { color: var(--ink); }
+.tenant-edit-head { margin-bottom: var(--space-4); }
+.tenant-edit-title { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.tenant-edit-mark { width: 48px; height: 48px; font-size: var(--text-lg); }
+.tenant-edit-name { flex: 1 1 260px; min-width: 0; }
+.tenant-edit-name .page-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); overflow-wrap: anywhere; }
+.tenant-edit-name .tenant-meta { margin: var(--space-1) 0 0; }
+.settings { padding: 0; overflow: clip; }
+.settings-section { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: var(--space-4) var(--space-8); padding: var(--space-6); border-top: 1px solid var(--line); }
+.settings-section:first-child, .app-head + .settings-section { border-top: 0; }
+.settings-about h2 { margin: 0 0 var(--space-1); font-size: var(--text-base); }
+.settings-about p { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.settings-fields > .field:last-child, .settings-fields > .field-row:last-child > .field { margin-bottom: 0; }
+.settings .field-label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-1); }
+/* Theme: the colours beside their preview. */
+.theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.colour-fields .field { margin-bottom: var(--space-3); }
+.colour-input { display: flex; align-items: center; gap: var(--space-2); }
+.colour-input input:not([type="color"]) { flex: 1; min-width: 0; font-family: var(--font-mono); }
+input[type="color"].colour-swatch { flex: none; width: 40px; height: 40px; min-height: 40px; padding: var(--space-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--panel); cursor: pointer; }
+input[type="color"].colour-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"].colour-swatch::-webkit-color-swatch { border: 0; border-radius: var(--radius-sm); }
+input[type="color"].colour-swatch::-moz-color-swatch { border: 0; border-radius: var(--radius-sm); }
+/* No colour set: a hatched swatch, so "default" does not read as white. */
+input[type="color"].colour-swatch.unset { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, var(--panel) 4px 8px); }
+input[type="color"].colour-swatch.unset::-webkit-color-swatch { opacity: 0; }
+input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
+.colour-reset { flex: none; width: 36px; min-width: 36px; }
+.theme-preview-col { position: sticky; top: calc(var(--space-10) + var(--space-8)); display: grid; gap: var(--space-2); }
+.theme-preview-col .hint { margin: 0; }
+/* Suggested questions: two columns of short fields. */
+.question-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-3); }
+.question-grid .field { margin-bottom: var(--space-3); }
+/* Weekend days: seven toggles. */
+.day-picks { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.day-picks button { min-width: 52px; min-height: var(--control-h-sm); padding: 0 var(--space-2); font-size: var(--text-sm); }
+.day-picks button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+/* An application, and the archive: an icon, a title with its state, the one action. */
+.app-head { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-6); border-bottom: 1px solid var(--line); }
+.settings-archive .app-head { border-bottom: 0; }
+.app-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-text); }
+.app-head-text { flex: 1 1 auto; min-width: 0; }
+.app-head-text h2 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); font-size: var(--text-base); }
+.app-head-text p { margin: 0; }
+.danger-zone { border-color: var(--danger-line); }
+.danger-zone .app-icon { background: var(--danger-soft); color: var(--danger); }
+.settings-archive { padding: 0; }
+/* The save bar: sticky at the bottom of the form, says what is unsaved. */
+.save-bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-6); border-top: 1px solid var(--line); background: var(--panel); }
+.save-bar-state { display: inline-flex; align-items: center; gap: var(--space-2); margin-right: auto; font-size: var(--text-sm); color: var(--muted); }
+.save-bar.dirty { background: var(--warn-soft); border-top-color: var(--warn-line); }
+.save-bar.dirty .save-bar-state { color: var(--ink); font-weight: 600; }
+.save-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--warn); }
+@media (max-width: 860px) {
+  .settings-section { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-5) var(--space-4); }
+  .theme-layout { grid-template-columns: minmax(0, 1fr); }
+  .theme-preview-col { position: static; }
+  .app-head { flex-wrap: wrap; padding: var(--space-5) var(--space-4); }
+  .save-bar { padding: var(--space-3) var(--space-4); }
+}
+@media (max-width: 560px) {
+  .question-grid { grid-template-columns: minmax(0, 1fr); }
+  .tenant-edit-title .button { width: 100%; justify-content: center; }
+}
