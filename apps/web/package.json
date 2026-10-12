@@ -16,6 +16,7 @@
     "@rag/db": "workspace:*",
     "@rag/openai": "workspace:*",
     "@rag/pipeline": "workspace:*",
+    "@rag/push": "workspace:*",
     "next": "^15",
     "react": "^19",
     "react-dom": "^19",

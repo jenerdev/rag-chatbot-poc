@@ -23,7 +23,8 @@
     "storage-orphans": "node --conditions=react-server --env-file=../../.env tools/storage-orphans.mjs"
   },
   "dependencies": {
-    "@rag/db": "workspace:*"
+    "@rag/db": "workspace:*",
+    "@rag/push": "workspace:*"
   },
   "devDependencies": {
     "@rag/tsconfig": "workspace:*",

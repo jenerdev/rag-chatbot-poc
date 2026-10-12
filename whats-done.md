@@ -9061,3 +9061,23 @@ refusal next to its allowed twin.
 
 `NOTIFY_PERMISSION` in `permissions.ts` is checked by a unit test that
 reads `notify_claim()`'s role list from the SQL file.
+
+## 2026-10-13 — notifications Phase 3: Web Push by hand (`@rag/push`)
+
+**What was done:** a new package, with no runtime dependency beyond
+`server-only`.
+- **Encryption:** a push body is encrypted to one device (RFC 8291) by
+  ECDH with a fresh key, two HKDFs and AES-128-GCM, all `node:crypto`.
+- **VAPID:** the server signs for itself with a 12-hour ES256 JWT (RFC
+  8292), in the raw r||s form JOSE wants, not node's default DER.
+- **Endpoints:** a device's endpoint is accepted only on a known push
+  service over https, so a member cannot make the server POST to an
+  internal address.
+- **Send:** `sendPush()` sends with TTL 24 h, Urgency high and a Topic per
+  stay, and reads the answer as ok, gone or retry.
+
+**What the observed values prove:** the body for RFC 8291 Appendix A's
+fixed inputs is the RFC's body, byte for byte, on the first run. That is
+the check that the hand-written path is right, and why the `web-push`
+fallback (§ 7 q6) is unused. A real send with random inputs decrypts back
+on the device's side in the test.

@@ -1755,6 +1755,17 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **Fixed on the way:** the probe slot needed `nightly: true` (several
   nights), and `submit_payment()` needs a real uploaded proof (`''` is
   refused: "did not arrive"); the probe uploads one and removes it.
+- **Phase 3, `@rag/push`:** RFC 8291 payload encryption (`encrypt.ts`),
+  RFC 8292 VAPID (`vapid.ts`, ES256 in `ieee-p1363`), the push-service host
+  allowlist against SSRF (`endpoint.ts`), `sendPush()` → ok | gone | retry
+  (`send.ts`), `vapidKeys()` the ONE reader of `VAPID_PRIVATE_JWK`
+  (`server-only`), `tools/vapid.mjs` for a new pair. Zero runtime
+  dependencies but `server-only`.
+- **Observed:** `encryptPayload()` equals RFC 8291 Appendix A's body byte for
+  byte on the first run (so § 7 q6's fallback, `web-push`, is not needed); a
+  VAPID JWT verifies with its public key (64-byte raw signature); 10/10
+  tests; the allowlist refuses http, localhost, 169.254.169.254, a lookalike
+  suffix, a port and credentials.
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name
