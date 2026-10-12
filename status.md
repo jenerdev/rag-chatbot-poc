@@ -56,6 +56,20 @@
 
 ## ▶ Next up (do this next)
 
+**Calendar, regrouped (2026-10-12).**
+- [x] Week view: per room a heading, then a row per slot; each cell one
+  block (Booked / Open / Closed, the pending count) that opens its day;
+  today's column tinted, weekend dates marked, the room and slot column
+  sticky on a phone. Calendar walk 4b/4c/4d/5b pass light and dark (56
+  named cells; a cell opens its day).
+- [x] One toolbar row (‹ period › Today; the view and room on the right),
+  the key under the grid with its footnote as a tip, cells read "2 of 8",
+  the Day view by room (each booking once, its own slot, contacts with
+  copy, "Open booking" to S-15). `plan/calendar-shots.mjs` (seeds harbor,
+  deletes): no console error, no sideways scroll. `plan/calendar-walk.mjs`
+  updated to the new markup: all pass but 1d/1f, which need villa's
+  October bookings (villa has 0 live bookings since today's cleanup).
+
 **Add a document drawer, redesigned (2026-10-12).**
 - [x] An intro line, a hint per field, "Load a text file" (.txt/.md, read
   in the browser), a live character and chunk meter, "How it will be split"

@@ -94,11 +94,11 @@ try {
     check(await openMonth('villa', '2026-10-01'), `1. [${scheme}] villa's October grid loads`);
     if (first) {
       const cells = await page.eval("document.querySelectorAll('.cal-month button.cal-day').length");
-      const legend = await page.eval("[...document.querySelectorAll('.cal-legend li')].map(li => li.textContent.trim())");
+      const legend = await page.eval("[...document.querySelectorAll('.cal-legend li')].map(li => { const c = li.cloneNode(true); c.querySelectorAll('.tip-text').forEach(t => t.remove()); return c.textContent.trim(); })");
       const states = await page.eval("[...new Set([...document.querySelectorAll('.cal-month button.cal-day')].map(b => [...b.classList].find(c => ['available','partial','full','closed','none'].includes(c))))]");
       const unlabelled = await page.eval("[...document.querySelectorAll('.cal-month button.cal-day')].filter(b => !/^\\w+day \\d+ \\w+ \\d{4}/.test(b.getAttribute('aria-label') ?? '')).length");
       check(cells === 35, '1b. 35 dates: Monday 28 Sep to Sunday 1 Nov', String(cells));
-      check(legend.join('|') === 'Available|Partly booked|Fully booked|Closed|Holiday|Peak|1Pending requests|Today|Past, or beyond the booking window', '1c. the legend names every swatch and marker', legend.join(' | '));
+      check(legend.join('|') === 'Available|Partly booked|Fully booked|Closed|Holiday|Peak|1Pending requests|Today|Past or not yet open|How it is counted', '1c. the legend names every swatch and marker', legend.join(' | '));
       check(states.includes('full') && states.includes('partial') && states.includes('available'), '1d. villa shows available, partly and fully booked dates', states.join(','));
       check(unlabelled === 0, '1e. every date is a button named by a sentence', `${unlabelled} without`);
       const full = await page.eval("[...document.querySelectorAll('.cal-month button.cal-day.full')][0]?.getAttribute('aria-label') ?? ''");
@@ -106,7 +106,7 @@ try {
       check(await page.eval("document.querySelectorAll('.cal-month button.cal-day.today').length === 1"), '1g. exactly one date is ringed as today');
       const words = await page.eval("({ dimOpen: [...document.querySelectorAll('.cal-month button.cal-day.dim')].filter(b => b.querySelector('.cal-word')?.textContent === 'Open').length, dim: document.querySelectorAll('.cal-month button.cal-day.dim').length, liveOpen: [...document.querySelectorAll('.cal-month button.cal-day.available:not(.dim)')].filter(b => b.querySelector('.cal-word')?.textContent === 'Open').length })");
       check(words.dim > 0 && words.dimOpen === 0 && words.liveOpen > 0, '1h. no "Open" on a past date; bookable dates still say it', JSON.stringify(words));
-      const bg = await page.eval("(() => { const c = (e) => e && getComputedStyle(e).backgroundColor; const card = c(document.querySelector('.cal-head').closest('.card')); const others = [...document.querySelectorAll('.cal-month button.cal-day.other-month')]; const inMonth = c(document.querySelector('.cal-month button.cal-day.available:not(.other-month):not(.dim)')); return { others: others.length, plain: others.every(e => c(e) === card), card, inMonth }; })()");
+      const bg = await page.eval("(() => { const c = (e) => e && getComputedStyle(e).backgroundColor; const card = c(document.querySelector('.cal-toolbar').closest('.card')); const others = [...document.querySelectorAll('.cal-month button.cal-day.other-month')]; const inMonth = c(document.querySelector('.cal-month button.cal-day.available:not(.other-month):not(.dim)')); return { others: others.length, plain: others.every(e => c(e) === card), card, inMonth }; })()");
       check(bg.others === 4 && bg.plain && bg.inMonth !== bg.card, '1i. the neighbouring months: 4 plain days; the open October dates are tinted', JSON.stringify(bg));
     }
     await shot('villa-month-1280');
@@ -125,7 +125,7 @@ try {
     if (first) {
       await page.eval(`[...document.querySelectorAll('.cal-month button.cal-day')].find(b => b.getAttribute('aria-label').startsWith('Friday 27 November')).click()`);
       check(await page.until("location.search.includes('view=day') && location.search.includes('date=2026-11-27') && !!document.querySelector('.cal-dayview')", 30000), '3. a click opens the Day view, and the address says so');
-      check(await page.until("[...document.querySelectorAll('.cal-booking')].some(li => li.textContent.includes('Walk guest') && li.textContent.includes('pending'))", 30000), '3b. the Day view lists the pending request');
+      check(await page.until("[...document.querySelectorAll('.cal-booking')].some(li => li.textContent.includes('Walk guest') && /pending/i.test(li.textContent))", 30000), '3b. the Day view lists the pending request');
       const href = await page.eval("document.querySelector('.cal-day-summary a.button')?.getAttribute('href')");
       check(href === '/t/harbor/admin/bookings?from=2026-11-27', '3c. "Open in Bookings" goes to Bookings at that date', href);
       await page.shot(join(OUT, `harbor-day-1280-${scheme}.png`));
@@ -137,10 +137,11 @@ try {
       await page.goto(`${BASE}/t/harbor/admin/calendar?view=day&date=2026-11-28`);
       await page.until("!!document.querySelector('.cal-dayview')", 30000);
       const card = await page.until("[...document.querySelectorAll('.cal-booking')].some(c => c.textContent.includes('Walk guest'))", 30000)
-        ? await page.eval("(() => { const c = [...document.querySelectorAll('.cal-booking')].find(c => c.textContent.includes('Walk guest')); const facts = Object.fromEntries([...c.querySelectorAll('dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent])); return { facts, tel: c.querySelector('a[href^=\"tel:\"]')?.getAttribute('href') ?? null }; })()")
+        ? await page.eval("(() => { const c = [...document.querySelectorAll('.cal-booking')].find(c => c.textContent.includes('Walk guest')); return { line: c.querySelector('.cal-booking-line')?.textContent ?? '', tel: c.querySelector('a[href^=\"tel:\"]')?.getAttribute('href') ?? null, web: [...c.querySelectorAll('.badge')].some(b => b.textContent === 'Booking page'), open: c.querySelector('a.cal-booking-open')?.getAttribute('href') ?? null }; })()")
         : null;
-      check(card?.facts?.Stay === 'Since Fri 27 Nov · Night' && card?.facts?.Guests === '2' && card?.facts?.Phone === '0917 555 0101' && card?.tel === 'tel:0917 555 0101' && card?.facts?.From === 'Staff',
-        '3c2. a stay from the night before shows its guest on the 28th: since, guests, phone (a tel: link), source', JSON.stringify(card));
+      // Since the Calendar's regrouping (2026-10-12): one line per booking, and a link to its page (S-15).
+      check(card?.line === 'Night since Fri 27 Nov · 2 guests' && card?.tel === 'tel:0917 555 0101' && card?.web === false && /^\/t\/harbor\/admin\/bookings\/[A-Z]+-/.test(card?.open ?? ''),
+        '3c2. a stay from the night before shows its guest on the 28th: its slot, since, guests, phone (a tel: link), staff-made, and a link to its page', JSON.stringify(card));
       await page.shot(join(OUT, `harbor-day-overlap-1280-${scheme}.png`));
     }
 
@@ -149,32 +150,40 @@ try {
     //     day keep a text title and have no picker.
     if (first) {
       await openMonth('harbor', '2026-11-01');
-      const head = await page.eval(`(() => { const s = document.querySelector('.cal-head select.cal-month-select'); return { h2: !!document.querySelector('.cal-head h2'), value: s?.value ?? null, options: s?.options.length ?? 0 }; })()`);
-      await page.eval(`(() => { const s = document.querySelector('.cal-head select.cal-month-select'); s.value = '2027-01'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-      const moved = await page.until("location.search.includes('date=2027-01-01') && document.querySelector('.cal-head select.cal-month-select')?.value === '2027-01' && document.querySelector('.cal-month button.cal-day')?.getAttribute('aria-label')?.includes('December 2026')", 30000);
+      const head = await page.eval(`(() => { const s = document.querySelector('.cal-toolbar select.cal-month-select'); return { h2: !!document.querySelector('.cal-toolbar h2'), value: s?.value ?? null, options: s?.options.length ?? 0 }; })()`);
+      await page.eval(`(() => { const s = document.querySelector('.cal-toolbar select.cal-month-select'); s.value = '2027-01'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      const moved = await page.until("location.search.includes('date=2027-01-01') && document.querySelector('.cal-toolbar select.cal-month-select')?.value === '2027-01' && document.querySelector('.cal-month button.cal-day')?.getAttribute('aria-label')?.includes('December 2026')", 30000);
       check(!head.h2 && head.value === '2026-11' && head.options === 25 && moved, '3e. month view: the picker is the title (no h2), 25 months; January 2027 picked, the grid and the address follow', JSON.stringify(head));
       await page.goto(`${BASE}/t/harbor/admin/calendar?view=week&date=2026-10-21`);
       await page.until("document.querySelectorAll('.cal-week tbody tr').length > 0", 30000);
-      const week = await page.eval(`({ h2: document.querySelector('.cal-head h2')?.textContent ?? null, picker: !!document.querySelector('.cal-month-select') })`);
+      const week = await page.eval(`({ h2: document.querySelector('.cal-toolbar h2')?.textContent ?? null, picker: !!document.querySelector('.cal-month-select') })`);
       check(week.h2 === '19 – 25 Oct 2026' && !week.picker, '3f. week view: a text title, no month picker', JSON.stringify(week));
       // 3g. The step buttons name the view's step.
       const steps = {};
       for (const v of ['month', 'week', 'day']) {
         await page.eval(`[...document.querySelectorAll('.segmented[aria-label="View"] button')].find(b => b.textContent === '${v[0].toUpperCase() + v.slice(1)}').click()`);
         await page.until(`location.search.includes('view=${v}') && !!document.querySelector('.cal-month, .cal-week, .cal-dayview')`, 30000);
-        steps[v] = await page.eval("[...document.querySelectorAll('.cal-head .cal-steps > button')].map(b => b.textContent.trim()).join(' | ')");
+        steps[v] = await page.eval("[...document.querySelectorAll('.cal-period > button')].map(b => b.getAttribute('aria-label') ?? b.textContent.trim()).join(' | ')");
       }
-      check(steps.month === 'Previous month | Today | Next month' && steps.week === 'Previous week | Today | Next week' && steps.day === 'Previous day | Today | Next day', '3g. the step buttons say month, week or day with the view', JSON.stringify(steps));
+      // The arrows are icons now; their names still say the view's step.
+      check(steps.month === 'Previous month | Next month | Today' && steps.week === 'Previous week | Next week | Today' && steps.day === 'Previous day | Next day | Today', '3g. the step buttons say month, week or day with the view', JSON.stringify(steps));
     }
 
     // 4. The week of harbor's pending requests (21–22 Oct).
     await page.goto(`${BASE}/t/harbor/admin/calendar?view=week&date=2026-10-21`);
     check(await page.until("document.querySelectorAll('.cal-week tbody tr').length > 0", 30000), `4. [${scheme}] harbor's week loads`);
     if (first) {
-      const rows = await page.eval("document.querySelectorAll('.cal-week tbody tr').length");
-      const chips = await page.eval("document.querySelectorAll('.cal-week td .slot-chip').length");
+      // Since the week's regrouping (2026-10-12): per room a heading row, then a row per slot; each cell one block.
+      const rooms = await page.eval("document.querySelectorAll('.cal-week .cal-week-room-head').length");
+      const rows = await page.eval("document.querySelectorAll('.cal-week tbody tr:not(.cal-week-room-head)').length");
+      const cells = await page.eval("document.querySelectorAll('.cal-week td button.wk-cell').length");
       const heads = await page.eval("document.querySelectorAll('.cal-week thead button.cal-day').length");
-      check(rows === 4 && chips === 56 && heads === 7, '4b. 4 rooms × 7 days, 56 slot chips, 7 day headers that are buttons', `${rows} rows · ${chips} chips · ${heads} heads`);
+      const named = await page.eval("[...document.querySelectorAll('.cal-week td button.wk-cell')].every(b => /: (booked|open|closed)/.test(b.getAttribute('aria-label') ?? ''))");
+      check(rooms === 4 && rows === 8 && cells === 56 && heads === 7 && named, '4b. 4 rooms, 8 slot rows × 7 days = 56 cells each named in a sentence, 7 day headers that are buttons', `${rooms} rooms · ${rows} rows · ${cells} cells · ${heads} heads · named ${named}`);
+      const opens = await page.eval("(() => { document.querySelector('.cal-week td button.wk-cell').click(); return true; })()");
+      check(opens && await page.until("location.search.includes('view=day') && !!document.querySelector('.cal-dayview')", 30000), '4d. a cell opens the Day view of its date');
+      await page.eval('history.back()');
+      await page.until("document.querySelectorAll('.cal-week tbody tr').length > 0", 30000);
       const fits = await page.eval("(() => { const s = document.querySelector('.cal-week-scroll'); return s.scrollWidth <= s.clientWidth + 1; })()");
       check(fits, '4c. at 1280 px all seven days fit: the week does not scroll');
     }

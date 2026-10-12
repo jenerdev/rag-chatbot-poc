@@ -8661,3 +8661,50 @@ the file name), the preview listed 3 chunks (956, 968 and 815 characters),
 and saving stored exactly 3 chunks: the preview is the server's split,
 not an estimate. The probe document was deleted, so villa's corpus is as
 the battery expects.
+
+## 2026-10-12 — the Calendar, regrouped
+
+**What was done:** the toolbar is one row: the period between two icon
+arrows (named "Previous month" and so on) and Today, then the view switch
+and the room filter on the right. The key moved under the grid, the grid
+being what people came for; its standing footnote became a "How it is
+counted" tip. A partly booked date reads "2 of 8" (it was "2 / 8"). The Day
+view groups by room: each room once with its slots as chips, then each
+booking once (it was a full card per slot, so a two-slot stay was two
+cards) as a compact block: guest, status, reference with copy, its own
+slot and since when, guests, mobile and email with copy, and "Open
+booking", which goes to the booking's page (S-15).
+
+**Why it matters:** the month picker sat alone with three wide buttons
+wrapping below; the key took two to four rows before the grid; a full
+day's view ran to about 2,000 px of repeated cards.
+
+**What the observed values prove:** screenshots of harbor with eight
+seeded stays at 1280 and 390 px; the existing calendar walk, updated to
+the new markup, caught one real wording slip (a stay from the night before
+read "Day Tour", the slot it reaches that day, not "Night", its own) which
+is fixed; it passes everything but its two checks of villa's October,
+which has had no bookings since today's cleanup (villa live bookings: 0).
+
+## 2026-10-12 — the Calendar's week, regrouped
+
+**What was done:** the week was rooms × days with every cell stacking
+"Day Tour: taken / Night: open" chips; now each room has a heading row and
+a row per slot, so a slot is named once at the start of its row. A cell is
+one block in its slot's state, with one word (Booked, Open, Closed) and the
+pending count, and opens the Day view of its date; each is named in a
+sentence for a screen reader ("Garden Room, Night, Saturday 17 October:
+booked. Open the day."). The day headers show the weekday, the date large
+and the day's word; today's column is tinted down the whole table; the
+weekend's weekdays are in the accent colour. The room and slot column is
+sticky, so on a phone the names stay while the days scroll inside the
+table.
+
+**Why it matters:** the slot names repeated in every cell and wrapped to
+two or three lines, so a room's week could not be read across.
+
+**What the observed values prove:** the calendar walk counts 4 rooms, 8
+slot rows, 56 cells each named in a sentence and 7 day headers, a cell
+opens its day, all seven days fit at 1280 px, and at 375 px the table
+scrolls inside itself, in light and dark. Its only failures are the two
+villa-October checks that need bookings (villa has none since the cleanup).

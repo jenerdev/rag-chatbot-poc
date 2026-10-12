@@ -17,7 +17,7 @@ const day = (patch: Partial<OccupancyDay>): OccupancyDay => ({
 describe('cellText', () => {
   it('says each state in words or a count', () => {
     expect(cellText(day({}))).toBe('Open');
-    expect(cellText(day({ state: 'partial', taken: 3 }))).toBe('3 / 8');
+    expect(cellText(day({ state: 'partial', taken: 3 }))).toBe('3 of 8');
     expect(cellText(day({ state: 'full', taken: 8 }))).toBe('Full');
     expect(cellText(day({ state: 'closed' }))).toBe('Closed');
     expect(cellText(day({ state: 'none', sellable: 0 }))).toBe('—');
@@ -25,7 +25,7 @@ describe('cellText', () => {
 
   it('says nothing on an available date that cannot be booked, but keeps a count', () => {
     expect(cellText(day({ bookable: false }))).toBe('');
-    expect(cellText(day({ state: 'partial', taken: 3, bookable: false }))).toBe('3 / 8');
+    expect(cellText(day({ state: 'partial', taken: 3, bookable: false }))).toBe('3 of 8');
   });
 });
 

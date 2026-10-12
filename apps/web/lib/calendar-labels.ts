@@ -28,7 +28,7 @@ export function cellText(day: Pick<OccupancyDay, 'state' | 'taken' | 'sellable' 
     case 'available':
       return day.bookable ? 'Open' : '';
     case 'partial':
-      return `${day.taken} / ${day.sellable}`;
+      return `${day.taken} of ${day.sellable}`;
     case 'full':
       return 'Full';
     case 'closed':

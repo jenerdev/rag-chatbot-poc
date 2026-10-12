@@ -5,6 +5,7 @@
 // legend is for the eye.
 
 import { Icon } from './icons';
+import { Tip } from './tooltip';
 
 const SWATCHES = [
   ['available', 'Available'],
@@ -47,12 +48,17 @@ export function CalendarLegend() {
         </li>
         <li>
           <span className="cal-swatch dim" aria-hidden="true" />
-          Past, or beyond the booking window
+          Past or not yet open
+        </li>
+        <li>
+          {/* How a date is counted, on request: it was a sentence under the key on every visit. */}
+          <Tip label="Counted over today’s rooms and slots. A stay that began the day before counts on this date too, booked or pending." describe>
+            <button type="button" className="ghost sm cal-key-info" aria-label="How dates are counted">
+              <Icon name="help" size={14} /> How it is counted
+            </button>
+          </Tip>
         </li>
       </ul>
-      <p className="small muted cal-footnote">
-        Counted over today’s rooms and slots. A stay that began the day before counts on this date too, booked or pending.
-      </p>
     </div>
   );
 }

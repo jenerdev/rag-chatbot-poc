@@ -208,32 +208,44 @@ export function CalendarScreen({ slug, businessName, logoUrl, bannerUrl, nav, pe
   return (
     <StaffFrame {...frame}>
       <section className="card">
-        <div className="range-head cal-head">
-          {view === 'month' ? (
-            // The month view's title IS the month picker (the user, 2026-10-09:
-            // a label beside a dropdown saying the same was redundant). A year
-            // either side of the tenant's today; picking one opens it whole.
-            <select
-              className="cal-month-select"
-              aria-label="Month"
-              disabled={!shown}
-              value={shown ? shown.date.slice(0, 7) : ''}
-              onChange={(e) => go({ date: `${e.target.value}-01` })}
-            >
-              {shown ? (
-                monthOptions(shown.today, shown.date).map((m) => (
-                  <option key={m} value={m}>
-                    {short(`${m}-01`, { month: 'long', year: 'numeric' })}
-                  </option>
-                ))
-              ) : (
-                <option value="">…</option>
-              )}
-            </select>
-          ) : (
-            <h2 aria-live="polite">{shown ? periodTitle(view, shown.date, shown.from, shown.to) : '…'}</h2>
-          )}
-          <div className="range-nav">
+        {/* One row: the period between its two arrows, Today, then the view and the room. */}
+        <div className="cal-toolbar">
+          <div className="cal-period">
+            <button type="button" className="icon-button" aria-label={`Previous ${UNIT[view]}`} disabled={!shown} onClick={() => date && go({ date: step(view, date, -1) })}>
+              <Icon name="chevron-left" size={18} />
+            </button>
+            {view === 'month' ? (
+              // The month view's title IS the month picker (the user, 2026-10-09:
+              // a label beside a dropdown saying the same was redundant). A year
+              // either side of the tenant's today; picking one opens it whole.
+              <select
+                className="cal-month-select"
+                aria-label="Month"
+                disabled={!shown}
+                value={shown ? shown.date.slice(0, 7) : ''}
+                onChange={(e) => go({ date: `${e.target.value}-01` })}
+              >
+                {shown ? (
+                  monthOptions(shown.today, shown.date).map((m) => (
+                    <option key={m} value={m}>
+                      {short(`${m}-01`, { month: 'long', year: 'numeric' })}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">…</option>
+                )}
+              </select>
+            ) : (
+              <h2 aria-live="polite">{shown ? periodTitle(view, shown.date, shown.from, shown.to) : '…'}</h2>
+            )}
+            <button type="button" className="icon-button" aria-label={`Next ${UNIT[view]}`} disabled={!shown} onClick={() => date && go({ date: step(view, date, 1) })}>
+              <Icon name="chevron-right" size={18} />
+            </button>
+            <button type="button" className="sm" disabled={!shown || shown.date === shown.today} onClick={() => shown && go({ date: shown.today })}>
+              Today
+            </button>
+          </div>
+          <div className="cal-filters">
             <div className="segmented" role="group" aria-label="View">
               {VIEWS.map((v) => (
                 <button key={v} type="button" aria-pressed={view === v} onClick={() => go({ view: v })}>
@@ -259,22 +271,8 @@ export function CalendarScreen({ slug, businessName, logoUrl, bannerUrl, nav, pe
                 ))}
               </select>
             )}
-            {/* One group, so the three always share a row (a phone included). */}
-            <div className="cal-steps">
-              <button type="button" disabled={!shown} onClick={() => date && go({ date: step(view, date, -1) })}>
-                <Icon name="chevron-left" size={16} /> Previous {UNIT[view]}
-              </button>
-              <button type="button" disabled={!shown || shown.date === shown.today} onClick={() => shown && go({ date: shown.today })}>
-                Today
-              </button>
-              <button type="button" disabled={!shown} onClick={() => date && go({ date: step(view, date, 1) })}>
-                Next {UNIT[view]} <Icon name="chevron-right" size={16} />
-              </button>
-            </div>
           </div>
         </div>
-
-        <CalendarLegend />
 
         {!shown ? (
           <LoadState
@@ -299,50 +297,49 @@ export function CalendarScreen({ slug, businessName, logoUrl, bannerUrl, nav, pe
         ) : (
           <DayView data={shown} slug={slug} />
         )}
+
+        {/* The key under the grid: the grid is what people came for; every cell says its state in words too. */}
+        {shown && view !== 'day' && <CalendarLegend />}
       </section>
     </StaffFrame>
   );
 }
 
-/** One room's slots on one date, as the Bookings screen's chips (reused, not redrawn). */
-function SlotChips({ slots }: { slots: OccupancySlot[] }) {
-  return (
-    <span className="day-slots">
-      {slots.map((s) => (
-        <span key={s.slotId} className={`slot-chip ${s.state}`}>
-          {s.slot}: {s.state}
-          {s.pending > 0 && <span className="visually-hidden">, {pendingWords(s.pending)}</span>}
-          {s.pending > 0 && (
-            <span className="cal-pending sm" aria-hidden="true">
-              {s.pending}
-            </span>
-          )}
-        </span>
-      ))}
-    </span>
-  );
-}
+/** A slot's state on a date, as one word: what the cell says (the colour says it too, never alone). */
+const SLOT_WORD: Record<OccupancySlot['state'], string> = { taken: 'Booked', open: 'Open', closed: 'Closed' };
 
-/** The week: a column per date, a row per room, each cell its slots. Scrolls sideways inside itself on a phone, never the page. */
+/**
+ * The week (regrouped 2026-10-12): a column per date, and per room a row
+ * for each of its slots, under the room's name, so a slot is named once at
+ * the start of its row instead of in every cell. Each cell is one block in
+ * the slot's state, with one word and the pending count, and opens the Day
+ * view of its date. Today's column is tinted, the weekend's dates marked;
+ * the room and slot column stays put while the table scrolls sideways on a
+ * phone, inside itself, never the page.
+ */
 function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: boolean; onPick: (date: string) => void }) {
   const slots = data.slots ?? [];
   const rooms = [...new Map(slots.map((s) => [s.unitId, s.unit])).entries()];
+  const weekend = (day: string) => [0, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+  const colClass = (day: string) => [day === data.today ? 'today-col' : '', weekend(day) ? 'weekend-col' : ''].filter(Boolean).join(' ') || undefined;
   return (
     <div className="cal-week-scroll">
       <table className="cal-week">
         <caption className="visually-hidden">{periodTitle('week', data.date, data.from, data.to)}</caption>
         <thead>
           <tr>
-            <th scope="col">{perRoom ? 'Room' : <span className="visually-hidden">Unit</span>}</th>
+            <th scope="col" className="cal-week-corner">
+              {perRoom ? 'Room and slot' : <span className="visually-hidden">Slot</span>}
+            </th>
             {data.days.map((day) => (
-              <th key={day.day} scope="col">
-                <button
-                  type="button"
-                  className={dayClasses(day, data.today, 'cal-week-day')}
-                  aria-label={sentence(day, data.today)}
-                  onClick={() => onPick(day.day)}
-                >
-                  <span aria-hidden="true">{short(day.day, { weekday: 'short', day: 'numeric' })}</span>
+              <th key={day.day} scope="col" className={colClass(day.day)}>
+                <button type="button" className={dayClasses(day, data.today, 'cal-week-day')} aria-label={sentence(day, data.today)} onClick={() => onPick(day.day)}>
+                  <span className="cal-week-weekday" aria-hidden="true">
+                    {short(day.day, { weekday: 'short' })}
+                  </span>
+                  <strong className="cal-week-date" aria-hidden="true">
+                    {short(day.day, { day: 'numeric' })}
+                  </strong>
                   {cellText(day) && (
                     <span className="cal-word" aria-hidden="true">
                       {cellText(day)}
@@ -356,18 +353,46 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
             ))}
           </tr>
         </thead>
-        <tbody>
-          {rooms.map(([unitId, name]) => (
-            <tr key={unitId}>
-              <th scope="row">{name}</th>
-              {data.days.map((day) => (
-                <td key={day.day} className={day.state === 'closed' ? 'closed' : undefined}>
-                  <SlotChips slots={slots.filter((s) => s.day === day.day && s.unitId === unitId)} />
-                </td>
+        {rooms.map(([unitId, name]) => {
+          const roomSlots = [...new Map(slots.filter((s) => s.unitId === unitId).map((s) => [s.slotId, s.slot])).entries()];
+          return (
+            <tbody key={unitId} className="cal-week-room">
+              <tr className="cal-week-room-head">
+                <th scope="rowgroup" colSpan={data.days.length + 1}>
+                  {name}
+                </th>
+              </tr>
+              {roomSlots.map(([slotId, slotName]) => (
+                <tr key={slotId}>
+                  <th scope="row" className="cal-week-slot">
+                    {slotName}
+                  </th>
+                  {data.days.map((day) => {
+                    const cell = slots.find((s) => s.day === day.day && s.unitId === unitId && s.slotId === slotId);
+                    if (!cell) return <td key={day.day} className={colClass(day.day)} />;
+                    return (
+                      <td key={day.day} className={colClass(day.day)}>
+                        <button
+                          type="button"
+                          className={`wk-cell ${cell.state}`}
+                          aria-label={`${name}, ${slotName}, ${short(day.day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${SLOT_WORD[cell.state].toLowerCase()}${cell.pending > 0 ? `, ${pendingWords(cell.pending)}` : ''}. Open the day.`}
+                          onClick={() => onPick(day.day)}
+                        >
+                          <span aria-hidden="true">{SLOT_WORD[cell.state]}</span>
+                          {cell.pending > 0 && (
+                            <span className="cal-pending sm" aria-hidden="true">
+                              {cell.pending}
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </tbody>
+            </tbody>
+          );
+        })}
       </table>
       {rooms.length === 0 && <p className="small muted">No active rooms or slots to show.</p>}
     </div>
@@ -378,64 +403,53 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
 const since = (date: string) => short(date, { weekday: 'short', day: 'numeric', month: 'short' });
 
 /** One booking at the front desk: who, how to reach them, how many, and its reference. No price (plan § 6). */
-function BookingCard({ booking: b, day, slot }: { booking: DayBooking; day: string; slot: string }) {
-  const earlier = b.date !== day || b.slot !== slot;
+/**
+ * One booking on the day, once however many of the room's slots it covers:
+ * who, its state, its reference, since when, how many, the contacts, and a
+ * link to its page (S-15), where it is acted on.
+ */
+function BookingRow({ booking: b, day, slug }: { booking: DayBooking; day: string; slug: string }) {
+  const earlier = b.date !== day;
   return (
     <li className="cal-booking">
       <div className="cal-booking-head">
         <strong>{b.guestName}</strong>
-        <span className={`badge ${b.status === 'confirmed' ? 'ok' : 'accent'}`}>{b.status}</span>
-        {b.reference && <CopyText text={b.reference} what="reference" className="muted small request-ref" />}
+        <span className={`badge ${b.status === 'confirmed' ? 'ok' : 'warn'}`}>{b.status === 'confirmed' ? 'Confirmed' : 'Pending'}</span>
+        {b.reference && <CopyText text={b.reference} what="reference" className="badge request-ref" />}
+        {b.source === 'web' && <span className="badge">Booking page</span>}
         {b.clash && (
           <span className="badge danger">
             <Icon name="alert" size={14} /> would clash on Confirm
           </span>
         )}
+        {b.reference && (
+          <Link className="button sm cal-booking-open" href={`/t/${slug}/admin/bookings/${b.reference}`}>
+            Open booking <Icon name="chevron-right" size={14} />
+          </Link>
+        )}
       </div>
-      <dl className="cal-booking-facts">
-        {earlier && (
-          <>
-            <dt>Stay</dt>
-            <dd>
-              Since {since(b.date)} · {b.slot}
-            </dd>
-          </>
-        )}
-        {b.guestCount !== null && (
-          <>
-            <dt>Guests</dt>
-            <dd>{b.guestCount}</dd>
-          </>
-        )}
-        {b.guestPhone && (
-          <>
-            <dt>Phone</dt>
-            <dd>
-              <CopyText text={b.guestPhone} what="mobile number">
-                <a href={`tel:${b.guestPhone}`}>{b.guestPhone}</a>
-              </CopyText>
-            </dd>
-          </>
-        )}
-        {b.guestEmail && (
-          <>
-            <dt>Email</dt>
-            <dd>
-              <CopyText text={b.guestEmail} what="email">
-                <a href={`mailto:${b.guestEmail}`}>{b.guestEmail}</a>
-              </CopyText>
-            </dd>
-          </>
-        )}
-        <dt>From</dt>
-        <dd>{b.source === 'web' ? 'The booking page' : 'Staff'}</dd>
-        {b.notes && (
-          <>
-            <dt>Notes</dt>
-            <dd className="cal-booking-notes">{b.notes}</dd>
-          </>
-        )}
-      </dl>
+      <p className="cal-booking-line">
+        {/* The booking's OWN slot ("Night since Fri 27 Nov"), not the slots it reaches on this day: those are the chips above. */}
+        {[earlier ? `${b.slot} since ${since(b.date)}` : `${b.slot}, starts today`, b.guestCount !== null ? `${b.guestCount} guest${b.guestCount === 1 ? '' : 's'}` : null]
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+      {(b.guestPhone || b.guestEmail) && (
+        <p className="cal-booking-contact">
+          {b.guestPhone && (
+            <CopyText text={b.guestPhone} what="mobile number">
+              <a href={`tel:${b.guestPhone}`}>{b.guestPhone}</a>
+            </CopyText>
+          )}
+          {b.guestEmail && (
+            <CopyText text={b.guestEmail} what="email">
+              <a href={`mailto:${b.guestEmail}`}>{b.guestEmail}</a>
+            </CopyText>
+          )}
+        </p>
+      )}
+      {/* Typed notes are a React child, so they are escaped. */}
+      {b.notes && <p className="cal-booking-notes">{b.notes}</p>}
     </li>
   );
 }
@@ -477,22 +491,36 @@ function DayView({ data, slug }: { data: CalendarData; slug: string }) {
       </div>
 
       {slots.length === 0 && <p className="small muted">No active rooms or slots to show.</p>}
-      <ul className="cal-day-slots">
-        {slots.map((s) => {
-          const here = bookings.filter((b) => b.unitId === s.unitId && b.slotId === s.slotId).map((b) => b.booking);
+      {/* By room: each room once, its slots as chips, then each booking once
+          (a stay covering two slots is one guest, not two cards). */}
+      <ul className="cal-day-rooms">
+        {[...new Set(slots.map((s) => s.unitId))].map((unitId) => {
+          const roomSlots = slots.filter((s) => s.unitId === unitId);
+          const here = bookings.filter((b) => b.unitId === unitId);
+          const once = [...new Map(here.map((b) => [b.booking.id, b.booking])).values()];
           return (
-            <li key={`${s.unitId}/${s.slotId}`}>
-              <div className="cal-day-slot-head">
-                <span className="cal-day-slot-name">
-                  {s.unit} · {s.slot}
+            <li key={unitId} className="cal-day-room">
+              <div className="cal-day-room-head">
+                <h3>{roomSlots[0]!.unit}</h3>
+                <span className="cal-day-room-slots">
+                  {roomSlots.map((s) => (
+                    <span key={s.slotId} className={`slot-chip ${s.state}`}>
+                      {s.slot}: {s.state}
+                    </span>
+                  ))}
                 </span>
-                <span className={`slot-chip ${s.state}`}>{s.state}</span>
-                {s.pending > 0 && <span className="badge accent">{pendingWords(s.pending)}</span>}
               </div>
-              {here.length > 0 && (
+              {once.length === 0 ? (
+                <p className="small muted">No bookings.</p>
+              ) : (
                 <ul className="cal-day-bookings">
-                  {here.map((b) => (
-                    <BookingCard key={b.id} booking={b} day={day.day} slot={s.slot} />
+                  {once.map((b) => (
+                    <BookingRow
+                      key={b.id}
+                      booking={b}
+                      day={day.day}
+                      slug={slug}
+                    />
                   ))}
                 </ul>
               )}
