@@ -27,6 +27,9 @@ import { StaffFrame } from '@/components/staff-frame';
 import { useNotice } from '@/components/toast';
 import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
+import { useConfirmDialog } from '@/components/dialogs';
+import { ListSearch } from '@/components/list-search';
+import { matches } from '@/lib/search';
 import { Tabs } from '@/components/tabs';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -98,6 +101,10 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   const [busy, setBusy] = useState(false);
 
   const { setNotice } = useNotice(false);
+  const { ask, dialog } = useConfirmDialog();
+  // All payments: a search and a status filter, over the rows loaded.
+  const [allQuery, setAllQuery] = useState('');
+  const [allFilter, setAllFilter] = useState<'all' | 'submitted' | 'verified' | 'rejected' | 'refund'>('all');
   const canSettings = role !== null && can(role, 'payments:settings');
 
   const unauthorized = useCallback(() => {
@@ -231,31 +238,54 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   }
 
   const bookingHref = (reference: string) => `/t/${slug}/admin/bookings/${reference}`;
-  const row = (p: PaymentRow, showReview: boolean) => (
-    <div key={p.id} className="list-row">
-      <span className="list-row-lead">{when(p.createdAt, timezone)}</span>
-      <span className="list-row-main">
-        <span className="list-row-title">
-          <CopyText text={p.reference} what="reference" className="request-ref" /> · {p.guestName}
-        </span>
-        <span className="badge">{p.kind === 'refund' ? 'Refund' : p.method}</span>
-        <span className={`badge ${p.status === 'verified' ? 'ok' : p.status === 'rejected' ? 'danger' : 'warn'}`}>
-          {p.kind === 'refund' ? 'Recorded' : p.status === 'verified' ? 'Verified' : p.status === 'rejected' ? 'Rejected' : 'To verify'}
-        </span>
-        <span className="badge">{STAY_PAYMENT[p.payment.status] ?? p.payment.status}</span>
-      </span>
-      <span className="list-row-meta">
-        {formatMoney(p.verifiedAmount ?? p.claimedAmount, currency)}
-        {p.status === 'submitted' ? ' claimed' : ''}
-      </span>
-      <span className="list-row-actions">
+  /** A payment's ONE status word: what this row is now (the stay's own payment is in the line under the name). */
+  const statusOf = (p: PaymentRow): { label: string; tone: string } =>
+    p.kind === 'refund'
+      ? { label: 'Refund recorded', tone: '' }
+      : p.status === 'verified'
+        ? { label: 'Verified', tone: 'ok' }
+        : p.status === 'rejected'
+          ? { label: 'Rejected', tone: 'danger' }
+          : { label: 'To check', tone: 'warn' };
+  const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+  /**
+   * One payment: the amount and how it came, then who and for which stay,
+   * then its status and the way to its booking (where it is reviewed,
+   * D-114). The stay's own payment state is a word in the line, not a
+   * third badge beside the payment's.
+   */
+  const row = (p: PaymentRow, showReview: boolean) => {
+    const status = statusOf(p);
+    return (
+      <div key={p.id} className={`pay-row${showReview ? ' waiting' : ''}`}>
+        <div className="pay-row-amount">
+          <strong>{formatMoney(p.verifiedAmount ?? p.claimedAmount, currency)}</strong>
+          <span className="small muted">
+            {p.kind === 'refund' ? 'Refund' : p.method}
+            {p.status === 'submitted' ? ', claimed' : ''}
+          </span>
+        </div>
+        <div className="pay-row-who">
+          <span className="pay-row-name">
+            <strong>{p.guestName}</strong>
+            <CopyText text={p.reference} what="reference" className="badge request-ref" />
+          </span>
+          <span className="small muted">
+            {[p.checkIn ? `Stay ${dateLabel(p.checkIn)}` : null, `sent ${when(p.createdAt, timezone)}`, `booking ${(STAY_PAYMENT[p.payment.status] ?? p.payment.status).toLowerCase()}`]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {p.status === 'rejected' && p.rejectionReason && <span className="small muted">Rejected: “{p.rejectionReason}”</span>}
+        </div>
+        <span className={`badge ${status.tone}`}>{status.label}</span>
         {/* Every action on a stay is on its page (D-114). */}
         <Link className={`button sm${showReview ? ' primary' : ''}`} href={bookingHref(p.reference)}>
-          {showReview ? 'Review on the booking' : 'Open booking'}
+          {showReview ? 'Review' : 'Open'} <Icon name="chevron-right" size={14} />
         </Link>
-      </span>
-    </div>
-  );
+      </div>
+    );
+  };
 
   const retry = () => {
     setLoadState(LOADING);
@@ -280,15 +310,47 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
     </section>
   );
 
+  // A plain filter, not a hook: this runs after the login screen's early return.
+  const shownAll = (all ?? [])
+    .filter((p) => (allFilter === 'all' ? true : allFilter === 'refund' ? p.kind === 'refund' : p.kind === 'payment' && p.status === allFilter))
+    .filter((p) => matches(`${p.reference} ${p.guestName} ${p.method} ${p.payerReference ?? ''}`, allQuery));
   const everything = (
     <section className="card">
       <h2>All payments</h2>
       {all === null ? (
         <LoadState load={loadState} what="payments" onRetry={retry} />
       ) : all.length === 0 ? (
-        <EmptyState icon="file" title="No payments yet" />
+        <EmptyState icon="file" title="No payments yet">
+          Proofs guests send and refunds you record are listed here.
+        </EmptyState>
       ) : (
-        all.map((p) => row(p, p.status === 'submitted' && p.kind === 'payment'))
+        <>
+          <div className="pay-toolbar">
+            <ListSearch value={allQuery} onChange={setAllQuery} label="Search name, reference, transaction" />
+            <div className="segmented" role="group" aria-label="Show">
+              {(
+                [
+                  ['all', 'All'],
+                  ['submitted', 'To check'],
+                  ['verified', 'Verified'],
+                  ['rejected', 'Rejected'],
+                  ['refund', 'Refunds'],
+                ] as const
+              ).map(([key, label]) => (
+                <button key={key} type="button" aria-pressed={allFilter === key} onClick={() => setAllFilter(key)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {shownAll.length === 0 ? (
+            <EmptyState icon="search" title="No payments match" compact>
+              Change the search or the filter.
+            </EmptyState>
+          ) : (
+            shownAll.map((p) => row(p, p.status === 'submitted' && p.kind === 'payment'))
+          )}
+        </>
       )}
     </section>
   );
@@ -296,128 +358,182 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
   const setMethod = (i: number, patch: Partial<SettingsDraft['methods'][number]>) =>
     setDraft({ ...draft, methods: draft.methods.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
 
+  // Unsaved changes: the form against what was loaded. The save bar shows only then (or before the first save).
+  const dirty = settings !== undefined && JSON.stringify(draft) !== JSON.stringify(toDraft(settings));
+  const stopTaking = async () => {
+    const sure = await ask({
+      title: 'Stop taking payment on the booking pages?',
+      body: 'Guests will no longer see how to pay or send a proof. Bookings already made keep the amount they were given, and their proofs stay here.',
+      actionLabel: 'Stop taking payment',
+      backLabel: 'Keep taking payment',
+      danger: true,
+    });
+    if (sure === null) return;
+    await write('PUT', '/payments/settings', { settings: null }, 'Stopped taking payment on the Manage booking page.');
+  };
+
+  /** One settings section: what it decides on the left, its fields on the right. */
+  const section = (title: string, hint: React.ReactNode, children: React.ReactNode) => (
+    <div className="settings-section">
+      <div className="settings-section-about">
+        <h3>{title}</h3>
+        <p className="small muted">{hint}</p>
+      </div>
+      <div className="settings-section-fields">{children}</div>
+    </div>
+  );
+
   const settingsPanel = (
-    <section className="card">
+    <section className="card settings-card">
       <h2>Payment settings</h2>
       <p className="small muted">
         {settings
           ? 'Guests see these on the Manage booking page. A change applies to bookings made after it; earlier bookings keep their amount.'
-          : 'This business takes no payment on the Manage booking page yet. Save these to start.'}
+          : 'This business takes no payment on the Manage booking page yet. Fill these in and save to start.'}
       </p>
+      {!canSettings && <p className="notice">Only an owner or admin can change these.</p>}
       <form onSubmit={saveSettings}>
         <fieldset disabled={!canSettings || busy} className="plain-fieldset">
-          <h3>Ways to pay</h3>
-          {draft.methods.map((m, i) => (
-            <div key={i} className="pay-method-edit">
-              <div className="field-row">
-                <div className="field">
-                  <label htmlFor={`m-kind-${i}`}>Type</label>
-                  <select id={`m-kind-${i}`} value={m.kind} onChange={(e) => setMethod(i, { kind: e.target.value as SettingsDraft['methods'][number]['kind'] })}>
-                    <option value="gcash">GCash</option>
-                    <option value="bank">Bank transfer</option>
-                    <option value="other">Other</option>
-                  </select>
+          {section(
+            'Ways to pay',
+            'Shown to the guest with a Copy button beside each account number. Up to five.',
+            <>
+              {draft.methods.map((m, i) => (
+                <div key={i} className="pay-method-edit">
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor={`m-kind-${i}`}>Type</label>
+                      <select id={`m-kind-${i}`} value={m.kind} onChange={(e) => setMethod(i, { kind: e.target.value as SettingsDraft['methods'][number]['kind'] })}>
+                        <option value="gcash">GCash</option>
+                        <option value="bank">Bank transfer</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="field grow">
+                      <label htmlFor={`m-label-${i}`}>Name guests see</label>
+                      <input id={`m-label-${i}`} required maxLength={40} placeholder="GCash" value={m.label} onChange={(e) => setMethod(i, { label: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="field-row">
+                    <div className="field grow">
+                      <label htmlFor={`m-name-${i}`}>Account name</label>
+                      <input id={`m-name-${i}`} maxLength={100} value={m.accountName} onChange={(e) => setMethod(i, { accountName: e.target.value })} />
+                    </div>
+                    <div className="field grow">
+                      <label htmlFor={`m-number-${i}`}>Account number</label>
+                      <input id={`m-number-${i}`} maxLength={60} value={m.accountNumber} onChange={(e) => setMethod(i, { accountNumber: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`m-instr-${i}`}>
+                      Instructions <span className="muted">(optional)</span>
+                    </label>
+                    <input id={`m-instr-${i}`} maxLength={500} placeholder="Send the screenshot after paying" value={m.instructions} onChange={(e) => setMethod(i, { instructions: e.target.value })} />
+                  </div>
+                  {draft.methods.length > 1 && (
+                    <button type="button" className="sm ghost danger" onClick={() => setDraft({ ...draft, methods: draft.methods.filter((_, j) => j !== i) })}>
+                      <Icon name="trash" size={14} /> Remove {m.label || 'this way to pay'}
+                    </button>
+                  )}
                 </div>
-                <div className="field grow">
-                  <label htmlFor={`m-label-${i}`}>Label</label>
-                  <input id={`m-label-${i}`} required maxLength={40} value={m.label} onChange={(e) => setMethod(i, { label: e.target.value })} />
-                </div>
-              </div>
-              <div className="field-row">
-                <div className="field grow">
-                  <label htmlFor={`m-name-${i}`}>Account name</label>
-                  <input id={`m-name-${i}`} maxLength={100} value={m.accountName} onChange={(e) => setMethod(i, { accountName: e.target.value })} />
-                </div>
-                <div className="field grow">
-                  <label htmlFor={`m-number-${i}`}>Account number</label>
-                  <input id={`m-number-${i}`} maxLength={60} value={m.accountNumber} onChange={(e) => setMethod(i, { accountNumber: e.target.value })} />
-                </div>
-              </div>
-              <div className="field">
-                <label htmlFor={`m-instr-${i}`}>
-                  Instructions <span className="muted">(optional)</span>
-                </label>
-                <input id={`m-instr-${i}`} maxLength={500} value={m.instructions} onChange={(e) => setMethod(i, { instructions: e.target.value })} />
-              </div>
-              {draft.methods.length > 1 && (
-                <button type="button" className="sm" onClick={() => setDraft({ ...draft, methods: draft.methods.filter((_, j) => j !== i) })}>
-                  Remove {m.label || 'this way to pay'}
+              ))}
+              {draft.methods.length < 5 && (
+                <button type="button" className="sm" onClick={() => setDraft({ ...draft, methods: [...draft.methods, { ...NEW_METHOD, label: '' }] })}>
+                  <Icon name="plus" size={14} /> Add a way to pay
                 </button>
               )}
-            </div>
-          ))}
-          {draft.methods.length < 5 && (
-            <button type="button" className="sm" onClick={() => setDraft({ ...draft, methods: [...draft.methods, { ...NEW_METHOD, label: '' }] })}>
-              <Icon name="plus" size={14} /> Add a way to pay
-            </button>
+            </>,
           )}
 
-          <h3>Needed to confirm</h3>
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="fee-kind">The guest pays</label>
-              <select id="fee-kind" value={draft.feeKind} onChange={(e) => setDraft({ ...draft, feeKind: e.target.value as SettingsDraft['feeKind'], feeValue: '' })}>
-                <option value="full">The full price</option>
-                <option value="fixed">A fixed reservation fee</option>
-                <option value="percent">A percentage of the price</option>
-              </select>
-            </div>
-            {draft.feeKind !== 'full' && (
-              <div className="field narrow">
-                <label htmlFor="fee-value">{draft.feeKind === 'fixed' ? `Amount (${currency})` : 'Percent'}</label>
-                <input id="fee-value" required inputMode="decimal" value={draft.feeValue} onChange={(e) => setDraft({ ...draft, feeValue: e.target.value })} />
+          {section(
+            'What the guest pays',
+            'What must be verified before you can confirm without a note, and how long the guest and you each have.',
+            <>
+              <div className="field-row">
+                <div className="field grow">
+                  <label htmlFor="fee-kind">To confirm, the guest pays</label>
+                  <select id="fee-kind" value={draft.feeKind} onChange={(e) => setDraft({ ...draft, feeKind: e.target.value as SettingsDraft['feeKind'], feeValue: '' })}>
+                    <option value="full">The full price</option>
+                    <option value="fixed">A fixed reservation fee</option>
+                    <option value="percent">A percentage of the price</option>
+                  </select>
+                </div>
+                {draft.feeKind !== 'full' && (
+                  <div className="field narrow">
+                    <label htmlFor="fee-value">{draft.feeKind === 'fixed' ? `Amount (${currency})` : 'Percent'}</label>
+                    <input id="fee-value" required inputMode="decimal" value={draft.feeValue} onChange={(e) => setDraft({ ...draft, feeValue: e.target.value })} />
+                  </div>
+                )}
               </div>
-            )}
-            <div className="field narrow">
-              <label htmlFor="pay-hours">Hours to pay</label>
-              <input id="pay-hours" type="number" min={1} max={168} value={draft.payWithinHours} onChange={(e) => setDraft({ ...draft, payWithinHours: e.target.value })} />
-            </div>
-            <div className="field narrow">
-              <label htmlFor="review-hours">Hours to review</label>
-              <input id="review-hours" type="number" min={1} max={168} value={draft.reviewWithinHours} onChange={(e) => setDraft({ ...draft, reviewWithinHours: e.target.value })} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="pay-hold">Hold the dates</label>
-            <select id="pay-hold" value={draft.hold} onChange={(e) => setDraft({ ...draft, hold: e.target.value as SettingsDraft['hold'] })}>
-              <option value="none">Never: a date is taken only when you confirm</option>
-              <option value="on_proof">From the proof of payment, until you review it</option>
-              <option value="on_request">From the request, until the time to pay ends</option>
-            </select>
-            <span className="small muted">
-              A held date cannot be requested or confirmed by anyone else. Holding from the request lets anyone with a phone number block dates
-              for the hours to pay; holding from the proof is the recommended setting.
-            </span>
-          </div>
-          <h3>Changes guests may ask for</h3>
-          <div className="field-row">
-            <div className="field grow">
-              <label htmlFor="cancel-tiers">
-                Refund when cancelling <span className="muted">(days before : percent)</span>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="pay-hours">Hours the guest has to pay</label>
+                  <input id="pay-hours" type="number" min={1} max={168} placeholder="no limit" value={draft.payWithinHours} onChange={(e) => setDraft({ ...draft, payWithinHours: e.target.value })} />
+                  <p className="hint">After that, an unpaid request expires.</p>
+                </div>
+                <div className="field">
+                  <label htmlFor="review-hours">Hours you have to review a proof</label>
+                  <input id="review-hours" type="number" min={1} max={168} placeholder="no limit" value={draft.reviewWithinHours} onChange={(e) => setDraft({ ...draft, reviewWithinHours: e.target.value })} />
+                  <p className="hint">Shown on the booking as "Decide by".</p>
+                </div>
+              </div>
+            </>,
+          )}
+
+          {section(
+            'Holding the dates',
+            'A held date cannot be requested or confirmed by anyone else.',
+            <div className="field">
+              <label htmlFor="pay-hold">Hold the dates</label>
+              <select id="pay-hold" value={draft.hold} onChange={(e) => setDraft({ ...draft, hold: e.target.value as SettingsDraft['hold'] })}>
+                <option value="none">Never: a date is taken only when you confirm</option>
+                <option value="on_proof">From the proof of payment, until you review it (recommended)</option>
+                <option value="on_request">From the request, until the time to pay ends</option>
+              </select>
+              {draft.hold === 'on_request' && (
+                <p className="hint field-warning">
+                  <Icon name="alert" size={14} /> Anyone with a phone number can block dates for the hours to pay.
+                </p>
+              )}
+            </div>,
+          )}
+
+          {section(
+            'Cancelling and moving',
+            'What a guest may ask for on the Manage booking page. Nothing changes until you approve it.',
+            <>
+              <div className="field">
+                <label htmlFor="cancel-tiers">
+                  Refund when cancelling <span className="muted">(days before : percent)</span>
+                </label>
+                <input id="cancel-tiers" placeholder="7:100, 2:50" value={draft.cancellation} onChange={(e) => setDraft({ ...draft, cancellation: e.target.value })} />
+                <p className="hint">7:100, 2:50 refunds all of what was paid 7 or more days ahead, half 2 to 6 days ahead, nothing later. Empty: no refund.</p>
+              </div>
+              <div className="field">
+                <label htmlFor="reschedule-until">Date changes allowed until (days before check-in)</label>
+                <input id="reschedule-until" type="number" min={0} max={365} placeholder="not allowed" value={draft.rescheduleUntil} onChange={(e) => setDraft({ ...draft, rescheduleUntil: e.target.value })} />
+              </div>
+            </>,
+          )}
+
+          {section(
+            'Terms',
+            'Shown to the guest beside the ways to pay.',
+            <div className="field">
+              <label htmlFor="pay-terms">
+                Terms guests read <span className="muted">(optional)</span>
               </label>
-              <input id="cancel-tiers" placeholder="7:100, 2:50" value={draft.cancellation} onChange={(e) => setDraft({ ...draft, cancellation: e.target.value })} />
-              <span className="small muted">7:100, 2:50 refunds all of what was paid 7 or more days ahead, half 2 to 6 days ahead, nothing later. Empty: no refund.</span>
-            </div>
-            <div className="field narrow">
-              <label htmlFor="reschedule-until">Date changes until (days before)</label>
-              <input id="reschedule-until" type="number" min={0} max={365} placeholder="none" value={draft.rescheduleUntil} onChange={(e) => setDraft({ ...draft, rescheduleUntil: e.target.value })} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="pay-terms">
-              Terms guests read <span className="muted">(optional)</span>
-            </label>
-            <textarea id="pay-terms" rows={3} maxLength={4000} value={draft.terms} onChange={(e) => setDraft({ ...draft, terms: e.target.value })} />
-          </div>
-          {canSettings && (
-            <div className="form-footer">
+              <textarea id="pay-terms" rows={4} maxLength={4000} value={draft.terms} onChange={(e) => setDraft({ ...draft, terms: e.target.value })} />
+            </div>,
+          )}
+
+          {/* In view only while something changed (or before the first save). */}
+          {canSettings && (dirty || !settings) && (
+            <div className="settings-savebar" role="region" aria-label="Unsaved changes">
+              <span className="small">{settings ? 'You have unsaved changes.' : 'Save to start taking payment.'}</span>
               {settings && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void write('PUT', '/payments/settings', { settings: null }, 'Stopped taking payment on the Manage booking page.')}
-                >
-                  Stop taking payment
+                <button type="button" disabled={busy} onClick={() => setDraft(toDraft(settings))}>
+                  Discard
                 </button>
               )}
               <button type="submit" className="primary" aria-busy={busy || undefined}>
@@ -427,7 +543,19 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
           )}
         </fieldset>
       </form>
-      {!canSettings && <p className="small muted">Only an owner or admin can change these.</p>}
+
+      {/* Turning payments off is apart from the form, and asks first. */}
+      {canSettings && settings && (
+        <div className="settings-danger">
+          <div>
+            <strong>Stop taking payment</strong>
+            <p className="small muted">Guests stop seeing how to pay. Bookings already made keep their amount.</p>
+          </div>
+          <button type="button" className="danger" disabled={busy} onClick={() => void stopTaking()}>
+            Stop taking payment
+          </button>
+        </div>
+      )}
     </section>
   );
 
@@ -444,30 +572,34 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
         <EmptyState icon="calendar" title="No change requests" />
       ) : (
         changes.map((c) => (
-          <div key={c.id} className="list-row">
-            <span className="list-row-lead">{when(c.createdAt, timezone)}</span>
-            <span className="list-row-main">
-              <span className="list-row-title">
-                <CopyText text={c.reference} what="reference" className="request-ref" /> · {c.guestName}
+          <div key={c.id} className={`pay-row${c.status === 'pending' ? ' waiting' : ''}`}>
+            <div className="pay-row-amount">
+              <strong>
+                {c.kind === 'cancel'
+                  ? formatMoney(c.refundDue ?? 0, currency)
+                  : c.quotedDifference
+                    ? `${c.quotedDifference > 0 ? '+' : '−'}${formatMoney(Math.abs(c.quotedDifference), currency)}`
+                    : 'Same price'}
+              </strong>
+              <span className="small muted">{c.kind === 'cancel' ? 'refund due' : 'price difference'}</span>
+            </div>
+            <div className="pay-row-who">
+              <span className="pay-row-name">
+                <strong>{c.guestName}</strong>
+                <CopyText text={c.reference} what="reference" className="badge request-ref" />
               </span>
-              <span className={c.kind === 'cancel' ? 'badge danger' : 'badge accent'}>
-                {c.kind === 'cancel' ? 'Cancel' : `Move ${c.checkIn ?? ''} → ${c.newCheckIn ?? ''}`}
+              <span className="small muted">
+                {c.kind === 'cancel' ? `Asks to cancel the stay of ${c.checkIn ? dateLabel(c.checkIn) : '?'}` : `Asks to move ${c.checkIn ? dateLabel(c.checkIn) : '?'} to ${c.newCheckIn ? dateLabel(c.newCheckIn) : '?'}`} · asked{' '}
+                {when(c.createdAt, timezone)}
               </span>
-              <span className={`badge ${c.status === 'pending' ? 'warn' : c.status === 'approved' ? 'ok' : ''}`}>{c.status}</span>
               {c.guestReason && <span className="small muted">“{c.guestReason}”</span>}
+            </div>
+            <span className={`badge ${c.status === 'pending' ? 'warn' : c.status === 'approved' ? 'ok' : ''}`}>
+              {c.status === 'pending' ? 'Waiting' : c.status === 'approved' ? 'Approved' : c.status === 'rejected' ? 'Rejected' : 'Withdrawn'}
             </span>
-            <span className="list-row-meta">
-              {c.kind === 'cancel'
-                ? `refund due ${formatMoney(c.refundDue ?? 0, currency)}`
-                : c.quotedDifference
-                  ? `${c.quotedDifference > 0 ? '+' : '−'}${formatMoney(Math.abs(c.quotedDifference), currency)}`
-                  : 'same price'}
-            </span>
-            <span className="list-row-actions">
-              <Link className={`button sm${c.status === 'pending' ? ' primary' : ''}`} href={bookingHref(c.reference)}>
-                {c.status === 'pending' ? 'Decide on the booking' : 'Open booking'}
-              </Link>
-            </span>
+            <Link className={`button sm${c.status === 'pending' ? ' primary' : ''}`} href={bookingHref(c.reference)}>
+              {c.status === 'pending' ? 'Decide' : 'Open'} <Icon name="chevron-right" size={14} />
+            </Link>
           </div>
         ))
       )}
@@ -476,6 +608,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, bannerUrl, nav, cu
 
   return (
     <StaffFrame {...frame}>
+      {dialog}
       <Tabs
         label="Payments"
         tabs={[

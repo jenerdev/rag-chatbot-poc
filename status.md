@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+**Payments screen, redesigned (2026-10-12).**
+- [x] Rows: the amount and how it came, who and for which stay, ONE status
+  badge, Review/Open; a waiting row marked on its edge. All payments:
+  search and a status filter. Change requests in the same row shape.
+  Settings: sections (what each decides beside its fields), a save bar only
+  while something changed (with Discard), "Stop taking payment" apart and
+  asking first. `plan/payments-shots.mjs` on alteza: both behaviour checks
+  PASS, no console error, no sideways scroll; its seeds deleted after.
+
 **Calendar, regrouped (2026-10-12).**
 - [x] Week view: per room a heading, then a row per slot; each cell one
   block (Booked / Open / Closed, the pending count) that opens its day;

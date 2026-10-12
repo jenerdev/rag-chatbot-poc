@@ -8708,3 +8708,31 @@ slot rows, 56 cells each named in a sentence and 7 day headers, a cell
 opens its day, all seven days fit at 1280 px, and at 375 px the table
 scrolls inside itself, in light and dark. Its only failures are the two
 villa-October checks that need bookings (villa has none since the cleanup).
+
+## 2026-10-12 — the Payments screen, redesigned
+
+**What was done:** a payment row leads with the amount and how it came
+("₱2,500.00 / GCash, claimed"), then the guest with the reference and
+"Stay Sun 18 Oct · sent 12 Oct, 14:30 · booking proof to check", then ONE
+status (To check, Verified, Rejected, Refund recorded) and Review or Open;
+a row waiting for staff is marked on its left edge. It used to carry three
+badges, two saying the same thing. All payments gained a search (name,
+reference, transaction) and a status filter. Change requests use the same
+row shape (the refund due or the price difference first). Settings became
+five sections, each saying what it decides beside its fields, with hints
+under the hours ("After that, an unpaid request expires"), a warning when
+the risky hold is chosen, a save bar pinned at the foot only while
+something changed (Discard puts the saved values back), and "Stop taking
+payment" moved apart, at the end, behind a question.
+
+**Why it matters:** the rows were hard to scan and repeated themselves;
+settings were one long form whose most destructive button sat beside Save,
+and nothing said when a change was unsaved.
+
+**What the observed values prove:** on alteza, two booking-page requests
+with real proofs (one verified): the queue and All payments draw them; a
+typed change shows "You have unsaved changes." and Discard restores the
+saved terms; "Stop taking payment" opens the question, and "Keep taking
+payment" leaves the stored settings as they were. No console error; every
+tab exactly 1280 or 390 px wide. The seeds and their proof files were
+deleted; the tenant's own earlier payments were left untouched.

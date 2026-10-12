@@ -1090,3 +1090,41 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
   .cal-booking-open { order: 99; flex-basis: 100%; justify-content: center; margin-left: 0; }
 }
 
+/* Payments (S-14), redesigned 2026-10-12. A row: the amount and how it
+   came, who and for which stay, ONE status, the way to the booking. A row
+   waiting for staff is marked on its edge. */
+.pay-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-3); border-top: 1px solid var(--line); }
+.pay-row:first-of-type { border-top: 0; }
+.pay-row.waiting { box-shadow: inset 3px 0 0 var(--warn); border-radius: var(--radius-sm); }
+.pay-row-amount { display: flex; flex-direction: column; gap: 2px; }
+.pay-row-amount strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.pay-row-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pay-row-name { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.pay-row .button { display: inline-flex; align-items: center; gap: 2px; }
+.pay-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
+.pay-toolbar .list-search { flex: 1 1 240px; }
+.pay-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+.pay-toolbar .segmented button { flex: none; }
+@media (max-width: 720px) {
+  .pay-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .pay-row-who { grid-column: 1 / -1; grid-row: 2; }
+  .pay-row > .badge { justify-self: end; }
+  .pay-row > .button { grid-column: 1 / -1; justify-content: center; }
+}
+
+/* Settings: each section what it decides (left) beside its fields (right);
+   a save bar pinned at the foot only while something changed; turning
+   payments off apart, at the end, behind a question. */
+.settings-section { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: var(--space-3) var(--space-6); padding: var(--space-5) 0; border-top: 1px solid var(--line); }
+.settings-section-about h3 { margin: 0 0 var(--space-1); font-size: var(--text-base); font-weight: 600; }
+.settings-section-about p { margin: 0; }
+.settings-section-fields .pay-method-edit { margin-bottom: var(--space-3); }
+.field-warning { color: var(--danger); }
+.settings-savebar { position: sticky; bottom: var(--space-3); z-index: 2; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--accent); border-radius: var(--radius-md); background: var(--panel); box-shadow: var(--shadow-2); }
+.settings-savebar > span { margin-right: auto; }
+.settings-danger { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-5); padding: var(--space-4); border: 1px solid var(--danger-line); border-radius: var(--radius-md); }
+.settings-danger p { margin: 2px 0 0; }
+@media (max-width: 720px) {
+  .settings-section { grid-template-columns: minmax(0, 1fr); }
+}
+
