@@ -30,6 +30,8 @@
 //   payment-review.ts  staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
 //   changes.ts     cancel and reschedule requests: the guest asks, staff decide (manage booking)
 //   attention.ts   what waits on staff now, three counts for the sidebar (notifications)
+//   push-devices.ts  a member's own devices for push (notifications)
+//   notify.ts      the drain: the outbox → each device's push service (notifications)
 
 export {
   MAX_AVAILABILITY_DAYS,
@@ -101,6 +103,10 @@ export { decideChange, listChanges, requestChange, withdrawChange } from './chan
 export type { ChangeInput, ChangeQuote, ChangeRow } from './changes.js';
 export { attentionCounts } from './attention.js';
 export type { AttentionCounts } from './attention.js';
+export { drainNotifications, pushMessage } from './notify.js';
+export type { DrainResult, NotifyKind, PushMessage } from './notify.js';
+export { deviceOf, removeDevice, saveDevice } from './push-devices.js';
+export type { DeviceInput } from './push-devices.js';
 export type { ChangeTerms, GuestChange, GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
 export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, PROOF_BUCKET, PROOF_RETENTION_DAYS, sniffProofType, submitProof } from './payments.js';
 export type { ProofInput, ProofType } from './payments.js';

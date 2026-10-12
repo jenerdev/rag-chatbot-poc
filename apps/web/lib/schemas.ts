@@ -459,3 +459,20 @@ export function unansweredIdsSchema(max: number) {
       .max(max, `At most ${max} questions at once`),
   });
 }
+
+/**
+ * A push subscription, as PushSubscription.toJSON() gives it, plus the kinds
+ * this device wants (plan/notifications.md Phase 4). The endpoint's HOST is
+ * checked by the package (a known push service); the database checks the
+ * keys' shapes again.
+ */
+const notifyKind = z.enum(['request', 'proof', 'change'], { message: 'A kind is request, proof or change' });
+export const pushDeviceSchema = z.object({
+  endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000, 'The endpoint is too long'),
+  keys: z.object({
+    p256dh: z.string().regex(/^[A-Za-z0-9_-]{86,88}=?$/, 'The device key is not a P-256 key'),
+    auth: z.string().regex(/^[A-Za-z0-9_-]{21,24}={0,2}$/, 'The device secret is not 16 bytes'),
+  }),
+  kinds: z.array(notifyKind).min(1, 'Choose at least one kind').max(3).transform((k) => [...new Set(k)]),
+});
+export const pushEndpointSchema = z.object({ endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000) });

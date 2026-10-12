@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SoundToggle, useAttention, useSound } from './attention';
 import { BrandHeader } from './brand-header';
+import { PushControl } from './push-control';
 import { Icon, type IconName } from './icons';
 import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
@@ -190,6 +191,7 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
           {features.bookings && (
             <div className="sidebar-notify">
               <SoundToggle on={sound.on} awake={sound.awake} onToggle={sound.toggle} />
+              <PushControl slug={slug} role={session.role} />
             </div>
           )}
           <div className="sidebar-account">

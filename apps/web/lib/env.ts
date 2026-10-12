@@ -30,6 +30,11 @@ const REQUIRED = [
   // could ever log in, so a missing one gets the same one-clear-sentence
   // treatment as a missing API key.
   'ADMIN_COOKIE_SECRET',
+  // OPTIONAL, so NOT here (plan/notifications.md Phase 4): VAPID_PUBLIC_KEY,
+  // VAPID_PRIVATE_JWK, VAPID_SUBJECT. Unset, push to devices is off and the
+  // sidebar says so; the in-app badges and chime still work. The private JWK
+  // is a secret like TENANT_SIGNING_JWK, read in ONE function, vapidKeys()
+  // in @rag/push. `pnpm --filter @rag/push vapid` prints a new pair.
 ] as const;
 
 const missing = REQUIRED.filter((name) => !process.env[name]);

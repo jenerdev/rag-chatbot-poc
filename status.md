@@ -1766,6 +1766,27 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   VAPID JWT verifies with its public key (64-byte raw signature); 10/10
   tests; the allowlist refuses http, localhost, 169.254.169.254, a lookalike
   suffix, a port and credentials.
+- **Phase 4, worker, manifest, subscribe:** `/t/<slug>/sw.js` (route, no-cache,
+  scope /t/<slug>/, push → showNotification tagged kind:reference,
+  notificationclick → an open tab of the tenant or a new one, never outside
+  the scope), `/t/<slug>/manifest.webmanifest` (staff app, the tenant's
+  colours; linked by the new `admin/layout.tsx` only), `GET/POST/DELETE
+  /api/t/[tenant]/admin/push` (`session`, bookings only; 503 when VAPID is
+  unset), `push-devices.ts` in @rag/bookings, `PushControl` in the sidebar
+  (prompt only from the tap; iPhone outside the Home Screen told how;
+  blocked told where; per-kind boxes, proofs only for payments:write).
+  `VAPID_*` OPTIONAL (env.ts comment, .env.example); a pair generated into
+  the local .env with a placeholder subject, the dev server restarted by
+  touching next.config.mjs.
+- **Deviation:** the VAPID public key reaches the browser from GET
+  /admin/push, not as a server-page prop: threading it through every staff
+  screen into StaffFrame for one non-secret string was not worth it.
+- **Observed:** `plan/notifications-phase4-walk.mjs` 5/5 with push OFF (POST
+  503 "not set up") and 5/5 with push ON (169.254.169.254 → 400, a bad key
+  400, an FCM endpoint 201 with kinds request,change, read back, removed,
+  gone); the worker 200 text/javascript no-cache with SCOPE "/t/villa/",
+  unknown tenant 404; the manifest theme #0f766e; the staff page links it,
+  the chat does not.
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name

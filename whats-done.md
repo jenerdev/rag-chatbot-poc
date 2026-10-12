@@ -9081,3 +9081,29 @@ fixed inputs is the RFC's body, byte for byte, on the first run. That is
 the check that the hand-written path is right, and why the `web-push`
 fallback (§ 7 q6) is unused. A real send with random inputs decrypts back
 on the device's side in the test.
+
+## 2026-10-13 — notifications Phase 4: a member turns on push for this device
+
+**What was done:**
+- **The worker:** each tenant serves its own service worker at
+  `/t/<slug>/sw.js`, so a person in two tenants gets two subscriptions,
+  each its tenant's. It shows what the server sent and, on a tap, opens
+  the stay inside the tenant's scope, never outside it.
+- **The manifest:** an iPhone can add the staff app to its Home Screen,
+  the only way iOS allows push. Only the staff pages link it.
+- **The control:** the sidebar's "Notify me on this device" asks for
+  permission only from that tap. When on, it shows per-kind boxes.
+- **The device route:** stores the subscription on the member's own staff
+  token. The database fills in whose it is, and an endpoint off a known
+  push service is a 400 (no SSRF).
+- **Push off:** with no VAPID key the route says so with a 503, and the
+  sidebar says "not set up on this server"; the in-app layer still works.
+
+**Deviation:** the plan passed the public key as a server-page prop. It
+comes from `GET /admin/push` instead, because it is not a secret and
+threading it through about sixteen staff screens was not worth it.
+
+**What the observed values prove:** the walk ran with push off and then
+on, against the same running server after a restart. It shows both halves
+of Rule 4: no key means a clear 503; a key means only push-service
+endpoints are stored.
