@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+**Manage booking: a live countdown to the payment deadline (2026-10-12).**
+- [x] S-13's notice shows "Expires in 23h 41m 05s" (to the second; red in
+  the last hour) while a stay is pending, tracked, not taken, with a pay-by and
+  no proof waiting; "The time to pay has passed" at zero. `lib/countdown.ts`
+  (pure, 8 tests). Typecheck clean. The deadline stays
+  the database's (stays.pay_by); the page only counts to it.
+- [ ] The user's look in a browser (a fresh request on alteza, which tracks
+  payment), and the axe audit over S-13 (the red text on the warn notice).
+
 **Staff booking on the page's rules (2026-10-12, `feat/staff-booking`, D-111).**
 The New booking form books a stay like the booking page: check-in + nights,
 guests per unit, name, mobile AND email, the same night-by-night price, and a

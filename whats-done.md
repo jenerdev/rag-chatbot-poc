@@ -8376,3 +8376,21 @@ an older function back (trap 20). Every inserted row carries every key
 (trap 15). The tools keep `createBookings()` unchanged, so their seeded
 staff rows need no email.
 
+## 2026-10-12 — Manage booking counts down to the payment deadline
+
+**What was done:** the status notice on S-13 shows the time left to pay,
+live and to the second ("Expires in 2d 3h 41m 05s", "41m 05s"; red in the
+last hour), and "The time to pay has passed" at zero. It shows exactly when the
+"Please pay by" sentence does, and also not once enough is paid.
+
+**Why it matters:** a guest reads a deadline as a time to act; a date alone
+had to be worked out against the clock.
+
+**What the observed values prove:** `timeLeft()` is pure and tested at
+each boundary (1 day, 1 hour, 0, negative), 8 cases.
+Not yet seen in a browser.
+
+**Traps it avoided:** the clock is never the decider. The stay expires by
+`stay_is_due()` in SQL; the page only counts. A `role="timer"` region is
+not announced every second.
+

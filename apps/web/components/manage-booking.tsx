@@ -19,13 +19,14 @@
 //
 // Everything from the server is a React child, so it is escaped.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GuestStatus, GuestStay, PaymentStatus } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { instantLabel } from '@/components/booking-page';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
 import { TenantNav } from '@/components/tenant-nav';
+import { timeLeft } from '@/lib/countdown';
 import { centavosToInput, formatMoney } from '@/lib/money';
 import { resizeImage } from '@/lib/resize-image';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -72,6 +73,54 @@ function stayBadge(stay: Found): { label: string; tone: string } {
  */
 function takesPayment(stay: Found): boolean {
   return stay.status === 'confirmed' || (stay.status === 'pending' && !stay.taken);
+}
+
+/**
+ * Is this stay counting down to its payment deadline? Pending, not taken,
+ * tracked, with a pay-by and no proof waiting: a proof sent in time stops the
+ * clock (stay_is_due()), so the page stops it too. The same condition the
+ * "Please pay by" sentence uses.
+ */
+function payDeadline(stay: Found): string | null {
+  if (stay.guestStatus !== 'pending' || stay.taken || !stay.payBy) return null;
+  if (stay.payment.open || stay.payment.status === 'not_tracked' || stay.payment.enough) return null;
+  return stay.payBy;
+}
+
+/**
+ * The time left to pay, live, to the second: "Expires in 23h 41m 05s". The sentence above it already names the date and time (nextStep()). The deadline is the database's; when it passes, the page says so and
+ * the next look-up reads the stay as expired (guest_stay(), D-110). A
+ * role="timer" region is not announced on every tick (its live default is
+ * off), so a screen reader is not interrupted each second.
+ */
+function ExpiryCountdown({ payBy }: { payBy: string }) {
+  const deadline = Date.parse(payBy);
+  const [now, setNow] = useState(() => Date.now());
+  const left = deadline - now;
+  useEffect(() => {
+    if (left <= 0) return;
+    // Redraw on the next whole second of the deadline, so the seconds step evenly.
+    const id = window.setTimeout(() => setNow(Date.now()), left % 1000 || 1000);
+    return () => window.clearTimeout(id);
+  }, [left]);
+  if (left <= 0) {
+    return (
+      <p className="countdown passed" role="status">
+        <strong>The time to pay has passed.</strong> This request will expire; look it up again to see its status.
+      </p>
+    );
+  }
+  return (
+    <p className={`countdown${left <= 3_600_000 ? ' urgent' : ''}`}>
+      <Icon name="clock" size={16} />
+      <span>
+        Expires in{' '}
+        <strong role="timer" aria-label={`Time left to pay: ${timeLeft(left)}`}>
+          {timeLeft(left)}
+        </strong>
+      </span>
+    </p>
+  );
 }
 
 function nextStep(stay: Found, businessName: string): string {
@@ -303,6 +352,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
             </div>
             <div className={`notice manage-notice ${badge.tone === 'danger' ? 'error' : stay.guestStatus === 'pending' || stay.guestStatus === 'expired' ? 'warn' : ''}`}>
               <p>{nextStep(stay, businessName)}</p>
+              {payDeadline(stay) && <ExpiryCountdown payBy={payDeadline(stay)!} />}
               {reason && (
                 <p>
                   <strong>Reason:</strong> {reason}

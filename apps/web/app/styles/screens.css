@@ -746,6 +746,10 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 /* The stay's own actions sit together on the left; the page's way out shares their row, pushed right. */
 .manage-notice p { margin: 0; }
 .manage-notice p + p { margin-top: var(--space-1); }
+/* The time left to pay (Manage booking): live, from the stay's pay_by. Red in the last hour. */
+.manage-notice .countdown { display: flex; align-items: center; gap: var(--space-2); }
+.countdown strong[role="timer"] { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.countdown.urgent, .countdown.passed { color: var(--danger); }
 .manage-actions { justify-content: flex-start; }
 .form-footer .manage-another { margin-left: auto; }
 @media (max-width: 560px) { .manage-actions { gap: var(--space-2); } .manage-actions button { padding: 0 var(--space-2); } }
