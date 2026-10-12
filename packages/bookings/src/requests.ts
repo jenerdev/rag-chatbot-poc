@@ -442,9 +442,11 @@ export function clashes(own: SpanRow[], groupId: string, takers: SpanRow[]): boo
 }
 
 /**
- * Every stay, a web request or a staff booking (D-100), whose first night is
- * on or after `from` (default: today), one per group, newest first, any
- * status. STAFF ONLY: guest data.
+ * Every stay, a web request or a staff booking (D-100), whose LAST night is
+ * on or after `from` (default: today), so a stay in progress is listed until
+ * it ends; one per group, newest first, any status. STAFF ONLY: guest data.
+ * The Bookings screen's one list (it was "first night on or after `from`",
+ * which dropped a stay the day after check-in).
  *
  * `clash` says a night of a pending stay is TAKEN by another stay of the same
  * unit (confirmed, or held for another guest and not lapsed: booking_takes()),
@@ -487,7 +489,8 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
   }
   const requests = [...groups.entries()]
     .map(([groupId, rows]) => ({ groupId, rows, checkIn: rows[0]!.booked_date }))
-    .filter((g) => g.checkIn >= from);
+    // Rows are ordered by date, so the last row is the last night.
+    .filter((g) => g.rows[g.rows.length - 1]!.booked_date >= from);
   if (requests.length === 0) return [];
 
   const last = requests.reduce((max, g) => (g.rows[g.rows.length - 1]!.booked_date > max ? g.rows[g.rows.length - 1]!.booked_date : max), from);
@@ -581,8 +584,26 @@ export async function declineRequest(tenant: BookingTenant, groupId: unknown, no
   return decide(tenant, groupId, 'cancelled', note);
 }
 
+/**
+ * Cancel a CONFIRMED stay: confirmed → cancelled, every night and unit in one
+ * statement, which frees its span (bookings_no_overlap ignores cancelled
+ * rows). The stay-level twin of cancelBooking(); the Bookings screen lists
+ * stays, not nights. A pending stay is declined, not cancelled, so the guest
+ * reads "Declined" (D-110). Same answers as confirmRequest.
+ */
+export async function cancelStay(tenant: BookingTenant, groupId: unknown, note?: unknown): Promise<boolean> {
+  return decide(tenant, groupId, 'cancelled', note, 'confirmed');
+}
+
 /** `note` (D-096): what staff wrote with the decision, on every row of the group. */
-async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' | 'cancelled', note?: unknown): Promise<boolean> {
+async function decide(
+  tenant: BookingTenant,
+  groupId: unknown,
+  to: 'confirmed' | 'cancelled',
+  note?: unknown,
+  /** the status the stay must have now: pending for a decision, confirmed for a cancel */
+  fromStatus: 'pending' | 'confirmed' = 'pending',
+): Promise<boolean> {
   await requireConfig(tenant);
   if (typeof groupId !== 'string' || !UUID.test(groupId)) throw new BookingInputError('That is not a request id.');
   const decision = decisionNote(note);
@@ -593,7 +614,7 @@ async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' |
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
     // D-100: any source; a staff stay is decided here like a web request.
-    .in('status', ['pending', to])
+    .in('status', [fromStatus, to])
     .select('id');
   if (error?.code === '23P01') {
     throw new BookingConflictError('A night of this request was confirmed for another booking. Decline it, or cancel the other booking first.');
@@ -602,7 +623,7 @@ async function decide(tenant: BookingTenant, groupId: unknown, to: 'confirmed' |
   if (closedNight) throw new BookingInputError(`${closedNight.message.replace(' Choose another date.', '')} Decline this request, or reopen the date first.`);
   // manage-booking § 9 q3: a tracked stay with nothing verified needs a note.
   if (error?.code === '23514' && /No payment has been verified/.test(error.message)) throw new BookingInputError(error.message);
-  if (error) throw new Error(`Could not ${to === 'confirmed' ? 'confirm' : 'decline'} the request: ${error.message}`);
+  if (error) throw new Error(`Could not ${to === 'confirmed' ? 'confirm' : fromStatus === 'confirmed' ? 'cancel' : 'decline'} the stay: ${error.message}`);
 
   if (data.length > 0) console.log(`[bookings] ${tenant.slug} request ${groupId} → ${to} (${data.length} row(s))`);
   return data.length > 0;

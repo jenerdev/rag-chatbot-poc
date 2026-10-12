@@ -8394,3 +8394,49 @@ Not yet seen in a browser.
 `stay_is_due()` in SQL; the page only counts. A `role="timer"` region is
 not announced every second.
 
+## 2026-10-12 — the staff New booking drawer, regrouped
+
+**What was done:** the drawer's form is four sections in the order a booking
+is taken: Stay (slot, check-in, nights, guests or rooms, with the span read
+back), Guest (name, mobile, email, Walk in), Extras (promo, notes) and Price
+(the page's breakdown). A footer stays in view with the server's total, or
+what is still missing, beside Cancel and Book. Walk in offers "Check in
+today" when the date is another day; it never changes the date itself.
+
+**Why it matters:** the form was one long column with the price and Book at
+the very bottom and a disabled button that never said why.
+
+**What the observed values prove:** screenshots of villa and harbor at 1280
+and 390 px: the footer reads "Total ₱32,000.00" (villa, 2 nights, 12
+guests) and "Total ₱6,300.00" (harbor, Garden Room, 2 guests, 2 nights,
+the automatic promo), and a party over a room's maximum shows the server's
+"Garden Room holds at most 2 guests." in the Price section.
+
+**Traps it avoided:** the rooms list said "No rooms yet" while it was still
+loading (seen in the first harbor shot); it now waits, and a failed load
+falls back to the empty message rather than a placeholder forever. The
+price is never the last one while a new one is asked.
+
+## 2026-10-12 — the Bookings screen is a list of stays (D-112)
+
+**What was done:** S-3's 14-day grid of open/taken chips and its per-night
+booking rows are gone. One "Stays" list draws one row per reference: dates
+and slot, guest, rooms and contacts, reference, status (Pending, Confirmed,
+Staying, Completed, Cancelled, Expired), source, Walk in, payment, clash,
+the stored total, and the action that fits (Confirm / Decline, or Cancel).
+Search, status counts, a room filter and "Show the last 90 days" narrow it.
+`cancelStay()` cancels a confirmed stay whole.
+
+**Why it matters:** the Calendar already shows dates; staff decide and
+cancel stays, and the grid made them do it night by night.
+
+**What the observed values prove:** the HTTP walk (5/5): a two-night staff
+stay is one row; it is listed from a date on its last night and not from
+the day after (the list used to drop a stay the day after check-in); cancel
+on a pending stay is 404 and changes nothing; confirm then cancel sets both
+rows cancelled and a repeat is 200; another stay then confirms on the freed
+nights. Screenshots: harbor with three seeded stays at 1280 and 390 px; the
+390 px page is 390 px wide.
+
+**Traps it avoided:** the status filter overflowed a phone's width (the
+first 390 px shot was 414 px wide); it now scrolls inside its own box.

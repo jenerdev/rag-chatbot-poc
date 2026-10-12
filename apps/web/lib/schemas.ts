@@ -306,8 +306,8 @@ export const updatePromoSchema = createPromoSchema.partial().extend({
 
 /** Staff decide a request: the whole group, one action, an optional note. */
 export const decideRequestSchema = z.object({
-  action: z.enum(['confirm', 'decline'], {
-    errorMap: () => ({ message: 'action is "confirm" or "decline"' }),
+  action: z.enum(['confirm', 'decline', 'cancel'], {
+    errorMap: () => ({ message: 'action is "confirm", "decline" or "cancel"' }),
   }),
   note: decisionNote,
 });

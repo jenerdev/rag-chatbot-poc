@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { confirmRequest, declineRequest } from '@rag/bookings';
+import { cancelStay, confirmRequest, declineRequest } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Confirm or decline a whole request: `{ "action": "confirm" }` or
- * `{ "action": "decline" }`. Every night and unit in ONE statement, so a stay
+ * `{ "action": "decline" }`; or cancel a confirmed stay, `{ "action": "cancel" }`. Every night and unit in ONE statement, so a stay
  * is never half confirmed (plan/customer-booking.md § 2.6).
  *
  *   200  done (and done again: confirming a confirmed request is still 200)
@@ -27,10 +27,13 @@ export const PATCH = withTenantRoute<{ groupId: string }>(async (request, { tena
   const parsed = decideRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
+  const { action, note } = parsed.data;
   const done =
-    parsed.data.action === 'confirm'
-      ? await confirmRequest(tenant, params.groupId, parsed.data.note)
-      : await declineRequest(tenant, params.groupId, parsed.data.note);
+    action === 'confirm'
+      ? await confirmRequest(tenant, params.groupId, note)
+      : action === 'cancel'
+        ? await cancelStay(tenant, params.groupId, note)
+        : await declineRequest(tenant, params.groupId, note);
   if (!done) return NextResponse.json({ error: 'No such request' }, { status: 404 });
   return NextResponse.json({ status: parsed.data.action === 'confirm' ? 'confirmed' : 'cancelled' });
 });

@@ -1,42 +1,34 @@
 'use client';
 
-// S-3 · Bookings. Staff see a range of dates, every slot on each date as open
-// or taken, and the bookings that start on that date. They can book a slot and
-// cancel a booking.
+// S-3 · Bookings. ONE list of stays, one row per reference (D-100): every web
+// request and staff booking that has not ended, or the last 90 days too, with
+// search, a status filter and (per_room) a room filter. Pending stays are
+// confirmed or declined here; a confirmed one is cancelled here, whole. Dates
+// at a glance are the Calendar's (S-12); this screen no longer draws a grid.
 //
 // Rendered by app/t/[tenant]/admin/bookings/page.tsx, which has already
 // checked on the server that the tenant exists and has the bookings
 // application. Every route this screen calls is admin-only, so it starts the
 // same way the knowledge-base screen does: is there a session for THIS tenant?
 //
-// What this screen does NOT do: decide whether a slot is free. It shows what
-// check_availability says, and it attempts the booking. If the slot was taken
-// in the meantime, the server's 409 is shown as-is. The rule lives in one
-// place, the exclusion constraint (plan/bookings.md § 2.2).
+// What this screen does NOT do: decide whether a night is free. A pending
+// stay holds nothing (D-070), so two can ask for the same night; `clash` warns
+// before anyone presses Confirm, and the server's 409 at Confirm is the guard,
+// shown as-is (trap 21). Nor does it add up a price: every amount is the
+// server's (the quote before, the stored rows after).
 //
-// A per_room tenant (plan/booking-types.md Phase 4) gets three more things,
-// and a whole-resort tenant sees none of them, so villa's screen is the one it
-// was before: rooms to tick (several at once, one guest count each), a price
-// from the server's quote, and a room filter. The price shown is ALWAYS the
-// server's (the quote before, the stored price after); this screen never adds
-// up a price of its own.
-//
-// Customer requests (plan/customer-booking.md Phase 4) come first: every
-// request sent from the public booking page, one row per request (all its
-// nights and units), with Confirm and Decline. A request holds nothing, so
-// two can ask for the same night; confirming the second is refused by the
-// server (409) and shown as-is. `clash` warns before anyone presses Confirm.
+// A per_room tenant (plan/booking-types.md Phase 4) gets rooms to tick in the
+// form (several at once, one guest count each) and a room filter on the list.
 //
 // The New booking form (D-111) is the booking page with a staff token: a
 // check-in and a number of nights, guests for every unit, the guest's name,
 // mobile AND email (so the guest can use Manage booking), the same
 // night-by-night price (StayLines, the page's own), and a Walk in label.
 //
-// The look (plan/ui-refresh.md Phase 7): Requests first, as rows with badges;
-// "New booking" is a side panel opened beside the page title; every decision
-// (confirm, decline, cancel) asks in a dialog with an optional note instead
-// of window.prompt (D-096), the same answer, so the calls are unchanged; the
-// list can be narrowed by status, on screen only (the same rows are read).
+// The look (plan/ui-refresh.md Phase 7): "New booking" is a side panel opened
+// beside the page title; every decision (confirm, decline, cancel) asks in a
+// dialog with an optional note (D-096); search and the filters narrow the
+// rows already loaded, on screen only.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -45,10 +37,8 @@ import type {
   BookingGroup,
   Promo,
   BookingRequest,
-  BookingSummary,
   BookingType,
   RequestQuote,
-  SlotAvailability,
   SlotSummary,
   UnitSummary,
 } from '@rag/bookings';
@@ -61,9 +51,10 @@ import { formatMoney } from '@/lib/money';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
-import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StayLines } from '@/components/stay-lines';
+import { ListSearch } from '@/components/list-search';
+import { PAGE_SIZE, matches } from '@/lib/search';
 
 export interface BookingsScreenProps {
   slug: string;
@@ -92,9 +83,8 @@ interface Setup {
 
 type Auth = 'checking' | 'out' | 'in';
 
-// How many days the screen shows at once. Under both server limits:
-// availability allows 31, the admin list 92.
-const RANGE_DAYS = 14;
+// "Show past" reaches this far back: stays whose last night was within it.
+const PAST_DAYS = 90;
 
 /** stay_payment()'s status, as a badge's words (manage booking § 4). */
 const PAYMENT_LABEL: Record<string, string> = {
@@ -132,161 +122,117 @@ function durationLabel(duration: string): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
-function BookingRow({
-  booking,
-  onCancel,
-  onConfirm,
-  busy,
-  perRoom,
-}: {
-  booking: BookingSummary;
-  onCancel: (booking: BookingSummary) => void;
-  /** D-095: a staff booking is born pending; this is the button that takes the span. */
-  onConfirm: (booking: BookingSummary) => void;
-  busy: boolean;
-  /** per_room: show the room and the stored price. Null for whole_resort, so villa's row is unchanged. */
-  perRoom: { currency: string } | null;
-}) {
-  const cancelled = booking.status === 'cancelled';
-  return (
-    <div className={`booking${cancelled ? ' cancelled' : ''}`}>
-      <div className="booking-main">
-        <span className="booking-slot">{perRoom ? `${booking.unit} · ${booking.slot}` : booking.slot}</span>
-        <span className="booking-guest">{booking.guestName}</span>
-        <span className="booking-meta">
-          {[
-            booking.guestCount ? `${booking.guestCount} guests` : null,
-            booking.guestPhone,
-            perRoom && booking.price !== null
-              ? booking.extraGuestPrice
-                ? `${formatMoney(booking.basePrice ?? 0, perRoom.currency)} + ${formatMoney(booking.extraGuestPrice, perRoom.currency)} extra guests = ${formatMoney(booking.price, perRoom.currency)}`
-                : formatMoney(booking.price, perRoom.currency)
-              : null,
-            // D-100: every stay has a reference; "group booking" means several rows, not "has a group".
-            booking.reference ? `ref ${booking.reference}` : null,
-            perRoom && booking.groupSize > 1 ? 'group booking' : null,
-            // D-097: the promo it got, and this night's share of the discount (part of the price shown).
-            booking.promoName ? `promo ${booking.promoName}${perRoom && booking.discount ? ` −${formatMoney(booking.discount, perRoom.currency)}` : ''}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-        <span className="booking-badges">
-          {booking.source === 'web' && <span className="badge accent">Web</span>}
-          {booking.walkIn && <span className="badge">Walk in</span>}
-          {booking.status === 'pending' && <span className="badge warn">Pending</span>}
-          {cancelled && <span className="badge">Cancelled</span>}
-          {booking.status === 'pending' && booking.clash && (
-            <span className="badge danger">
-              <Icon name="alert" size={12} /> Clash
-            </span>
-          )}
-        </span>
-        <span className="booking-actions">
-          {booking.status === 'pending' && (
-            // D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21).
-            <button type="button" className="primary sm" disabled={busy || booking.clash} onClick={() => onConfirm(booking)}>
-              Confirm
-            </button>
-          )}
-          {!cancelled && (
-            <button type="button" className="sm" disabled={busy} onClick={() => onCancel(booking)}>
-              Cancel
-            </button>
-          )}
-        </span>
-      </div>
-      {/* D-099: the Requests section's warning, on a pending staff booking whose night is already confirmed. Cancel is what staff do with it. */}
-      {booking.status === 'pending' && booking.clash && (
-        <div className="booking-notes request-clash">A night of this booking is already confirmed for another booking.</div>
-      )}
-      {/* Notes are a React child, so whatever staff typed is escaped (CLAUDE.md § Conventions). */}
-      {booking.notes && <div className="booking-notes">{booking.notes}</div>}
-      {/* D-096: what staff wrote when they confirmed or cancelled it. */}
-      {booking.decisionNote && (
-        <div className="booking-notes decision-note">
-          {booking.status === 'cancelled' ? 'Cancelled' : booking.status === 'expired' ? 'Expired' : 'Confirmed'}: {booking.decisionNote}
-        </div>
-      )}
-    </div>
-  );
+/** What a stay's status reads as on its row: a confirmed stay whose nights are over is completed. */
+function stayState(stay: BookingRequest, today: string): { label: string; tone: string } {
+  const checkOut = addDays(stay.checkIn, stay.nights);
+  switch (stay.status) {
+    case 'pending':
+      return { label: 'Pending', tone: 'warn' };
+    case 'confirmed':
+      return checkOut <= today ? { label: 'Completed', tone: '' } : stay.checkIn <= today ? { label: 'Staying', tone: 'ok' } : { label: 'Confirmed', tone: 'ok' };
+    case 'expired':
+      return { label: 'Expired', tone: '' };
+    default:
+      return { label: 'Cancelled', tone: '' };
+  }
 }
 
-/** One customer request: who, what, when, the stored total, and the decision buttons. */
-function RequestRow({
-  request,
+/** One stay: when, who, what, the stored total, its badges, and what staff can do with it now. */
+function StayRow({
+  stay,
+  today,
   currency,
   busy,
   onDecide,
 }: {
-  request: BookingRequest;
+  stay: BookingRequest;
+  today: string;
   currency: string;
   busy: boolean;
-  onDecide: (request: BookingRequest, action: 'confirm' | 'decline') => void;
+  onDecide: (stay: BookingRequest, action: 'confirm' | 'decline' | 'cancel') => void;
 }) {
-  const pending = request.status === 'pending';
-  const nights = request.nights > 1 ? `${request.nights} nights from ` : '';
+  const pending = stay.status === 'pending';
+  const state = stayState(stay, today);
+  const checkOut = addDays(stay.checkIn, stay.nights);
+  // A confirmed stay can be cancelled until it is over; the server frees its nights.
+  const cancellable = stay.status === 'confirmed' && checkOut > today;
+  const live = pending || cancellable;
   return (
-    <div className={`booking request${pending ? '' : ` ${request.status}`}`}>
-      <div className="booking-main">
-        <span className="badge request-ref">{request.reference}</span>
-        <span className="booking-guest">{request.guestName}</span>
+    <div className={`booking stay-row${live ? '' : ' decided'}`}>
+      <div className="stay-when">
+        <span className="stay-dates">
+          {stay.nights > 1 ? `${dayLabel(stay.checkIn)} – ${dayLabel(checkOut)}` : dayLabel(stay.checkIn)}
+        </span>
+        <span className="small muted">
+          {stay.slot}
+          {stay.nights > 1 ? ` · ${stay.nights} nights` : ''}
+        </span>
+      </div>
+      <div className="stay-who">
+        <span className="booking-guest">{stay.guestName}</span>
         <span className="booking-meta">
           {[
-            `${request.slot}, ${nights}${dayLabel(request.checkIn)}`,
-            request.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', '),
-            request.total !== null ? formatMoney(request.total, currency) : null,
-            request.guestPhone,
-            request.guestEmail,
+            stay.units.map((u) => `${u.unit}${u.guests ? ` (${u.guests})` : ''}`).join(', '),
+            stay.guestPhone,
+            stay.guestEmail,
           ]
             .filter(Boolean)
             .join(' · ')}
         </span>
         <span className="booking-badges">
-          {/* D-100: which door it came through; both are decided here. */}
-          <span className={request.source === 'web' ? 'badge accent' : 'badge'}>{request.source === 'web' ? 'Web' : 'By staff'}</span>
-          {request.walkIn && <span className="badge">Walk in</span>}
-          {!pending && (
-            <span className={request.status === 'confirmed' ? 'badge ok' : 'badge'}>
-              {request.status === 'confirmed' ? 'Confirmed' : request.status === 'expired' ? 'Expired' : 'Declined'}
-            </span>
-          )}
+          <span className="badge request-ref">{stay.reference}</span>
+          <span className={`badge ${state.tone}`}>{state.label}</span>
+          {/* D-100: which door it came through. */}
+          <span className={stay.source === 'web' ? 'badge accent' : 'badge'}>{stay.source === 'web' ? 'Web' : 'By staff'}</span>
+          {stay.walkIn && <span className="badge">Walk in</span>}
           {/* manage booking § 4: the payment, from stay_payment(), and the deadline. */}
-          {pending && request.payment && (
-            <span className={`badge ${request.payment.enough ? 'ok' : request.payment.status === 'submitted' ? 'warn' : ''}`}>
-              {PAYMENT_LABEL[request.payment.status] ?? request.payment.status}
-              {request.payment.payBy && !request.payment.enough ? ` · pay by ${new Date(request.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}
+          {pending && stay.payment && (
+            <span className={`badge ${stay.payment.enough ? 'ok' : stay.payment.status === 'submitted' ? 'warn' : ''}`}>
+              {PAYMENT_LABEL[stay.payment.status] ?? stay.payment.status}
+              {stay.payment.payBy && !stay.payment.enough
+                ? ` · pay by ${new Date(stay.payment.payBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
+                : ''}
             </span>
           )}
-          {pending && (request.clash || request.closed) && (
+          {pending && (stay.clash || stay.closed) && (
             <span className="badge danger">
-              <Icon name="alert" size={12} /> {request.closed ? 'Closed date' : 'Clash'}
+              <Icon name="alert" size={12} /> {stay.closed ? 'Closed date' : 'Clash'}
             </span>
           )}
         </span>
-        {pending && (
+      </div>
+      <div className="stay-end">
+        {stay.total !== null && <strong className="stay-total">{formatMoney(stay.total, currency)}</strong>}
+        {live && (
           <span className="booking-actions">
-            <button type="button" className="primary sm" disabled={busy || request.clash || request.closed} onClick={() => onDecide(request, 'confirm')}>
-              Confirm
-            </button>
-            <button type="button" className="sm" disabled={busy} onClick={() => onDecide(request, 'decline')}>
-              Decline
-            </button>
+            {pending ? (
+              <>
+                {/* D-099: disabled on a clash is the courtesy; the server's 409 at Confirm is the guard (trap 21). */}
+                <button type="button" className="primary sm" disabled={busy || stay.clash || stay.closed} onClick={() => onDecide(stay, 'confirm')}>
+                  Confirm
+                </button>
+                <button type="button" className="sm" disabled={busy} onClick={() => onDecide(stay, 'decline')}>
+                  Decline
+                </button>
+              </>
+            ) : (
+              <button type="button" className="sm" disabled={busy} onClick={() => onDecide(stay, 'cancel')}>
+                Cancel
+              </button>
+            )}
           </span>
         )}
       </div>
-      {pending && request.clash && (
-        <div className="booking-notes request-clash">A night of this request is already confirmed for another booking.</div>
+      {pending && stay.clash && <div className="booking-notes request-clash">A night of this stay is already taken by another booking.</div>}
+      {pending && stay.closed && (
+        <div className="booking-notes request-clash">A night of this stay is on a closed date. Decline it, or reopen the date on the Holidays screen.</div>
       )}
-      {pending && request.closed && (
-        <div className="booking-notes request-clash">A night of this request is on a closed date. Decline it, or reopen the date on the Holidays screen.</div>
-      )}
-      {/* Customer-typed notes are a React child, so they are escaped. */}
-      {request.notes && <div className="booking-notes">{request.notes}</div>}
+      {/* Typed notes are a React child, so they are escaped. */}
+      {stay.notes && <div className="booking-notes">{stay.notes}</div>}
       {/* D-096: what staff wrote when they decided it. */}
-      {request.decisionNote && (
+      {stay.decisionNote && (
         <div className="booking-notes decision-note">
-          {request.status === 'cancelled' ? 'Declined' : request.status === 'expired' ? 'Expired' : 'Confirmed'}: {request.decisionNote}
+          {stay.status === 'cancelled' ? 'Cancelled' : stay.status === 'expired' ? 'Expired' : 'Confirmed'}: {stay.decisionNote}
         </div>
       )}
     </div>
@@ -300,9 +246,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // open (the routes behind them refuse anyway, with a 403 that names why).
   const [role, setRole] = useState<Role | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
+  // Where the list starts: today, or the date the Calendar's day view links to (?from=).
   const [from, setFrom] = useState<string | null>(null);
-  const [availability, setAvailability] = useState<SlotAvailability[] | null>(null);
-  const [bookings, setBookings] = useState<BookingSummary[] | null>(null);
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
 
@@ -325,14 +270,20 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   // per_room: the ticked rooms, each with its own guest count (capacity is
   // checked per room, plan/booking-types.md Phase 2), and the list's room
   // filter. Both types: the server's quote for the stay (D-111).
-  const [rooms, setRooms] = useState<Accommodation[]>([]);
+  const [rooms, setRooms] = useState<Accommodation[] | null>(null);
   const [chosen, setChosen] = useState<Record<number, string>>({});
   const [quote, setQuote] = useState<{ quote: RequestQuote | null; message: string | null }>({ quote: null, message: null });
+  // While a price is being asked the footer shows a placeholder, never the
+  // last price, which may no longer be true (the booking page's rule).
+  const [quotePending, setQuotePending] = useState(false);
   const [roomFilter, setRoomFilter] = useState<number | null>(null);
 
-  // Customer requests from the public booking page, from today on.
-  const [requests, setRequests] = useState<BookingRequest[] | null>(null);
-  const [showDecided, setShowDecided] = useState(false);
+  // Every stay that has not ended (or, with Show past, ended in the last
+  // PAST_DAYS), one per reference; filtered on screen, never re-asked for it.
+  const [stays, setStays] = useState<BookingRequest[] | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const [search, setSearch] = useState('');
+  const [shown, setShown] = useState(PAGE_SIZE);
 
   // The decisions' dialog (D-096's note), the New booking panel, and the
   // list's status filter, which only narrows what is drawn.
@@ -344,8 +295,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const unauthorized = useCallback(() => {
     setAuth('out');
     setSetup(null);
-    setAvailability(null);
-    setBookings(null);
+    setStays(null);
   }, []);
 
   useEffect(() => {
@@ -374,8 +324,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       const body: Setup = await response.json();
       setSetup(body);
       // ?from=YYYY-MM-DD opens the list at that date (the calendar's Day view
-      // links here, plan/calendar.md § 4.2); never before today, where the
-      // availability read refuses.
+      // links here, plan/calendar.md § 4.2): the stays still running then.
       const asked = new URLSearchParams(window.location.search).get('from');
       setFrom(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked > body.today ? asked : body.today);
       setDate(body.today);
@@ -388,7 +337,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
         // Capacities for the room list. Staff-only, like everything here.
         const r = await fetch(`${api}/accommodations`);
         if (r.status === 401) return unauthorized();
-        if (r.ok) setRooms(await r.json());
+        setRooms(r.ok ? await r.json() : []);
       }
     } catch (error) {
       setLoadState(failed(await describeFailure(error as Error, response)));
@@ -399,33 +348,22 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     if (auth === 'in') void loadSetup();
   }, [auth, loadSetup]);
 
-  const to = from ? addDays(from, RANGE_DAYS - 1) : null;
-
-  // Availability and bookings for the range, in parallel. They are two calls
-  // on purpose: availability is the shape the chatbot will see, with no guest
-  // data, and the bookings list is the admin-only one that has it.
+  // The stays, one call: the list route has every stay as one row, with its
+  // payment, clash and walk-in already worked out on the server.
+  const listFrom = from && setup ? (showPast ? addDays(from < setup.today ? from : setup.today, -PAST_DAYS) : from) : null;
   const load = useCallback(async () => {
-    if (!from || !to) return;
+    if (!listFrom) return;
     let response: Response | null = null;
     try {
-      const range = `from=${from}&to=${to}`;
-      const [a, b, r] = await Promise.all([
-        fetch(`${api}/bookings/availability?${range}`),
-        fetch(`${api}/bookings?${range}${roomFilter === null ? '' : `&unit=${roomFilter}`}`),
-        fetch(`${api}/bookings/requests`),
-      ]);
-      if (a.status === 401 || b.status === 401 || r.status === 401) return unauthorized();
-      response = !a.ok ? a : !b.ok ? b : r;
-      if (!a.ok || !b.ok || !r.ok) throw new Error('failed');
-      setAvailability(await a.json());
-      setBookings(await b.json());
-      setRequests(await r.json());
+      response = await fetch(`${api}/bookings/requests?from=${listFrom}`);
+      if (response.status === 401) return unauthorized();
+      if (!response.ok) throw new Error('failed');
+      setStays(await response.json());
     } catch (error) {
-      setAvailability(null);
-      setBookings(null);
+      setStays(null);
       setLoadState(failed(await describeFailure(error as Error, response)));
     }
-  }, [api, from, roomFilter, to, unauthorized]);
+  }, [api, listFrom, unauthorized]);
 
   useEffect(() => {
     void load();
@@ -447,6 +385,19 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     if (picked.length === 0 || picked.some((r) => r.guestCount === null)) return null;
     return picked.map((r) => ({ unitId: r.unitId, guests: r.guestCount as number }));
   }, [chosenRooms, guestCount, perRoom, unitId]);
+  // Why Book is not ready yet, in words, instead of a silently disabled button.
+  const missing =
+    slotId === null
+      ? 'Choose a slot'
+      : !date
+        ? 'Choose a date'
+        : perRoom && chosenRooms.length === 0
+          ? 'Choose a room'
+          : stayRooms === null
+            ? perRoom
+              ? 'Enter the guests for each room'
+              : 'Enter the number of guests'
+            : null;
   // A day slot is one date; a nightly one takes a number of nights.
   const nightly = setup?.slots.find((s) => s.id === slotId)?.nightly ?? false;
   const nightCount = nightly && nights !== '' ? Number(nights) : 1;
@@ -457,9 +408,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   useEffect(() => {
     if (stayRooms === null || slotId === null || !date) {
       setQuote({ quote: null, message: null });
+      setQuotePending(false);
       return;
     }
     let stale = false;
+    setQuote({ quote: null, message: null });
+    setQuotePending(true);
     void (async () => {
       let response: Response | null = null;
       try {
@@ -478,6 +432,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       } catch (error) {
         const message = await describeFailure(error as Error, response);
         if (!stale) setQuote({ quote: null, message });
+      } finally {
+        if (!stale) setQuotePending(false);
       }
     })();
     return () => {
@@ -549,83 +505,17 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     [api, date, guestEmail, guestName, guestPhone, load, nightCount, notes, perRoom, promoId, setNotice, setup, slotId, stayRooms, unauthorized, walkIn],
   );
 
-  const cancel = useCallback(
-    async (booking: BookingSummary) => {
-      // D-096: the dialog is both the confirmation and the note. Back or
-      // Escape aborts; the action with nothing typed cancels with no note.
-      const note = await ask({
-        title: 'Cancel this booking?',
-        body: `${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. The slot is free again once it is cancelled.`,
-        noteLabel: 'Reason, shown to the guest',
-        actionLabel: 'Cancel booking',
-        backLabel: 'Keep it',
-        danger: true,
-      });
-      if (note === null) return;
-      setNotice(null);
-      setBusy(true);
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${api}/bookings/${booking.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'cancel', note }),
-        });
-        if (response.status === 401) return unauthorized();
-        if (!response.ok) throw new Error('failed');
-        setNotice({ message: `Cancelled ${booking.slot} on ${dayLabel(booking.date)}. The slot is free again.`, kind: 'ok' });
-        void load();
-      } catch (error) {
-        setNotice({ message: `Could not cancel: ${await describeFailure(error as Error, response)}`, kind: 'error' });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [api, ask, load, unauthorized],
-  );
-
-  // D-095: confirm a pending staff booking. The server's 409 (another
-  // confirmed booking holds the span) arrives with its own sentence.
-  const confirmOne = useCallback(
-    async (booking: BookingSummary) => {
-      const note = await ask({
-        title: 'Confirm this booking?',
-        body: `${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. Confirming takes the slot.`,
-        noteLabel: 'Note',
-        actionLabel: 'Confirm',
-      });
-      if (note === null) return;
-      setNotice(null);
-      setBusy(true);
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${api}/bookings/${booking.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'confirm', note }),
-        });
-        if (response.status === 401) return unauthorized();
-        if (!response.ok) throw new Error('failed');
-        setNotice({ message: `Confirmed ${booking.slot} on ${dayLabel(booking.date)} for ${booking.guestName}. The slot is now taken.`, kind: 'ok' });
-        void load();
-      } catch (error) {
-        setNotice({ message: await describeFailure(error as Error, response), kind: 'error' });
-        void load();
-      } finally {
-        setBusy(false);
-      }
-    },
-    [api, ask, load, unauthorized],
-  );
-
   const decide = useCallback(
-    async (req: BookingRequest, action: 'confirm' | 'decline') => {
+    async (req: BookingRequest, action: 'confirm' | 'decline' | 'cancel') => {
       const what = `${req.reference} for ${req.guestName}`;
+      const when = `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}${req.nights > 1 ? `, ${req.nights} nights` : ''}.`;
       // D-096: the dialog is both the confirmation and the note.
       const note = await ask(
         action === 'confirm'
-          ? { title: `Confirm ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}. Confirming books the dates; then contact the guest.`, noteLabel: 'Note', actionLabel: 'Confirm' }
-          : { title: `Decline ${req.reference}?`, body: `${req.guestName}: ${req.slot} from ${dayLabel(req.checkIn)}.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Decline', danger: true },
+          ? { title: `Confirm ${req.reference}?`, body: `${when} Confirming books the dates; then contact the guest.`, noteLabel: 'Note', actionLabel: 'Confirm' }
+          : action === 'cancel'
+            ? { title: `Cancel ${req.reference}?`, body: `${when} Every night is freed once it is cancelled.`, noteLabel: 'Reason, shown to the guest', actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
+            : { title: `Decline ${req.reference}?`, body: when, noteLabel: 'Reason, shown to the guest', actionLabel: 'Decline', danger: true },
       );
       if (note === null) return;
       setNotice(null);
@@ -643,7 +533,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
           message:
             action === 'confirm'
               ? `Confirmed ${what}. The dates are now booked; contact the guest at ${req.guestPhone ?? req.guestEmail}.`
-              : `Declined ${what}.`,
+              : action === 'cancel'
+                ? `Cancelled ${what}. Its nights are free again.`
+                : `Declined ${what}.`,
           kind: 'ok',
         });
         void load();
@@ -658,21 +550,17 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     [api, ask, load, unauthorized],
   );
 
-  // The room filter by name, because availability rows carry the unit's name.
-  const filteredName = roomFilter === null ? null : (setup?.units.find((u) => u.id === roomFilter)?.name ?? null);
-
-  // Group both lists by date, in range order.
-  const days = useMemo(() => {
-    if (!from || !availability || !bookings) return [];
-    return Array.from({ length: RANGE_DAYS }, (_, i) => {
-      const day = addDays(from, i);
-      return {
-        day,
-        slots: availability.filter((a) => a.date === day && (filteredName === null || a.unit === filteredName)),
-        bookings: bookings.filter((b) => b.date === day),
-      };
-    });
-  }, [availability, bookings, filteredName, from]);
+  // The list as drawn: status, room and search narrow what was loaded; then
+  // by check-in, the soonest first. Counts per status for the filter's labels.
+  const visible = useMemo(() => {
+    if (!stays) return [];
+    return stays
+      .filter((st) => statusFilter === 'all' || st.status === statusFilter)
+      .filter((st) => roomFilter === null || st.units.some((u) => u.unitId === roomFilter))
+      .filter((st) => matches([st.reference, st.guestName, st.guestPhone ?? '', st.guestEmail ?? '', st.units.map((u) => u.unit).join(' ')].join(' '), search))
+      .sort((a, b) => (a.checkIn === b.checkIn ? (a.createdAt < b.createdAt ? -1 : 1) : a.checkIn < b.checkIn ? -1 : 1));
+  }, [roomFilter, search, statusFilter, stays]);
+  const countOf = (status: 'pending' | 'confirmed' | 'cancelled' | 'expired') => stays?.filter((st) => st.status === status).length ?? 0;
 
   // Active units only: a retired room is not offered in the form or shown as
   // a chip. Villa has one, so none of the per-unit UI appears for it.
@@ -707,7 +595,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     );
   }
 
-  if (!setup || !from || !to) {
+  if (!setup || !from) {
     return (
       <>
         <StaffFrame {...frame}>
@@ -722,153 +610,298 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       <StaffFrame {...frame} actions={newBooking}>
         {dialog}
 
-        {requests && requests.length > 0 && (
-          <section className="card">
-            <div className="range-head">
-              <h2>Requests</h2>
-              <div className="range-nav">
-                <Link className="button" href={`/t/${slug}/book`}>
-                  Booking page
-                </Link>
-                {requests.some((r) => r.status !== 'pending') && (
-                  <button type="button" onClick={() => setShowDecided((v) => !v)}>
-                    {showDecided ? 'Hide decided' : 'Show decided'}
-                  </button>
-                )}
-              </div>
+        <section className="card stays">
+          <div className="range-head">
+            <h2>Stays</h2>
+            <div className="range-nav">
+              <Link className="button" href={`/t/${slug}/admin/calendar`}>
+                <Icon name="calendar" size={16} /> Calendar
+              </Link>
+              <Link className="button" href={`/t/${slug}/book`}>
+                Booking page
+              </Link>
             </div>
-            <p className="small muted">
-              Every stay waiting for a decision: sent from the booking page, or made here by staff. A request does not hold its
-              dates: the first one you confirm gets them.
-            </p>
-            {requests.filter((r) => r.status === 'pending').length === 0 && (
-              <EmptyState icon="calendar" title="No requests waiting" compact>
-                A request from the booking page appears here until it is confirmed or declined.
-              </EmptyState>
-            )}
-            {requests
-              .filter((r) => r.status === 'pending' || showDecided)
-              .map((r) => (
-                <RequestRow key={r.groupId} request={r} currency={setup.currency} busy={busy} onDecide={decide} />
+          </div>
+          <div className="stays-toolbar">
+            <ListSearch value={search} onChange={(v) => { setSearch(v); setShown(PAGE_SIZE); }} label="Search reference, guest, phone, email" />
+            <div className="segmented" role="group" aria-label="Show stays">
+              {(['all', 'pending', 'confirmed', 'cancelled', 'expired'] as const).map((f) => (
+                <button key={f} type="button" aria-pressed={statusFilter === f} onClick={() => { setStatusFilter(f); setShown(PAGE_SIZE); }}>
+                  {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : f === 'expired' ? 'Expired' : 'Cancelled'}
+                  {f !== 'all' && countOf(f) > 0 && <span className="segment-count">{countOf(f)}</span>}
+                </button>
               ))}
-          </section>
-        )}
+            </div>
+            {perRoom && (
+              <select aria-label="Show room" value={roomFilter ?? ''} onChange={(e) => { setRoomFilter(e.target.value === '' ? null : Number(e.target.value)); setShown(PAGE_SIZE); }}>
+                <option value="">All rooms</option>
+                {setup.units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                    {u.active ? '' : ' (retired)'}
+                  </option>
+                ))}
+              </select>
+            )}
+            <label className="check-line stays-past">
+              <input type="checkbox" checked={showPast} onChange={(e) => { setShowPast(e.target.checked); setShown(PAGE_SIZE); }} /> Show the last {PAST_DAYS} days
+            </label>
+          </div>
+          <p className="small muted">
+            {from > setup.today ? `Stays running on or after ${dayLabel(from)}. ` : ''}A pending stay does not hold its dates: the first one you confirm gets them.
+          </p>
+
+          {stays === null ? (
+            <LoadState load={loadState} what="stays" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
+          ) : visible.length === 0 ? (
+            stays.length === 0 ? (
+              <EmptyState icon="calendar" title="No stays yet" action={newBooking}>
+                A request from the booking page, or a booking made here, appears in this list.
+              </EmptyState>
+            ) : (
+              <EmptyState icon="search" title="No stays match" compact>
+                Change the search or the filters.
+              </EmptyState>
+            )
+          ) : (
+            <>
+              {visible.slice(0, shown).map((st) => (
+                <StayRow key={st.groupId} stay={st} today={setup.today} currency={setup.currency} busy={busy} onDecide={decide} />
+              ))}
+              {visible.length > shown && (
+                <div className="list-more">
+                  <span>
+                    Showing {shown} of {visible.length}
+                  </span>
+                  <button type="button" className="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+                    Show {Math.min(PAGE_SIZE, visible.length - shown)} more
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
 
         <Drawer open={formOpen} title="New booking" onClose={() => setFormOpen(false)}>
-          <form onSubmit={book}>
-            {perRoom && (
-              <div className="field">
-                <label>Rooms</label>
-                {rooms.filter((r) => r.active).length === 0 && (
-                  <div className="small muted">
-                    No rooms yet. Add them on the <Link href={`/t/${slug}/admin/accommodations`}>Rooms</Link> screen.
-                  </div>
-                )}
-                <div className="room-picks">
-                  {rooms
-                    .filter((r) => r.active)
-                    .map((r) => {
-                      const picked = chosen[r.id] !== undefined;
-                      return (
-                        <div key={r.id} className={`room-pick${picked ? ' picked' : ''}`}>
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={picked}
-                              onChange={(e) =>
-                                setChosen((current) => {
-                                  const next = { ...current };
-                                  if (e.target.checked) next[r.id] = '';
-                                  else delete next[r.id];
-                                  return next;
-                                })
-                              }
-                            />{' '}
-                            {r.name}
-                            {r.capacity !== null && <span className="muted"> · up to {r.capacity}</span>}
-                            {r.standardCapacity !== null && r.extraPersonRate !== null && r.extraPersonRate > 0 && (
-                              <span className="muted">
-                                {' '}
-                                · {r.standardCapacity} included, +{formatMoney(r.extraPersonRate, setup.currency)} each extra
-                              </span>
-                            )}
-                            {r.rates.length === 0 && <span className="muted"> · no rate yet</span>}
-                          </label>
-                          {picked && (
-                            <input
-                              type="number"
-                              min={1}
-                              max={r.capacity ?? undefined}
-                              step={1}
-                              placeholder="guests"
-                              aria-label={`Guests in ${r.name}`}
-                              value={chosen[r.id]}
-                              onChange={(e) => setChosen((current) => ({ ...current, [r.id]: e.target.value }))}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-
-            <div className="field-row">
-              {!perRoom && multipleUnits && (
-                <div className="field">
-                  <label htmlFor="unit">Unit</label>
-                  <select id="unit" value={unitId ?? ''} onChange={(e) => setUnitId(Number(e.target.value))}>
-                    {activeUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
+          {/* Three sections in the order a booking is taken: when, who, anything
+              else. The price depends on the first, so it comes first. The footer
+              stays in view with the server's total and the one Book button. */}
+          <form onSubmit={book} className="booking-form">
+            <fieldset className="form-section">
+              <legend>Stay</legend>
+              <div className="field-row">
+                <div className="field grow">
+                  <label htmlFor="slot">Slot</label>
+                  <select id="slot" value={slotId ?? ''} onChange={(e) => setSlotId(Number(e.target.value))}>
+                    {setup.slots.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — {s.startTime}, {durationLabel(s.duration)}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
-              <div className="field">
-                <label htmlFor="slot">Slot</label>
-                <select id="slot" value={slotId ?? ''} onChange={(e) => setSlotId(Number(e.target.value))}>
-                  {setup.slots.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.startTime}, {durationLabel(s.duration)}
-                    </option>
-                  ))}
-                </select>
+                {!perRoom && multipleUnits && (
+                  <div className="field">
+                    <label htmlFor="unit">Unit</label>
+                    <select id="unit" value={unitId ?? ''} onChange={(e) => setUnitId(Number(e.target.value))}>
+                      {activeUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-              <div className="field">
-                <label htmlFor="date">{nightly ? 'Check-in' : 'Date'}</label>
-                <input
-                  type="date"
-                  id="date"
-                  required
-                  min={setup.today}
-                  max={setup.lastDate}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
-              {nightly && (
-                <div className="field narrow">
-                  <label htmlFor="nights">Nights</label>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="date">{nightly ? 'Check-in' : 'Date'}</label>
                   <input
-                    type="number"
-                    id="nights"
+                    type="date"
+                    id="date"
                     required
-                    min={1}
-                    max={setup.maxNights}
-                    step={1}
-                    value={nights}
-                    onChange={(e) => setNights(e.target.value)}
+                    min={setup.today}
+                    max={setup.lastDate}
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
                   />
                 </div>
+                {nightly && (
+                  <div className="field narrow">
+                    <label htmlFor="nights">Nights</label>
+                    <input
+                      type="number"
+                      id="nights"
+                      required
+                      min={1}
+                      max={setup.maxNights}
+                      step={1}
+                      value={nights}
+                      onChange={(e) => setNights(e.target.value)}
+                    />
+                  </div>
+                )}
+                {!perRoom && (
+                  <div className="field narrow">
+                    <label htmlFor="guest-count">Guests</label>
+                    <input
+                      type="number"
+                      id="guest-count"
+                      required
+                      min={1}
+                      step={1}
+                      value={guestCount}
+                      onChange={(e) => setGuestCount(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Calendar arithmetic only, for reading back; the server prices the nights. */}
+              {date && (
+                <p className="hint stay-span">
+                  <Icon name="calendar" size={14} />
+                  {nightly
+                    ? `${nightCount} night${nightCount === 1 ? '' : 's'}: ${dayLabel(date)} to ${dayLabel(addDays(date, nightCount))}`
+                    : dayLabel(date)}
+                  {' · '}times in {setup.timezone}
+                </p>
               )}
+
+              {perRoom && (
+                <div className="field rooms-field">
+                  <span className="field-label" id="rooms-label">
+                    Rooms
+                  </span>
+                  {/* null until the rooms arrive: "no rooms" is said only once it is true. */}
+                  {rooms === null ? (
+                    <div className="quote-skeleton" role="status" aria-label="Loading rooms">
+                      <span />
+                      <span />
+                    </div>
+                  ) : (
+                    rooms.filter((r) => r.active).length === 0 && (
+                      <div className="small muted">
+                        No rooms yet. Add them on the <Link href={`/t/${slug}/admin/accommodations`}>Rooms</Link> screen.
+                      </div>
+                    )
+                  )}
+                  <div className="room-picks" role="group" aria-labelledby="rooms-label">
+                    {(rooms ?? [])
+                      .filter((r) => r.active)
+                      .map((r) => {
+                        const picked = chosen[r.id] !== undefined;
+                        return (
+                          <div key={r.id} className={`room-pick${picked ? ' picked' : ''}`}>
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={picked}
+                                onChange={(e) =>
+                                  setChosen((current) => {
+                                    const next = { ...current };
+                                    if (e.target.checked) next[r.id] = '';
+                                    else delete next[r.id];
+                                    return next;
+                                  })
+                                }
+                              />
+                              <span className="room-pick-text">
+                                <span className="room-pick-name">{r.name}</span>
+                                <span className="small muted">
+                                  {[
+                                    r.capacity !== null ? `up to ${r.capacity}` : null,
+                                    r.standardCapacity !== null && r.extraPersonRate !== null && r.extraPersonRate > 0
+                                      ? `${r.standardCapacity} included, +${formatMoney(r.extraPersonRate, setup.currency)} each extra`
+                                      : null,
+                                    r.rates.length === 0 ? 'no rate yet' : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </span>
+                              </span>
+                            </label>
+                            {picked && (
+                              <label className="room-pick-guests">
+                                <span className="small muted">Guests</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={r.capacity ?? undefined}
+                                  step={1}
+                                  required
+                                  aria-label={`Guests in ${r.name}`}
+                                  value={chosen[r.id]}
+                                  onChange={(e) => setChosen((current) => ({ ...current, [r.id]: e.target.value }))}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Guest</legend>
+              <div className="field">
+                <label htmlFor="guest-name">Name</label>
+                <input type="text" id="guest-name" required autoComplete="off" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+              </div>
+              {/* D-111: both, as on the booking page, so the guest can find the stay on Manage booking with either. */}
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="guest-phone">Mobile number</label>
+                  <input
+                    type="tel"
+                    id="guest-phone"
+                    required
+                    autoComplete="off"
+                    placeholder="0917 123 4567"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="guest-email">Email</label>
+                  <input
+                    type="email"
+                    id="guest-email"
+                    required
+                    autoComplete="off"
+                    placeholder="name@example.com"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="hint">The guest finds this booking on Manage booking with its reference and either of these.</p>
+              <div className={`option-card${walkIn ? ' picked' : ''}`}>
+                <label>
+                  <input type="checkbox" checked={walkIn} onChange={(e) => setWalkIn(e.target.checked)} />
+                  <span className="room-pick-text">
+                    <span className="room-pick-name">Walk in</span>
+                    <span className="small muted">The guest is here in person. It still waits for Confirm, like any booking.</span>
+                  </span>
+                </label>
+                {/* A walk-in usually starts today; one click, never automatic. */}
+                {walkIn && date !== setup.today && (
+                  <button type="button" className="sm" onClick={() => setDate(setup.today)}>
+                    Check in today
+                  </button>
+                )}
+              </div>
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Extras</legend>
               {setup.promos.length > 0 && (
                 <div className="field">
                   <label htmlFor="promo">
                     Promo <span className="muted">(optional)</span>
                   </label>
-                  {/* The discount is the database's; the quote below previews it (D-097). */}
+                  {/* The discount is the database's; the quote previews it (D-097). */}
                   <select id="promo" value={promoId} onChange={(e) => setPromoId(e.target.value)}>
                     <option value="">None</option>
                     {setup.promos.map((p) => (
@@ -881,197 +914,78 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   </select>
                 </div>
               )}
-            </div>
-
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="guest-name">Guest name</label>
-                <input type="text" id="guest-name" required value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+              <div className="field">
+                <label htmlFor="notes">
+                  Notes <span className="muted">(optional)</span>
+                </label>
+                <textarea id="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              {!perRoom && (
-                <div className="field narrow">
-                  <label htmlFor="guest-count">Guests</label>
-                  <input
-                    type="number"
-                    id="guest-count"
-                    required
-                    min={1}
-                    step={1}
-                    value={guestCount}
-                    onChange={(e) => setGuestCount(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* D-111: both, as on the booking page, so the guest can find the stay on Manage booking with either. */}
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="guest-phone">Mobile number</label>
-                <input
-                  type="tel"
-                  id="guest-phone"
-                  required
-                  autoComplete="off"
-                  placeholder="0917 123 4567"
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                />
-              </div>
-              <div className="field grow">
-                <label htmlFor="guest-email">Email</label>
-                <input
-                  type="email"
-                  id="guest-email"
-                  required
-                  autoComplete="off"
-                  value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="field">
-              <label htmlFor="notes">
-                Notes <span className="muted">(optional)</span>
-              </label>
-              <input type="text" id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-
-            <div className="field">
-              <label className="check-line">
-                <input type="checkbox" checked={walkIn} onChange={(e) => setWalkIn(e.target.checked)} /> Walk in
-              </label>
-              <span className="small muted">The guest is here in person. A label on the stay; it is still pending until you confirm it.</span>
-            </div>
+            </fieldset>
 
             {/* The booking page's breakdown (D-111): each night's rate, extra guests,
                 holiday surcharge and promo, then the total. Every number is the server's. */}
-            {(quote.quote || quote.message) && (
-              <div className={quote.message || !quote.quote?.available ? 'quote error' : 'quote'}>
-                {quote.quote ? (
-                  <>
-                    {!quote.quote.available && (
-                      <div className="quote-warning">A night in this stay is already booked. Confirming it would be refused.</div>
-                    )}
-                    <StayLines
-                      lines={quote.quote.lines}
-                      currency={quote.quote.currency}
-                      total={quote.quote.total}
-                      discount={quote.quote.discount}
-                      promoName={quote.quote.promo?.name ?? null}
-                    />
-                  </>
-                ) : (
-                  quote.message
-                )}
-              </div>
-            )}
+            <section className="form-section price-section" aria-labelledby="price-heading" aria-live="polite">
+              <h3 id="price-heading">Price</h3>
+              {quotePending ? (
+                <div className="quote-skeleton" role="status" aria-label="Getting the price">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ) : quote.quote ? (
+                <div className={quote.quote.available ? 'quote' : 'quote error'}>
+                  {!quote.quote.available && (
+                    <div className="quote-warning">A night in this stay is already booked. Confirming it would be refused.</div>
+                  )}
+                  <StayLines
+                    lines={quote.quote.lines}
+                    currency={quote.quote.currency}
+                    total={quote.quote.total}
+                    discount={quote.quote.discount}
+                    promoName={quote.quote.promo?.name ?? null}
+                  />
+                </div>
+              ) : quote.message ? (
+                <div className="quote error">{quote.message}</div>
+              ) : (
+                <p className="small muted">{missing ?? 'The price appears here.'}</p>
+              )}
+            </section>
 
-            <div className="form-footer">
-              <span className="small muted">
-                Times are in {setup.timezone}. Today there is {dayLabel(setup.today)}.
-              </span>
-              <button
-                type="submit"
-                className="primary"
-                // Every unit needs its guests, and a quote must have come back
-                // (D-111). The server checks everything again.
-                disabled={busy || slotId === null || stayRooms === null || quote.quote === null}
-              >
-                {busy ? 'Saving…' : 'Book'}
-              </button>
-            </div>
-            {/* A refusal while the panel is open is said here, beside the form, not as a toast (useNotice). */}
+            {/* A refusal while the panel is open is said here, above the button, not as a toast (useNotice). */}
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
               </div>
             )}
+
+            <div className="drawer-footer">
+              <div className="drawer-footer-total">
+                {quote.quote && !quotePending ? (
+                  <>
+                    <span className="small muted">Total</span>
+                    <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>
+                  </>
+                ) : (
+                  <span className="small muted">{quotePending ? 'Getting the price…' : (missing ?? (quote.message ? 'Fix the stay to see a price' : ''))}</span>
+                )}
+              </div>
+              <button type="button" onClick={() => setFormOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary"
+                // Every unit needs its guests, and a quote must have come back
+                // (D-111). The server checks everything again.
+                disabled={busy || slotId === null || stayRooms === null || quote.quote === null || quotePending}
+              >
+                {busy ? 'Saving…' : 'Book'}
+              </button>
+            </div>
           </form>
         </Drawer>
 
-        <section className="card">
-          <div className="range-head">
-            <h2>
-              {dayLabel(from)} – {dayLabel(to)}
-            </h2>
-            <div className="range-nav">
-              <div className="segmented" role="group" aria-label="Show bookings">
-                {(['all', 'pending', 'confirmed', 'cancelled', 'expired'] as const).map((f) => (
-                  <button key={f} type="button" aria-pressed={statusFilter === f} onClick={() => setStatusFilter(f)}>
-                    {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : f === 'confirmed' ? 'Confirmed' : f === 'expired' ? 'Expired' : 'Cancelled'}
-                  </button>
-                ))}
-              </div>
-              {perRoom && (
-                <select aria-label="Show room" value={roomFilter ?? ''} onChange={(e) => setRoomFilter(e.target.value === '' ? null : Number(e.target.value))}>
-                  <option value="">All rooms</option>
-                  {setup.units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                      {u.active ? '' : ' (retired)'}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button type="button" disabled={from <= setup.today} onClick={() => setFrom(addDays(from, -RANGE_DAYS))}>
-                ← Earlier
-              </button>
-              <button type="button" disabled={from === setup.today} onClick={() => setFrom(setup.today)}>
-                Today
-              </button>
-              <button type="button" onClick={() => setFrom(addDays(from, RANGE_DAYS))}>
-                Later →
-              </button>
-            </div>
-          </div>
-
-          {availability === null || bookings === null ? (
-            <LoadState load={loadState} what="bookings" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
-          ) : (
-            <>
-              {/* What a chip's word means, written once (plan/ui-components.md
-                  Phase 6). It was each chip's `title`, which a keyboard, a phone
-                  and a screen reader never see; making every chip focusable
-                  instead would have been ~112 Tab stops on harbor's two weeks. */}
-              <p className="small muted slot-legend">
-                <strong>open</strong> free to book · <strong>taken</strong> overlaps a booking, maybe one that starts on
-                another day · <strong>closed</strong> closed on the Holidays screen, nothing can be booked
-              </p>
-              {days.map(({ day, slots, bookings: dayBookings }) => (
-                <div key={day} className="day">
-                  <div className="day-head">
-                    <span className="day-label">{dayLabel(day)}</span>
-                    <span className="day-slots">
-                      {slots.map((s) => (
-                        // The same reason on hover, for the mouse; the legend above says it for everyone.
-                        <Tip
-                          key={`${s.unit}/${s.slot}`}
-                          label={
-                            s.status === 'closed'
-                              ? 'Closed on the Holidays screen: nothing can be booked'
-                              : s.status === 'taken'
-                                ? 'Overlaps a booking, maybe one from another day'
-                                : 'Free to book'
-                          }
-                        >
-                          <span className={`slot-chip ${s.status}`}>
-                            {multipleUnits || perRoom ? `${s.unit} · ` : ''}
-                            {s.slot}: {s.status}
-                          </span>
-                        </Tip>
-                      ))}
-                    </span>
-                  </div>
-                  {dayBookings.filter((b) => statusFilter === 'all' || b.status === statusFilter).map((b) => (
-                    <BookingRow key={b.id} booking={b} busy={busy} onCancel={cancel} onConfirm={confirmOne} perRoom={perRoom ? { currency: setup.currency } : null} />
-                  ))}
-                </div>
-              ))}
-            </>
-          )}
-        </section>
       </StaffFrame>
     </>
   );

@@ -89,7 +89,7 @@ export {
 } from './accommodations.js';
 export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder } from './images.js';
 export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from './promos.js';
-export { bookingPage, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
+export { bookingPage, cancelStay, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { createStaffStay, quoteStaffStay, type NewStaffStay } from './staff-stay.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';

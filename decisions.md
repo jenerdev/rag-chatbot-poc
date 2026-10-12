@@ -3591,3 +3591,27 @@ should be told apart. A label only: a walk-in is pending and paid like any
 stay (the user's choice, 2026-10-12).
 
 **Measured:** tests 124/124 (the staff wording); typecheck clean; verify 162–164 pass; rooms, bookings isolation (both ways) and staff-cases all pass (the staff POST 201 over HTTP).
+
+---
+
+## D-112 · The Bookings screen is a list of stays; the date grid is gone · **Added 2026-10-12**
+
+**Decision:** S-3 draws ONE list, one row per stay (reference), from
+`listRequests()`: every stay whose LAST night is on or after today (a stay
+in progress stays listed until it ends), or the last 90 days too ("Show the
+last 90 days"). Search (reference, guest, phone, email, room), a status
+filter with counts, a room filter (per_room), the first 25 then "Show
+more". A pending stay is confirmed or declined; a confirmed one is
+CANCELLED whole by `cancelStay()` (`{ action: 'cancel' }` on
+`PATCH /bookings/requests/[groupId]`, confirmed → cancelled, every night in
+one statement). The 14-day grid of open/taken chips and the per-night rows
+are removed: dates at a glance are the Calendar's (S-12).
+
+**Why:** the user's call (2026-10-12): the grid repeated the Calendar, and
+staff work in stays, not nights. A pending stay is never "cancelled" (404):
+it is declined, so the guest reads "Declined" (D-110).
+
+**Measured:** `plan/stays-list-walk.mjs` 5/5 over HTTP (one row per stay;
+listed on its last night, not the day after; cancel on pending 404;
+confirm then cancel frees both nights, again 200; a second stay then
+confirms on them). Screenshots at 1280 and 390 px (no sideways scroll).

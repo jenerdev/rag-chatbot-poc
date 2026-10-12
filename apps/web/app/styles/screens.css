@@ -764,3 +764,57 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 .stay-history { margin: 0 0 var(--space-4); padding-left: var(--space-5); }
 .stay-history li { margin-bottom: var(--space-2); }
 .check-line { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-3); }
+
+/* The staff New booking form (S-3, D-111): Stay, Guest, Extras, Price. Each
+   section is a fieldset whose legend names it; a rule between them, no cards
+   inside the drawer, which is a card already. */
+.booking-form .form-section { margin: 0; padding: var(--space-5) 0 var(--space-1); border: 0; border-top: 1px solid var(--line); min-width: 0; }
+.booking-form .form-section:first-of-type { padding-top: 0; border-top: 0; }
+/* A legend floats so it lays out like a heading inside its fieldset (not on the border); the price's h3 is a plain heading. */
+.booking-form legend, .booking-form .form-section h3 { margin: 0 0 var(--space-3); padding: 0; font-size: var(--text-base); font-weight: 600; }
+.booking-form legend { float: left; width: 100%; }
+.booking-form legend + * { clear: both; }
+.booking-form .field-label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-1); }
+.booking-form .stay-span { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
+.booking-form .rooms-field { margin-bottom: var(--space-3); }
+.room-pick > label.room-pick-guests { flex: none; display: flex; align-items: center; gap: var(--space-2); cursor: default; }
+.room-pick-guests input[type="number"] { width: 72px; }
+.booking-form .form-section > .hint { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
+/* Walk in: the room card's look, because it is the same kind of choice. */
+.option-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); margin-bottom: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.option-card.picked { border-color: var(--accent); background: var(--accent-soft); }
+.option-card > label { flex: 1; display: flex; align-items: flex-start; gap: var(--space-3); margin: 0; font-weight: 400; cursor: pointer; }
+.option-card > label input[type="checkbox"] { margin-top: 3px; }
+.booking-form .price-section .quote { margin-bottom: 0; }
+@media (max-width: 560px) {
+  .drawer-footer-total strong { font-size: var(--text-base); }
+}
+
+/* S-3's list of stays: one row per reference. When on the left (the thing
+   staff scan), who and what in the middle, the stored total and the actions
+   on the right; on a phone the three stack. A decided stay is dimmed with
+   colour (never opacity). */
+.stays-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
+.stays-toolbar .list-search { flex: 1 1 240px; }
+.stays-past { margin: 0; font-weight: 400; }
+.stays-toolbar select { width: auto; flex: 0 1 200px; }
+/* The five statuses fit a desktop row; on a phone they scroll inside their own box, never the page. */
+.stays-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+.stays-toolbar .segmented button { flex: none; }
+.segment-count { margin-left: var(--space-1); font-variant-numeric: tabular-nums; color: var(--muted); }
+.stay-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); align-items: start; margin: var(--space-2) 0 0; }
+.stay-row > .booking-notes { grid-column: 2 / -1; margin-top: 0; }
+.stay-when { display: flex; flex-direction: column; gap: 2px; }
+.stay-dates { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stay-who { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.stay-who .booking-meta { flex: none; overflow-wrap: anywhere; }
+.stay-end { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+.stay-total { font-variant-numeric: tabular-nums; }
+.stay-end .booking-actions { margin-left: 0; }
+.stay-row.decided .stay-dates, .stay-row.decided .booking-guest, .stay-row.decided .stay-total { color: var(--muted); }
+@media (max-width: 720px) {
+  .stay-row { grid-template-columns: minmax(0, 1fr); }
+  .stay-row > .booking-notes { grid-column: 1; }
+  .stay-end { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+

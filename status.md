@@ -56,6 +56,25 @@
 
 ## ▶ Next up (do this next)
 
+**Bookings is a list of stays (2026-10-12, D-112).**
+- [x] The date grid and per-night rows are gone; one row per stay with
+  search, status (with counts), room filter, "Show the last 90 days", Show
+  more; Confirm / Decline on pending, Cancel (whole stay, `cancelStay()`)
+  on confirmed. Stays in progress stay listed until their last night.
+  `plan/stays-list-walk.mjs` 5/5; screenshots in
+  `plan/ui-refresh/staff-booking/*-list-*.png`. Typecheck clean, tests pass.
+- [ ] The axe audit over S-3 (list and drawer).
+
+**Staff New booking drawer, regrouped (2026-10-12).**
+- [x] Stay → Guest → Extras → Price sections; the stay read back ("2 nights:
+  Mon 19 Oct to Wed 21 Oct"); Walk in as an option card with "Check in
+  today"; a pinned footer with the server's total, what is missing, Cancel
+  and Book; a price placeholder while asking; rooms show a placeholder
+  until they load (they said "No rooms yet" while loading). Screenshots:
+  `plan/staff-booking-drawer-shots.mjs` → `plan/ui-refresh/staff-booking/`
+  (villa and harbor, 1280 and 390). Typecheck clean; web tests pass.
+- [ ] The axe audit over S-3 with the drawer open.
+
 **Manage booking: a live countdown to the payment deadline (2026-10-12).**
 - [x] S-13's notice shows "Expires in 23h 41m 05s" (to the second; red in
   the last hour) while a stay is pending, tracked, not taken, with a pay-by and
