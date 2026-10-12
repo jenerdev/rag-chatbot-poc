@@ -1,28 +1,27 @@
 import { NextResponse } from 'next/server';
-import { quote } from '@rag/bookings';
+import { quoteStaffStay } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
-import { firstError, quoteSchema } from '@/lib/schemas';
+import { firstError, staffQuoteSchema } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * What these rooms would cost on that date, before booking them. per_room
- * only: a whole-resort tenant gets a 404 (PerRoomOnlyError), because its
- * prices live in its documents, not the database (plan/booking-types.md § 8 q3).
- *
- * The same unit_price() the insert trigger calls, so the preview cannot
- * differ from what is stored (plan Rule 2). A POST because it takes a list.
+ * What a stay would cost, night by night, before booking it (D-111): the
+ * booking page's quote (priceStay(), the same unit_quote() the insert
+ * trigger stores from, plan Rule 2) with the promo the staff member picked.
+ * Both booking types; a whole-resort tenant's unit has its rates in the
+ * database since customer booking. A POST because it takes a list.
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
 
-  const parsed = quoteSchema.safeParse(await request.json().catch(() => null));
+  const parsed = staffQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
-  return NextResponse.json(await quote(tenant, parsed.data));
+  return NextResponse.json(await quoteStaffStay(tenant, parsed.data));
 });

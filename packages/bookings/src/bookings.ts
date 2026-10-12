@@ -237,7 +237,7 @@ async function pricedAvailability(
 }
 
 /** Refuse a retired slot in words (D-090). A missing one is the trigger's "No such unit or slot.". */
-async function refuseRetiredSlot(tenant: BookingTenant, slotId: number): Promise<void> {
+export async function refuseRetiredSlot(tenant: BookingTenant, slotId: number): Promise<void> {
   const { data, error } = await tenant.db.from('slots').select('active').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle();
   if (error) throw new Error(`Could not load the slot: ${error.message}`);
   if (data && !data.active) throw new BookingInputError(RETIRED);
@@ -360,10 +360,11 @@ export async function listBookings(
   // Names are joined here rather than embedded in the select. All three
   // lookups are tenant-scoped, so a name can only come from this tenant.
   // The promo names (D-097) include retired promos: a booking keeps its name.
-  const [units, slots, promos] = await Promise.all([
+  const [units, slots, promos, walkIns] = await Promise.all([
     listUnits(tenant),
     listSlots(tenant, { retired: true }),
     tenant.db.from('promos').select('id, name').eq('tenant_id', tenant.id),
+    walkInGroups(tenant, data.map((b) => b.group_id)),
   ]);
   if (promos.error) throw new Error(`Could not load promos: ${promos.error.message}`);
   const unitName = new Map(units.map((u) => [u.id, u.name]));
@@ -409,8 +410,25 @@ export async function listBookings(
     source: b.source,
     reference: b.reference,
     guestEmail: b.guest_email,
+    walkIn: b.group_id !== null && walkIns.has(b.group_id),
     createdAt: b.created_at,
   }));
+}
+
+/**
+ * The stays among these groups that a walk-in started (D-111). Read from the
+ * STAY, not the rows: a reschedule inserts new rows into the same stay
+ * without the row's flag (schema-walk-in.sql). Staff read `stays`; a chat
+ * token reads nothing there, so this is for staff lists only.
+ */
+export async function walkInGroups(tenant: BookingTenant, groupIds: (string | null)[]): Promise<Set<string>> {
+  const ids = new Set(groupIds.filter((g): g is string => g !== null));
+  if (ids.size === 0) return new Set();
+  // The tenant's walk-in stays, matched here rather than with .in(): a long
+  // list's ids would all go into the URL, and walk-ins are the few.
+  const { data, error } = await tenant.db.from('stays').select('group_id').eq('tenant_id', tenant.id).eq('walk_in', true);
+  if (error) throw new Error(`Could not load stays: ${error.message}`);
+  return new Set(data.map((s) => s.group_id).filter((g) => ids.has(g)));
 }
 
 /**
@@ -635,7 +653,7 @@ export const RETIRED = 'That slot is no longer offered. Choose another.';
  * codes the schema raises on purpose are translated; anything else propagates
  * as a plain Error, so a real fault is never dressed up as bad input.
  */
-function writeError(error: { code?: string; message: string }, date: string): Error {
+export function writeError(error: { code?: string; message: string }, date: string): Error {
   const closed = closedError(error);
   if (closed) return closed;
   if (error.code === '23514' && /slot retired/.test(error.message)) return new BookingInputError(RETIRED);

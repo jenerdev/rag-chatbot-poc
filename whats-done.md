@@ -8340,3 +8340,39 @@ member, alteza's held requests read clash false, and harbor's HAR-4YXGRU,
 whose night HAR-KU3HG5 holds confirmed, reads clash true: the positive
 twin (trap 12).
 
+## 2026-10-12 — a staff booking is a stay on the booking page's rules (D-111)
+
+**What was done:** the staff New booking form now takes a check-in and a
+number of nights, guests for every unit, the guest's name, mobile and
+email, checked by the booking page's own `parseRequest()`, and shows the
+page's night-by-night breakdown (rate, extra guests, holiday surcharge,
+promo, total) from a quote that shares `priceStay()` with the page. One
+insert of every unit × night makes one stay with one reference, pending. A
+Walk in checkbox labels the stay (`schema-walk-in.sql`: `bookings.walk_in`,
+`stays.walk_in`, the `bookings_ac_walk_in` trigger, `bookings_walk_in`
+check); the Requests and Bookings rows show a "Walk in" badge.
+
+**Why it matters:** a guest booked by staff had no email, so Manage booking
+(email or phone, D-104) could not always find the stay, and staff saw a
+price per room only (per_room) or none (villa). Now both doors check and
+price a stay the same way.
+
+**What the observed values prove:** typecheck clean across the repo;
+tests 124/124 in @rag/bookings (one new: the staff wording, and that the
+rules are otherwise the page's), 107/107 web. After the file ran: verify
+162 (two walk-in nights mark both rows and the stay; a plain stay stays
+unmarked: the positive and negative twins), 163 (a later row without the
+flag leaves the stay's label set: what a reschedule does) and 164 (a web
+row set to walk_in is 23514 `bookings_walk_in`) pass. rooms, bookings
+isolation both ways and staff-cases pass; staff-cases booked through the
+new POST (201) and listed it back. Also fixed: verify's probe proofs were
+dated 2026-10-10 and the stays they pay are booked today, so
+submit_payment refused them and 138–164 never ran; they pay today now.
+
+**Traps it avoided:** the label is on the STAY because `decide_change()`
+copies named row columns only (a reschedule would have dropped a row
+label); a new trigger rather than a redefinition, so no older file can put
+an older function back (trap 20). Every inserted row carries every key
+(trap 15). The tools keep `createBookings()` unchanged, so their seeded
+staff rows need no email.
+

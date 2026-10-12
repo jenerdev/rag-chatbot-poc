@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createBooking, createBookings, listBookings } from '@rag/bookings';
+import { createStaffStay, listBookings } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
-import { createBookingSchema, firstError } from '@/lib/schemas';
+import { firstError, staffStaySchema } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -38,11 +38,10 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
 });
 
 /**
- * Book a slot. 409 if any span is taken, 400 on bad input.
- *
- *   `unitId`  one unit: 201 with the booking, exactly as before
- *   `rooms`   several rooms (per_room): 201 with the group,
- *             `{ groupId, bookings, total }`, all saved or none (D-053)
+ * Book a stay for a guest (D-111): the booking page's rules (name, mobile AND
+ * email, check-in and nights, guests per unit), one stay with one reference,
+ * born pending (D-095). 201 with `{ groupId, bookings, total }`; 409 if a
+ * night is taken, 400 on bad input.
  *
  * No price is read from the body. The schema has no `price` key, and the
  * insert trigger would overwrite one anyway (plan/booking-types.md Rule 2).
@@ -51,11 +50,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'bookings:write');
   await requireApplication(tenant, 'bookings');
 
-  const parsed = createBookingSchema.safeParse(await request.json().catch(() => null));
+  const parsed = staffStaySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
-  if (parsed.data.rooms !== undefined) {
-    return NextResponse.json(await createBookings(tenant, parsed.data), { status: 201 });
-  }
-  return NextResponse.json(await createBooking(tenant, parsed.data), { status: 201 });
+  return NextResponse.json(await createStaffStay(tenant, parsed.data), { status: 201 });
 });

@@ -305,7 +305,15 @@ export function parseRequest(
     bookingType,
     maxNights,
     maxAdvanceDays,
-  }: { today: string; bookingType: BookingType; maxNights: number; maxAdvanceDays: number },
+    byStaff = false,
+  }: {
+    today: string;
+    bookingType: BookingType;
+    maxNights: number;
+    maxAdvanceDays: number;
+    /** D-111: the staff form, the same rules in a staff member's words ("The guest's name") */
+    byStaff?: boolean;
+  },
 ): ParsedRequest {
   const slotId = positiveInt(input.slotId, 'Slot');
 
@@ -340,10 +348,11 @@ export function parseRequest(
     throw new BookingInputError(`That is ${rooms.length * nights} room-nights; one request holds at most ${MAX_REQUEST_ROWS}.`);
   }
 
-  if (typeof input.name !== 'string') throw new BookingInputError('Your name is required.');
+  const whose = byStaff ? "The guest's" : 'Your';
+  if (typeof input.name !== 'string') throw new BookingInputError(`${whose} name is required.`);
   const name = input.name.trim();
   if (name.length < MIN_REQUEST_NAME || name.length > MAX_REQUEST_NAME) {
-    throw new BookingInputError(`Your name must be ${MIN_REQUEST_NAME} to ${MAX_REQUEST_NAME} characters.`);
+    throw new BookingInputError(`${whose} name must be ${MIN_REQUEST_NAME} to ${MAX_REQUEST_NAME} characters.`);
   }
   const phone = normalisePhone(input.phone);
   if (!phone) throw new BookingInputError('Enter a mobile number like 0917 123 4567.');

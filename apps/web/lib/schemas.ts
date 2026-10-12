@@ -93,52 +93,6 @@ export const setPasswordSchema = z.object({
 });
 
 /**
- * A new booking, from the admin screen.
- *
- * Shape only. The meaning (a real date, not in the past, a non-blank name,
- * lengths) is checked by @rag/bookings. That package has a second caller, the
- * chatbot's tool executor, which has no zod schema in front of it. If the rules
- * lived here too they would be two copies free to drift, so they live in one
- * place and this only rejects the wrong TYPES.
- */
-const room = z.object({
-  unitId: z.number({ required_error: 'A room is required', invalid_type_error: 'A room is required' }),
-  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
-});
-
-// One unit (`unitId`, what the form has always sent) or several rooms
-// (`rooms`, per_room only, plan/booking-types.md § 2.5). "Exactly one of the
-// two" is @rag/bookings' rule (parseRooms), so both are optional here.
-// There is deliberately no `price`: zod strips unknown keys, and the trigger
-// would overwrite one anyway (plan Rule 2).
-export const createBookingSchema = z.object({
-  unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
-  rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
-  slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
-  date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
-  guestName: z.string({ required_error: 'Guest name is required.', invalid_type_error: 'Guest name is required.' }),
-  guestPhone: z.string({ invalid_type_error: 'Guest phone must be text.' }).nullish(),
-  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
-  notes: z.string({ invalid_type_error: 'Notes must be text.' }).nullish(),
-  // No `status` since D-095: a staff booking is born pending (zod strips the
-  // key if a client sends one), and PATCH /bookings/[id] confirms it.
-  /** D-097: a promo the staff member picked; the trigger checks it and stores the discount */
-  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
-});
-
-/** A price preview for one unit or several rooms (per_room only). */
-export const quoteSchema = z.object({
-  unitId: z.number({ invalid_type_error: 'A unit is required' }).optional(),
-  // One unit's guests; with `rooms`, each room carries its own.
-  guestCount: z.number({ invalid_type_error: 'Guest count must be a number' }).nullish(),
-  /** D-097: preview with a promo the staff member picked */
-  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
-  rooms: z.array(room, { invalid_type_error: 'Rooms must be a list' }).optional(),
-  slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
-  date: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
-});
-
-/**
  * A new room. Lengths and "positive" are @rag/bookings' to check, and so are
  * the defaults for anything left out (standard 2, maximum 4, ₱250;
  * plan/extra-guests.md). `maxCapacity` and `capacity` are the same thing.
@@ -222,6 +176,30 @@ export const bookRequestSchema = bookQuoteSchema.extend({
   email: z.string({ required_error: 'Your email is required', invalid_type_error: 'Your email is required' }),
   notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
   website: z.string().optional(),
+});
+
+/**
+ * A price for a stay on the staff form (D-111): the booking page's quote
+ * with the promo the staff member PICKED instead of a typed code. Types
+ * only; every rule is parseRequest()'s, the page's own.
+ */
+export const staffQuoteSchema = bookQuoteSchema.omit({ promoCode: true }).extend({
+  /** D-097: a promo the staff member picked; the trigger checks it and stores the discount */
+  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
+});
+
+/**
+ * A stay booked by staff (D-111): the booking page's fields (name, mobile AND
+ * email, check-in, nights, guests per unit), the picked promo, and Walk in.
+ * No `status` (D-095: born pending; zod strips the key) and no `price`
+ * (the trigger's, plan Rule 2).
+ */
+export const staffStaySchema = staffQuoteSchema.extend({
+  name: z.string({ required_error: "The guest's name is required", invalid_type_error: "The guest's name is required" }),
+  phone: z.string({ required_error: "The guest's mobile number is required", invalid_type_error: "The guest's mobile number is required" }),
+  email: z.string({ required_error: "The guest's email is required", invalid_type_error: "The guest's email is required" }),
+  notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
+  walkIn: z.boolean({ invalid_type_error: 'Walk in is true or false' }).optional(),
 });
 
 /**

@@ -25,6 +25,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { anonClient, mintPlatformToken, mintTenantToken, parseStoredVector, scopedClient, VECTOR_DIMENSIONS } from '../dist/index.js';
 import { supabase } from '../dist/service.js';
 
+// A proof's payment date must fall between the day the stay was booked and
+// today (submit_payment()); the probes book today, so they pay today, in the
+// probe tenants' timezone. A fixed date went stale the day after it was written.
+const PAID_TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
 let failures = 0;
 const check = (ok, label, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
@@ -2442,7 +2447,7 @@ async function manageBookingChecks() {
     };
     const submit = (over = {}) => chat.rpc('submit_payment', {
       p_tenant_id: probe.id, p_reference: webRef, p_contact: payContact.email, p_proof_path: '', p_method: 'gcash',
-      p_claimed_amount: 30000, p_paid_on: '2026-10-10', p_payer_reference: 'TXN 1', p_idempotency_key: randomUUID(), ...over,
+      p_claimed_amount: 30000, p_paid_on: PAID_TODAY, p_payer_reference: 'TXN 1', p_idempotency_key: randomUUID(), ...over,
     });
 
     // 134. The web stay's terms were set when it was born; a staff stay is
@@ -2508,11 +2513,11 @@ async function manageBookingChecks() {
     {
       const notTracked = await chat.rpc('submit_payment', {
         p_tenant_id: probe.id, p_reference: ref1, p_contact: contact.guest_email, p_proof_path: '', p_method: 'GCash',
-        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+        p_claimed_amount: 100, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
       });
       const cancelled = await chat.rpc('submit_payment', {
         p_tenant_id: probe.id, p_reference: two[0].reference, p_contact: contact.guest_email, p_proof_path: '', p_method: 'GCash',
-        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+        p_claimed_amount: 100, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
       });
       const miss = await submit({ p_contact: 'not.the.payer@example.com' });
       const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
@@ -2678,7 +2683,7 @@ async function manageBookingChecks() {
     };
     const proofFor = async (stay) => chat.rpc('submit_payment', {
       p_tenant_id: probe.id, p_reference: stay.ref, p_contact: stay.email, p_proof_path: await uploadProof(), p_method: 'GCash',
-      p_claimed_amount: 100000, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+      p_claimed_amount: 100000, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
     });
 
     // 145. hold "none" (today's rule, D-070): two requests share a night and
@@ -2764,7 +2769,7 @@ async function manageBookingChecks() {
       const guest = (await lookup(late.ref, late.email)).data;
       const pay = await chat.rpc('submit_payment', {
         p_tenant_id: probe.id, p_reference: late.ref, p_contact: late.email, p_proof_path: await uploadProof(), p_method: 'GCash',
-        p_claimed_amount: 100, p_paid_on: '2026-10-10', p_payer_reference: null, p_idempotency_key: randomUUID(),
+        p_claimed_amount: 100, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
       });
       const swept = await staff.rpc('expire_due_stays', { p_tenant_id: probe.id });
       const again = await staff.rpc('expire_due_stays', { p_tenant_id: probe.id });
@@ -3017,6 +3022,59 @@ async function manageBookingChecks() {
           && proof.error?.code === '55000',
         "manage: a stay past pay_by reads expired with 'Not paid in time', is neither taken nor declined, and takes no proof (55000)",
         `${dueError?.message ?? 'ok'} · ${due?.status} "${due?.decision_note}" taken ${due?.taken} declined ${due?.declined} · proof ${proof.error?.code}`,
+      );
+    }
+
+    // 162–164 are schema-walk-in.sql (D-111): a staff stay can say the guest
+    // walked in, and the label is the STAY's.
+    //
+    // 162. A staff token inserts two nights with walk_in in one statement:
+    //      both rows say it and their stay says it; a staff stay without it
+    //      does not (the positive and negative twins, trap 12).
+    const walkGroup = randomUUID();
+    {
+      const row = (day, group, walkIn) => ({
+        tenant_id: probe.id, unit_id: unit.B, slot_id: slotRow.id, booked_date: day, status: 'pending', guest_count: 1,
+        guest_name: 'Walk Probe', guest_phone: '09170000162', guest_email: 'walk.probe@example.com', group_id: group, walk_in: walkIn,
+      });
+      const plainGroup = randomUUID();
+      const walked = await staff.from('bookings').insert([row('2027-08-30', walkGroup, true), row('2027-08-31', walkGroup, true)]).select('walk_in');
+      const plain = await staff.from('bookings').insert([row('2027-09-06', plainGroup, false)]).select('walk_in');
+      const { data: stays } = await supabase.from('stays').select('group_id, walk_in').eq('tenant_id', probe.id).in('group_id', [walkGroup, plainGroup]);
+      const of = (g) => stays?.find((s) => s.group_id === g)?.walk_in;
+      check(
+        !walked.error && walked.data.length === 2 && walked.data.every((r) => r.walk_in === true) && of(walkGroup) === true
+          && !plain.error && plain.data[0]?.walk_in === false && of(plainGroup) === false,
+        'walk in: a staff stay inserted with walk_in marks both rows and its stay; one without it stays unmarked',
+        `walked ${walked.error?.message ?? walked.data.map((r) => r.walk_in).join(',')} stay ${of(walkGroup)} · plain ${plain.error?.message ?? plain.data[0]?.walk_in} stay ${of(plainGroup)}`,
+      );
+    }
+
+    // 163. A later row in a walk-in stay WITHOUT the flag (what a reschedule
+    //      inserts, decide_change() copying no walk_in) leaves the stay's
+    //      label alone: the trigger only ever sets it.
+    {
+      const later = await staff.from('bookings').insert([{
+        tenant_id: probe.id, unit_id: unit.B, slot_id: slotRow.id, booked_date: '2027-09-01', status: 'pending', guest_count: 1,
+        guest_name: 'Walk Probe', guest_phone: '09170000162', guest_email: 'walk.probe@example.com', group_id: walkGroup, walk_in: false,
+      }]).select('id');
+      const { data: stay } = await supabase.from('stays').select('walk_in').eq('tenant_id', probe.id).eq('group_id', walkGroup).single();
+      check(
+        !later.error && later.data.length === 1 && stay?.walk_in === true,
+        "walk in: a later row without the flag leaves the stay's label set",
+        `${later.error?.message ?? `${later.data.length} row`} · stay ${stay?.walk_in}`,
+      );
+    }
+
+    // 164. Only a staff row may say it (bookings_walk_in): a web request's
+    //      row set to walk_in is 23514, even for service_role.
+    {
+      const w = await requestStay('A', '2027-09-13');
+      const set = await supabase.from('bookings').update({ walk_in: true }).eq('tenant_id', probe.id).eq('group_id', w.group).select('id');
+      check(
+        !w.error && set.error?.code === '23514' && /bookings_walk_in/.test(set.error.message),
+        'walk in: a web row cannot say walk_in (23514, bookings_walk_in)',
+        `${w.error?.message ?? w.ref} · ${set.error ? `${set.error.code} ${set.error.message}` : `UPDATED ${set.data.length}`}`,
       );
     }
   } catch (error) {

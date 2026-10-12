@@ -35,6 +35,7 @@ import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { Icon } from '@/components/icons';
+import { StayLines } from '@/components/stay-lines';
 
 export interface BookingPageScreenProps {
   slug: string;
@@ -130,10 +131,6 @@ function CheckTimes({ checkIn, checkOut }: { checkIn: { date: string; time: stri
   );
 }
 
-/** "Thu" for a calendar date (UTC, as dateLabel() reads it). */
-function weekday(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
-}
 
 type Sent = { receipt: RequestReceipt } | null;
 
@@ -424,7 +421,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
 
             <section className="confirm-section" aria-labelledby="price-title">
               <h2 id="price-title">Price</h2>
-              <Lines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
+              <StayLines lines={r.lines} currency={r.currency} total={r.total} discount={r.discount} promoName={null} />
             </section>
 
             {r.instructions && (
@@ -869,7 +866,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   {!quote.quote.available && (
                     <div className="quote-warning">A night in this stay is already booked. Please choose other dates.</div>
                   )}
-                  <Lines
+                  <StayLines
                     lines={quote.quote.lines}
                     currency={quote.quote.currency}
                     total={quote.quote.total}
@@ -901,90 +898,5 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
         </form>
       </main>
     </>
-  );
-}
-
-/**
- * A stay, night by night: each unit's rate, extra guests and holiday
- * surcharge, then the promo's discount (D-097) and the total. The lines'
- * prices are net of the discount already; the discount line says what came
- * off, so the figures add up as the server added them.
- */
-function Lines({
-  lines,
-  currency,
-  total,
-  discount,
-  promoName,
-}: {
-  lines: RequestQuote['lines'];
-  currency: string;
-  total: number;
-  discount: number;
-  promoName: string | null;
-}) {
-  const dates = [...new Set(lines.map((l) => l.date))];
-  const multipleUnits = new Set(lines.map((l) => l.unitId)).size > 1;
-  return (
-    <div className="stay-lines">
-      {dates.map((date, night) =>
-        lines
-          .filter((l) => l.date === date)
-          .map((l) => {
-            // One group per night (and room): the rate on the first line, each
-            // addition or deduction on its own line under it, then the night's
-            // total, the server's `price`, only when something was added.
-            const extras = l.extraGuestPrice > 0 || l.surcharge > 0 || l.discount > 0;
-            return (
-              <div key={`${date}-${l.unitId}`} className="quote-night">
-                <div className="quote-line">
-                  {/* The dates are in Check-in / Check-out above: a night is named by its
-                      number and weekday (weekday and weekend rates differ), not its date again. */}
-                  <span>
-                    {dates.length > 1 ? `Night ${night + 1} · ${weekday(date)}` : multipleUnits ? '' : 'Rate'}
-                    {multipleUnits ? `${dates.length > 1 ? ' · ' : ''}${l.unit}` : ''}
-                    {l.holiday && <span className="holiday-badge">{l.holiday}</span>}
-                  </span>
-                  <span>{formatMoney(l.basePrice, currency)}</span>
-                </div>
-                {l.extraGuestPrice > 0 && (
-                  <div className="quote-line quote-sub">
-                    <span>Extra guests</span>
-                    <span>+{formatMoney(l.extraGuestPrice, currency)}</span>
-                  </div>
-                )}
-                {l.surcharge > 0 && (
-                  <div className="quote-line quote-sub">
-                    <span>Holiday surcharge</span>
-                    <span>+{formatMoney(l.surcharge, currency)}</span>
-                  </div>
-                )}
-                {l.discount > 0 && (
-                  <div className="quote-line quote-sub quote-discount">
-                    <span>Promo</span>
-                    <span>−{formatMoney(l.discount, currency)}</span>
-                  </div>
-                )}
-                {extras && (
-                  <div className="quote-line quote-sub quote-subtotal">
-                    <span>{multipleUnits ? 'Room total' : 'Night total'}</span>
-                    <span>{formatMoney(l.price, currency)}</span>
-                  </div>
-                )}
-              </div>
-            );
-          }),
-      )}
-      {discount > 0 && (
-        <div className="quote-line quote-discount">
-          <span>{promoName ? `Promo: ${promoName}` : 'Promo discount'}</span>
-          <span>−{formatMoney(discount, currency)}</span>
-        </div>
-      )}
-      <div className="quote-line quote-total">
-        <strong>Total</strong>
-        <strong>{formatMoney(total, currency)}</strong>
-      </div>
-    </div>
   );
 }

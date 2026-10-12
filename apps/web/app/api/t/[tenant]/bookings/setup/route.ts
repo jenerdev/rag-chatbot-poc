@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { bookingsConfig, listPromos, listSlots, listUnits, localDate } from '@rag/bookings';
+import { bookingsConfig, lastBookingDate, listPromos, listSlots, listUnits, localDate } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { withTenantRoute } from '@/lib/tenant';
@@ -34,6 +34,10 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
     today: localDate(config.timezone),
     bookingType: config.bookingType,
     currency: config.currency,
+    // D-111: the staff form books a stay of N nights on the page's rules;
+    // its inputs carry the same limits the server checks (D-078).
+    maxNights: config.maxStayNights,
+    lastDate: lastBookingDate(localDate(config.timezone), config.maxAdvanceDays),
     units,
     slots,
     promos,

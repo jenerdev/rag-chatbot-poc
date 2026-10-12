@@ -89,9 +89,18 @@ try {
     const booked = await asCookie(cookie, '/api/t/villa/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unitId: unit.id, slotId: slot.id, date, guestName: 'staff-cases probe' }),
+      // D-111: the staff form's shape is the booking page's (both contacts, guests, nights).
+      body: JSON.stringify({
+        rooms: [{ unitId: unit.id, guests: 2 }],
+        slotId: slot.id,
+        checkIn: date,
+        nights: 1,
+        name: 'staff-cases probe',
+        phone: '0917 000 0000',
+        email: 'staff-cases@example.com',
+      }),
     });
-    const row = booked.ok ? await booked.json() : null;
+    const row = booked.ok ? (await booked.json()).bookings[0] : null;
     const listed = await asCookie(cookie, `/api/t/villa/bookings?from=${date}&to=${date}`);
     const rows = listed.ok ? await listed.json() : [];
     check(

@@ -3557,3 +3557,37 @@ nothing (D-070), so "taken" is a real state, and staff could not confirm
 it anyway (`bookings_no_overlap`).
 
 **Measured:** verify 159–161 and 126 amended, 161/161.
+
+---
+
+## D-111 · A staff booking is a stay on the booking page's rules, and can say "Walk in" · **Added 2026-10-12 (schema-walk-in.sql)**
+
+**Decision:** the staff form (S-3, New booking) books a STAY the way the
+booking page does: a check-in and a number of nights (a nightly slot),
+guests for every unit (both booking types), the guest's name, mobile AND
+email, the same checks (`parseRequest()`, with `byStaff` for the wording),
+and the same night-by-night price (`priceStay()`, shared with
+`quoteRequest()`; `StayLines`, shared with the page). Every unit × night
+goes in ONE insert, one group, one reference (D-100), born pending
+(D-095). The picked promo is checked against every night. A **Walk in**
+checkbox stores `bookings.walk_in` on the rows, and a BEFORE INSERT
+definer trigger (`bookings_ac_walk_in`) copies it to `stays.walk_in`,
+which every list reads. `bookings_walk_in` refuses it on a web row.
+
+**What stays different from the page:** staff insert on their own token
+under the bookings insert policy, not through `request_booking()`: no
+per-contact limit and no `source = 'web'`. Contact is required in code
+(the package), not by a SQL constraint, because the tools seed staff rows
+without an email (`createBookings()`, unchanged, for them).
+
+**Why the label is on the stay:** a reschedule (`decide_change()`) inserts
+new rows into the same stay without copying row columns it does not name;
+the stay outlives them. A new trigger, not a redefinition: no older file
+is replaced (trap 20 does not arise).
+
+**Why:** the request: a guest booked by staff could not use Manage booking
+(it matches on email or phone, D-104) and saw no breakdown; walk-ins
+should be told apart. A label only: a walk-in is pending and paid like any
+stay (the user's choice, 2026-10-12).
+
+**Measured:** tests 124/124 (the staff wording); typecheck clean; verify 162–164 pass; rooms, bookings isolation (both ways) and staff-cases all pass (the staff POST 201 over HTTP).

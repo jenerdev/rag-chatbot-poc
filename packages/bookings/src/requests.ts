@@ -23,7 +23,7 @@
 
 import { MAX_STAY_NIGHTS } from './constants.js';
 import { expireDueStays } from './deadlines.js';
-import { bookingsConfig, decisionNote, requireConfig, listSlots, RETIRED } from './bookings.js';
+import { bookingsConfig, decisionNote, requireConfig, listSlots, RETIRED, walkInGroups } from './bookings.js';
 import { listCalendar } from './calendar.js';
 import { BookingConflictError, BookingInputError, BookingLimitError, BookingsNotEnabledError } from './errors.js';
 import type {
@@ -31,13 +31,14 @@ import type {
   BookingRequest,
   BookingStatus,
   BookingTenant,
+  PromoKind,
   RequestLine,
   RequestQuote,
   RequestReceipt,
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { discountLines, optionalCode, promoForStay, promoMessage } from './promos.js';
-import { addDays, lastBookingDate, localDate, pageSettings, parseRequest, paymentFlow } from './validate.js';
+import { addDays, lastBookingDate, localDate, pageSettings, parseRequest, paymentFlow, type ParsedRequest } from './validate.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -159,7 +160,35 @@ export async function quoteRequest(
     { ...input, name: 'Quote', phone: '09000000000', email: 'quote@example.com' },
     { today, bookingType: config.bookingType, maxNights: config.maxStayNights, maxAdvanceDays: config.maxAdvanceDays },
   );
+  const stay = await priceStay(tenant, request);
 
+  // The promo (D-097), by the same two functions request_booking() uses, on
+  // the same rows in the same order: the typed code, or the automatic one.
+  // A code that does not apply changes nothing and says why (promoMessage);
+  // the request would refuse it in the same words.
+  const subtotal = stay.lines.reduce((sum, l) => sum + l.price, 0);
+  const found = await promoForStay(tenant, code, request.checkIn, stay.lastNight, subtotal);
+  const applied = found !== null && found.reason === null ? found : null;
+  return withDiscount(tenant, config.currency, request, stay, applied, promoMessage(code, found));
+}
+
+/** A checked stay, priced night by night before any promo, and whether every night is still free. */
+export interface PricedStay {
+  slot: string;
+  lines: RequestLine[];
+  lastNight: string;
+  available: boolean;
+}
+
+/**
+ * Price a checked stay: one unit_quote() per unit per night, the function
+ * the insert trigger stores from (plan Rule 3). Shared by the booking page's
+ * quote and the staff form's (D-111), so the two cannot price differently.
+ * Refuses, in words, what the insert would refuse: a unit or slot that is
+ * not this tenant's, a retired slot, several nights of a day slot, too many
+ * guests, a closed date.
+ */
+export async function priceStay(tenant: BookingTenant, request: ParsedRequest): Promise<PricedStay> {
   const [units, slot] = await Promise.all([
     tenant.db
       .from('units')
@@ -230,15 +259,24 @@ export async function quoteRequest(
       });
     }
   }
+  return { slot: slot.data.name, lines, lastNight, available };
+}
 
-  // The promo (D-097), by the same two functions request_booking() uses, on
-  // the same rows in the same order: the typed code, or the automatic one.
-  // A code that does not apply changes nothing and says why (promoMessage);
-  // the request would refuse it in the same words.
-  const subtotal = lines.reduce((sum, l) => sum + l.price, 0);
-  const found = await promoForStay(tenant, code, request.checkIn, lastNight, subtotal);
-  const applied = found !== null && found.reason === null ? found : null;
-  const discounts = await discountLines(tenant, applied?.id ?? null, lines.map((l) => l.price));
+/**
+ * A priced stay with its promo taken off by promo_discount(), the function
+ * the trigger stores from, on the same rows in the same order. Mutates the
+ * lines it was given; the quote is the only owner of them.
+ */
+export async function withDiscount(
+  tenant: BookingTenant,
+  currency: string,
+  request: ParsedRequest,
+  stay: PricedStay,
+  promo: { id: number; name: string; kind: PromoKind; value: number } | null,
+  message: string | null,
+): Promise<RequestQuote> {
+  const { lines } = stay;
+  const discounts = await discountLines(tenant, promo?.id ?? null, lines.map((l) => l.price));
   lines.forEach((line, i) => {
     line.discount = discounts[i] ?? 0;
     line.price -= line.discount;
@@ -246,16 +284,16 @@ export async function quoteRequest(
 
   return {
     slotId: request.slotId,
-    slot: slot.data.name,
+    slot: stay.slot,
     checkIn: request.checkIn,
     nights: request.nights,
     lines,
     total: lines.reduce((sum, l) => sum + l.price, 0),
-    currency: config.currency,
-    available,
-    promo: applied ? { id: applied.id, name: applied.name, kind: applied.kind, value: applied.value } : null,
+    currency,
+    available: stay.available,
+    promo: promo ? { id: promo.id, name: promo.name, kind: promo.kind, value: promo.value } : null,
     discount: discounts.reduce((sum, d) => sum + d, 0),
-    promoMessage: promoMessage(code, found),
+    promoMessage: message,
   };
 }
 
@@ -458,6 +496,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
   // overlap a listed one starts at most MAX_STAY_NIGHTS before it, which is
   // the window loaded above.
   const takers = takingRows(data, Date.now());
+  const walkIns = await walkInGroups(tenant, requests.map((g) => g.groupId));
 
   const list = requests
     .map(({ groupId, rows, checkIn }) => {
@@ -470,6 +509,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
         groupId,
         reference: first.reference ?? '',
         source: first.source as 'staff' | 'web',
+        walkIn: walkIns.has(groupId),
         status,
         guestName: first.guest_name,
         guestPhone: first.guest_phone,

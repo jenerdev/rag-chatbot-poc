@@ -207,6 +207,15 @@
 > touching a payment, a hold, a guest door or the event log. Since D-110
 > (`schema-stay-outcome.sql`, the 25th file) a declined, expired or taken
 > stay says why on S-13 and takes no proof (`payments_refuse_taken`).
+>
+> **Staff book a stay on the booking page's rules** since 2026-10-12
+> (D-111). New booking takes check-in + nights, guests per unit, name,
+> mobile AND email (`parseRequest()`, `byStaff`), shows the page's
+> night-by-night price (`priceStay()` and `StayLines`, shared), and inserts
+> every unit × night as ONE pending stay (`staff-stay.ts`). A **Walk in**
+> box labels the STAY (`schema-walk-in.sql`, the 26th file:
+> `stays.walk_in`, set by the `bookings_ac_walk_in` trigger, refused on a
+> web row). `createBookings()` is unchanged, for the tools.
 
 ## What this is
 
@@ -294,7 +303,7 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (25 files; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (26 files; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
@@ -306,7 +315,8 @@ packages/
   bookings/            @rag/bookings — availability, bookings; admin routes AND the chatbot tool call it
     src/accommodations.ts  rooms and their rates (+ holiday_price), staff only (per_room)
     src/images.ts          room photos in the `unit-images` bucket, staff only
-    src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline
+    src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline; priceStay(), the ONE stay quote
+    src/staff-stay.ts      D-111: a staff stay on the page's rules (quoteStaffStay, createStaffStay), Walk in
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
     tools/isolation.mjs    33 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking)

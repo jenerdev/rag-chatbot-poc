@@ -56,6 +56,30 @@
 
 ## ▶ Next up (do this next)
 
+**Staff booking on the page's rules (2026-10-12, `feat/staff-booking`, D-111).**
+The New booking form books a stay like the booking page: check-in + nights,
+guests per unit, name, mobile AND email, the same night-by-night price, and a
+Walk in label (on the stay).
+- [x] Code: `staff-stay.ts` (`createStaffStay`, `quoteStaffStay`),
+  `priceStay()` shared with `quoteRequest()`, `StayLines` shared with the
+  page, the two staff routes, the form, Walk in badges; `staff-cases.mjs`
+  posts the new shape. Typecheck clean; tests 124/124 bookings, 107 web.
+- [x] `schema-walk-in.sql` run (2026-10-12, by Claude through the session
+  pooler, `DATABASE_URL`, one transaction).
+- [x] verify: 162–164 pass. 162/164 overall: the two failures are "RLS
+  alone, conversations/messages under villa's token" (0 rows, villa has 0),
+  because every conversation was deleted today; they pass again once villa
+  has a chat. verify's probe payments were dated 2026-10-10 and went stale
+  (submit_payment refuses a date before the booking), which aborted
+  138–164; they now pay on today's Manila date (`PAID_TODAY`).
+- [x] rooms all pass; bookings isolation all pass, both ways;
+  staff-cases all pass over HTTP (the new POST: 201 #10091, listed back).
+- [ ] The user's browser walk of New booking (villa and harbor, one night
+  and several, Walk in). Owed on `master`.
+- [x] Merged `feat/staff-booking` into `master` (2026-10-12, by the user's
+  word, before the browser walk above).
+
+
 **Manage booking (2026-10-10, in progress on `feat/manage-booking`; Phases 0–4 done):**
 [`plan/manage-booking.md`](./plan/manage-booking.md). The guest's Manage
 booking page (reference + email or phone), payment proof and staff

@@ -591,6 +591,8 @@ export interface Database {
           /** for people, shared by the rows of one request; grants nothing */
           reference: string | null;
           guest_email: string | null;
+          /** schema-walk-in.sql (D-111): the staff form said the guest walked in; copied to the stay */
+          walk_in: boolean;
           created_at: string;
         };
         Insert: {
@@ -621,6 +623,8 @@ export interface Database {
           source?: 'staff';
           reference?: never;
           guest_email?: string | null;
+          /** staff rows only (bookings_walk_in) */
+          walk_in?: boolean;
           created_at?: string;
         };
         Update: {
@@ -682,6 +686,8 @@ export interface Database {
           pay_by: string | null;
           /** Phase 5: set when a proof arrives, the time staff have to decide it */
           review_by: string | null;
+          /** schema-walk-in.sql (D-111): set by bookings_ac_walk_in from the stay's first walk-in row; a label only */
+          walk_in: boolean;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;

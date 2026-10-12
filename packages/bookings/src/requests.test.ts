@@ -105,6 +105,17 @@ describe('parseRequest', () => {
     expect(refused({ email: 'maria@' })).toMatch(/valid email/);
     expect(refused({ notes: 'x'.repeat(1001) })).toMatch(/longer than 1000/);
   });
+
+  it("says the same rules in a staff member's words on the staff form (D-111)", () => {
+    const staff = { today: TODAY, bookingType: 'whole_resort' as const, maxNights: MAX_STAY_NIGHTS, maxAdvanceDays: MAX_BOOKING_ADVANCE_DAYS, byStaff: true };
+    expect(() => parseRequest({ ...valid, name: 'X' }, staff)).toThrow("The guest's name must be 2 to 100 characters.");
+    expect(() => parseRequest({ ...valid, name: undefined }, staff)).toThrow("The guest's name is required.");
+    // Everything else is the page's rule, unchanged: both contacts, the horizon, the guests.
+    expect(() => parseRequest({ ...valid, email: undefined }, staff)).toThrow(/valid email/);
+    expect(() => parseRequest({ ...valid, phone: '' }, staff)).toThrow(/mobile number/);
+    expect(() => parseRequest({ ...valid, checkIn: '2026-09-27' }, staff)).toThrow(/in the past/);
+    expect(parseRequest(valid, staff)).toEqual(parse());
+  });
 });
 
 describe('normalisePhone', () => {

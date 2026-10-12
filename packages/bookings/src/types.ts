@@ -84,6 +84,8 @@ export interface BookingSummary {
   /** the stay's reference, for people (D-100: every stay has one; null only on a row older than the backfill) */
   reference: string | null;
   guestEmail: string | null;
+  /** D-111: the staff member ticked Walk in; read from the stay. A label only */
+  walkIn: boolean;
   createdAt: string;
 }
 
@@ -499,6 +501,8 @@ export interface BookingRequest {
   reference: string;
   /** D-100: 'web' from the booking page (request_booking), 'staff' made on the Bookings screen; both are decided here */
   source: 'staff' | 'web';
+  /** D-111: a staff stay for a guest who walked in; a label only */
+  walkIn: boolean;
   /** every row of a group has the same status (confirm and decline are one statement) */
   status: BookingStatus;
   guestName: string;
