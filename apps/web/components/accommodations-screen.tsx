@@ -52,6 +52,8 @@ export interface AccommodationsScreenProps {
   maxImageBytes: number;
   maxImageEdge: number;
   maxImagesPerUnit: number;
+  /** A new room's defaults (@rag/bookings), from the server page, never a copy: shown as placeholders and in the read-back. */
+  roomDefaults: { standard: number; max: number; extraFee: number };
 }
 
 interface Setup {
@@ -490,6 +492,7 @@ export function AccommodationsScreen({
   maxImageBytes,
   maxImageEdge,
   maxImagesPerUnit,
+  roomDefaults,
 }: AccommodationsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
@@ -512,6 +515,11 @@ export function AccommodationsScreen({
   // The new-room form, in a drawer.
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState('');
+  // The rest of a new room, each optional: left empty, @rag/bookings' default
+  // (roomDefaults, from the server page). The fee is typed in pesos.
+  const [description, setDescription] = useState('');
+  const [standard, setStandard] = useState('');
+  const [extraFee, setExtraFee] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
@@ -577,7 +585,14 @@ export function AccommodationsScreen({
         method: 'POST',
         // Left empty, the maximum is @rag/bookings' default (4), and so are
         // the standard (2) and the extra-guest fee (₱250).
-        body: JSON.stringify({ name, ...(capacity === '' ? {} : { maxCapacity: Number(capacity) }), sortOrder: rooms?.length ?? 0 }),
+        body: JSON.stringify({
+          name,
+          ...(description.trim() === '' ? {} : { description: description.trim() }),
+          ...(capacity === '' ? {} : { maxCapacity: Number(capacity) }),
+          ...(standard === '' ? {} : { standardCapacity: Number(standard) }),
+          ...(extraFee.trim() === '' || parseMoneyInput(extraFee) === null ? {} : { extraPersonRate: parseMoneyInput(extraFee) }),
+          sortOrder: rooms?.length ?? 0,
+        }),
       });
       // Opened, so its rates are the next thing in view.
       const added = (await response.json()) as Accommodation;
@@ -585,6 +600,9 @@ export function AccommodationsScreen({
       setNotice({ message: `Added ${name}. Give it a rate so it can be booked.`, kind: 'ok' });
       setName('');
       setCapacity('');
+      setDescription('');
+      setStandard('');
+      setExtraFee('');
       setFormOpen(false);
       void load();
     } catch (error) {
@@ -669,35 +687,63 @@ export function AccommodationsScreen({
         {dialog}
 
         <Drawer open={formOpen} title="Add a room" onClose={() => setFormOpen(false)}>
-          <form onSubmit={addRoom}>
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="new-name">Name</label>
-                <input type="text" id="new-name" required value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="field narrow">
-                <label htmlFor="new-capacity">Max guests</label>
-                <input type="number" id="new-capacity" min={1} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
-              </div>
+          <form onSubmit={addRoom} className="setup-form">
+            <p className="small muted setup-intro">A room guests can book on its own. Next you give it a rate for each slot and add photos.</p>
+            <div className="field">
+              <label htmlFor="new-name">Name</label>
+              <input type="text" id="new-name" required autoComplete="off" placeholder="Garden Room" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <div className="form-footer">
-              <span className="small muted">
-                A new room covers 2 guests, takes up to 4, and charges ₱250 per extra guest until you change it. It is offered once it has a rate.
-              </span>
-              <span className="form-actions">
-                <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
-                  Add room
-                </button>
-              </span>
+            <div className="field">
+              <label htmlFor="new-description">
+                Description <span className="muted">(optional)</span>
+              </label>
+              <textarea id="new-description" rows={2} placeholder="A queen bed and a view of the garden." value={description} onChange={(e) => setDescription(e.target.value)} />
+              <p className="hint">Shown with the room's photos on the booking page and in the chat.</p>
             </div>
+            <fieldset className="setup-group">
+              <legend>Guests</legend>
+              <div className="field-row">
+                <div className="field narrow">
+                  <label htmlFor="new-standard">Included</label>
+                  <input type="number" id="new-standard" min={1} step={1} placeholder={String(roomDefaults.standard)} value={standard} onChange={(e) => setStandard(e.target.value)} />
+                </div>
+                <div className="field narrow">
+                  <label htmlFor="new-capacity">At most</label>
+                  <input type="number" id="new-capacity" min={1} step={1} placeholder={String(roomDefaults.max)} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="new-fee">Each extra guest</label>
+                  <div className="input-prefix">
+                    <span aria-hidden="true">{setup.currency === 'PHP' ? '₱' : setup.currency}</span>
+                    <input type="text" id="new-fee" inputMode="decimal" placeholder={centavosToInput(roomDefaults.extraFee)} value={extraFee} onChange={(e) => setExtraFee(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <p className="hint">Empty fields keep the defaults shown. You can change all of these later.</p>
+            </fieldset>
+            {/* Read back with the defaults filled in: what a guest will be told. */}
+            <p className="setup-summary" aria-live="polite">
+              <Icon name="bed" size={14} />
+              {`${name.trim() || 'This room'} covers ${standard || roomDefaults.standard} guest${(standard || String(roomDefaults.standard)) === '1' ? '' : 's'}, takes up to ${capacity || roomDefaults.max}, and charges ${
+                extraFee.trim() && parseMoneyInput(extraFee) !== null ? formatMoney(parseMoneyInput(extraFee)!, setup.currency) : formatMoney(roomDefaults.extraFee, setup.currency)
+              } a night for each guest above ${standard || roomDefaults.standard}.`}
+            </p>
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
               </div>
             )}
+            <div className="drawer-footer">
+              <div className="drawer-footer-total">
+                <span className="small muted">{name.trim() === '' ? 'Give it a name' : 'It is offered once it has a rate.'}</span>
+              </div>
+              <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || name.trim() === ''}>
+                {busy ? 'Adding…' : 'Add room'}
+              </button>
+            </div>
           </form>
         </Drawer>
 

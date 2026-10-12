@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { bookingsConfig, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_IMAGES_PER_UNIT } from '@rag/bookings';
+import { bookingsConfig, DEFAULT_EXTRA_PERSON_RATE, DEFAULT_MAX_CAPACITY, DEFAULT_STANDARD_CAPACITY, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_IMAGES_PER_UNIT } from '@rag/bookings';
 import { AccommodationsScreen } from '@/components/accommodations-screen';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
@@ -38,6 +38,7 @@ export default async function TenantAccommodationsPage({ params }: { params: Pro
       maxImageBytes={MAX_IMAGE_BYTES}
       maxImageEdge={MAX_IMAGE_EDGE}
       maxImagesPerUnit={MAX_IMAGES_PER_UNIT}
+      roomDefaults={{ standard: DEFAULT_STANDARD_CAPACITY, max: DEFAULT_MAX_CAPACITY, extraFee: DEFAULT_EXTRA_PERSON_RATE }}
     />
   );
 }

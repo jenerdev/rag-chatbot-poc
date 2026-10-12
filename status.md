@@ -56,6 +56,19 @@
 
 ## ▶ Next up (do this next)
 
+**Rooms, Holidays, Slots and Promos, with their drawers, redesigned (2026-10-12).**
+- [x] One drawer pattern: an intro line, hints, choices as cards (holiday
+  kind; promo discount and how a guest gets it; Nightly), a live sentence
+  of what will be saved, and the pinned footer saying what is missing.
+  Rows: a slot's start and end (`lib/slot-span.ts`, 7 tests), a date's
+  weekday, a promo's range in words with Running / Starts later / Ended and
+  its code with copy. The Rooms drawer takes the description, guests
+  included, the maximum and the extra-guest fee (defaults from the server
+  page). `plan/setup-drawers-walk.mjs` 12/12 (a slot, a promo with a code
+  and a closed date saved through the drawers, checked in the database,
+  then deleted; nothing left behind). Screenshots:
+  `plan/setup-pages-shots.mjs`.
+
 **Payments screen, redesigned (2026-10-12).**
 - [x] Rows: the amount and how it came, who and for which stay, ONE status
   badge, Review/Open; a waiting row marked on its edge. All payments:

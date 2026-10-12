@@ -16,9 +16,11 @@
 // A new slot has no price until rates are set for it (the Rooms screen, or
 // the whole property's rates), so it is not offered on the booking page yet.
 //
-// The look (plan/ui-refresh.md Phase 9): "Add a slot" and Edit open the form
-// in a drawer; Retire and Delete ask in the dialog; the retired slots are
-// folded away under "Retired (n)".
+// The look (plan/ui-refresh.md Phase 9, refined 2026-10-12): "Add a slot"
+// and Edit open the form in a drawer that reads its times back ("Runs 14:00
+// to 12:00 the next day") with a pinned footer saying what is missing; each
+// row says when the slot starts and ends; Retire and Delete ask in the
+// dialog; the retired slots are folded away under "Retired (n)".
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SlotAdmin } from '@rag/bookings';
@@ -32,6 +34,7 @@ import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { dayWords, slotEnd } from '@/lib/slot-span';
 
 export interface SlotsScreenProps {
   slug: string;
@@ -185,6 +188,10 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   // The times are fixed while upcoming bookings use the slot: the fields say
   // so before the server has to (the server and Postgres still decide).
   const timesFixed = editing !== null && editing.upcoming > 0;
+  // The form read back: the length in minutes and when it ends; what is still missing.
+  const draftMinutes = Number(draft.hours || 0) * 60 + Number(draft.minutes || 0);
+  const draftEnd = slotEnd(draft.startTime, draftMinutes);
+  const formMissing = draft.name.trim() === '' ? 'Add a name' : draft.startTime === '' ? 'Set the start time' : !(draftMinutes > 0) ? 'Set how long it lasts' : null;
 
   const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'slots' as const, title: 'Slots', session: { auth, role, onLogout: logout } };
 
@@ -232,89 +239,82 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
         {dialog}
 
         <Drawer open={formOpen} title={draft.id === null ? 'Add a slot' : `Edit "${editing?.name ?? draft.name}"`} onClose={closeForm}>
-          <p className="small muted">
-            A slot is a period you sell, such as a Day Tour from 08:00 for 9 hours. It can run past midnight. Nightly means a
-            stay can repeat it night after night. Times are in {slots?.[0]?.timezone ?? 'the business’s timezone'}.
-          </p>
-          {timesFixed && (
-            <p className="small">
-              <strong>
-                {editing!.upcoming} upcoming booking{editing!.upcoming === 1 ? '' : 's'} use this slot,
-              </strong>{' '}
-              so its start time and length cannot change. Its name and nightly can. For new times, add a new slot and retire
-              this one.
+          <form onSubmit={save} className="setup-form">
+            <p className="small muted setup-intro">
+              A period you sell, such as a Day Tour or a Night. Times are in {slots?.[0]?.timezone ?? 'the business’s timezone'}.
             </p>
-          )}
-          <form onSubmit={save}>
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="slot-name">Name</label>
-                <input id="slot-name" required maxLength={60} placeholder="Day Tour" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-              </div>
-              <div className="field">
-                <label htmlFor="slot-start">Starts at</label>
-                <input
-                  id="slot-start"
-                  type="time"
-                  required
-                  disabled={timesFixed}
-                  value={draft.startTime}
-                  onChange={(e) => setDraft({ ...draft, startTime: e.target.value })}
-                />
-              </div>
-              <div className="field narrow">
-                <label htmlFor="slot-hours">Hours</label>
-                <input
-                  id="slot-hours"
-                  type="number"
-                  min={0}
-                  max={48}
-                  required
-                  disabled={timesFixed}
-                  value={draft.hours}
-                  onChange={(e) => setDraft({ ...draft, hours: e.target.value })}
-                />
-              </div>
-              <div className="field narrow">
-                <label htmlFor="slot-minutes">Minutes</label>
-                <input
-                  id="slot-minutes"
-                  type="number"
-                  min={0}
-                  max={59}
-                  disabled={timesFixed}
-                  value={draft.minutes}
-                  onChange={(e) => setDraft({ ...draft, minutes: e.target.value })}
-                />
-              </div>
+            {timesFixed && (
+              <p className="notice">
+                <strong>
+                  {editing!.upcoming} upcoming booking{editing!.upcoming === 1 ? '' : 's'} use this slot,
+                </strong>{' '}
+                so its start time and length cannot change. Its name and Nightly can. For new times, add a new slot and retire this one.
+              </p>
+            )}
+            <div className="field">
+              <label htmlFor="slot-name">Name</label>
+              <input id="slot-name" required maxLength={60} autoComplete="off" placeholder="Day Tour" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+              <p className="hint">Guests see it on the booking page and in the chat.</p>
             </div>
-            <label className="small">
-              <input type="checkbox" checked={draft.nightly} onChange={(e) => setDraft({ ...draft, nightly: e.target.checked })} /> Nightly: a stay
-              can book this slot for several nights in a row
+            <fieldset className="setup-group">
+              <legend>When it runs</legend>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="slot-start">Starts at</label>
+                  <input id="slot-start" type="time" required disabled={timesFixed} value={draft.startTime} onChange={(e) => setDraft({ ...draft, startTime: e.target.value })} />
+                </div>
+                <div className="field narrow">
+                  <label htmlFor="slot-hours">Hours</label>
+                  <input id="slot-hours" type="number" min={0} max={48} required disabled={timesFixed} value={draft.hours} onChange={(e) => setDraft({ ...draft, hours: e.target.value })} />
+                </div>
+                <div className="field narrow">
+                  <label htmlFor="slot-minutes">Minutes</label>
+                  <input id="slot-minutes" type="number" min={0} max={59} disabled={timesFixed} value={draft.minutes} onChange={(e) => setDraft({ ...draft, minutes: e.target.value })} />
+                </div>
+              </div>
+              {/* Read back, so a 22-hour night is seen to end the next day before it is saved. */}
+              <p className="setup-summary" aria-live="polite">
+                <Icon name="clock" size={14} />
+                {draftEnd ? (
+                  <>
+                    Runs {draft.startTime} to {draftEnd.time} {dayWords(draftEnd.days)} ({lengthLabel(draftMinutes)}).
+                  </>
+                ) : (
+                  'Set a start time and a length to see when it ends.'
+                )}
+              </p>
+            </fieldset>
+            <label className={`option-card${draft.nightly ? ' picked' : ''}`}>
+              <input type="checkbox" checked={draft.nightly} onChange={(e) => setDraft({ ...draft, nightly: e.target.checked })} />
+              <span className="room-pick-text">
+                <span className="room-pick-name">Nightly</span>
+                <span className="small muted">A guest can book it night after night, for a stay of several nights.</span>
+              </span>
             </label>
-            <div className="form-footer">
-              <span className="small muted">
-                {draft.id === null ? 'A new slot has no price until its rates are set.' : 'Bookings already made keep the times they were made with.'}
-              </span>
-              <span className="form-actions">
-                <button type="button" disabled={busy} onClick={closeForm}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
-                  {busy ? 'Saving…' : draft.id === null ? 'Add slot' : 'Save'}
-                </button>
-              </span>
-            </div>
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
               </div>
             )}
+            <div className="drawer-footer">
+              <div className="drawer-footer-total">
+                <span className="small muted">
+                  {formMissing ?? (draft.id === null ? 'A new slot is offered once its rates are set.' : 'Bookings already made keep their times.')}
+                </span>
+              </div>
+              <button type="button" disabled={busy} onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+                {busy ? 'Saving…' : draft.id === null ? 'Add slot' : 'Save'}
+              </button>
+            </div>
           </form>
         </Drawer>
 
         <section className="card">
           <h2>Slots offered</h2>
+          <p className="small muted">Each room is priced per slot on the Rooms screen. A slot with no rate is not offered yet.</p>
           {slots === null ? (
             <LoadState load={loadState} what="slots" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : active.length === 0 ? (
@@ -322,16 +322,25 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
               Nothing can be booked without one.
             </EmptyState>
           ) : (
-            active.map((s) => (
-              <div key={s.id} className="list-row">
-                <span className="list-row-lead">{s.startTime}</span>
+            active.map((s) => {
+              const end = slotEnd(s.startTime, s.minutes);
+              return (
+              <div key={s.id} className="list-row setup-row">
+                <span className="setup-row-when">
+                  <strong>{s.startTime}</strong>
+                  <span className="small muted">
+                    to {end?.time ?? '?'}
+                    {end && end.days > 0 ? ` +${end.days}d` : ''}
+                  </span>
+                </span>
                 <span className="list-row-main">
                   <span className="list-row-title">{s.name}</span>
                   {s.nightly && <span className="badge accent">Nightly</span>}
-                </span>
-                <span className="list-row-meta">
-                  {lengthLabel(s.minutes)}
-                  {s.upcoming > 0 ? ` · ${s.upcoming} upcoming` : ''}
+                  <span className="small muted setup-row-line">
+                    {lengthLabel(s.minutes)}
+                    {end ? `, ending ${dayWords(end.days)}` : ''}
+                    {s.upcoming > 0 ? ` · ${s.upcoming} upcoming booking${s.upcoming === 1 ? '' : 's'}` : ''}
+                  </span>
                 </span>
                 <span className="list-row-actions">
                   <Tip label="Edit">
@@ -380,7 +389,8 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
                   )}
                 </span>
               </div>
-            ))
+              );
+            })
           )}
         </section>
 

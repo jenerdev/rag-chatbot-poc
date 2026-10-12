@@ -19,9 +19,12 @@
 // many), and refuses every booking on a closed date whatever this screen
 // shows. Removing it reopens the date.
 //
-// The look (plan/ui-refresh.md Phase 9): "Add a date" and Edit open the form
-// in a drawer; the next twelve months are grouped by month, each date's kind
-// a badge; Remove and Reopen ask in the dialog.
+// The look (plan/ui-refresh.md Phase 9, refined 2026-10-12): "Add a date"
+// and Edit open the form in a drawer where the kind is a choice of three
+// cards (Holiday, Peak, Closed), each saying what it does, the surcharge
+// shows only where it applies, a sentence reads back what will happen on
+// the date, and the footer says what is missing; the next twelve months are
+// grouped by month, each date's kind a badge; Remove and Reopen ask.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { CalendarDay } from '@rag/bookings';
@@ -276,6 +279,10 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       className="primary"
       onClick={() => {
         setNotice(null);
+        setDay('');
+        setLabel('');
+        setSurcharge('');
+        setKind('holiday');
         setFormOpen(true);
       }}
     >
@@ -291,6 +298,22 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     if (last && last.month === month) last.days.push(d);
     else months.push({ month, days: [d] });
   }
+  // What the form will save, read back; what it still needs; whether it replaces a listed date.
+  const listed = (upcoming ?? []).find((d) => d.day === day) ?? null;
+  const formMissing = day === '' ? 'Choose the date' : label.trim() === '' ? 'Give it a name' : null;
+  const amountText = kind !== 'closed' && surcharge.trim() !== '' && parseMoneyInput(surcharge) ? formatMoney(parseMoneyInput(surcharge)!, setup.currency) : null;
+  const summary =
+    day === ''
+      ? null
+      : kind === 'closed'
+        ? `${dayLabel(day)}${label.trim() ? `, ${label.trim()}` : ''}: nothing can be booked, and the chat says you are closed.`
+        : `${dayLabel(day)}${label.trim() ? `, ${label.trim()}` : ''}: every room is priced at its holiday rate (or its weekend rate)${amountText ? `, plus ${amountText} a night` : ''}.`;
+  const KINDS: { key: CalendarDay['kind']; title: string; text: string }[] = [
+    { key: 'holiday', title: 'Holiday', text: 'A public or local holiday, priced at the holiday rate.' },
+    { key: 'peak', title: 'Peak', text: 'A busy date that is not a holiday, priced the same way.' },
+    { key: 'closed', title: 'Closed', text: 'Nothing can be booked, by guests or staff.' },
+  ];
+
   const kindBadge = (k: CalendarDay['kind']) =>
     k === 'closed' ? <span className="badge danger">Closed</span> : k === 'peak' ? <span className="badge accent">Peak</span> : <span className="badge warn">Holiday</span>;
 
@@ -299,36 +322,13 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
       <StaffFrame {...frame} actions={addDate}>
         {dialog}
 
-        <Drawer open={formOpen} title="Add a holiday or a closed date" onClose={() => setFormOpen(false)}>
-          <p className="small muted">
-            On a holiday or peak date every room is priced at its holiday rate, or its weekend rate if it has none, plus the
-            surcharge for each night. Bookings already made keep their price.
-          </p>
-          <p className="small muted">
-            On a closed date nothing can be booked, by a customer or by staff, and the chat says you are closed. A date that
-            already has confirmed bookings cannot be closed until they are cancelled or moved.
-          </p>
-          <form onSubmit={save}>
+        <Drawer open={formOpen} title={listed ? `Edit ${dayLabel(listed.day)}` : 'Add a date'} onClose={() => setFormOpen(false)}>
+          <form onSubmit={save} className="setup-form">
+            <p className="small muted setup-intro">A date priced differently from a normal weekday or weekend, or closed. Bookings already made keep their price.</p>
             <div className="field-row">
               <div className="field">
                 <label htmlFor="day">Date</label>
-                <input type="date" id="day" required value={day} onChange={(e) => setDay(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="kind">Kind</label>
-                <select
-                  id="kind"
-                  value={kind}
-                  onChange={(e) => {
-                    const next = e.target.value as CalendarDay['kind'];
-                    setKind(next);
-                    if (next === 'closed') setSurcharge('');
-                  }}
-                >
-                  <option value="holiday">Holiday</option>
-                  <option value="peak">Peak</option>
-                  <option value="closed">Closed</option>
-                </select>
+                <input type="date" id="day" required min={setup.today} value={day} onChange={(e) => setDay(e.target.value)} />
               </div>
               <div className="field grow">
                 <label htmlFor="label">Name</label>
@@ -337,47 +337,84 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
                   id="label"
                   required
                   maxLength={100}
+                  autoComplete="off"
                   placeholder={kind === 'closed' ? 'Maintenance' : 'Christmas Eve'}
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </div>
+            </div>
+            {listed && <p className="hint">This date is already listed as {listed.label}; saving changes it.</p>}
+
+            <fieldset className="setup-choice-set">
+              <legend className="field-label">What happens on this date</legend>
+              <div className="setup-choices cols-3">
+              {KINDS.map((k) => (
+                <label key={k.key} className={`review-option${k.key === 'closed' ? ' danger' : ''}${kind === k.key ? ' picked' : ''}`}>
+                  <input
+                    type="radio"
+                    name="kind"
+                    checked={kind === k.key}
+                    onChange={() => {
+                      setKind(k.key);
+                      if (k.key === 'closed') setSurcharge('');
+                    }}
+                  />
+                  <span>
+                    <strong>{k.title}</strong>
+                    <span className="small muted">{k.text}</span>
+                  </span>
+                </label>
+              ))}
+              </div>
+            </fieldset>
+            {kind === 'closed' && (
+              <p className="hint">A date with confirmed bookings cannot be closed until they are cancelled or moved.</p>
+            )}
+
+            {/* Only where it applies: a closed date has no price. */}
+            {kind !== 'closed' && (
               <div className="field">
                 <label htmlFor="surcharge">
                   Surcharge per night <span className="muted">(optional)</span>
                 </label>
-                <input
-                  type="text"
-                  id="surcharge"
-                  inputMode="decimal"
-                  placeholder="0"
-                  disabled={kind === 'closed'}
-                  value={surcharge}
-                  onChange={(e) => setSurcharge(e.target.value)}
-                />
+                <div className="input-prefix">
+                  <span aria-hidden="true">{setup.currency === 'PHP' ? '₱' : setup.currency}</span>
+                  <input type="text" id="surcharge" inputMode="decimal" placeholder="0" value={surcharge} onChange={(e) => setSurcharge(e.target.value)} />
+                </div>
+                <p className="hint">Added to every night on this date, for every room.</p>
               </div>
-            </div>
-            <div className="form-footer">
-              <span className="small muted">Saving a date that is already listed changes it.</span>
-              <span className="form-actions">
-                <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
-                  {busy ? 'Saving…' : 'Save'}
-                </button>
-              </span>
-            </div>
+            )}
+
+            {summary && (
+              <p className="setup-summary" aria-live="polite">
+                <Icon name={kind === 'closed' ? 'alert' : 'flag'} size={14} />
+                {summary}
+              </p>
+            )}
+
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
               </div>
             )}
+            <div className="drawer-footer">
+              <div className="drawer-footer-total">
+                <span className="small muted">{formMissing ?? (listed ? 'Saving replaces the listed date.' : 'Ready to save.')}</span>
+              </div>
+              <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+                {busy ? 'Saving…' : listed ? 'Save changes' : 'Add date'}
+              </button>
+            </div>
           </form>
         </Drawer>
 
         <section className="card">
           <h2>The next twelve months</h2>
+          <p className="small muted">Holidays and peak dates use each room's holiday rate; closed dates take no booking.</p>
           {upcoming === null ? (
             <LoadState load={loadState} what="dates" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : upcoming.length === 0 ? (
@@ -389,8 +426,11 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
               <div key={month} className="month-group">
                 <h3 className="month-label">{month}</h3>
                 {days.map((d) => (
-                  <div key={d.day} className="list-row">
-                    <span className="list-row-lead">{dayLabel(d.day)}</span>
+                  <div key={d.day} className="list-row setup-row">
+                    <span className="setup-row-when">
+                      <strong>{new Date(`${d.day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}</strong>
+                      <span className="small muted">{new Date(`${d.day}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })}</span>
+                    </span>
                     <span className="list-row-main">
                       <span className="list-row-title">{d.label}</span>
                       {kindBadge(d.kind)}

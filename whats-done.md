@@ -8736,3 +8736,33 @@ saved terms; "Stop taking payment" opens the question, and "Keep taking
 payment" leaves the stored settings as they were. No console error; every
 tab exactly 1280 or 390 px wide. The seeds and their proof files were
 deleted; the tenant's own earlier payments were left untouched.
+
+## 2026-10-12 — Rooms, Holidays, Slots and Promos, and their drawers
+
+**What was done:** the four setup drawers share one pattern: an intro line;
+a hint under each field; choices as cards, not dropdowns (a date is a
+Holiday, Peak or Closed; a promo is a percentage or a fixed amount, given
+by itself or with a code; a slot is Nightly or not); a sentence reading
+back what will be saved ("Runs 20:30 to 02:45 the next day (6 hours 15
+minutes)", "15 % off stays from 1 Mar to 31 Mar 2027, for guests who type
+WALK15, for up to 3 bookings.", "Thu, 30 Dec 2027, Walk closed: nothing
+can be booked…", "Walk Room covers 3 guests, takes up to 5, and charges
+₱400.00 a night for each guest above 3."); and the pinned footer that says
+what is missing. Fields show only where they apply (no surcharge on a
+closed date, no code field for an automatic promo). The Rooms drawer now
+takes the description and the guest numbers and fee at creation, with the
+defaults shown as placeholders (passed from the server page, never a copy).
+Rows: a slot shows when it starts and ends (`slotEnd()`, tested); a date
+leads with its day and weekday; a promo leads with its discount and range
+in words, says Running, Starts later or Ended by the tenant's today, and
+its code can be copied.
+
+**Why it matters:** the drawers were bare forms with long paragraphs above
+them; a 22-hour slot or an automatic promo's reach had to be worked out in
+one's head; the promo list printed raw ISO dates.
+
+**What the observed values prove:** the walk saved through the drawers and
+read the database back: the slot as 20:30 for 06:15:00, the promo as
+percent 1500 with code WALK15 and limit 3, the date as closed with no
+surcharge; each footer held its button until the form was complete; then
+everything it made was deleted (0 left behind). Web tests 130 (7 new).

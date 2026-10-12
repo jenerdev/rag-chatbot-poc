@@ -17,9 +17,12 @@
 // an INTEGER: centavos, or hundredths of a percent (1250). Parsed by string,
 // never × 100 (plan § 2.1).
 //
-// The look (plan/ui-refresh.md Phase 9): "Add a promo" and Edit open the
-// form in a drawer; the value is a badge in words ("12.5 % off"); Retire and
-// Delete ask in the dialog.
+// The look (plan/ui-refresh.md Phase 9, refined 2026-10-12): "Add a promo"
+// and Edit open the form in a drawer where the discount's kind and how a
+// guest gets it (automatic or with a code) are choices of two cards each,
+// a sentence reads the promo back, and the footer says what is missing.
+// Each row says its dates in words, whether it is running, starts later or
+// has ended (the tenant's today), and its uses; Retire and Delete ask.
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Promo } from '@rag/bookings';
@@ -33,6 +36,7 @@ import { parsePercentInput, percentToInput } from '@/lib/percent';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { CopyText } from '@/components/copy-button';
 import { Tip } from '@/components/tooltip';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
@@ -80,6 +84,11 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
   const [showRetired, setShowRetired] = useState(false);
+  // How a guest gets the promo: by itself, or by typing a code. A choice of
+  // its own (the code field shows only for it), saved as the code or none.
+  const [withCode, setWithCode] = useState(false);
+  // The TENANT's today (trap 9), for whether a promo is running.
+  const [today, setToday] = useState<string | null>(null);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -115,6 +124,14 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   useEffect(() => {
     if (auth === 'in') void load();
   }, [auth, load]);
+
+  useEffect(() => {
+    if (auth !== 'in') return;
+    void fetch(`${api}/bookings/setup`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { today?: string } | null) => setToday(body?.today ?? null))
+      .catch(() => setToday(null));
+  }, [api, auth]);
 
   const logout = useCallback(async () => {
     await fetch(`${api}/admin/session`, { method: 'DELETE' }).catch(() => undefined);
@@ -169,7 +186,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       value,
       validFrom: draft.validFrom,
       validTo: draft.validTo,
-      code: draft.code.trim() === '' ? null : draft.code.trim(),
+      code: withCode && draft.code.trim() !== '' ? draft.code.trim() : null,
       maxUses,
     };
     const ok =
@@ -199,6 +216,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       code: p.code ?? '',
       maxUses: p.maxUses === null ? '' : String(p.maxUses),
     });
+    setWithCode(p.code !== null);
     setNotice(null);
     setFormOpen(true);
   }
@@ -234,15 +252,45 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
   // stay, which is a surprise worth naming (plan § 2.5).
   const overlapping = active.filter((p) => p.code === null && active.some((q) => q.id !== p.id && q.code === null && q.validFrom <= p.validTo && p.validFrom <= q.validTo));
 
+  const short = (d: string, year = false) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}), timeZone: 'UTC' });
+  /** "4 Oct – 4 Dec 2026", the year once when both dates share it. */
+  const rangeLabel = (from: string, to: string) => (from.slice(0, 4) === to.slice(0, 4) ? `${short(from)} – ${short(to, true)}` : `${short(from, true)} – ${short(to, true)}`);
+  const statusOf = (p: Promo): { label: string; tone: string } | null =>
+    !p.active || !today ? null : today > p.validTo ? { label: 'Ended', tone: '' } : today < p.validFrom ? { label: 'Starts later', tone: 'accent' } : { label: 'Running', tone: 'ok' };
+
+  // The form read back, and what it still needs.
+  const parsedValue = draft.value.trim() === '' ? null : draft.kind === 'fixed' ? parseMoneyInput(draft.value) : parsePercentInput(draft.value);
+  const formMissing =
+    draft.name.trim() === ''
+      ? 'Give it a name'
+      : !parsedValue
+        ? draft.kind === 'fixed'
+          ? 'Enter the amount off'
+          : 'Enter the percentage off'
+        : draft.validFrom === '' || draft.validTo === ''
+          ? 'Choose the dates'
+          : draft.validTo < draft.validFrom
+            ? 'The end date is before the start'
+            : withCode && draft.code.trim() === ''
+              ? 'Type the code guests will enter'
+              : null;
+  const summary =
+    parsedValue && draft.validFrom && draft.validTo && draft.validTo >= draft.validFrom
+      ? `${draft.kind === 'fixed' ? `${formatMoney(parsedValue, currency)} off` : `${percentToInput(parsedValue)} % off`} stays from ${draft.validFrom.slice(0, 4) === draft.validTo.slice(0, 4) ? short(draft.validFrom) : short(draft.validFrom, true)} to ${short(draft.validTo, true)}, ${
+          withCode ? (draft.code.trim() ? `for guests who type ${draft.code.trim().toUpperCase()}` : 'for guests who type the code') : 'applied by itself'
+        }${draft.maxUses.trim() ? `, for up to ${draft.maxUses.trim()} booking${draft.maxUses.trim() === '1' ? '' : 's'}` : ''}.`
+      : null;
+
   const row = (p: Promo) => (
-    <div key={p.id} className="list-row">
-      <span className="list-row-lead">
-        {p.validFrom} → {p.validTo}
+    <div key={p.id} className="list-row setup-row">
+      <span className="setup-row-when">
+        <strong>{valueLabel(p, currency)} off</strong>
+        <span className="small muted">{rangeLabel(p.validFrom, p.validTo)}</span>
       </span>
       <span className="list-row-main">
         <span className="list-row-title">{p.name}</span>
-        <span className="badge ok">{valueLabel(p, currency)} off</span>
-        <span className={p.code ? 'badge accent' : 'badge'}>{p.code ? `Code ${p.code}` : 'Automatic'}</span>
+        {statusOf(p) && <span className={`badge ${statusOf(p)!.tone}`}>{statusOf(p)!.label}</span>}
+        {p.code ? <CopyText text={p.code} what="promo code" className="badge accent request-ref" /> : <span className="badge">Automatic</span>}
         {!p.active && <span className="badge">Retired</span>}
         {overlapping.includes(p) && (
           <span className="badge warn">
@@ -251,8 +299,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
         )}
       </span>
       <span className="list-row-meta">
-        {p.uses} use{p.uses === 1 ? '' : 's'}
-        {p.maxUses !== null ? ` of ${p.maxUses}` : ''}
+        {p.maxUses !== null ? `${p.uses} of ${p.maxUses} used` : `${p.uses} use${p.uses === 1 ? '' : 's'}`}
       </span>
       <span className="list-row-actions">
         {p.active && (
@@ -310,7 +357,10 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
       type="button"
       className="primary"
       onClick={() => {
-        if (draft.id !== null) setDraft(EMPTY);
+        if (draft.id !== null) {
+          setDraft(EMPTY);
+          setWithCode(false);
+        }
         setNotice(null);
         setFormOpen(true);
       }}
@@ -325,89 +375,117 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
         {dialog}
 
         <Drawer open={formOpen} title={draft.id === null ? 'Add a promo' : `Edit "${editing?.name ?? draft.name}"`} onClose={closeForm}>
-          <p className="small muted">
-            A promo takes its discount off every stay whose dates fall inside its range. With a code, the customer types it on
-            the booking page; without one, it applies by itself. The database computes the discount when a booking is quoted or
-            made; a promo edited later changes future bookings only.
-          </p>
-          <form onSubmit={save}>
-            <div className="field-row">
-              <div className="field grow">
-                <label htmlFor="promo-name">Name</label>
-                <input id="promo-name" required maxLength={80} placeholder="Off season discount" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <form onSubmit={save} className="setup-form">
+            <p className="small muted setup-intro">A discount on the stays in its dates. Bookings already made keep their discount.</p>
+            <div className="field">
+              <label htmlFor="promo-name">Name</label>
+              <input id="promo-name" required maxLength={80} autoComplete="off" placeholder="Off season discount" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+              <p className="hint">Guests see it on the booking page's price; staff see it on each booking.</p>
+            </div>
+
+            <fieldset className="setup-choice-set">
+              <legend className="field-label">The discount</legend>
+              <div className="setup-choices cols-2">
+                {(
+                  [
+                    ['percent', 'A percentage off', 'Of each night, e.g. 10 %.'],
+                    ['fixed', 'A fixed amount off', 'Once per booking, e.g. ₱500.'],
+                  ] as const
+                ).map(([key, title, text]) => (
+                  <label key={key} className={`review-option${draft.kind === key ? ' picked' : ''}`}>
+                    <input type="radio" name="promo-kind" checked={draft.kind === key} onChange={() => setDraft({ ...draft, kind: key, value: '' })} />
+                    <span>
+                      <strong>{title}</strong>
+                      <span className="small muted">{text}</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div className="field">
-                <label htmlFor="promo-kind">Type</label>
-                <select id="promo-kind" value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value === 'fixed' ? 'fixed' : 'percent', value: '' })}>
-                  <option value="percent">Percentage</option>
-                  <option value="fixed">Fixed amount</option>
-                </select>
-              </div>
-              <div className="field narrow">
-                <label htmlFor="promo-value">{draft.kind === 'fixed' ? `Amount (${currency})` : 'Percent'}</label>
-                <input
-                  id="promo-value"
-                  required
-                  inputMode="decimal"
-                  placeholder={draft.kind === 'fixed' ? '500' : '12.5'}
-                  value={draft.value}
-                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                />
+            </fieldset>
+            <div className="field">
+              <label htmlFor="promo-value">{draft.kind === 'fixed' ? 'Amount off' : 'Percentage off'}</label>
+              <div className="input-prefix">
+                <span aria-hidden="true">{draft.kind === 'fixed' ? (currency === 'PHP' ? '₱' : currency) : '%'}</span>
+                <input id="promo-value" required inputMode="decimal" placeholder={draft.kind === 'fixed' ? '500' : '12.5'} value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
               </div>
             </div>
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="promo-from">Stays from</label>
-                <input id="promo-from" type="date" required value={draft.validFrom} onChange={(e) => setDraft({ ...draft, validFrom: e.target.value })} />
+
+            <fieldset className="setup-group">
+              <legend>Stays it covers</legend>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="promo-from">From</label>
+                  <input id="promo-from" type="date" required value={draft.validFrom} onChange={(e) => setDraft({ ...draft, validFrom: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="promo-to">To</label>
+                  <input id="promo-to" type="date" required min={draft.validFrom || undefined} value={draft.validTo} onChange={(e) => setDraft({ ...draft, validTo: e.target.value })} />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="promo-to">to</label>
-                <input id="promo-to" type="date" required value={draft.validTo} onChange={(e) => setDraft({ ...draft, validTo: e.target.value })} />
-              </div>
-              <div className="field">
-                <label htmlFor="promo-code">
-                  Code <span className="muted">(optional)</span>
+              <p className="hint">Every night of the stay must fall within these dates.</p>
+            </fieldset>
+
+            <fieldset className="setup-choice-set">
+              <legend className="field-label">How a guest gets it</legend>
+              <div className="setup-choices cols-2">
+                <label className={`review-option${!withCode ? ' picked' : ''}`}>
+                  <input type="radio" name="promo-how" checked={!withCode} onChange={() => setWithCode(false)} />
+                  <span>
+                    <strong>By itself</strong>
+                    <span className="small muted">Every stay in the dates gets it.</span>
+                  </span>
                 </label>
-                <input
-                  id="promo-code"
-                  maxLength={32}
-                  placeholder="SUMMER10"
-                  value={draft.code}
-                  onChange={(e) => setDraft({ ...draft, code: e.target.value })}
-                />
-              </div>
-              <div className="field narrow">
-                <label htmlFor="promo-max">
-                  Limit <span className="muted">(optional)</span>
+                <label className={`review-option${withCode ? ' picked' : ''}`}>
+                  <input type="radio" name="promo-how" checked={withCode} onChange={() => setWithCode(true)} />
+                  <span>
+                    <strong>With a code</strong>
+                    <span className="small muted">The guest types it on the booking page.</span>
+                  </span>
                 </label>
-                <input id="promo-max" type="number" min={1} placeholder="10" value={draft.maxUses} onChange={(e) => setDraft({ ...draft, maxUses: e.target.value })} />
               </div>
+            </fieldset>
+            {withCode && (
+              <div className="field">
+                <label htmlFor="promo-code">Code</label>
+                <input id="promo-code" maxLength={32} autoComplete="off" placeholder="SUMMER10" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
+              </div>
+            )}
+            <div className="field">
+              <label htmlFor="promo-max">
+                Limit <span className="muted">(optional)</span>
+              </label>
+              <input id="promo-max" type="number" min={1} placeholder="no limit" value={draft.maxUses} onChange={(e) => setDraft({ ...draft, maxUses: e.target.value })} />
+              <p className="hint">How many bookings may use it. A declined or cancelled booking gives its use back.</p>
             </div>
-            <div className="form-footer">
-              <span className="small muted">
-                {draft.code.trim() === ''
-                  ? 'No code: this promo applies by itself to every eligible stay.'
-                  : 'The limit counts bookings, pending or confirmed; a declined or cancelled one gives its use back.'}
-              </span>
-              <span className="form-actions">
-                <button type="button" disabled={busy} onClick={closeForm}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
-                  {busy ? 'Saving…' : draft.id === null ? 'Add promo' : 'Save'}
-                </button>
-              </span>
-            </div>
+
+            {summary && (
+              <p className="setup-summary" aria-live="polite">
+                <Icon name="tag" size={14} />
+                {summary}
+              </p>
+            )}
             {notice?.kind === 'error' && formOpen && (
               <div className="notice error drawer-notice" role="alert">
                 {notice.message}
               </div>
             )}
+            <div className="drawer-footer">
+              <div className="drawer-footer-total">
+                <span className="small muted">{formMissing ?? (draft.id === null ? 'Ready to add.' : 'Future bookings get the change.')}</span>
+              </div>
+              <button type="button" disabled={busy} onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+                {busy ? 'Saving…' : draft.id === null ? 'Add promo' : 'Save'}
+              </button>
+            </div>
           </form>
         </Drawer>
 
         <section className="card">
           <h2>Promos offered</h2>
+          <p className="small muted">The database takes the discount off when a booking is priced. Two automatic promos on the same stay: the larger wins.</p>
           {promos === null ? (
             <LoadState load={loadState} what="promos" onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : active.length === 0 ? (
