@@ -1880,6 +1880,22 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   `plan/notifications/`.
 - **Superseded:** `plan/notifications-phase1-walk.mjs` checks the old Bookings
   badge and the three counts; the inbox walk replaces it.
+- **"click to allow" kept coming back (2026-10-14, the user):** every staff
+  page draws its own StaffFrame, so `useSound()` mounted again on each page
+  with `awake = false` though the tab's one AudioContext was running; and it
+  never tried the context without a click, so a browser that allows the
+  site sound still asked. Now `awake` is READ from the context
+  (`statechange`), it is tried on mount, and a click or a key wakes it.
+- **Observed:** `plan/notifications-sound-walk.mjs` 5/5 (fresh tab asks once;
+  a click allows it; Calendar via the sidebar says "Sound on" with no click;
+  the chime plays there, 2 tones; with `--autoplay-policy=no-user-gesture-required`
+  "Sound on" with no click). Against the previous attention.tsx, A3 and B
+  FAIL ("Sound on · click to allow"): the walk catches the bug. Typecheck
+  exit 0, web tests 158, the inbox walk 12/12 again. `openBrowser()` takes
+  optional extra Chrome `args`.
+- **Still true, and said by the toggle:** after a full reload, a browser
+  that does NOT allow the site sound needs one click per tab (Chrome's
+  rule). Chrome → site settings → Sound → Allow removes even that.
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name

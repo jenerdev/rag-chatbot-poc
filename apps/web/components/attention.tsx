@@ -16,8 +16,9 @@
 //
 // The chime is an OscillatorNode, no audio file. Browsers keep audio silent
 // until the page has had a click (§ 2b.1). The sound is ON unless this
-// device turned it off, and the first click anywhere on a staff page wakes
-// it; until then the toggle says so.
+// device turned it off. Where the browser already allows the site sound it
+// plays with no click at all; elsewhere the first click or key on a staff
+// page wakes it, once per tab, and until then the toggle says so.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './icons';
@@ -30,14 +31,24 @@ const SOUND_KEY = 'rag-staff-sound';
 
 let audio: AudioContext | null = null;
 
-/** Made or resumed inside a click: the only moment a browser allows it. */
+/**
+ * Made, or resumed. Inside a click this always works. Outside one it works
+ * only where the browser already allows this site to play sound (a site
+ * setting, or Chrome's own engagement rule); elsewhere the context stays
+ * "suspended" until a click, and nothing is lost by having asked.
+ */
 function wakeAudio(): void {
   try {
     audio ??= new AudioContext();
-    if (audio.state === 'suspended') void audio.resume();
+    if (audio.state === 'suspended') void audio.resume().catch(() => undefined);
   } catch {
     audio = null;
   }
+}
+
+/** Allowed now: the one truth the toggle reads (never a remembered flag). */
+function audioRunning(): boolean {
+  return audio?.state === 'running';
 }
 
 /**
@@ -146,21 +157,33 @@ export function useAttention(slug: string, enabled: boolean, sound: boolean): At
 /** This device's choice, and whether the browser has let the sound start yet. */
 export function useSound(): { on: boolean; awake: boolean; toggle: () => void } {
   const [on, setOn] = useState(false);
-  const [awake, setAwake] = useState(false);
+  // Every staff page draws its own frame, so this hook mounts again on each
+  // page. "Allowed" is therefore READ from the one AudioContext, which lives
+  // for the whole tab, never kept here: a remembered false said "click to
+  // allow" on every page though the sound was already allowed.
+  const [awake, setAwake] = useState(audioRunning);
 
   // Read after mount: the server has no localStorage, and the first render must match it.
   useEffect(() => setOn(storedSound()), []);
 
-  // On, but not yet allowed: the first click anywhere wakes it (§ 2b.1).
+  // On: try at once (allowed already in this tab, or by the browser for this
+  // site), follow the context's state from then on, and until it runs let
+  // the first click or key anywhere wake it (§ 2b.1).
   useEffect(() => {
-    if (!on || awake) return;
-    const wake = () => {
-      wakeAudio();
-      setAwake(audio !== null);
+    if (!on) return;
+    wakeAudio();
+    const context = audio;
+    const sync = () => setAwake(audioRunning());
+    sync();
+    context?.addEventListener('statechange', sync);
+    document.addEventListener('pointerdown', wakeAudio);
+    document.addEventListener('keydown', wakeAudio);
+    return () => {
+      context?.removeEventListener('statechange', sync);
+      document.removeEventListener('pointerdown', wakeAudio);
+      document.removeEventListener('keydown', wakeAudio);
     };
-    document.addEventListener('pointerdown', wake, { once: true });
-    return () => document.removeEventListener('pointerdown', wake);
-  }, [on, awake]);
+  }, [on]);
 
   // Side effects here, not in a state updater: React may call an updater twice.
   const toggle = useCallback(() => {
@@ -169,7 +192,6 @@ export function useSound(): { on: boolean; awake: boolean; toggle: () => void } 
     storeSound(next);
     if (next) {
       wakeAudio();
-      setAwake(audio !== null);
       // The click that turned it on also says what it will sound like.
       chime();
     }

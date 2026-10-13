@@ -18,9 +18,10 @@ const killTree = (child) => {
   else child.kill();
 };
 
-export async function openBrowser({ port = 9400 + Math.floor(Math.random() * 500), scheme = 'light' } = {}) {
+// `args`: extra Chrome flags for one walk (the sound walk's autoplay policy).
+export async function openBrowser({ port = 9400 + Math.floor(Math.random() * 500), scheme = 'light', args = [] } = {}) {
   const profile = mkdtempSync(join(tmpdir(), 'ui-shoot-'));
-  const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
+  const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--hide-scrollbars', ...args, 'about:blank'], { stdio: 'ignore' });
 
   let target;
   for (let i = 0; i < 150 && !target; i++) {

@@ -9227,3 +9227,28 @@ or every minute once the browser slows a hidden tab.
 
 **Not changed:** a push's own sound is the operating system's (§ 2b.5). On
 Windows, Chrome's notification sound is set in Windows, not by the site.
+
+## 2026-10-14 — "click to allow" kept coming back
+
+**What the user saw:** the Sound toggle said "click to allow" again and
+again, though they had allowed it.
+
+**Why:**
+- Each staff page draws its own sidebar, so the toggle's "allowed" flag
+  started over as false on every page. The tab's audio was already
+  running, and the chime would have played.
+- The page never tried the audio without a click. So a browser that
+  allows the site sound still asked for one.
+
+**What was done:** "allowed" is now read from the audio itself, which
+lives for the whole tab, and follows it as it changes. The page tries
+the audio as soon as it opens, and any click or key wakes it.
+
+**What the observed values prove:**
+- On the old code, the new sound walk failed exactly as the user saw:
+  "click to allow" on Calendar, and after a load where Chrome allows
+  sound. On the fix, all five checks pass, including the chime on the
+  next page.
+- One click per freshly loaded tab is still Chrome's rule when the site
+  is not allowed sound. Setting the site's Sound to Allow in Chrome
+  removes even that.
