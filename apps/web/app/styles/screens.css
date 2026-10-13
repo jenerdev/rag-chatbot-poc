@@ -1123,7 +1123,7 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
 .cal-period { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .cal-period h2 { margin: 0; font-size: var(--text-lg); white-space: nowrap; }
 .cal-filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.cal-filters select { width: auto; }
+.cal-filters select { width: auto; margin-bottom: var(--space-3); }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; }
 .cal-key-info { font-size: var(--text-xs); color: var(--muted); }
 .cal-day-rooms { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-3); }
