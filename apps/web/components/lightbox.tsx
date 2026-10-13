@@ -37,8 +37,13 @@ export function useLightbox() {
     opener.current?.focus();
     opener.current = null;
   }, []);
-  const show = useCallback((room: string, photos: string[]) => {
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  /**
+   * `from`: the control that opened it, where focus returns. Passed by the
+   * caller because a click does not always focus a button (Safari, and a
+   * scripted click), so "whatever had focus" can be the page itself.
+   */
+  const show = useCallback((room: string, photos: string[], from?: HTMLElement | null) => {
+    opener.current = from ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setOpen({ room, photos, index: 0 });
   }, []);
   const step = useCallback(

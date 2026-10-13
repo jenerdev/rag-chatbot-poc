@@ -223,3 +223,16 @@ export async function roomPhotos(tenant: BookingTenant): Promise<{ name: string;
   if (error) throw new Error(`Could not load rooms: ${error.message}`);
   return units.map((u) => ({ name: u.name, photos: images.filter((i) => i.unitId === u.id).map((i) => i.url) }));
 }
+
+/**
+ * Every active room's photos by room ID, for the booking page's room step
+ * (plan/landing-and-media.md item 2). Read on the guest's CHAT token, like
+ * roomPhotos(): the photos are public, and a tenant's own rows only (the
+ * tenant_id filter, and RLS behind it). `{}` at a whole-resort tenant.
+ */
+export async function unitPhotos(tenant: BookingTenant): Promise<Record<number, string[]>> {
+  const images = await listImagesFor(tenant, null);
+  const out: Record<number, string[]> = {};
+  for (const image of images) (out[image.unitId] ??= []).push(image.url);
+  return out;
+}

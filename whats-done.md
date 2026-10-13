@@ -9408,3 +9408,21 @@ a real tenant's prices and names on a public page.
 schemes. The screenshots found two layout bugs before they shipped: a
 section out of line, and a mockup card covering a mockup button on a
 phone.
+
+## 2026-10-14 — room photos on the booking page (D-122)
+
+**What was done:** guests choosing rooms on the booking page now see each
+room's photo and how many there are. A tap opens the photo viewer on that
+room without choosing it.
+
+**What the observed values prove:**
+- **The walk:** the six rooms each have a thumbnail named with its count,
+  a tap opens the right room and leaves it unticked, and Escape gives
+  focus back; axe is clean in 8 states.
+- **What the walk taught:**
+  - its first version passed on a HIDDEN step: a scripted click works on
+    hidden buttons, and alteza books only about 20 days ahead, so the
+    date never took. It now waits for the step to be visible and picks a
+    date in the tenant's own range;
+  - finding that showed the viewer relied on the button having focus, so
+    the opener is now passed in explicitly.

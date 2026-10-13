@@ -89,7 +89,7 @@ function Table({ header, rows, cards }: { header: string[]; rows: string[][]; ca
                   {photoColumn && (
                     <td data-label="Photo" className="photo">
                       {card && card.photos.length > 0 ? (
-                        <button type="button" className="photo-link" onClick={() => lightbox.show(card.name, card.photos)}>
+                        <button type="button" className="photo-link" onClick={(event) => lightbox.show(card.name, card.photos, event.currentTarget)}>
                           View{card.photos.length > 1 ? ` (${card.photos.length})` : ''}
                         </button>
                       ) : null}

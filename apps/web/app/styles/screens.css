@@ -1337,3 +1337,14 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 .notification-body { overflow-wrap: anywhere; }
 .notification-when { font-size: var(--text-xs); color: var(--muted); }
 .notification > button { flex: none; }
+
+/* A room's photo on the booking page's room step (plan/landing-and-media.md
+   item 2): a thumbnail beside the choice, the photo viewer on a click. */
+.room-pick-photo { position: relative; flex: none; align-self: flex-start; width: 96px; height: 72px; padding: 0; overflow: hidden; border: 0; border-radius: var(--radius-md); box-shadow: none; background: var(--surface-2); cursor: zoom-in; }
+.room-pick-photo img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform var(--dur) var(--ease); }
+.room-pick-photo:hover img { transform: scale(1.06); }
+.room-pick-count { position: absolute; right: 4px; bottom: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--overlay-control); color: var(--on-overlay); font-size: var(--text-xs); font-weight: 600; }
+@media (max-width: 560px) {
+  .room-pick { flex-wrap: wrap; }
+  .room-pick-photo { width: 76px; height: 58px; }
+}

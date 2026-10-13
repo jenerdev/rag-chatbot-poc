@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { bookingPage, BookingsNotEnabledError } from '@rag/bookings';
+import { bookingPage, BookingsNotEnabledError, unitPhotos } from '@rag/bookings';
 import { BookingPageScreen } from '@/components/booking-page';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
@@ -29,7 +29,8 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
     if (error instanceof BookingsNotEnabledError) notFound();
     throw error;
   }
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // Each room's photos for the room step (per_room only); a whole-resort page has no room to show.
+  const [branding, nav, photos] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant), page.bookingType === 'per_room' ? unitPhotos(tenant) : {}]);
 
   return (
     <BookingPageScreen
@@ -39,6 +40,7 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
       bannerUrl={branding.bannerUrl}
       nav={nav}
       page={page}
+      photos={photos}
     />
   );
 }

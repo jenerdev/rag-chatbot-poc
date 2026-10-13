@@ -92,7 +92,7 @@ export {
   setRates,
   updateAccommodation,
 } from './accommodations.js';
-export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder } from './images.js';
+export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder, unitPhotos } from './images.js';
 export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from './promos.js';
 export { bookingPage, cancelStay, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { createStaffStay, quoteStaffStay, type NewStaffStay } from './staff-stay.js';

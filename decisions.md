@@ -3918,3 +3918,19 @@ constant.
 tenants' names, prices and guests on a public page.
 
 **Measured:** axe 4 states, 0 violations.
+
+## D-122 · The booking page shows each room's photos · **Added 2026-10-14**
+
+**Decision:** at a per_room tenant, the booking page's room step shows each
+room's first photo with its count. A click opens the chat's photo viewer
+(D-120) on that room; the thumbnail is outside the room's checkbox label,
+so looking never chooses.
+- **The read:** the photos are read on the guest's CHAT token by
+  `unitPhotos()`, keyed by room ID, filtered by tenant, with RLS behind.
+- **Focus:** the viewer now takes the control that opened it
+  (`show(room, photos, from)`). A click does not always focus a button
+  (Safari, a scripted click), and focus must go back there.
+
+**Measured:** `plan/book-photos-check.mjs` walk 3/3 (a named thumbnail per
+room; it opens its room and does not tick it; Escape returns focus); axe 8
+states, 0 violations.
