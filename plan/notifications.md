@@ -337,3 +337,58 @@ whats-done.md, and `pnpm eval` once.
 9. **Per-kind opt-out per device?** **Decided: yes,** `kinds` on the
    subscription, three checkboxes. An owner may want proofs on the phone
    and requests only on the desk.
+
+---
+
+## 8. The Notifications item (2026-10-14, after the user's walk)
+
+**What the user found:** no sound, and a number that stayed after the
+notification was clicked. Asked for: a Notifications item of its own in the
+sidebar, instead of badges on Bookings and Payments.
+
+**Why each happened:**
+- The number was Phase 1's "what WAITS" count (pending requests, proofs to
+  verify). Only deciding the stay lowers it, so reading a notification never
+  could.
+- The poll STOPPED while the tab was hidden (§ 2b.9), so a member in
+  another tab or app never got the chime. That is exactly when it is
+  needed. The sound was also OFF until the toggle was found.
+
+**What changed (this amends § 2b.9, § 4 layer 1, and Out of scope's "no
+inbox"):**
+- **S-17 `/t/<slug>/admin/notifications`:** the last 30 days, the push's
+  own words and links, read or not. "Mark all read" is the page action.
+  Opening a row marks it read and goes to the stay, or to Payments for a
+  proof. Every role (`bookings:read`); a proof only for owners and admins,
+  by RLS, as the push (Rule 3).
+- **The ONE badge is on Notifications** (Overview, after Dashboard). Its
+  number is what this MEMBER has not read, on every device at once. Bookings
+  and Payments carry no badge. The tab title's "(n)" and the menu button
+  count the same.
+- **`schema-notification-reads.sql`, the 30th file:**
+  - staff may READ their tenant's outbox rows (the same role rule as
+    `notify_claim()`);
+  - `notification_reads` holds one mark per (member, notification), with
+    RLS on the member's own rows only;
+  - `notification_feed()` and `notification_read()` are security INVOKER
+    and refuse non-staff, like `conversation_list()`.
+- **A tapped push marks itself read:** the payload carries the outbox `id`
+  (still no guest data, Rule 2), and the worker POSTs it before it opens the
+  page.
+- **The sound:**
+  - the poll keeps running while the tab is hidden;
+  - a push that reaches the device tells the open tabs, which poll at once;
+  - the sound is ON unless the device turned it off, and the first click
+    anywhere wakes it;
+  - the chime is louder (gain 0.18 → 0.35).
+- **Not changed:** the push's own sound is the OS's (§ 2b.5). On Windows,
+  Chrome's notification sound is a Windows setting.
+
+**Evidence:**
+- `verify` 187: 183–186 are new, and 176 is amended (staff now read their
+  1 outbox row).
+- bookings isolation 39/39 both ways: 31f, each feed its own, A marks none
+  of B's.
+- `plan/notifications-inbox-walk.mjs` 12/12.
+- `plan/notifications-a11y.mjs` 8 states, 0 violations; the screenshots
+  are in `plan/notifications/`.

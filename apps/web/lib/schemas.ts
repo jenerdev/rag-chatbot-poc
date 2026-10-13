@@ -476,3 +476,12 @@ export const pushDeviceSchema = z.object({
   kinds: z.array(notifyKind).min(1, 'Choose at least one kind').max(3).transform((k) => [...new Set(k)]),
 });
 export const pushEndpointSchema = z.object({ endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000) });
+
+/**
+ * POST /admin/notifications (plan/notifications.md § 8): mark these read, or
+ * `all`. Ids are the outbox's; one that is not the member's marks nothing.
+ */
+export const notificationsReadSchema = z.union([
+  z.object({ ids: z.array(z.number().int().positive(), { message: 'ids is a list of notification ids' }).min(1, 'Name at least one notification').max(200) }),
+  z.object({ all: z.literal(true) }),
+], { errorMap: () => ({ message: 'Send { ids: [...] } or { all: true }' }) });

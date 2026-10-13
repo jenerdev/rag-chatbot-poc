@@ -9133,3 +9133,97 @@ worker. So the worker's source became a pure function, run in a test
 against a fake `self`. That test found a real bug: a push whose payload
 parses to `null` threw before showing anything. It now shows a fallback.
 Seeing the notification on a real screen is a manual check.
+
+## 2026-10-14 — notifications Phase 6: the walls
+
+**What was done:** the bookings isolation script gained check 31, five
+checks (31a–e) on push notifications across the two per_room probes, A and
+B. Northwind's operator joins B as **staff**, a member of B only. Villa's
+operator has a device in A **and** one in B, so the checks also cover a
+person in two tenants. The production bundle was then grepped for the VAPID
+private key, by name and by value.
+
+**What the observed values prove (38/38 both ways, was 33):**
+- **Devices.** A's staff cannot read or remove B's devices, not even the
+  same person's (`null`, `false`). Each tenant reads its own. B keeps both.
+- **The outbox.** A's web request is ONE outbox row in A and none in B.
+  So the trigger writes to the event's own tenant only.
+- **The claim, wall 2.** `notify_claim` called for B on A's chat token is
+  `42501 not this tenant's token`, and B's outbox stays unclaimed.
+- **The claim, the join.** A's claim reaches A's device only. B's claim
+  reaches B's two devices and never A's, though one owner has both.
+  The proof goes to B's admin only, never to the staff member (Rule 3).
+- **The results.** `notify_done` from A's token, naming B's ids as
+  `gone`, deleted nothing and sent nothing. B's own `ok` is recorded
+  (the positive twin, trap 12).
+- **Both walls.** The claim runs on chat tokens in both modes, as
+  book/request's does: inside the definer, the tenant filter is the code
+  wall and the token check the database's. The device reads follow the
+  mode, so `--filters-only` proves their `tenant_id` filters alone.
+
+**The static grep:** `pnpm dev` was running on :3000, and `next build`
+beside it breaks it (trap 16). So the build ran in a throwaway git
+worktree, with a throwaway VAPID pair in that worktree's `.env` only.
+- 0 of 114 static files name `service_role`, `SUPABASE_SECRET`,
+  `TENANT_SIGNING_JWK`, `guest_phone` or `VAPID_PRIVATE`.
+- 0 hold the VALUE of the VAPID `d`, the whole JWK, the signer's `d`, the
+  service key, the secret key or the cookie secret.
+- The twin: both key names appear in the server bundle, so the grep finds
+  what is there.
+- The worktree, its `.env` and the keys were deleted after.
+
+**Closing run:** typecheck exit 0, verify 183, pipeline isolation both
+ways, the three chatbot snapshots byte-identical (Rule 5).
+
+**Still owed:** the phone walk (gated on deployment or a tunnel, § 7 q8),
+the on-screen check in a headed Chrome, and Phase 7, the record.
+
+## 2026-10-14 — notifications § 8: a Notifications item, and a sound that rings
+
+**What the user found:** they heard no sound. And after clicking a
+notification, the number stayed. They asked for a Notifications item of
+its own in the sidebar, instead of badges on Bookings and Payments.
+
+**Why each happened:**
+- The badge counted what still WAITS (pending requests, proofs to verify).
+  Only deciding a stay lowers that, so reading a notification never could.
+- The 30-second poll stopped whenever the tab was hidden. The chime is for
+  someone in another tab or app, and for them it never rang. The sound
+  was also off until the toggle was found.
+
+**What was done:**
+- **S-17 Notifications:** the last 30 days, in the push's own words, with
+  the ONE badge in the sidebar. The badge is what this member has not
+  read, on every device at once. Opening a row marks it read and goes to
+  the stay; "Mark all read" clears the rest.
+- **`schema-notification-reads.sql`, the 30th file:** staff now read their
+  tenant's outbox, under the push's role rule (a proof only for owners and
+  admins). It adds per-member read marks and two invoker functions that
+  refuse non-staff.
+- **A tapped push** carries its outbox id, so the worker marks it read
+  before opening the page.
+- **The poll** keeps running while the tab is hidden, and a push makes
+  open tabs ask at once.
+- **The sound** is on by default, and the first click anywhere wakes it.
+
+**What the observed values prove:**
+- In the browser walk, a hidden tab went from 0 to 1 on Notifications in
+  28 s and played two tones, though the Sound toggle was never clicked.
+  Before this, the same tab asked nothing until shown.
+- Clicking the row opened the stay and dropped the badge to 0 while the
+  request stayed pending. So reading and deciding are now separate.
+- In verify, staff marking a request read lowered their count 4 → 3 while
+  the owner's held at 5, so reads are per member.
+- verify also showed staff never see a proof, and every cross-tenant or
+  chat-token call was 42501.
+- In isolation, A's feed held only A's notification, and A marking B's
+  ids marked 0. Both held with RLS on and with the code filters alone.
+- axe: 0 violations on 8 page states.
+
+**Deviation:** the plan had put a notification inbox out of scope, and § 2b.9
+paused hidden tabs to save requests. The user's report showed both were
+wrong for staff. The cost is one indexed count per open tab every 30 s,
+or every minute once the browser slows a hidden tab.
+
+**Not changed:** a push's own sound is the operating system's (§ 2b.5). On
+Windows, Chrome's notification sound is set in Windows, not by the site.

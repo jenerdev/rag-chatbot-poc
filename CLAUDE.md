@@ -341,7 +341,7 @@ packages/
     src/staff-stay.ts      D-111: a staff stay on the page's rules (quoteStaffStay, createStaffStay), Walk in
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
-    tools/isolation.mjs    33 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking)
+    tools/isolation.mjs    39 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking, 31a–f push notifications and the Notifications feed)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
     src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409 (and, D-106, "is held for another guest"); the constraint's own 23P01 keeps the sentence
@@ -392,8 +392,8 @@ pnpm scores                     # real similarity scores for northwind, threshol
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 22 of them, code filters alone (RLS bypassed)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
-pnpm --filter @rag/bookings isolation   # 33 cross-tenant booking checks, on operator staff tokens, no API key
-pnpm --filter @rag/bookings isolation -- --filters-only   # the same 33, code filters alone
+pnpm --filter @rag/bookings isolation   # 39 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 39, code filters alone
 pnpm --filter @rag/bookings rooms       # 50 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
 pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)

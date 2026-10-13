@@ -35,6 +35,8 @@ interface ClaimRow {
 
 /** What a device shows. Named fields only (Rule 2): no guest name, phone, email or amount. */
 export interface PushMessage {
+  /** the outbox row: a tap on the device marks THIS notification read (notification_read()) */
+  id: number | null;
   kind: NotifyKind;
   reference: string;
   title: string;
@@ -49,13 +51,14 @@ function shortDate(date: string): string {
 }
 
 /** The words and the link for one outbox row. Pure, tested. */
-export function pushMessage(slug: string, row: { kind: string; reference: string; first_night: string | null; nights: number | null }): PushMessage {
+export function pushMessage(slug: string, row: { id?: number | null; kind: string; reference: string; first_night: string | null; nights: number | null }): PushMessage {
+  const id = row.id ?? null;
   const kind = (['request', 'proof', 'change'].includes(row.kind) ? row.kind : 'request') as NotifyKind;
   const when = row.first_night ? `${row.nights && row.nights > 1 ? `${row.nights} nights from ` : ''}${shortDate(row.first_night)}` : '';
   const stay = `/t/${slug}/admin/bookings/${encodeURIComponent(row.reference)}`;
-  if (kind === 'proof') return { kind, reference: row.reference, title: 'A proof of payment to verify', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: `/t/${slug}/admin/payments` };
-  if (kind === 'change') return { kind, reference: row.reference, title: 'A guest asks to change a stay', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: stay };
-  return { kind, reference: row.reference, title: 'New booking request', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: stay };
+  if (kind === 'proof') return { id, kind, reference: row.reference, title: 'A proof of payment to verify', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: `/t/${slug}/admin/payments` };
+  if (kind === 'change') return { id, kind, reference: row.reference, title: 'A guest asks to change a stay', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: stay };
+  return { id, kind, reference: row.reference, title: 'New booking request', body: `${row.reference}${when ? ` · ${when}` : ''}`, path: stay };
 }
 
 /** How many devices are sent to at once: a drain is small, but not one by one. */
@@ -82,7 +85,7 @@ export async function drainNotifications(tenant: BookingTenant): Promise<DrainRe
   const worker = async () => {
     while (next < rows.length) {
       const row = rows[next++]!;
-      const message = pushMessage(tenant.slug, row);
+      const message = pushMessage(tenant.slug, { ...row, id: row.outbox_id });
       const result = await sendPush({ endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth }, message, keys, row.reference);
       results.push({ outbox: row.outbox_id, subscription: row.subscription_id, result });
     }

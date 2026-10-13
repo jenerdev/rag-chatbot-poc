@@ -13,16 +13,20 @@
 //   * (24–29, customer booking Phase 6) holiday days and web requests in the
 //     two per_room probes, gone with them;
 //   * (30, manage booking) a proof object, a payment and a change request on
-//     B's request, gone with the probe (the object removed and counted).
+//     B's request, gone with the probe (the object removed and counted);
+//   * (31, notifications) three push devices and northwind's operator as
+//     B's staff, gone with the probes (the deletes cascade).
 //
 // TWO WALLS (auth-rls Rule 1). By default staff work runs as each tenant's
 // OPERATOR member, on a staff token, as the admin routes' does, so both the
 // code filters and RLS stand in the way. With --filters-only it runs on the
 // service client: RLS bypassed, the tenant_id filters alone. Both must pass.
-// Needs: pnpm --filter @rag/db member:operator -- villa (and northwind)
+// Needs: pnpm --filter @rag/db member:operator -- villa (and northwind; 31
+// makes northwind's operator a member of a probe).
 //
 // Run:  pnpm --filter @rag/bookings isolation [-- --filters-only]
 
+import { randomUUID } from 'node:crypto';
 import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, operatorEmail, supabase, userIdByEmail } from '@rag/db/service';
 import {
@@ -42,10 +46,13 @@ import {
   createBooking,
   createBookings,
   declineRequest,
+  deviceOf,
   getAccommodation,
   guestStay,
   listChanges,
   listPayments,
+  markNotificationsRead,
+  notificationFeed,
   proofUrl,
   stayHistory,
   hasBookingPage,
@@ -66,6 +73,7 @@ import {
   quote,
   quoteRequest,
   removeCalendarDay,
+  removeDevice,
   removeImage,
   requestBooking,
   setCalendarDay,
@@ -650,6 +658,121 @@ try {
         && aGuest === null && bGuest?.reference === bStay.reference,
       "manage A: none of B's payments, change requests, history or proof; B's guest is not found on A's page; B sees all of it",
       `payments A ${aPays.length} B ${bPays.length} · changes A ${aChanges.length} B ${bChanges.length} · history A ${aHistory.length} B ${bHistory.length} · proof A ${aProof === null ? 'null' : 'SIGNED'} B ${bProof ? 'signed' : 'null'} · guest A ${aGuest?.reference ?? 'null'} B ${bGuest?.reference}`,
+    );
+  }
+
+  // 31. Notifications (plan/notifications.md Phase 6, Rule 3): A's web
+  //     request reaches no B-only member, and B's news reaches nobody in A.
+  //     Northwind's operator joins B as STAFF for this run: a member of B
+  //     only. Villa's operator has a device in A AND one in B, so a person
+  //     in two tenants is told only by the tenant the event is in. Devices
+  //     are seeded on the service client (not under test, as 30's proof);
+  //     the package's device reads follow the mode. The drain's claim runs
+  //     on CHAT tokens in both modes, as book/request's does: inside
+  //     notify_claim() the tenant filter is the code wall, its token check
+  //     the database's. The claim is called directly, not drainNotifications(),
+  //     which would POST to the fake endpoints.
+  {
+    const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+    const endpoint = (who) => `https://fcm.googleapis.com/fcm/send/iso-${who}-${randomUUID()}`;
+    const operatorId = await userIdByEmail(operatorEmail('villa'));
+    const outsiderId = await userIdByEmail(operatorEmail('northwind'));
+    if (!operatorId || !outsiderId) throw new Error('Needs the villa and northwind operators (member:operator)');
+    // With --filters-only roomProbe() made no memberships; a device needs one (its foreign key).
+    if (filtersOnly) await supabase.from('memberships').insert([a.id, b.id].map((tenant_id) => ({ user_id: operatorId, tenant_id, role: 'admin' })));
+    await supabase.from('memberships').insert({ user_id: outsiderId, tenant_id: b.id, role: 'staff' });
+    const devices = { a: endpoint('a-operator'), b: endpoint('b-operator'), outsider: endpoint('b-staff') };
+    const seeded = await supabase.from('push_subscriptions').insert([
+      { tenant_id: a.id, user_id: operatorId, endpoint: devices.a, ...KEYS },
+      { tenant_id: b.id, user_id: operatorId, endpoint: devices.b, ...KEYS },
+      { tenant_id: b.id, user_id: outsiderId, endpoint: devices.outsider, ...KEYS },
+    ]);
+    if (seeded.error) throw new Error(`devices: ${seeded.error.message}`);
+
+    const own = await requestBooking(chat(a), { slotId: aNight.id, rooms: [{ unitId: aRoom.id, guests: 1 }], checkIn: REQ_DATE, nights: 1, ...contact(3) });
+    const outboxOf = async (t) => (await supabase.from('notification_outbox').select('id, kind, reference, claimed_at, sent_at').eq('tenant_id', t.id).order('id')).data ?? [];
+    const devicesOf = async (t) => (await supabase.from('push_subscriptions').select('endpoint, last_ok_at').eq('tenant_id', t.id)).data ?? [];
+    const [aBox, bBox] = await Promise.all([outboxOf(a), outboxOf(b)]);
+
+    // 31a. A's staff cannot read or remove B's devices, even the same
+    //      person's; B's twin reads its own.
+    const [aSeesB, aSeesOutsider, aRemovesB, aRemovesOutsider, aOwn, bOwn] = await Promise.all([
+      deviceOf(a, devices.b), deviceOf(a, devices.outsider),
+      removeDevice(a, devices.b), removeDevice(a, devices.outsider),
+      deviceOf(a, devices.a), deviceOf(b, devices.b),
+    ]);
+    const bDevices = await devicesOf(b);
+    check(
+      aSeesB === null && aSeesOutsider === null && aRemovesB === false && aRemovesOutsider === false
+        && aOwn?.kinds.length === 3 && bOwn?.kinds.length === 3 && bDevices.length === 2,
+      "notify devices A: cannot read or remove B's (the same member's either); each reads its own; B keeps both",
+      `A reads B ${aSeesB ? 'FOUND' : 'null'}, B-staff ${aSeesOutsider ? 'FOUND' : 'null'} · removes ${aRemovesB}/${aRemovesOutsider} · own A ${aOwn?.kinds.length ?? 'null'} B ${bOwn?.kinds.length ?? 'null'} · B devices ${bDevices.length}`,
+    );
+
+    // 31b. Each outbox holds only its own tenant's news: A's request in A, none in B.
+    check(
+      aBox.length === 1 && aBox[0].kind === 'request' && aBox[0].reference === own.reference
+        && bBox.length > 0 && bBox.every((r) => r.reference !== own.reference),
+      "notify outbox: A's request is one row in A and none in B",
+      `A ${aBox.map((r) => `${r.kind} ${r.reference}`).join(', ')} · B ${bBox.map((r) => `${r.kind} ${r.reference}`).join(', ')}`,
+    );
+
+    // 31c. A's chat token cannot claim B's outbox (42501), and B's rows stay unclaimed.
+    const cross = await chat(a).db.rpc('notify_claim', { p_tenant_id: b.id });
+    const bUntouched = (await outboxOf(b)).every((r) => r.claimed_at === null && r.sent_at === null);
+    check(
+      cross.error?.code === '42501' && (cross.data ?? []).length === 0 && bUntouched,
+      "notify claim A→B: refused, B's outbox untouched",
+      `${cross.error?.code ?? 'NO ERROR'} ${cross.error?.message ?? ''} · rows ${(cross.data ?? []).length} · B unclaimed ${bUntouched}`,
+    );
+
+    // 31d. A's drain tells A's device only; B's tells B's two, never A's,
+    //      and a proof only B's admin (Rule 3), never the staff member.
+    const aClaim = (await chat(a).db.rpc('notify_claim', { p_tenant_id: a.id })).data ?? [];
+    const bClaim = (await chat(b).db.rpc('notify_claim', { p_tenant_id: b.id })).data ?? [];
+    const bEndpoints = new Set([devices.b, devices.outsider]);
+    const proofs = bClaim.filter((r) => r.kind === 'proof');
+    check(
+      aClaim.length === 1 && aClaim[0].endpoint === devices.a && aClaim[0].reference === own.reference
+        && bClaim.length > 0 && bClaim.every((r) => bEndpoints.has(r.endpoint) && r.reference !== own.reference)
+        && bClaim.some((r) => r.endpoint === devices.outsider) && proofs.every((r) => r.endpoint === devices.b),
+      "notify claim: A's request reaches A's device alone; B's news reaches B's devices, a proof only B's admin",
+      `A → ${aClaim.map((r) => `${r.kind}@${r.endpoint === devices.a ? 'A-operator' : 'ELSEWHERE'}`).join(', ')} · B → ${bClaim.map((r) => `${r.kind}@${r.endpoint === devices.b ? 'B-operator' : r.endpoint === devices.outsider ? 'B-staff' : 'ELSEWHERE'}`).join(', ')}`,
+    );
+
+    // 31e. A's chat token cannot record B's results ("gone" would delete
+    //      B's devices); B's own "ok" is recorded. The twin.
+    const results = bClaim.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'gone' }));
+    const crossDone = await chat(a).db.rpc('notify_done', { p_results: results });
+    const bAfterCross = await devicesOf(b);
+    const bBoxAfterCross = await outboxOf(b);
+    const ownDone = await chat(b).db.rpc('notify_done', { p_results: results.map((r) => ({ ...r, result: 'ok' })) });
+    const bAfterOwn = await devicesOf(b);
+    const bSent = (await outboxOf(b)).filter((r) => bClaim.some((c) => c.outbox_id === r.id)).every((r) => r.sent_at !== null);
+    check(
+      !crossDone.error && bAfterCross.length === 2 && bBoxAfterCross.every((r) => r.sent_at === null)
+        && !ownDone.error && bAfterOwn.every((d) => d.last_ok_at !== null) && bSent,
+      "notify done A→B: B's devices and outbox untouched; B records its own",
+      `after A: B devices ${bAfterCross.length}, B sent ${bBoxAfterCross.filter((r) => r.sent_at).length} · after B: ${ownDone.error?.message ?? 'ok'}, devices ok ${bAfterOwn.filter((d) => d.last_ok_at).length}/${bAfterOwn.length}, claimed rows sent ${bSent}`,
+    );
+
+    // 31f. The Notifications item (plan/notifications.md § 8): each tenant's
+    //      feed holds only its own, and A cannot mark B's read. On STAFF
+    //      tokens in both modes (the feed asks the token's tenant itself):
+    //      the function's tenant filter is the code wall, RLS the other.
+    const staffOf = async (t) => ({ id: t.id, slug: t.slug, db: (await staffClient(t.id, operatorId))?.db });
+    const [aStaff, bStaff] = await Promise.all([staffOf(a), staffOf(b)]);
+    const bIds = bBox.map((r) => r.id);
+    const aFeed = await notificationFeed(aStaff);
+    const bBefore = await notificationFeed(bStaff);
+    const crossMarked = await markNotificationsRead(aStaff, bIds);
+    const bAfter = await notificationFeed(bStaff);
+    const ownMarked = await markNotificationsRead(bStaff, null);
+    check(
+      aFeed.items.length === 1 && aFeed.items[0].reference === own.reference && bBefore.items.every((i) => i.reference !== own.reference)
+        && bBefore.items.length === bBox.length && crossMarked === 0 && bAfter.unread === bBefore.unread && ownMarked === bBefore.unread,
+      "notify feed A: only A's own; A marks none of B's read; B's unread holds, and B marks its own",
+      `A ${aFeed.items.map((i) => i.reference).join(',')} · B ${bBefore.items.length} (${bBefore.unread} unread) · A marks B's ${crossMarked} · B unread after ${bAfter.unread} · B marks ${ownMarked}`,
     );
   }
 

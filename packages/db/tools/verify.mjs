@@ -3402,7 +3402,9 @@ async function notificationChecks() {
     }
 
     // 176. A chat token reads no subscription and no outbox row (the twin:
-    //      service_role sees both); notify_claim refuses another tenant's id.
+    //      service_role sees both); staff read their tenant's outbox row since
+    //      schema-notification-reads.sql (the Notifications item);
+    //      notify_claim refuses another tenant's id.
     {
       const subs = await chat.from('push_subscriptions').select('id');
       const box = await chat.from('notification_outbox').select('id');
@@ -3410,9 +3412,9 @@ async function notificationChecks() {
       const foreign = await claim(chat, villaRow.id);
       const serviceSubs = await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id);
       check(
-        (subs.data ?? []).length === 0 && (box.data ?? []).length === 0 && (staffBox.data ?? []).length === 0 && foreign.error?.code === '42501'
+        (subs.data ?? []).length === 0 && (box.data ?? []).length === 0 && (staffBox.data ?? []).length === 1 && foreign.error?.code === '42501'
           && serviceSubs.data?.length === 2 && (await outbox()).length === 1,
-        "notify: a chat token reads 0 devices and 0 outbox rows, staff 0 outbox rows (service sees 2 and 1); notify_claim on another tenant is 42501",
+        "notify: a chat token reads 0 devices and 0 outbox rows, staff their 1 outbox row (service sees 2 and 1); notify_claim on another tenant is 42501",
         `chat subs ${subs.error?.code ?? (subs.data ?? []).length} · chat outbox ${box.error?.code ?? (box.data ?? []).length} · staff outbox ${staffBox.error?.code ?? (staffBox.data ?? []).length} · foreign ${foreign.error?.code}`,
       );
     }
@@ -3512,7 +3514,79 @@ async function notificationChecks() {
       );
     }
 
-    // 182. Removing a member removes their devices, at once.
+    // 183–186. The Notifications item (schema-notification-reads.sql): a
+    //          feed per member, read marks per member, the role rule of the
+    //          push (a proof for owners and admins), and no one else's.
+    const feed = async (client, tenantId = probe.id) => client.rpc('notification_feed', { p_tenant_id: tenantId, p_limit: 100 });
+    const markRead = async (client, ids, tenantId = probe.id) => client.rpc('notification_read', { p_tenant_id: tenantId, p_ids: ids });
+
+    // 183. The feed: the owner sees every kind, staff no proof; a chat token
+    //      and another tenant's staff are refused (42501).
+    {
+      const all = await outbox();
+      const [ownerFeed, staffFeed, chatFeed, villaFeed] = await Promise.all([feed(owner), feed(staff), feed(chat), feed(asToken(chatToken(villaRow.id)))]);
+      const kinds = (f) => [...new Set((f.data?.items ?? []).map((i) => i.kind))].sort().join(',');
+      const proofs = all.filter((r) => r.kind === 'proof').length;
+      check(
+        proofs >= 1 && ownerFeed.data?.items.length === all.length && ownerFeed.data?.unread === all.length
+          && staffFeed.data?.items.length === all.length - proofs && !kinds(staffFeed).includes('proof')
+          && chatFeed.error?.code === '42501' && villaFeed.error?.code === '42501',
+        'notify feed: the owner sees every notification (proofs too), staff all but proofs, all unread; a chat token and another tenant are 42501',
+        `outbox ${all.length} (${proofs} proof) · owner ${ownerFeed.data?.items.length}/${ownerFeed.data?.unread} unread [${kinds(ownerFeed)}] · staff ${staffFeed.data?.items.length} [${kinds(staffFeed)}] · chat ${chatFeed.error?.code} · villa ${villaFeed.error?.code}`,
+      );
+    }
+
+    // 184. Reading is per member: staff mark one request read (1, then 0 on
+    //      a repeat); their unread falls by one, the owner's does not; a
+    //      proof id staff cannot see marks nothing.
+    {
+      const all = await outbox();
+      const request = all.find((r) => r.kind === 'request');
+      const proof = all.find((r) => r.kind === 'proof');
+      const [staffBefore, ownerBefore] = [(await feed(staff)).data?.unread, (await feed(owner)).data?.unread];
+      const first = await markRead(staff, [request.id]);
+      const again = await markRead(staff, [request.id]);
+      const hidden = await markRead(staff, [proof.id]);
+      const [staffAfter, ownerAfter] = [(await feed(staff)).data?.unread, (await feed(owner)).data?.unread];
+      const marked = (await feed(staff)).data?.items.find((i) => i.id === request.id)?.read;
+      check(
+        first.data === 1 && again.data === 0 && hidden.data === 0 && staffAfter === staffBefore - 1 && ownerAfter === ownerBefore && marked === true,
+        "notify reads: staff mark a request read once (1, then 0), their unread falls by one, the owner's holds; a proof they cannot see marks nothing",
+        `first ${first.data ?? first.error?.code} · again ${again.data} · proof ${hidden.data ?? hidden.error?.code} · staff ${staffBefore}→${staffAfter} · owner ${ownerBefore}→${ownerAfter} · read ${marked}`,
+      );
+    }
+
+    // 185. A mark is the member's own: staff cannot write one for the owner,
+    //      read the owner's, or mark another tenant's notifications.
+    {
+      const request = (await outbox()).find((r) => r.kind === 'request');
+      await markRead(owner, [request.id]);
+      const forged = await staff.from('notification_reads').insert({ tenant_id: probe.id, user_id: ownerId, outbox_id: request.id });
+      const seen = (await staff.from('notification_reads').select('user_id')).data ?? [];
+      const serviceSeen = (await supabase.from('notification_reads').select('user_id').eq('tenant_id', probe.id)).data ?? [];
+      const foreign = await markRead(asToken(chatToken(villaRow.id)), null);
+      const chatRead = await markRead(chat, null);
+      check(
+        forged.error?.code === '42501' && seen.length >= 1 && seen.every((r) => r.user_id === staffId)
+          && serviceSeen.some((r) => r.user_id === ownerId) && foreign.error?.code === '42501' && chatRead.error?.code === '42501',
+        "notify reads: staff cannot mark for the owner (42501) nor see the owner's marks (service sees both); another tenant and a chat token cannot mark (42501)",
+        `forged ${forged.error?.code ?? 'INSERTED'} · staff sees ${seen.length} own · service ${serviceSeen.length} · foreign ${foreign.error?.code} · chat ${chatRead.error?.code}`,
+      );
+    }
+
+    // 186. Mark all read: every unread one, then none left.
+    {
+      const before = (await feed(owner)).data?.unread ?? -1;
+      const all = await markRead(owner, null);
+      const after = (await feed(owner)).data?.unread;
+      check(
+        before > 0 && all.data === before && after === 0,
+        'notify reads: mark all read marks exactly the unread ones, and leaves none',
+        `unread ${before} · marked ${all.data ?? all.error?.code} · after ${after}`,
+      );
+    }
+
+    // 187. Removing a member removes their devices, at once.
     {
       const before = (await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id).eq('user_id', ownerId)).data?.length ?? 0;
       // A second owner first: the keep-an-owner trigger refuses removing the last.

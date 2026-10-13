@@ -31,6 +31,7 @@
 //   changes.ts     cancel and reschedule requests: the guest asks, staff decide (manage booking)
 //   attention.ts   what waits on staff now, three counts for the sidebar (notifications)
 //   push-devices.ts  a member's own devices for push (notifications)
+//   notifications.ts the Notifications item: this member's feed and read marks
 //   notify.ts      the drain: the outbox → each device's push service (notifications)
 
 export {
@@ -106,6 +107,8 @@ export type { AttentionCounts } from './attention.js';
 export { drainNotifications, pushMessage } from './notify.js';
 export type { DrainResult, NotifyKind, PushMessage } from './notify.js';
 export { deviceOf, removeDevice, saveDevice } from './push-devices.js';
+export { markNotificationsRead, NOTIFICATION_PAGE_ITEMS, NOTIFICATION_POLL_ITEMS, notificationFeed, parseFeed } from './notifications.js';
+export type { NotificationFeed, NotificationItem } from './notifications.js';
 export type { DeviceInput } from './push-devices.js';
 export type { ChangeTerms, GuestChange, GuestPayment, GuestStatus, GuestStay, PaymentStatus, PayMethod, StayPayment } from './guest.js';
 export { checkProof, MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, PROOF_BUCKET, PROOF_RETENTION_DAYS, sniffProofType, submitProof } from './payments.js';

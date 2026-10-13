@@ -1321,3 +1321,19 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
   .question-grid { grid-template-columns: minmax(0, 1fr); }
   .tenant-edit-title .button { width: 100%; justify-content: center; }
 }
+
+/* S-17 Notifications (plan/notifications.md § 8): one row per notification;
+   an unread row is marked by a dot and weight, never by colour alone. */
+.notification-list { list-style: none; margin: 0; padding: 0; }
+.notification { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.notification:first-child { border-top: 0; }
+.notification-icon { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius-full); background: var(--surface-3); color: var(--muted); }
+.notification.unread .notification-icon { background: var(--accent-soft); color: var(--accent-text); }
+.notification.unread .notification-icon::after { content: ""; position: absolute; top: 0; right: 0; width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--accent-fill); border: 2px solid var(--panel); }
+.notification-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; }
+.notification-text:hover .notification-title { text-decoration: underline; }
+.notification-title { color: var(--muted); }
+.notification.unread .notification-title { color: var(--ink); font-weight: 600; }
+.notification-body { overflow-wrap: anywhere; }
+.notification-when { font-size: var(--text-xs); color: var(--muted); }
+.notification > button { flex: none; }

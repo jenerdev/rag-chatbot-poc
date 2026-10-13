@@ -1,59 +1,57 @@
-// attention.ts — what the staff frame does with the three counts that wait
-// on staff (plan/notifications.md Phase 1): the sidebar's badges, the tab
-// title's "(n)", and the words a rise is announced in. Pure and
+// attention.ts — what the staff frame does with the attention poll
+// (plan/notifications.md § 8): the Notifications item's badge, the tab
+// title's "(n)", and the words a new arrival is announced in. Pure and
 // browser-safe, like nav-items.ts, so it is tested without a browser.
+//
+// Phase 1 counted what WAITS (requests, proofs, changes) and badged Bookings
+// and Payments with it, so opening a notification never cleared a number.
+// The number is now what this member has not READ, on one item of its own.
 //
 // A count shown here is a courtesy, like a nav link: every page behind it
 // asks requireAdmin() for its permission again.
 
-import { can, type Role } from './permissions';
+/** One notification, as the poll and the Notifications page carry it (@rag/bookings NotificationItem). */
+export interface AttentionItem {
+  id: number;
+  kind: 'request' | 'proof' | 'change';
+  reference: string;
+  title: string;
+  body: string;
+  path: string;
+  at: string;
+  read: boolean;
+}
 
 /** The attention route's body: GET /api/t/<slug>/admin/attention. */
 export interface Attention {
-  requests: number;
-  proofs: number;
-  changes: number;
+  /** unread for this member, the last 30 days */
+  unread: number;
+  /** the newest few, read or not, newest first */
+  latest: AttentionItem[];
 }
 
-/** How often an open, visible staff tab asks (§ 7 q1: polling, not Realtime). */
+/** How often an open staff tab asks (§ 7 q1: polling, not Realtime). A push asks at once. */
 export const ATTENTION_POLL_MS = 30_000;
 
-/**
- * The counts a role is told about, by page: requests and change requests on
- * Bookings (anyone who reads bookings), proofs on Payments (anyone who
- * reads payments). `total` is what the tab title shows.
- */
-export function attentionFor(counts: Attention, role: Role | null): { bookings: number; payments: number; total: number } {
-  const bookings = role && can(role, 'bookings:read') ? counts.requests + counts.changes : 0;
-  const payments = role && can(role, 'payments:read') ? counts.proofs : 0;
-  return { bookings, payments, total: bookings + payments };
-}
+/** The window event a screen sends after it marks notifications read, so the badge follows at once. */
+export const NOTIFICATIONS_CHANGED = 'rag:notifications-changed';
 
-/** "(3) Bookings · Villa" while 3 wait; the title as it was when none do. Never stacks a second "(n)". */
+/** "(3) Bookings · Villa" while 3 are unread; the title as it was when none are. Never stacks a second "(n)". */
 export function titleWithCount(title: string, n: number): string {
   const bare = title.replace(/^\(\d+\) /, '');
   return n > 0 ? `(${n}) ${bare}` : bare;
 }
 
 /**
- * What ROSE between two reads, in words, for the toast. The first read
- * (prev null) announces nothing: a count that was already there when the
- * page opened is not news. A fall (a request decided in another tab) says
- * nothing either.
+ * What ARRIVED between two reads, in words, for the toast: the unread rows
+ * newer than anything the last read had. The first read (prev null)
+ * announces nothing: what was there when the page opened is not news.
  */
-export function risen(prev: Attention | null, next: Attention, role: Role | null): string[] {
-  if (prev === null || role === null) return [];
-  const out: string[] = [];
-  const up = (key: keyof Attention) => Math.max(0, next[key] - prev[key]);
-  if (can(role, 'bookings:read')) {
-    const r = up('requests');
-    if (r > 0) out.push(r === 1 ? 'New booking request' : `${r} new booking requests`);
-    const c = up('changes');
-    if (c > 0) out.push(c === 1 ? 'A guest asks to change a stay' : `${c} guests ask to change a stay`);
-  }
-  if (can(role, 'payments:read')) {
-    const p = up('proofs');
-    if (p > 0) out.push(p === 1 ? 'A proof of payment to verify' : `${p} proofs of payment to verify`);
-  }
-  return out;
+export function risen(prev: Attention | null, next: Attention): string[] {
+  if (prev === null) return [];
+  const seen = Math.max(0, ...prev.latest.map((item) => item.id));
+  return next.latest
+    .filter((item) => item.id > seen && !item.read)
+    .sort((a, b) => a.id - b.id)
+    .map((item) => `${item.title} · ${item.body}`);
 }

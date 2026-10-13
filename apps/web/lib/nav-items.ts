@@ -6,7 +6,7 @@
 // page still asks requireAdmin() for the permission named below. Hiding a
 // button is never the guard.
 
-import { attentionFor, type Attention } from './attention';
+import type { Attention } from './attention';
 import { can, type Role } from './permissions';
 
 /**
@@ -23,14 +23,14 @@ export interface NavFeatures {
   book: boolean;
 }
 
-export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'notifications' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
 
 export interface NavItem {
   page: NavPage;
   label: string;
   href: string;
   primary?: boolean;
-  /** what waits there (plan/notifications.md Phase 1): Bookings' requests and changes, Payments' proofs */
+  /** Notifications only (plan/notifications.md § 8): what this member has not read */
   badge?: number;
 }
 
@@ -49,6 +49,8 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null,
   const staff: [NavPage, string, string, boolean][] = [
     // First (plan/dashboard.md § 7 q1): the page to land on; /admin redirects here.
     ['dashboard', 'Dashboard', '/admin/dashboard', can(role, 'dashboard:read')],
+    // S-17 (plan/notifications.md § 8): what arrived, read or not; the ONE badge.
+    ['notifications', 'Notifications', '/admin/notifications', features.bookings && can(role, 'bookings:read')],
     ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read')],
     ['unanswered', 'Unanswered', '/admin/unanswered', can(role, 'unanswered:read')],
     // S-16 (plan/conversations.md, D-115): every chat, every tenant.
@@ -64,12 +66,10 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null,
     ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read')],
     ['members', 'Members', '/admin/members', can(role, 'members:manage')],
   ];
-  // The counts that wait, on the page where they are dealt with; a zero is no badge.
-  const waiting = attention ? attentionFor(attention, role) : null;
-  const badgeOf: Partial<Record<NavPage, number>> = { bookings: waiting?.bookings, payments: waiting?.payments };
+  // What this member has not read, on Notifications alone; a zero is no badge.
   for (const [page, label, path, allowed] of staff) {
     if (!allowed) continue;
-    const badge = badgeOf[page];
+    const badge = page === 'notifications' ? attention?.unread : undefined;
     items.push(badge ? { page, label, href: `${base}${path}`, badge } : { page, label, href: `${base}${path}` });
   }
   return items;
@@ -80,6 +80,7 @@ export type NavGroup = 'Overview' | 'Content' | 'Bookings' | 'Team';
 
 const GROUP_OF: Readonly<Partial<Record<NavPage, NavGroup>>> = {
   dashboard: 'Overview',
+  notifications: 'Overview',
   documents: 'Content',
   unanswered: 'Content',
   conversations: 'Content',

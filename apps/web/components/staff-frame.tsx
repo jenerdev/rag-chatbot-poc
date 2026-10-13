@@ -28,7 +28,7 @@ import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
 import { groupNavItems, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/permissions';
-import { attentionFor, titleWithCount } from '@/lib/attention';
+import { titleWithCount } from '@/lib/attention';
 
 const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   chat: 'chat',
@@ -36,6 +36,7 @@ const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   manage: 'search',
   payments: 'check',
   dashboard: 'chart',
+  notifications: 'bell',
   documents: 'file',
   unanswered: 'help',
   conversations: 'messages',
@@ -72,12 +73,12 @@ export interface StaffFrameProps {
 export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
-  // What waits on staff (plan/notifications.md Phase 1): polled while signed
-  // in on a tenant with bookings, the only one with anything to wait on.
+  // What is new for this member (plan/notifications.md § 8): polled while
+  // signed in on a tenant with bookings, the only one with anything to say.
   const sound = useSound();
-  const attention = useAttention(slug, session.role, session.auth === 'in' && features.bookings, sound.on);
-  const waiting = attention ? attentionFor(attention, session.role).total : 0;
-  // "(2) Bookings · Villa" while two wait; the title as it was when none do, and on the way out.
+  const attention = useAttention(slug, session.auth === 'in' && features.bookings, sound.on);
+  const waiting = attention?.unread ?? 0;
+  // "(2) Bookings · Villa" while two are unread; the title as it was when none are, and on the way out.
   useEffect(() => {
     document.title = titleWithCount(document.title, waiting);
   }, [waiting, current]);
@@ -159,7 +160,7 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
           <span className="nav-badge" aria-hidden="true">
             {item.badge}
           </span>
-          <span className="visually-hidden">, {item.badge} waiting</span>
+          <span className="visually-hidden">, {item.badge} unread</span>
         </>
       ) : null}
     </Link>
@@ -213,7 +214,7 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
             ref={menuButton}
             type="button"
             className="ghost"
-            aria-label={waiting > 0 ? `Open menu, ${waiting} waiting` : 'Open menu'}
+            aria-label={waiting > 0 ? `Open menu, ${waiting} unread` : 'Open menu'}
             aria-controls="staff-sidebar"
             aria-expanded={open}
             onClick={() => setOpen(true)}

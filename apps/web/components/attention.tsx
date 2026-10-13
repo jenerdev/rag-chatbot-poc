@@ -1,25 +1,28 @@
 'use client';
 
-// The staff frame's ear (plan/notifications.md Phase 1, layer 1): while a
-// staff page is open and VISIBLE, ask every 30 s what waits on staff, and
-// when a count rises, say so: a toast, and a two-tone chime if this device
-// has the sound on. The badges and the tab title are drawn by StaffFrame
-// from the same counts.
+// The staff frame's ear (plan/notifications.md Phase 1, layer 1; § 8): while
+// a staff page is open, ask every 30 s what is new for this member, and when
+// a notification arrives, say so: a toast, and a two-tone chime if this
+// device has the sound on. The Notifications badge and the tab title are
+// drawn by StaffFrame from the same answer.
 //
 // Polling, not Supabase Realtime (§ 7 q1): Realtime would need a staff token
-// in the browser, and a TenantContext never reaches a Client Component. A
-// hidden tab stops asking and asks once when it is shown again (§ 2b.9).
+// in the browser, and a TenantContext never reaches a Client Component.
+// A HIDDEN tab keeps asking (§ 8, which reversed § 2b.9): the chime is for a
+// member who is in another tab or app, and a paused poll never rang for
+// them. The browser may slow a hidden tab's timer to once a minute; a push
+// to this device asks at once (the worker tells the tab), and so does a
+// screen that marked something read.
 //
 // The chime is an OscillatorNode, no audio file. Browsers keep audio silent
-// until the page has had a click (§ 2b.1), so the Sound toggle IS that click;
-// after a reload with the sound "on", the first click anywhere wakes it, and
-// until then the toggle says so.
+// until the page has had a click (§ 2b.1). The sound is ON unless this
+// device turned it off, and the first click anywhere on a staff page wakes
+// it; until then the toggle says so.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './icons';
 import { notify } from './toast';
-import { ATTENTION_POLL_MS, risen, type Attention } from '@/lib/attention';
-import type { Role } from '@/lib/permissions';
+import { ATTENTION_POLL_MS, NOTIFICATIONS_CHANGED, risen, type Attention } from '@/lib/attention';
 
 const SOUND_KEY = 'rag-staff-sound';
 
@@ -61,7 +64,7 @@ function tones(audio: AudioContext): void {
     osc.type = 'sine';
     osc.frequency.value = hz;
     gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.18, at + 0.02);
+    gain.gain.linearRampToValueAtTime(0.35, at + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
     osc.connect(gain).connect(audio.destination);
     osc.start(at);
@@ -69,11 +72,12 @@ function tones(audio: AudioContext): void {
   }
 }
 
+/** On unless this device said off: a member who never found the toggle still hears it. */
 function storedSound(): boolean {
   try {
-    return window.localStorage.getItem(SOUND_KEY) === 'on';
+    return window.localStorage.getItem(SOUND_KEY) !== 'off';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -88,10 +92,11 @@ function storeSound(on: boolean): void {
 // --- the poll ---------------------------------------------------------------
 
 /**
- * The counts, or null before the first answer (and for a tenant without
- * bookings, which has nothing to wait on). `enabled` false asks nothing.
+ * The unread count and the newest rows, or null before the first answer
+ * (and for a tenant without bookings, which has nothing to say). `enabled`
+ * false asks nothing.
  */
-export function useAttention(slug: string, role: Role | null, enabled: boolean, sound: boolean): Attention | null {
+export function useAttention(slug: string, enabled: boolean, sound: boolean): Attention | null {
   const [counts, setCounts] = useState<Attention | null>(null);
   const last = useRef<Attention | null>(null);
   const soundOn = useRef(sound);
@@ -103,7 +108,7 @@ export function useAttention(slug: string, role: Role | null, enabled: boolean, 
       // 401: the session ended; the screen's own reads say so. Nothing to announce.
       if (!response.ok) return;
       const next: Attention = await response.json();
-      const news = risen(last.current, next, role);
+      const news = risen(last.current, next);
       for (const message of news) notify(message, 'ok');
       if (news.length > 0 && soundOn.current) chime();
       last.current = next;
@@ -111,26 +116,25 @@ export function useAttention(slug: string, role: Role | null, enabled: boolean, 
     } catch {
       // Offline for a moment: the next tick tries again.
     }
-  }, [slug, role]);
+  }, [slug]);
 
   useEffect(() => {
     if (!enabled) return;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const start = () => {
-      if (timer) return;
-      void ask();
-      timer = setInterval(() => void ask(), ATTENTION_POLL_MS);
-    };
-    const stop = () => {
-      if (timer) clearInterval(timer);
-      timer = null;
-    };
-    const onVisibility = () => (document.visibilityState === 'visible' ? start() : stop());
-    onVisibility();
+    void ask();
+    const timer = setInterval(() => void ask(), ATTENTION_POLL_MS);
+    // Shown again: ask now rather than at the (possibly slowed) next tick.
+    const onVisibility = () => document.visibilityState === 'visible' && void ask();
+    // The service worker says a push reached this device (lib/service-worker.ts).
+    const onWorker = (event: MessageEvent) => event.data?.type === 'rag-notification' && void ask();
+    const onChanged = () => void ask();
     document.addEventListener('visibilitychange', onVisibility);
+    navigator.serviceWorker?.addEventListener('message', onWorker);
+    window.addEventListener(NOTIFICATIONS_CHANGED, onChanged);
     return () => {
-      stop();
+      clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
+      navigator.serviceWorker?.removeEventListener('message', onWorker);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, onChanged);
     };
   }, [enabled, ask]);
 

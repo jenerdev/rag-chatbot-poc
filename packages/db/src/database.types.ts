@@ -845,7 +845,7 @@ export interface Database {
         Update: Record<never, never>;
         Relationships: [];
       };
-      /** schema-notifications.sql (D-116): written by a trigger on booking_events, read by notify_claim(); no token policy */
+      /** schema-notifications.sql (D-116): written by a trigger on booking_events, read by notify_claim(); since schema-notification-reads.sql staff read their tenant's rows (a proof: owners and admins) */
       notification_outbox: {
         Row: {
           id: number;
@@ -864,9 +864,26 @@ export interface Database {
         Update: Record<never, never>;
         Relationships: [];
       };
+      /** schema-notification-reads.sql: one row per (member, notification) read; a member reads, adds and deletes only their own */
+      notification_reads: {
+        Row: { tenant_id: number; user_id: string; outbox_id: number; read_at: string };
+        Insert: { tenant_id: number; user_id?: string; outbox_id: number };
+        Update: Record<never, never>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
+      /** schema-notification-reads.sql: { unread, items } for the member, the last 30 days; security invoker */
+      notification_feed: {
+        Args: { p_tenant_id: number; p_limit?: number };
+        Returns: Json;
+      };
+      /** schema-notification-reads.sql: mark the named notifications (or, ids null, all) read; how many were */
+      notification_read: {
+        Args: { p_tenant_id: number; p_ids?: number[] | null };
+        Returns: number;
+      };
       /** schema-notifications.sql (D-116): the drain's read; claims this tenant's unsent rows, joined to who may hear them now */
       notify_claim: {
         Args: { p_tenant_id: number };

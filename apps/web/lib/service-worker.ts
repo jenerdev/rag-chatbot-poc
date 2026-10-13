@@ -7,10 +7,15 @@
 // It does two things and caches nothing:
 //   push               show the notification the server sent (title, body),
 //                      tagged by kind and reference, so a second push about
-//                      the same stay replaces the first rather than stacking
-//   notificationclick  focus an open tab of this tenant and take it to the
-//                      path, or open one. A path outside the scope is not
-//                      followed: the dashboard instead.
+//                      the same stay replaces the first rather than stacking;
+//                      and tell this tenant's open tabs, so their badge and
+//                      chime (components/attention.tsx) do not wait for the
+//                      next 30 s poll
+//   notificationclick  mark THIS notification read for the member (the
+//                      Notifications item's count, § 8), then focus an open
+//                      tab of this tenant and take it to the path, or open
+//                      one. A path outside the scope is not followed: the
+//                      dashboard instead.
 //
 // The sound is the device's own (§ 2b.5); `silent: false` is all it asks.
 
@@ -21,6 +26,13 @@ export function serviceWorkerSource(slug: string, businessName: string): string 
   return `// ${name}: staff notifications (plan/notifications.md)
 const SCOPE = ${JSON.stringify(scope)};
 const HOME = SCOPE + 'admin/dashboard';
+const READ = '/api' + SCOPE + 'admin/notifications';
+
+/** This tenant's open tabs. */
+async function tabs() {
+  const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  return open.filter((client) => new URL(client.url).pathname.startsWith(SCOPE));
+}
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
@@ -37,29 +49,39 @@ self.addEventListener('push', (event) => {
   const title = typeof message.title === 'string' ? message.title : 'Something waits for you';
   const body = typeof message.body === 'string' ? message.body : '';
   const path = typeof message.path === 'string' && message.path.startsWith(SCOPE) ? message.path : HOME;
+  const id = Number.isInteger(message.id) && message.id > 0 ? message.id : null;
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag: (message.kind || 'notice') + ':' + (message.reference || ''),
-      renotify: true,
-      silent: false,
-      data: { path },
-    }),
+    (async () => {
+      await self.registration.showNotification(title, {
+        body,
+        tag: (message.kind || 'notice') + ':' + (message.reference || ''),
+        renotify: true,
+        silent: false,
+        data: { path, id },
+      });
+      for (const client of await tabs()) client.postMessage({ type: 'rag-notification' });
+    })(),
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const wanted = event.notification.data && typeof event.notification.data.path === 'string' && event.notification.data.path.startsWith(SCOPE) ? event.notification.data.path : HOME;
+  const data = event.notification.data || {};
+  const wanted = typeof data.path === 'string' && data.path.startsWith(SCOPE) ? data.path : HOME;
+  const id = Number.isInteger(data.id) && data.id > 0 ? data.id : null;
   event.waitUntil(
     (async () => {
-      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of open) {
-        if (new URL(client.url).pathname.startsWith(SCOPE)) {
-          await client.focus();
-          if ('navigate' in client) await client.navigate(wanted);
-          return;
-        }
+      // Read first, so the page it opens already counts it read. The
+      // session cookie goes with it (same origin); a failure only leaves
+      // it unread, to be opened from the list.
+      if (id !== null) {
+        await fetch(READ, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [id] }) }).catch(() => undefined);
+      }
+      const [client] = await tabs();
+      if (client) {
+        await client.focus();
+        if ('navigate' in client) await client.navigate(wanted);
+        return;
       }
       await self.clients.openWindow(wanted);
     })(),

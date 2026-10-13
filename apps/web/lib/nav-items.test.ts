@@ -16,19 +16,19 @@ describe('navItems', () => {
   });
 
   it('shows staff the daily work, and no admin-only page', () => {
-    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments']);
+    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments']);
   });
 
   it('adds rooms and holidays for an admin, but not members', () => {
-    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos']);
+    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos']);
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos', 'Members']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Holidays', 'Slots', 'Promos', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Holidays', 'Slots', 'Promos', 'Members']);
     expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Members']);
   });
 
@@ -37,6 +37,7 @@ describe('navItems', () => {
       '/t/harbor',
       '/t/harbor/book',
       '/t/harbor/admin/dashboard',
+      '/t/harbor/admin/notifications',
       '/t/harbor/admin/documents',
       '/t/harbor/admin/unanswered',
       '/t/harbor/admin/conversations',
@@ -60,7 +61,7 @@ describe('groupNavItems', () => {
 
   it("sections an owner's harbor links, Chat and Book apart", () => {
     expect(sections(HARBOR, 'owner')).toEqual({
-      groups: ['Overview: Dashboard', 'Content: Knowledge base, Unanswered, Conversations', 'Bookings: Bookings, Calendar, Payments, Rooms, Holidays, Slots, Promos', 'Team: Members'],
+      groups: ['Overview: Dashboard, Notifications', 'Content: Knowledge base, Unanswered, Conversations', 'Bookings: Bookings, Calendar, Payments, Rooms, Holidays, Slots, Promos', 'Team: Members'],
       publicItems: ['Chat', 'Book'],
     });
   });
@@ -79,22 +80,27 @@ describe('groupNavItems', () => {
 });
 
 describe('navItems badges', () => {
-  const counts = { requests: 2, proofs: 1, changes: 1 };
-  const badges = (role: Parameters<typeof navItems>[2], attention?: typeof counts | null) =>
+  const unread = { unread: 3, latest: [] };
+  const badges = (role: Parameters<typeof navItems>[2], attention?: typeof unread | null) =>
     navItems('t', HARBOR, role, attention).filter((i) => i.badge).map((i) => [i.label, i.badge]);
 
-  it('puts requests and changes on Bookings, proofs on Payments', () => {
-    expect(badges('owner', counts)).toEqual([['Bookings', 3], ['Payments', 1]]);
-    expect(badges('staff', counts)).toEqual([['Bookings', 3], ['Payments', 1]]);
+  it('puts the unread count on Notifications alone, for every role', () => {
+    expect(badges('owner', unread)).toEqual([['Notifications', 3]]);
+    expect(badges('staff', unread)).toEqual([['Notifications', 3]]);
   });
 
   it('shows no badge for a zero, before the first read, or to a visitor', () => {
-    expect(badges('owner', { requests: 0, proofs: 0, changes: 0 })).toEqual([]);
+    expect(badges('owner', { unread: 0, latest: [] })).toEqual([]);
     expect(badges('owner', null)).toEqual([]);
-    expect(badges(null, counts)).toEqual([]);
+    expect(badges(null, unread)).toEqual([]);
   });
 
-  it('never badges a page the tenant does not have', () => {
-    expect(navItems('t', NORTHWIND, 'owner', counts).filter((i) => i.badge)).toEqual([]);
+  it('has no Notifications item, and so no badge, for a tenant without bookings', () => {
+    expect(navItems('t', NORTHWIND, 'owner', unread).filter((i) => i.page === 'notifications' || i.badge)).toEqual([]);
+  });
+
+  it('lists Notifications in Overview, after the Dashboard', () => {
+    const { groups } = groupNavItems(navItems('t', HARBOR, 'staff'));
+    expect(groups[0]!.items.map((i) => i.label)).toEqual(['Dashboard', 'Notifications']);
   });
 });

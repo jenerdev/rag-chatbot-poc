@@ -56,6 +56,24 @@
 
 ## ▶ Next up (do this next)
 
+**Notifications (`feat/notifications`, plan/notifications.md).**
+- [x] Phases 0–5 (2026-10-13): in-app badges, SQL, @rag/push, worker and
+  subscribe, the drain.
+- [x] Phase 6, the walls (2026-10-14): bookings isolation 38/38 both ways
+  (check 31), the static grep clean by name and by value.
+- [x] § 8, the Notifications item (2026-10-14, the user's bug report: no
+  sound; the number stayed after a click): S-17, the ONE badge (unread, per
+  member), `schema-notification-reads.sql` (the 30th file, applied), a tapped
+  push marks itself read, the poll runs while hidden, the sound on by default.
+- [ ] Phase 6, the phone walk: gated on deployment or a tunnel (§ 7 q8).
+- [ ] Phase 7, the record: D-116 (now with § 8), R-51, CLAUDE.md (30 sql
+  files, verify 187, S-17 in the layout), whats-done, `pnpm eval` once.
+- [x] VAPID keys back in `.env` (2026-10-14, a new pair from
+  `packages/push/tools/vapid.mjs`, subject still the placeholder
+  `mailto:you@example.com`); dev restarted by touching next.config.mjs; GET
+  /admin/push returns the public key (87 chars, equal to .env's). Devices
+  subscribed under the OLD pair must turn notifications off and on again.
+
 **Conversations: staff read every chat (2026-10-13, D-115).**
 - [x] S-16 `/admin/conversations` and S-16a `/admin/conversations/<id>`, on
   `conversation_list()` (`schema-conversations.sql`, the 28th file, run by
@@ -1808,6 +1826,60 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **▶ Next:** the user's manual check in a headed Chrome; then Phase 6 (the
   isolation additions, the static grep for VAPID_PRIVATE, the phone walk over
   a tunnel) and Phase 7 (D-116, R-51, CLAUDE.md, eval once).
+- **Phase 6, the walls (2026-10-14):** bookings isolation check 31 (five
+  checks, 31a–e) on the two per_room probes, with northwind's operator made
+  B's STAFF (a B-only member) and villa's operator holding a device in A AND
+  in B. Devices seeded on the service client; the package's `deviceOf` /
+  `removeDevice` follow the mode; the claim runs on CHAT tokens both ways.
+- **Observed:** bookings isolation **38/38 both ways** (was 33): A cannot read
+  or remove B's devices, the same member's either (null, false/false), each
+  reads its own (3 kinds); A's request is ONE outbox row in A and none in B
+  (B holds request, proof, change for ROO-…); `notify_claim` A→B is 42501
+  "not this tenant's token" and B's outbox stays unclaimed; A's claim →
+  `request@A-operator` only; B's → request and change to both B devices, the
+  proof to B's admin only, never A's device; `notify_done` from A's token on
+  B's ids as `gone` leaves B's 2 devices and 0 sent, B's own `ok` sets
+  last_ok_at 2/2 and sends. Probes cleaned: 0 probe tenants, 0 `iso-` devices.
+- **The static grep:** `pnpm build` in a throwaway git worktree (dev was
+  running on :3000, trap 16), with a throwaway VAPID pair from
+  `packages/push/tools/vapid.mjs` in that worktree's .env only: 114 files
+  under `.next/static/`, 0 hold `service_role|SUPABASE_SECRET|TENANT_SIGNING_JWK|guest_phone|VAPID_PRIVATE`;
+  by VALUE, 0 hold the VAPID `d`, the whole JWK, the signer's `d`, the
+  service key, the secret key, the cookie secret (nor the VAPID public key,
+  which is fetched at run time). Twin: `VAPID_PRIVATE_JWK` and
+  `TENANT_SIGNING_JWK` are named in 1 server file each. Worktree, its .env
+  and the keys deleted.
+- **Closing run:** typecheck exit 0; verify 183 PASS; pipeline isolation PASS
+  both ways; the three snapshots identical (prompt-snapshot;
+  `plan/tables-phase0-tools.mjs` villa, harbor).
+- **Not done (gated, § 7 q8):** the phone walk (Android Chrome closed; iPhone
+  from the Home Screen) needs deployment or a tunnel. The headed-Chrome
+  on-screen check from Phase 5 is still the user's.
+- **▶ Next:** Phase 7, the record (D-116, R-51, CLAUDE.md paragraph and layout
+  lines, eval once); the phone walk when a tunnel or deployment exists.
+- **§ 8, the Notifications item (2026-10-14):** the user heard no sound and
+  the number stayed after clicking a notification. Causes: the number was
+  "what waits" (only deciding lowers it), and the poll stopped while the tab
+  was hidden, so the chime never rang for a member in another tab; the sound
+  was off by default. Now S-17 Notifications with the ONE badge (unread per
+  member), `schema-notification-reads.sql` (30th, applied by Claude with
+  node `pg` from the scratchpad; a second run changed nothing: 4 policies,
+  both functions), the outbox id in the push so a tap marks it read, the
+  poll running hidden, the worker telling open tabs, the sound on by default.
+- **Observed:** unit tests 13+10+14+5+366+132+158 green, typecheck exit 0;
+  verify 187 PASS (183 owner 5/5 incl. 1 proof, staff 4 with no proof, chat
+  and villa 42501; 184 staff mark 1 then 0, proof 0, staff 4→3, owner 5→5;
+  185 forged mark 42501, foreign and chat 42501; 186 mark all 4 → 0);
+  bookings isolation 39/39 both ways (31f: A sees only its own, marks 0 of
+  B's, B's 3 unread hold); `plan/notifications-inbox-walk.mjs` 12/12 (sound on
+  by default, a click wakes it with 0 tones; a HIDDEN tab 0 → 1 on
+  Notifications after 28 s, no badge on Bookings, "(1)" title, toast "New
+  booking request · VIL-…", 2 tones with the toggle never clicked; the row
+  opens S-15 and is read, badge 0; Mark all read: server 0);
+  `plan/notifications-a11y.mjs` 8 states, 0 violations, screenshots in
+  `plan/notifications/`.
+- **Superseded:** `plan/notifications-phase1-walk.mjs` checks the old Bookings
+  badge and the three counts; the inbox walk replaces it.
 
 ### 2026-10-13 — the platform's tenant form (edit) redesigned
 - **Did:** `tenant-form.tsx` edit mode: a head (back to Tenants, the name

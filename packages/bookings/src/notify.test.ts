@@ -10,7 +10,8 @@ const { drainNotifications, pushMessage } = await import('./notify');
 
 describe('pushMessage', () => {
   it('says what waits, with the reference and the dates, and links to where it is dealt with', () => {
-    expect(pushMessage('villa', { kind: 'request', reference: 'VIL-ABC234', first_night: '2026-10-16', nights: 3 })).toEqual({
+    expect(pushMessage('villa', { id: 41, kind: 'request', reference: 'VIL-ABC234', first_night: '2026-10-16', nights: 3 })).toEqual({
+      id: 41,
       kind: 'request',
       reference: 'VIL-ABC234',
       title: 'New booking request',
@@ -30,7 +31,7 @@ describe('pushMessage', () => {
 
   it('carries the named fields only: no guest name, phone, email or amount (Rule 2)', () => {
     const row = { kind: 'request', reference: 'VIL-ABC234', first_night: '2026-10-16', nights: 1, guest_name: 'Ana', guest_phone: '0917', amount: 500000 };
-    expect(Object.keys(pushMessage('villa', row)).sort()).toEqual(['body', 'kind', 'path', 'reference', 'title']);
+    expect(Object.keys(pushMessage('villa', row)).sort()).toEqual(['body', 'id', 'kind', 'path', 'reference', 'title']);
     expect(JSON.stringify(pushMessage('villa', row))).not.toMatch(/Ana|0917|500000/);
   });
 });

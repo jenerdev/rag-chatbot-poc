@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { attentionFor, risen, titleWithCount } from './attention';
+import { risen, titleWithCount, type Attention, type AttentionItem } from './attention';
 
-const none = { requests: 0, proofs: 0, changes: 0 };
-
-describe('attentionFor', () => {
-  it('puts requests and changes on Bookings, proofs on Payments', () => {
-    expect(attentionFor({ requests: 2, proofs: 1, changes: 1 }, 'admin')).toEqual({ bookings: 3, payments: 1, total: 4 });
-    expect(attentionFor({ requests: 2, proofs: 1, changes: 1 }, 'staff')).toEqual({ bookings: 3, payments: 1, total: 4 });
-  });
-
-  it('tells nobody who is not signed in', () => {
-    expect(attentionFor({ requests: 2, proofs: 1, changes: 1 }, null)).toEqual({ bookings: 0, payments: 0, total: 0 });
-  });
+const item = (id: number, read = false): AttentionItem => ({
+  id,
+  kind: 'request',
+  reference: `VIL-${id}`,
+  title: 'New booking request',
+  body: `VIL-${id} · Fri 16 Oct`,
+  path: `/t/villa/admin/bookings/VIL-${id}`,
+  at: '2026-10-14T03:00:00Z',
+  read,
 });
+const feed = (...items: AttentionItem[]): Attention => ({ unread: items.filter((i) => !i.read).length, latest: items });
 
 describe('titleWithCount', () => {
   it('prefixes the count, and never stacks two', () => {
@@ -20,7 +19,7 @@ describe('titleWithCount', () => {
     expect(titleWithCount('(3) Bookings · Villa', 4)).toBe('(4) Bookings · Villa');
   });
 
-  it('gives the title back when nothing waits', () => {
+  it('gives the title back when nothing is unread', () => {
     expect(titleWithCount('(3) Bookings · Villa', 0)).toBe('Bookings · Villa');
     expect(titleWithCount('Bookings · Villa', 0)).toBe('Bookings · Villa');
   });
@@ -28,15 +27,16 @@ describe('titleWithCount', () => {
 
 describe('risen', () => {
   it('says nothing on the first read: what was there on load is not news', () => {
-    expect(risen(null, { requests: 2, proofs: 1, changes: 0 }, 'owner')).toEqual([]);
+    expect(risen(null, feed(item(2), item(1)))).toEqual([]);
   });
 
-  it('names each kind that rose, one or several', () => {
-    expect(risen(none, { requests: 1, proofs: 0, changes: 0 }, 'staff')).toEqual(['New booking request']);
-    expect(risen(none, { requests: 2, proofs: 1, changes: 1 }, 'owner')).toEqual(['2 new booking requests', 'A guest asks to change a stay', 'A proof of payment to verify']);
+  it('names each notification that arrived, oldest first', () => {
+    expect(risen(feed(item(1)), feed(item(3), item(2), item(1)))).toEqual(['New booking request · VIL-2 · Fri 16 Oct', 'New booking request · VIL-3 · Fri 16 Oct']);
+    expect(risen(feed(), feed(item(1)))).toEqual(['New booking request · VIL-1 · Fri 16 Oct']);
   });
 
-  it('says nothing when a count falls or holds', () => {
-    expect(risen({ requests: 3, proofs: 1, changes: 0 }, { requests: 2, proofs: 1, changes: 0 }, 'owner')).toEqual([]);
+  it('says nothing when nothing new came, or what came is already read (a tap on another device)', () => {
+    expect(risen(feed(item(2), item(1)), feed(item(2, true), item(1)))).toEqual([]);
+    expect(risen(feed(item(1)), feed(item(2, true), item(1)))).toEqual([]);
   });
 });
