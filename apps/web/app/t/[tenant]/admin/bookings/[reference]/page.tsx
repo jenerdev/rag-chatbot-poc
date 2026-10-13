@@ -26,7 +26,6 @@ export default async function StayDetailPage({ params }: { params: Promise<{ ten
       reference={decodeURIComponent(reference).toUpperCase()}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
     />
   );

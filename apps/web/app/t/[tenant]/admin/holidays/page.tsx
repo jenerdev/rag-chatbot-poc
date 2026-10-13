@@ -20,6 +20,6 @@ export default async function TenantHolidaysPage({ params }: { params: Promise<{
   const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
   return (
-    <HolidaysScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} nav={nav} />
+    <HolidaysScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />
   );
 }

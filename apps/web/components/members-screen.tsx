@@ -17,13 +17,11 @@ export function MembersScreen({
   slug,
   businessName,
   logoUrl,
-  bannerUrl,
   nav,
 }: {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
 }) {
   const api = `/api/t/${slug}`;
@@ -55,7 +53,7 @@ export function MembersScreen({
     unauthorized();
   }, [api, unauthorized]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'members' as const, title: 'Members', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'members' as const, title: 'Members', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

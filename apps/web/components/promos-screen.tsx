@@ -44,7 +44,6 @@ export interface PromosScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
   /** The tenant's currency, for the fixed amounts in the list. */
@@ -72,7 +71,7 @@ function valueLabel(p: Promo, currency: string): string {
   return p.kind === 'percent' ? `${percentToInput(p.value)} %` : formatMoney(p.value, currency);
 }
 
-export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, currency }: PromosScreenProps) {
+export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: PromosScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -223,7 +222,7 @@ export function PromosScreen({ slug, businessName, logoUrl, bannerUrl, nav, curr
 
   const editing = draft.id === null ? null : (promos?.find((p) => p.id === draft.id) ?? null);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'promos' as const, title: 'Promos', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'promos' as const, title: 'Promos', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

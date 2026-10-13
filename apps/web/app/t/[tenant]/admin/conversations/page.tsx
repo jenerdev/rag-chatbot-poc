@@ -29,7 +29,6 @@ export default async function TenantConversationsPage({
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       initial={parseListFilters(query)}
     />

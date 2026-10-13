@@ -44,7 +44,6 @@ export interface HolidaysScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
 }
@@ -67,7 +66,7 @@ function dayLabel(date: string): string {
   });
 }
 
-export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: HolidaysScreenProps) {
+export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, for the header's links only; the routes decide for themselves.
@@ -244,7 +243,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
     }
   }
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'holidays' as const, title: 'Holidays', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'holidays' as const, title: 'Holidays', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

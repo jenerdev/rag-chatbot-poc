@@ -34,7 +34,6 @@ export default async function ConversationPage({
       businessName={branding.businessName}
       assistantName={branding.assistantName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       backQuery={listQuery(parseListFilters(query))}
       focus={Number.isInteger(m) && m > 0 ? m : null}

@@ -64,7 +64,6 @@ export interface StaffFrameProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   features: NavFeatures;
   current: NavPage;
   /** The page's name: the header's subtitle signed out, the page title signed in. */
@@ -77,7 +76,7 @@ export interface StaffFrameProps {
   children: ReactNode;
 }
 
-export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
+export function StaffFrame({ slug, businessName, logoUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   // What is new for this member (plan/notifications.md § 8): polled while
@@ -143,7 +142,7 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
   if (session.auth !== 'in') {
     return (
       <>
-        <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle={title}>
+        <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={null} subtitle={title}>
           <TenantNav slug={slug} features={features} current={current} session={session} />
         </BrandHeader>
         <main className={mainClassName}>{children}</main>
@@ -248,10 +247,6 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
             />
           </div>
         </div>
-        {bannerUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className="brand-banner" src={bannerUrl} alt="" />
-        )}
         <main className={mainClassName ? `staff-content ${mainClassName}` : 'staff-content'}>
           <div className="page-head">
             <h1 className="page-title">{title}</h1>

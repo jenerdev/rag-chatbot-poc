@@ -22,7 +22,6 @@ export default async function TenantDashboardPage({ params }: { params: Promise<
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       currency={config?.currency ?? 'PHP'}
     />

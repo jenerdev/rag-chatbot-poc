@@ -31,7 +31,6 @@ export interface NotificationsScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
 }
 
@@ -44,7 +43,7 @@ function whenLabel(at: string): string {
   return new Date(at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-export function NotificationsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: NotificationsScreenProps) {
+export function NotificationsScreen({ slug, businessName, logoUrl, nav }: NotificationsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -138,7 +137,6 @@ export function NotificationsScreen({ slug, businessName, logoUrl, bannerUrl, na
     slug,
     businessName,
     logoUrl,
-    bannerUrl,
     features: nav,
     current: 'notifications' as const,
     title: 'Notifications',

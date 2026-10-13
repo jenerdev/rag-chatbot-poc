@@ -33,7 +33,6 @@ export default async function TenantAccommodationsPage({ params }: { params: Pro
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       maxImageBytes={MAX_IMAGE_BYTES}
       maxImageEdge={MAX_IMAGE_EDGE}

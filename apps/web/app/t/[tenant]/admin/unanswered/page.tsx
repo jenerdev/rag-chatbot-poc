@@ -22,7 +22,6 @@ export default async function TenantUnansweredPage({ params }: { params: Promise
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       limit={UNANSWERED_LIMIT}
     />

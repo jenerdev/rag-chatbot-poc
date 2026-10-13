@@ -40,7 +40,6 @@ export interface SlotsScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
 }
@@ -67,7 +66,7 @@ function lengthLabel(total: number): string {
   return parts.join(' ') || '0 minutes';
 }
 
-export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: SlotsScreenProps) {
+export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, for the header's links only; the routes decide for themselves.
@@ -193,7 +192,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Slo
   const draftEnd = slotEnd(draft.startTime, draftMinutes);
   const formMissing = draft.name.trim() === '' ? 'Add a name' : draft.startTime === '' ? 'Set the start time' : !(draftMinutes > 0) ? 'Set how long it lasts' : null;
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'slots' as const, title: 'Slots', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'slots' as const, title: 'Slots', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

@@ -33,7 +33,6 @@ export interface ConversationsScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
   /** The filters the URL arrived with (lib/conversation-words.ts). */
   initial: ListFilters;
@@ -44,7 +43,7 @@ type Auth = 'checking' | 'out' | 'in';
 /** How long the search waits after the last keystroke before asking. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function ConversationsScreen({ slug, businessName, logoUrl, bannerUrl, nav, initial }: ConversationsScreenProps) {
+export function ConversationsScreen({ slug, businessName, logoUrl, nav, initial }: ConversationsScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -148,7 +147,7 @@ export function ConversationsScreen({ slug, businessName, logoUrl, bannerUrl, na
     unauthorized();
   }, [api, unauthorized]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'conversations' as const, title: 'Conversations', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'conversations' as const, title: 'Conversations', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

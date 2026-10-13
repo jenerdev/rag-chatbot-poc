@@ -46,7 +46,6 @@ export default async function TenantCalendarPage({
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       perRoom={config?.bookingType === 'per_room'}
       rooms={units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }))}

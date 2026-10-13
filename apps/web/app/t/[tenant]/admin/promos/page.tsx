@@ -24,7 +24,6 @@ export default async function TenantPromosPage({ params }: { params: Promise<{ t
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
       currency={config?.currency ?? 'PHP'}
     />

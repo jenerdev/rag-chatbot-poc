@@ -31,7 +31,6 @@ export interface DashboardScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
   currency: string;
 }
@@ -79,7 +78,7 @@ function ChartOr({ bars, empty, children }: { bars: { value: number }[]; empty: 
   return bars.some((b) => b.value > 0) ? <>{children}</> : <p className="small muted chart-empty">{empty}</p>;
 }
 
-export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, currency }: DashboardScreenProps) {
+export function DashboardScreen({ slug, businessName, logoUrl, nav, currency }: DashboardScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -127,7 +126,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, bannerUrl, nav, c
     unauthorized();
   }, [api, unauthorized]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'dashboard' as const, title: 'Dashboard', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'dashboard' as const, title: 'Dashboard', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

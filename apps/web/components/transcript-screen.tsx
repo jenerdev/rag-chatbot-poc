@@ -35,7 +35,6 @@ export interface TranscriptScreenProps {
   businessName: string;
   assistantName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
   /** The list's filters as a query string, for Back ('' for none). */
   backQuery: string;
@@ -59,7 +58,7 @@ function Badge({ message }: { message: TranscriptMessage }) {
   }
 }
 
-export function TranscriptScreen({ slug, id, businessName, assistantName, logoUrl, bannerUrl, nav, backQuery, focus }: TranscriptScreenProps) {
+export function TranscriptScreen({ slug, id, businessName, assistantName, logoUrl, nav, backQuery, focus }: TranscriptScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -113,7 +112,7 @@ export function TranscriptScreen({ slug, id, businessName, assistantName, logoUr
     unauthorized();
   }, [api, unauthorized]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'conversations' as const, title: 'Conversation', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'conversations' as const, title: 'Conversation', session: { auth, role, onLogout: logout } };
   const back = (
     <Link className="button" href={`/t/${slug}/admin/conversations${backQuery}`}>
       <Icon name="chevron-left" size={16} /> Conversations

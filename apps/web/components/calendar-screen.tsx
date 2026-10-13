@@ -36,7 +36,6 @@ export interface CalendarScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
   perRoom: boolean;
   /** Active rooms, names only, for the room select (per_room). */
@@ -91,7 +90,7 @@ function query(view: CalendarView, date: string | null, unit: number | null): st
   return params.toString();
 }
 
-export function CalendarScreen({ slug, businessName, logoUrl, bannerUrl, nav, perRoom, rooms, initial }: CalendarScreenProps) {
+export function CalendarScreen({ slug, businessName, logoUrl, nav, perRoom, rooms, initial }: CalendarScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -177,7 +176,6 @@ export function CalendarScreen({ slug, businessName, logoUrl, bannerUrl, nav, pe
     slug,
     businessName,
     logoUrl,
-    bannerUrl,
     features: nav,
     current: 'calendar' as const,
     title: 'Calendar',
