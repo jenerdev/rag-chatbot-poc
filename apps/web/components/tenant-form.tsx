@@ -22,6 +22,7 @@
 import { useMemo, useState } from 'react';
 import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
+import { BrandImageField } from '@/components/brand-image-field';
 import { MembersPanel } from '@/components/members-panel';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
@@ -332,17 +333,40 @@ export function TenantForm({
               <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
             </div>
           </div>
+          {/* Uploaded (D-123), or an address pasted as before. An upload saves at once; Remove waits for Save. */}
           <div className="field-row">
-            <div className="field">
-              <label htmlFor="tenant-logo">Logo URL</label>
-              <input id="tenant-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" />
-              <p className="hint">https only. Square works best.</p>
-            </div>
-            <div className="field">
-              <label htmlFor="tenant-banner">Banner URL</label>
-              <input id="tenant-banner" type="url" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} placeholder="https://…" />
-              <p className="hint">https only. Shown wide, behind the header.</p>
-            </div>
+            <BrandImageField
+              api={api}
+              tenantId={id}
+              kind="logo"
+              label="Logo"
+              hint="JPEG, PNG or WebP. Square works best."
+              maxEdge={512}
+              value={logoUrl}
+              onChange={setLogoUrl}
+              onUploaded={(saved) => {
+                setLogoUrl(saved.logoUrl ?? '');
+                onSaved(saved);
+              }}
+              onMessage={(message, kind) => setNotice({ message, kind })}
+              onUnauthorized={onUnauthorized}
+            />
+            <BrandImageField
+              api={api}
+              tenantId={id}
+              kind="banner"
+              label="Banner"
+              hint="JPEG, PNG or WebP. Shown wide behind the booking page's header and on the chat's welcome."
+              maxEdge={2000}
+              value={bannerUrl}
+              onChange={setBannerUrl}
+              onUploaded={(saved) => {
+                setBannerUrl(saved.bannerUrl ?? '');
+                onSaved(saved);
+              }}
+              onMessage={(message, kind) => setNotice({ message, kind })}
+              onUnauthorized={onUnauthorized}
+            />
           </div>
         </div>
       </section>

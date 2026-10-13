@@ -9426,3 +9426,28 @@ room without choosing it.
     date in the tenant's own range;
   - finding that showed the viewer relied on the button having focus, so
     the opener is now passed in explicitly.
+
+## 2026-10-14 — upload a tenant's logo and banner (D-123)
+
+**What was done:**
+- **The form:** the platform's tenant form has Upload / Replace / Remove
+  for the logo and the banner, with a preview, and "paste an image
+  address" folded away. An upload is saved at once.
+- **Storage:** the images go to a new public bucket that only a super
+  user may write to. A replaced or removed image is deleted from it, and
+  the orphan sweeper and `tenant:remove` know the bucket.
+
+**What the observed values prove:**
+- **The walk:** in the real form, uploading set the row and left one
+  object; replacing changed the URL and still left one; Remove and Save
+  left only the banner.
+- **verify:** a super user can write and the public can read; a tenant
+  owner, a chat token and anon are refused by the database itself. The
+  owner cannot delete what the super user put there: 0 removed, and it is
+  still there.
+- **Two problems the checks caught:**
+  - a text file named `.png` reported "Cannot reach the server": the
+    generic error helper reads every failure with no response as a network
+    problem. It now says the file is not an image;
+  - the upload control was a `<label class="button">`, which the base
+    styles do not draw as a button.

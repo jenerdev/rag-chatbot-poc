@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTenant, updateTenant } from '@rag/pipeline';
+import { getTenant, sweepBrandImages, updateTenant } from '@rag/pipeline';
 import { withPlatformRoute } from '@/lib/platform-auth';
 import { badRequest, parseId } from '@/lib/route';
 import { firstError, updateTenantSchema } from '@/lib/schemas';
@@ -31,5 +31,9 @@ export const PATCH = withPlatformRoute<{ id: string }>(async (request, { platfor
   if (id === null) return badRequest('Invalid tenant id');
   const parsed = updateTenantSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
-  return NextResponse.json(await updateTenant(platform, id, parsed.data));
+  const before = await getTenant(platform, id);
+  const after = await updateTenant(platform, id, parsed.data);
+  // An uploaded logo or banner the tenant no longer points at leaves the bucket (D-123).
+  await sweepBrandImages(platform, before, after);
+  return NextResponse.json(after);
 });

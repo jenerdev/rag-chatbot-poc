@@ -3934,3 +3934,33 @@ so looking never chooses.
 **Measured:** `plan/book-photos-check.mjs` walk 3/3 (a named thumbnail per
 room; it opens its room and does not tick it; Escape returns focus); axe 8
 states, 0 violations.
+
+## D-123 · A tenant's logo and banner are uploaded on the platform page · **Added 2026-10-14 (schema-brand-images.sql)**
+
+**Decision:** the platform's tenant form uploads a logo or banner, and
+pasting an address remains as an alternative.
+- **The browser** resizes and re-encodes the image (512 px for a logo,
+  2000 px for a banner, WebP, EXIF dropped). Then `POST
+  /api/platform/tenants/<id>/images` checks the bytes (JPEG, PNG or WebP,
+  ≤ 2 MiB), stores them as `<tenant_id>/<kind>-<uuid>.<ext>` in a public
+  bucket, `brand-images`, and points the tenant's field at the public URL
+  through `updateTenant()`, so the https rule still applies.
+- **The bucket:** its insert, select and delete policies ask
+  `app_is_super()`, the 31st SQL file. Only a super user, on the platform
+  token, can write to it.
+- **Cleanup:** a replaced image, and one cleared on the form and saved, is
+  removed. Only an object in our bucket, named as an upload names it
+  (`brandObjectPath()`, tested), is ever deleted. `storage-orphans` sweeps
+  the bucket too, so `tenant:remove` clears a tenant's images.
+
+**Why:** the user's call (item 4 of 5). Pasting a URL meant hosting the
+image somewhere else first.
+
+**Measured:**
+- verify **189**: 188, a super user uploads (served publicly) and removes;
+  189, a tenant owner, a chat token and anon cannot upload, and the owner
+  cannot remove the super user's image.
+- `plan/brand-upload-check.mjs` walk 5/5 (upload, replace with the old
+  object gone, banner, Remove and Save with its object gone, a fake image
+  refused in words) and axe 2 states, 0 violations.
+- Tests: pipeline 369 (`brandObjectPath`).

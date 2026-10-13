@@ -3615,6 +3615,81 @@ async function notificationChecks() {
   }
 }
 
+// --- schema-brand-images.sql (D-123): the brand-images bucket --------------
+// 188. A super user uploads to it and removes from it (the positive twin);
+// 189. a tenant's OWNER token, a chat token and anon cannot upload, list or
+//      remove; its public URL serves the image to anyone.
+{
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const users = [];
+  const made = [];
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const user = async () => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `brand-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      return data.user.id;
+    };
+    const superId = await user();
+    const ownerId = await user();
+    const pa = await supabase.from('platform_admins').insert({ user_id: superId });
+    if (pa.error) throw new Error(`platform_admins: ${pa.error.message}`);
+    const m = await supabase.from('memberships').insert({ user_id: ownerId, tenant_id: villaRow.id, role: 'owner' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const superDb = asToken(platformToken(superId));
+    const ownerDb = asToken(staffToken(villaRow.id, ownerId));
+    const path = (who) => `${villaRow.id}/logo-${randomUUID()}.png`;
+
+    // 188
+    {
+      const mine = path('super');
+      const up = await superDb.storage.from('brand-images').upload(mine, PNG, { contentType: 'image/png' });
+      if (!up.error) made.push(mine);
+      const url = superDb.storage.from('brand-images').getPublicUrl(mine).data.publicUrl;
+      const served = await fetch(url);
+      const gone = await superDb.storage.from('brand-images').remove([mine]);
+      if ((gone.data ?? []).length === 1) made.splice(made.indexOf(mine), 1);
+      check(
+        !up.error && served.status === 200 && url.startsWith('https://') && (gone.data ?? []).length === 1,
+        'brand-images: a super user uploads (served publicly, https) and removes (1 removed)',
+        `upload ${up.error?.message ?? 'ok'} · public ${served.status} · removed ${(gone.data ?? []).length}`,
+      );
+    }
+
+    // 189
+    {
+      const theirs = path('owner');
+      const ownerUp = await ownerDb.storage.from('brand-images').upload(theirs, PNG, { contentType: 'image/png' });
+      if (!ownerUp.error) made.push(theirs);
+      const chatUp = await asToken(chatToken(villaRow.id)).storage.from('brand-images').upload(path('chat'), PNG, { contentType: 'image/png' });
+      const anonUp = await anonClient().storage.from('brand-images').upload(path('anon'), PNG, { contentType: 'image/png' });
+      // The twin of the delete refusal: an object the super user put there, which the owner cannot remove.
+      const kept = path('kept');
+      await superDb.storage.from('brand-images').upload(kept, PNG, { contentType: 'image/png' });
+      made.push(kept);
+      const ownerRemove = await ownerDb.storage.from('brand-images').remove([kept]);
+      const stillThere = (await supabase.storage.from('brand-images').list(String(villaRow.id))).data?.some((o) => kept.endsWith(o.name));
+      check(
+        !!ownerUp.error && !!chatUp.error && !!anonUp.error && (ownerRemove.data ?? []).length === 0 && stillThere === true,
+        "brand-images: a tenant owner, a chat token and anon cannot upload; the owner cannot remove the super user's image (0 removed, still there)",
+        `owner ${ownerUp.error?.message ?? 'UPLOADED'} · chat ${chatUp.error?.message ?? 'UPLOADED'} · anon ${anonUp.error?.message ?? 'UPLOADED'} · owner removed ${(ownerRemove.data ?? []).length} · kept ${stillThere}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'brand-images: setup', error.message);
+  } finally {
+    if (made.length) {
+      const { data: gone } = await supabase.storage.from('brand-images').remove(made);
+      if ((gone ?? []).length !== made.length) console.log(`WARN  removed ${(gone ?? []).length} of ${made.length} brand-images probe objects`);
+    }
+    for (const id of users) {
+      await supabase.from('platform_admins').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+    }
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +

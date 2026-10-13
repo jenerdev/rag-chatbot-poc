@@ -1348,3 +1348,22 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
   .room-pick { flex-wrap: wrap; }
   .room-pick-photo { width: 76px; height: 58px; }
 }
+
+/* A tenant's logo or banner on the platform form (components/brand-image-field.tsx, D-123):
+   the current image, Upload / Replace and Remove, and the address folded away. */
+.brand-image-row { display: flex; align-items: center; gap: var(--space-3); }
+.brand-image-preview { display: flex; align-items: center; justify-content: center; flex: none; overflow: hidden; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.brand-image-preview.logo, .brand-image-preview.avatar { width: 72px; height: 72px; }
+.brand-image-preview.avatar { border-radius: var(--radius-full); }
+.brand-image-preview.banner { width: 160px; height: 72px; }
+.brand-image-preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.brand-image-preview:has(img) { border-style: solid; border-color: var(--line); }
+.brand-image-preview span { padding: var(--space-1); text-align: center; }
+.brand-image-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.brand-upload { margin: 0; cursor: pointer; }
+.brand-upload:focus-within .button { box-shadow: 0 0 0 3px var(--ring); }
+.brand-upload.busy { cursor: progress; }
+.brand-upload.busy .button { color: var(--muted); }
+.brand-image-url { margin-top: var(--space-2); }
+.brand-image-url summary { font-size: var(--text-sm); color: var(--muted); cursor: pointer; }
+.brand-image-url input { margin-top: var(--space-2); }

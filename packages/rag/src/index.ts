@@ -79,6 +79,8 @@ export {
   updateTenant,
 } from './platform.js';
 export type { NewTenant, PlatformContext, TenantDetail, TenantPatch, TenantSummary } from './platform.js';
+export { BRAND_BUCKET, BRAND_IMAGE_KINDS, brandObjectPath, MAX_BRAND_BYTES, sweepBrandImages, uploadBrandImage } from './brand-images.js';
+export type { BrandImageKind } from './brand-images.js';
 export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
 export { CONVERSATION_DAYS, CONVERSATION_PAGE_SIZE, conversationDays, getTranscript, listConversations, messageKind } from './conversations.js';
 export type { ConversationDays, ConversationPage, ConversationSummary, MessageKind, Transcript, TranscriptMessage } from './conversations.js';
