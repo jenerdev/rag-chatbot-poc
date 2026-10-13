@@ -3883,3 +3883,25 @@ from a tenant.
 
 **Measured:** walk 5/5; axe 16 states, 0 violations (after restoring the
 login's h1, twice); typecheck exit 0, web tests 159.
+
+## D-120 · Room cards read as cards, and the photo viewer frames the photo · **Added 2026-10-14 (plan/room-cards.md)**
+
+**Decision:**
+- **The cards:**
+  - a room card's short cells are fact chips and its sentences are its
+    text (`cardParts()`);
+  - on a phone the cards are one sideways-scrolling row, each card 84%
+    wide;
+  - the photo button is named with its badge's words.
+- **The viewer:** a bar (the room, "n of m", Close), the photo with the
+  arrows beside it, and a thumbnail strip. Tab is kept inside, and the
+  backdrop is near-solid with a blur. This amends D-094's look; its data
+  path (the table joined to `meta.roomCards` by name) is unchanged.
+
+**Why:** the user's call. A description squeezed into a 34% label column,
+six screen-high cards on a phone, controls over the photo, no room name,
+and no way to jump to a photo.
+
+**Measured:** walk 7/7 and axe 8 states, 0 violations (after the photo
+button's name took its badge's words, WCAG 2.5.3); typecheck exit 0, web
+tests 163.

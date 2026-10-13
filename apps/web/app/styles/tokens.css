@@ -40,6 +40,9 @@
   --on-accent: #ffffff;
   --on-overlay: #ffffff;
   --overlay: rgb(0 0 0 / 0.88);
+  /* The photo viewer's backdrop (plan/room-cards.md): near-solid, so its bar's
+     words never sit over the page's (0.88 let the header show through). */
+  --viewer-bg: rgb(0 0 0 / 0.95);
   --overlay-control: rgb(0 0 0 / 0.55);
   --overlay-control-hover: rgb(0 0 0 / 0.8);
 

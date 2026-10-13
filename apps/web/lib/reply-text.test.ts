@@ -55,11 +55,13 @@ describe('ReplyText', () => {
     ];
     const text = 'Here are our rooms:\n\n| Room | Guests | Details |\n|---|---|---|\n| **Garden Room** | up to 2 | Opens onto the garden. |\n| Loft | up to 3 |  |\n\nTell me a date.';
     const html = renderToStaticMarkup(createElement(ReplyText, { text, cards, view: 'cards' }));
-    expect(html).toContain('<div class="room-cards">');
+    expect(html).toContain('<div class="room-cards" role="region" aria-label="Rooms" tabindex="0">');
     expect(html).toContain('<img src="https://x/garden-1.webp" alt="Garden Room" loading="lazy"/>');
-    expect(html).toContain('<span class="room-card-count">2 photos</span>');
+    expect(html).toMatch(/<span class="room-card-count"><svg[^>]*>.*?<\/svg>2 photos<\/span>/);
     expect(html).toContain('<div class="room-card-title"><strong>Garden Room</strong></div>');
-    expect(html).toContain('<span class="room-card-label">Guests</span><span class="room-card-value">up to 2</span>');
+    // plan/room-cards.md: a short cell is a fact chip; a sentence is the card's text, unlabelled when alone.
+    expect(html).toContain('<li><span class="room-card-label">Guests</span><span class="room-card-value">up to 2</span></li>');
+    expect(html).toContain('<p class="room-card-text">Opens onto the garden.</p>');
     // The Loft has no photo: a card with no <img>, and its empty Details cell is left out.
     expect(html).not.toContain('alt="Loft"');
     expect(html).not.toContain('<table');

@@ -56,6 +56,15 @@
 
 ## ▶ Next up (do this next)
 
+**Room cards and the photo viewer (`feat/room-cards`, plan/room-cards.md, D-120, 2026-10-14).**
+- [x] Cards: fact chips and text, a sideways row on a phone, the photo
+  badge with an icon and a name that contains it. Viewer: a bar (room,
+  count, Close), the photo framed, thumbnails, Tab kept inside, a
+  near-solid backdrop. No pipeline, prompt or tool change.
+- [x] Observed: walk 7/7; axe 8 states 0 violations (after WCAG 2.5.3 on the
+  photo button); typecheck exit 0, web tests 163. Screenshots in
+  `plan/room-cards/`.
+
 **Platform header (`feat/platform-header`, plan/platform-header.md, D-119, 2026-10-14).**
 - [x] /platform has the staff top bar: the mark, "Platform", the breadcrumb
   (Tenants › the tenant, a way back), the account menu ("Super user", Log

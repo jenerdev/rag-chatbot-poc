@@ -101,7 +101,7 @@ function Table({ header, rows, cards }: { header: string[]; rows: string[][]; ca
           </tbody>
         </table>
       </div>
-      {photoColumn && <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} />}
+      {photoColumn && <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} to={lightbox.to} />}
     </>
   );
 }

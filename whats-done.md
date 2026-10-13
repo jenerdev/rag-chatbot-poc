@@ -9369,3 +9369,30 @@ guests.
 - **What axe caught twice:** the login page had lost its only h1 (the old
   header had been it). Then the phone rule that hides the name beside the
   breadcrumb hid the restored h1 too. Now only the signed-in name hides.
+
+## 2026-10-14 — room cards and the photo viewer, redrawn (D-120)
+
+**What was done:**
+- **The cards:**
+  - a short fact ("Guests up to 3") is a chip, and a description is plain
+    text across the card, no longer squeezed beside a 34% label column;
+  - on a phone the rooms are one sideways row, so a guest sees there are
+    more without scrolling past a screen of each.
+- **The viewer:**
+  - names the room;
+  - says "1 of 2" in a bar above the photo, with Close, instead of on it;
+  - adds thumbnails to jump to any photo;
+  - keeps Tab inside;
+  - darkens the page behind it enough that the bar's words never sit over
+    the page's.
+
+**What the observed values prove:**
+- **The walk:** on a real reply, every step of the viewer works by keyboard
+  (Close first, Tab kept in, the arrow keys, Escape back to the photo) and
+  by pointer (a thumbnail jumps). Close no longer overlaps the photo. On a
+  phone the row is 295 px with 248 px cards, so the next one shows.
+- **What axe caught:** the photo button showed "2 photos" but was named
+  "See photos of …". A screen-reader or voice-control user saying what
+  they see would miss it, so the name now carries the badge's words.
+- **The chips:** the unit test showed a short sentence ("Opens onto the
+  garden.") becoming a chip; sentences are now text whatever their length.
