@@ -17,6 +17,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
+import { tmpdir } from 'node:os';
 import { supabase } from '../packages/db/dist/service.js';
 import { openBrowser } from './ui-refresh-cdp.mjs';
 
@@ -41,7 +42,8 @@ function png(width, height, [r, g, b]) {
   const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3).map((_, i) => [r, g, b][i % 3])]);
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.concat(Array(height).fill(row)))), chunk('IEND', Buffer.alloc(0))]);
 }
-const files = { logo1: join(TMP, 'logo-1.png'), logo2: join(TMP, 'logo-2.png'), banner: join(TMP, 'banner.png'), fake: join(TMP, 'not-an-image.png') };
+// The files to choose are made fresh in the OS temp folder: only the screenshots belong in plan/.
+const files = { logo1: join(tmpdir(), 'brand-logo-1.png'), logo2: join(tmpdir(), 'brand-logo-2.png'), banner: join(tmpdir(), 'brand-banner.png'), fake: join(tmpdir(), 'brand-not-an-image.png') };
 writeFileSync(files.logo1, png(300, 300, [194, 65, 12]));
 writeFileSync(files.logo2, png(300, 300, [15, 118, 110]));
 writeFileSync(files.banner, png(1200, 400, [37, 99, 235]));
