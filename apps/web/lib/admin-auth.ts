@@ -128,6 +128,8 @@ class PermissionError extends Error {
 /** A tenant context on a staff token, plus what the member is. */
 export interface StaffContext extends TenantContext {
   role: Role;
+  /** the signed-in member: for a filter on their OWN rows (wall 1), never trusted from a request */
+  userId: string;
 }
 
 /**
@@ -152,7 +154,7 @@ export async function requireAdmin(request: Request, tenant: TenantContext, perm
   if (!can(staff.role, permission)) {
     throw new PermissionError(`Your role (${staff.role}) may not do this (${permission}). Ask an owner of "${tenant.slug}" to change it.`);
   }
-  return { ...tenant, db: staff.db, role: staff.role };
+  return { ...tenant, db: staff.db, role: staff.role, userId };
 }
 
 /**

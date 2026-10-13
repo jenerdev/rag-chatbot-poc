@@ -50,6 +50,31 @@ export async function saveDevice(tenant: BookingTenant, input: DeviceInput): Pro
   return { kinds: data.kinds };
 }
 
+/**
+ * How many devices the signed-in member has in this tenant, so the sidebar
+ * can offer "Turn off on all my devices" (R-51: a lost phone). `userId` is
+ * the session's, never a request's; RLS limits the read to it as well.
+ */
+export async function deviceCount(tenant: BookingTenant, userId: string): Promise<number> {
+  const { count, error } = await tenant.db.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('user_id', userId);
+  if (error) throw new Error(`Could not count your devices: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Forget EVERY device of the signed-in member in this tenant (R-51): a lost
+ * or sold phone stops getting pushes from here. Filtered on the member in
+ * code (wall 1); RLS lets a member delete only their own anyway (wall 2).
+ * How many went.
+ */
+export async function removeAllDevices(tenant: BookingTenant, userId: string): Promise<number> {
+  const { data, error } = await tenant.db.from('push_subscriptions').delete().eq('tenant_id', tenant.id).eq('user_id', userId).select('id');
+  if (error) throw new Error(`Could not remove your devices: ${error.message}`);
+  const removed = (data ?? []).length;
+  console.log(`[notify] ${tenant.slug}: a member turned off ${removed} device(s)`);
+  return removed;
+}
+
 /** Forget this device for the signed-in member. true when a row went. */
 export async function removeDevice(tenant: BookingTenant, endpoint: string): Promise<boolean> {
   const { data, error } = await tenant.db.from('push_subscriptions').delete().eq('tenant_id', tenant.id).eq('endpoint', endpoint).select('id');

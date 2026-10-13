@@ -106,7 +106,7 @@ export { attentionCounts } from './attention.js';
 export type { AttentionCounts } from './attention.js';
 export { drainNotifications, pushMessage } from './notify.js';
 export type { DrainResult, NotifyKind, PushMessage } from './notify.js';
-export { deviceOf, removeDevice, saveDevice } from './push-devices.js';
+export { deviceCount, deviceOf, removeAllDevices, removeDevice, saveDevice } from './push-devices.js';
 export { markNotificationsRead, NOTIFICATION_PAGE_ITEMS, NOTIFICATION_POLL_ITEMS, notificationFeed, parseFeed } from './notifications.js';
 export type { NotificationFeed, NotificationItem } from './notifications.js';
 export type { DeviceInput } from './push-devices.js';

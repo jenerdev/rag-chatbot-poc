@@ -11,7 +11,9 @@
 //   - one service worker per tenant, scope /t/<slug>/ (§ 2b.4);
 //   - on, the kinds this device wants: requests, change requests, and (for
 //     the roles that verify them) proofs. Who hears what is decided again on
-//     the server at send time (Rule 3); the boxes only narrow it.
+//     the server at send time (Rule 3); the boxes only narrow it;
+//   - "Turn off on all my devices" whenever the member has a device other
+//     than this one (R-51): a lost or sold phone stops hearing this tenant.
 //
 // The server's VAPID public key comes from GET /admin/push; with none, push
 // is not set up here and the control says so (Rule 4).
@@ -62,6 +64,9 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // How many devices this member has here (this one included, when on).
+  const [devices, setDevices] = useState(0);
+  const [note, setNote] = useState<string | null>(null);
   const proofsToo = role !== null && can(role, 'payments:write');
 
   const load = useCallback(async () => {
@@ -73,8 +78,9 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
       const sub = await reg?.pushManager.getSubscription();
       const response = await fetch(sub ? `${api}?endpoint=${encodeURIComponent(sub.endpoint)}` : api, { cache: 'no-store' });
       if (!response.ok) return setState('hidden');
-      const body: { publicKey: string | null; kinds: Kind[] | null } = await response.json();
+      const body: { publicKey: string | null; kinds: Kind[] | null; devices?: number } = await response.json();
       setPublicKey(body.publicKey);
+      setDevices(body.devices ?? 0);
       if (!body.publicKey) return setState('off-server');
       if (Notification.permission === 'denied') return setState('denied');
       if (sub && body.kinds) {
@@ -123,13 +129,15 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
         if (!response.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not turn notifications on.');
         setKinds(body.kinds ?? wanted);
         setState('on');
+        setNote(null);
+        void load();
       } catch (e) {
         setError((e as Error).message || 'Could not turn notifications on.');
       } finally {
         setBusy(false);
       }
     },
-    [api, publicKey, scope],
+    [api, load, publicKey, scope],
   );
 
   const turnOff = useCallback(async () => {
@@ -143,12 +151,42 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
         await sub.unsubscribe();
       }
       setState('off');
+      void load();
     } catch {
       setError('Could not turn notifications off.');
     } finally {
       setBusy(false);
     }
+  }, [api, load, scope]);
+
+  /** Every device of this member, here and elsewhere (R-51). */
+  const turnOffAll = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(api, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) });
+      if (!response.ok) throw new Error('failed');
+      const { removed } = (await response.json()) as { removed: number };
+      const reg = await navigator.serviceWorker.getRegistration(scope);
+      await (await reg?.pushManager.getSubscription())?.unsubscribe();
+      setDevices(0);
+      setState('off');
+      setNote(removed === 1 ? 'Turned off on 1 device.' : `Turned off on ${removed} devices.`);
+    } catch {
+      setError('Could not turn notifications off on your devices.');
+    } finally {
+      setBusy(false);
+    }
   }, [api, scope]);
+
+  // Shown when another device would be reached: off here and any elsewhere, or on here and more than this one.
+  const others = state === 'on' ? devices - 1 : devices;
+  const allButton =
+    others > 0 ? (
+      <button type="button" className="ghost sm" disabled={busy} onClick={() => void turnOffAll()}>
+        Turn off on all my devices ({devices})
+      </button>
+    ) : null;
 
   if (state === 'checking' || state === 'hidden') return null;
   if (state === 'unsupported') return <p className="push-note">This browser cannot show notifications.</p>;
@@ -162,6 +200,12 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
         <button type="button" className="ghost sm push-toggle" disabled={busy} onClick={() => void save(kinds)}>
           <Icon name="phone" size={16} /> {busy ? 'Turning on…' : 'Notify me on this device'}
         </button>
+        {allButton}
+        {note && (
+          <p className="push-note" role="status">
+            {note}
+          </p>
+        )}
         {error && (
           <p className="push-note error" role="alert">
             {error}
@@ -197,6 +241,7 @@ export function PushControl({ slug, role }: { slug: string; role: Role | null })
       <button type="button" className="ghost sm" disabled={busy} onClick={() => void turnOff()}>
         Turn off on this device
       </button>
+      {allButton}
       {error && (
         <p className="push-note error" role="alert">
           {error}

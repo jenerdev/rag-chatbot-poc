@@ -314,6 +314,11 @@ return 404, with no redirect.
 | `GET` | `/t/<slug>/admin/conversations`, `…/conversations/:id` | S-16 the chats / S-16a one transcript, read-only (D-115) | `ConversationsScreen` / `TranscriptScreen` | public page, staff data |
 | `GET` | `/api/t/<slug>/admin/conversations` | one page of chats: `?days=7\|30\|90&q=&refused=1&before=&beforeId=`, from `conversation_list()`, which refuses a non-member itself | `listConversations` | admin (any member) |
 | `GET` | `/api/t/<slug>/admin/conversations/:id` | one transcript, every message named; 404 if not this tenant's. (The OPEN `/conversations/:id/messages` was removed, D-115.) | `getTranscript` | admin (any member) |
+| `GET` | `/t/<slug>/admin/notifications` | S-17 Notifications: the last 30 days, read or not; the sidebar's ONE badge is its unread count (D-116 § 8) | `NotificationsScreen` | public page, staff data |
+| `GET` | `/api/t/<slug>/admin/attention` | the poll, every 30 s (hidden tabs too) and at once on a push: `{ unread, latest }`; also sweeps the outbox (`notifyAfter`) | `notificationFeed` | admin (any member) |
+| `GET` / `POST` | `/api/t/<slug>/admin/notifications` | the member's feed / mark `{ ids }` or `{ all: true }` read (the service worker posts here when a push is tapped) | `notificationFeed` / `markNotificationsRead` | admin (any member); a proof only for owners and admins, by RLS |
+| `GET` / `POST` / `DELETE` | `/api/t/<slug>/admin/push` | the VAPID public key and this device / subscribe / `{ endpoint }` or `{ all: true }` (R-51) | `deviceOf` / `saveDevice` / `removeDevice`, `removeAllDevices` | admin (any member) |
+| `GET` | `/t/<slug>/sw.js`, `/t/<slug>/manifest.webmanifest` | the tenant's service worker (scope `/t/<slug>/`) and staff app manifest (D-116) | `lib/service-worker.ts` | public |
 | `GET` | `/t/<slug>/admin/reset` | set a password from an invite or reset link | `app/t/[tenant]/admin/reset/page.tsx` → `ResetPassword` | public |
 | `POST` / `GET` / `DELETE` | `/api/t/<slug>/admin/session` | log in (email + password) / status / log out | `lib/admin-auth.ts` | open |
 | `POST` | `/api/t/<slug>/admin/password-reset`, `…/admin/password` | email a reset link / set the new password | `@rag/db` `staff-auth.ts` | open |
@@ -330,7 +335,7 @@ return 404, with no redirect.
 | `PATCH` / `DELETE` | `/api/t/<slug>/accommodations/:id/images/:imageId` | reorder / remove (row, then object) | `setImageOrder` / `removeImage` | admin |
 | `GET` | `/t/<slug>/book` | the customer booking page (404 without the application or a priced unit) | `app/t/[tenant]/book/page.tsx` → `BookingPageScreen` | public |
 | `POST` | `/api/t/<slug>/book/quote` | a stay's price night by night, and whether it is still open | `quoteRequest` | open |
-| `POST` | `/api/t/<slug>/book/request` | send a request: `pending` rows via `request_booking()`; honeypot + per-IP window | `requestBooking` | open |
+| `POST` | `/api/t/<slug>/book/request` | send a request: `pending` rows via `request_booking()`; honeypot + per-IP window; then, after the response, the outbox drain (D-116; so do `manage/proof` and `manage/change`) | `requestBooking` | open |
 | `GET` | `/api/t/<slug>/bookings/requests` | every stay waiting for a decision, web or staff (D-100), one per group with its reference, `source` and `clash` | `listRequests` | admin |
 | `PATCH` | `/api/t/<slug>/bookings/requests/:groupId` | `{ action: confirm \| decline }`, the whole group, any source; 409 on a clash | `confirmRequest` / `declineRequest` | admin |
 | `GET` | `/t/<slug>/manage` | S-13, Manage booking: look up a stay, pay, ask for a change (404 without the application) | `app/t/[tenant]/manage/page.tsx` → `ManageBookingScreen` | public |

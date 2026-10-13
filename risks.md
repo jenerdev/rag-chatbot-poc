@@ -750,6 +750,32 @@ button (a delete would also cascade away Unanswered's history). The open
 uuid-keyed transcript route was removed at the same time. A retention
 policy is a decision for before real guests, like R-48's.
 
+## R-51 · Pushes leave through Google, Apple and Mozilla, and a lost phone keeps hearing · **Mitigated 2026-10-14 (D-116)**
+
+Every push is POSTed to the push service of the member's browser (FCM for
+Chrome, Apple's for Safari, Mozilla's for Firefox), which then delivers it.
+
+**What limits it:**
+- The payload is encrypted to the device (RFC 8291), so the service sees
+  only its size and timing.
+- It carries no guest name, phone, email or amount: a reference, dates
+  and a link.
+- It lives at most 24 h (TTL).
+
+**What remains:** what a lock screen shows is shown to whoever holds the
+phone. A lost or sold phone keeps getting pushes until its subscription
+goes. Three things end one:
+- the member presses "Turn off on all my devices" in the sidebar, from
+  any other device (each tenant separately);
+- an owner removes the member, and their devices go with the membership,
+  at once;
+- the browser drops the subscription, and the drain deletes it on the push
+  service's 404 or 410.
+
+The endpoints themselves are URLs the server POSTs to. Only known push
+services' hosts are accepted, so the server makes no requests to internal
+hosts (SSRF).
+
 ---
 
 ## Explicitly still missing after tenancy

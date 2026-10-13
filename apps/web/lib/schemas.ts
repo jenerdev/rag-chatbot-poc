@@ -476,6 +476,8 @@ export const pushDeviceSchema = z.object({
   kinds: z.array(notifyKind).min(1, 'Choose at least one kind').max(3).transform((k) => [...new Set(k)]),
 });
 export const pushEndpointSchema = z.object({ endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000) });
+/** DELETE /admin/push: this device, or (R-51) every device of the member. */
+export const pushRemoveSchema = z.union([pushEndpointSchema, z.object({ all: z.literal(true) })], { errorMap: () => ({ message: 'Send { endpoint } or { all: true }' }) });
 
 /**
  * POST /admin/notifications (plan/notifications.md § 8): mark these read, or

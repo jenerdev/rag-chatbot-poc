@@ -46,6 +46,7 @@ import {
   createBooking,
   createBookings,
   declineRequest,
+  deviceCount,
   deviceOf,
   getAccommodation,
   guestStay,
@@ -73,6 +74,7 @@ import {
   quote,
   quoteRequest,
   removeCalendarDay,
+  removeAllDevices,
   removeDevice,
   removeImage,
   requestBooking,
@@ -773,6 +775,19 @@ try {
         && bBefore.items.length === bBox.length && crossMarked === 0 && bAfter.unread === bBefore.unread && ownMarked === bBefore.unread,
       "notify feed A: only A's own; A marks none of B's read; B's unread holds, and B marks its own",
       `A ${aFeed.items.map((i) => i.reference).join(',')} · B ${bBefore.items.length} (${bBefore.unread} unread) · A marks B's ${crossMarked} · B unread after ${bAfter.unread} · B marks ${ownMarked}`,
+    );
+
+    // 31g. "Turn off on all my devices" (R-51) in A removes the member's A
+    //      device only: their B device and B's staff member's stay. Staff
+    //      work follows the mode, so --filters-only proves the member and
+    //      tenant filters alone.
+    const [aCount, bCount] = await Promise.all([deviceCount(a, operatorId), deviceCount(b, operatorId)]);
+    const removed = await removeAllDevices(a, operatorId);
+    const left = (await supabase.from('push_subscriptions').select('endpoint').in('tenant_id', [a.id, b.id])).data?.map((r) => r.endpoint) ?? [];
+    check(
+      aCount === 1 && bCount === 1 && removed === 1 && !left.includes(devices.a) && left.includes(devices.b) && left.includes(devices.outsider),
+      "notify devices: turning off all in A removes the member's A device only; their B device and B's staff device stay",
+      `counts A ${aCount} B ${bCount} · removed ${removed} · left ${left.length} (A ${left.includes(devices.a)}, B ${left.includes(devices.b)}, B-staff ${left.includes(devices.outsider)})`,
     );
   }
 

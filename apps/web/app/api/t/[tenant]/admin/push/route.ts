@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { deviceOf, removeDevice, saveDevice } from '@rag/bookings';
+import { deviceCount, deviceOf, removeAllDevices, removeDevice, saveDevice } from '@rag/bookings';
 import { vapidKeys } from '@rag/push';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
-import { firstError, pushDeviceSchema, pushEndpointSchema } from '@/lib/schemas';
+import { firstError, pushDeviceSchema, pushRemoveSchema } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -16,17 +16,19 @@ export const dynamic = 'force-dynamic';
  * proof is decided when it is sent, from the role (Rule 3), not here. Only
  * a tenant with bookings has anything to notify of.
  *
- * GET ?endpoint= → { publicKey, kinds }: the server's VAPID public key (null
- * when push is not configured: the sidebar then says so), and this device's
- * kinds (null: not subscribed). The public key is not a secret; it is sent
+ * GET ?endpoint= → { publicKey, kinds, devices }: the server's VAPID public
+ * key (null when push is not configured: the sidebar then says so), this
+ * device's kinds (null: not subscribed), and how many devices the member
+ * has here, for "Turn off on all my devices" (R-51). The public key is not a secret; it is sent
  * here rather than threaded as a prop through every staff screen.
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant, 'session');
+  const staff = await requireAdmin(request, tenant, 'session');
+  tenant = staff;
   await requireApplication(tenant, 'bookings');
   const endpoint = new URL(request.url).searchParams.get('endpoint');
-  const device = endpoint && /^https:\/\//.test(endpoint) ? await deviceOf(tenant, endpoint) : null;
-  return NextResponse.json({ publicKey: vapidKeys()?.publicKey ?? null, kinds: device?.kinds ?? null }, { headers: { 'Cache-Control': 'no-store' } });
+  const [device, devices] = await Promise.all([endpoint && /^https:\/\//.test(endpoint) ? deviceOf(tenant, endpoint) : null, deviceCount(tenant, staff.userId)]);
+  return NextResponse.json({ publicKey: vapidKeys()?.publicKey ?? null, kinds: device?.kinds ?? null, devices }, { headers: { 'Cache-Control': 'no-store' } });
 });
 
 export const POST = withTenantRoute(async (request, { tenant }) => {
@@ -41,9 +43,12 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 });
 
 export const DELETE = withTenantRoute(async (request, { tenant }) => {
-  tenant = await requireAdmin(request, tenant, 'session');
+  const staff = await requireAdmin(request, tenant, 'session');
+  tenant = staff;
   await requireApplication(tenant, 'bookings');
-  const parsed = pushEndpointSchema.safeParse(await request.json().catch(() => null));
+  const parsed = pushRemoveSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // { all: true }: every device of THIS member (R-51, a lost phone); the member is the session's.
+  if ('all' in parsed.data) return NextResponse.json({ removed: await removeAllDevices(tenant, staff.userId) });
   return NextResponse.json({ removed: await removeDevice(tenant, parsed.data.endpoint) });
 });

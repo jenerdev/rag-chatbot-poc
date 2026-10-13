@@ -234,6 +234,24 @@
 > link in (`conversationId`, staff only). Transcripts are kept
 > indefinitely (R-50). The chatbot is untouched: the three baselines are
 > byte-identical.
+>
+> **Staff hear what waits on them** since 2026-10-14 (D-116,
+> [`plan/notifications.md`](./plan/notifications.md), Phases 0–8; the phone
+> walk owed). A guest's request, a proof, a change request: the
+> `booking_events` log is the ONE source, and a trigger fills
+> `notification_outbox` (`sql/schema-notifications.sql`, the 29th file).
+> In the app, every staff tab polls `/admin/attention` every 30 s, HIDDEN
+> too, and chimes (sound on by default; a click or key wakes it). On
+> devices, Web Push by hand in `@rag/push` (VAPID, RFC 8291, `node:crypto`;
+> `VAPID_PRIVATE_JWK` read in ONE function, unset = push off). The drain
+> (`notify_claim()` / `notify_done()`, definers) runs in `after()` and in the
+> poll, and decides recipients from the membership row at send time: a
+> proof reaches owners and admins only. The payload has NO guest name,
+> phone, email or amount. S-17 `/admin/notifications` holds the sidebar's
+> ONE badge, what this member has not READ
+> (`schema-notification-reads.sql`, the 30th). A tapped push marks itself
+> read. "Turn off on all my devices" is R-51's answer to a lost phone. The
+> chatbot is untouched.
 
 ## What this is
 
@@ -279,6 +297,9 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/conversations/page.tsx  S-16 conversations (D-115) — every member (conversations:read), every tenant; filters in the URL
   app/t/[tenant]/admin/conversations/[id]/page.tsx  S-16a one transcript, read-only; ?m= scrolls to a message; the route is /api/t/[tenant]/admin/conversations/[id]
+  app/t/[tenant]/admin/notifications/page.tsx  S-17 Notifications (D-116 § 8): the last 30 days, read or not; the sidebar's ONE badge is its unread count; 404 without bookings
+  app/t/[tenant]/sw.js/route.ts, manifest.webmanifest/route.ts  the tenant's service worker (scope /t/<slug>/; source in lib/service-worker.ts) and staff app manifest (D-116)
+  app/api/t/[tenant]/admin/attention, notifications, push  the poll (unread + newest), the feed and read marks, this device's subscription / all my devices (D-116)
   app/t/[tenant]/admin/accommodations/page.tsx  S-5 rooms — 404 unless the tenant books per_room
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment
   app/t/[tenant]/book/page.tsx   S-6 the customer booking page — PUBLIC; 404 unless the tenant has a priced unit
@@ -316,6 +337,8 @@ apps/web/              Next.js 15, App Router
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
   components/staff-frame.tsx  every staff screen's frame (D-101): signed in, a sectioned sidebar (groupNavItems) that is a drawer below 900 px; signed out, the old header
+  components/attention.tsx   the poll, the toast and the chime, the Sound toggle (D-116); push-control.tsx the device's subscription; notifications-screen.tsx S-17
+  lib/attention.ts, lib/service-worker.ts, lib/notify.ts  the badge/title/news words (pure); the worker's source (pure, tested on a fake self); notifyAfter(), the drain in after()
   components/icons.tsx   the icons: hand-drawn inline SVG on a 20 px grid, currentColor, aria-hidden unless labelled (D-101)
   components/toast.tsx   useNotice(drawerOpen): a success or a refusal as a toast, a refusal in an open drawer stays in it; ONE queue, ONE <Toaster /> per page (StaffFrame, the platform), a popover in the top layer (D-102)
   components/load-state.tsx  LoadState (a skeleton, or an alert with Retry running the load that failed) and EmptyState (title, line, the page's own add button) (D-102)
@@ -325,11 +348,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (28 files; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (30 files; the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     172 checks (168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     187 checks (173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -341,7 +364,7 @@ packages/
     src/staff-stay.ts      D-111: a staff stay on the page's rules (quoteStaffStay, createStaffStay), Walk in
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
-    tools/isolation.mjs    39 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking, 31a–f push notifications and the Notifications feed)
+    tools/isolation.mjs    40 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking, 31a–g push notifications, the Notifications feed, all my devices)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
     src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409 (and, D-106, "is held for another guest"); the constraint's own 23P01 keeps the sentence
@@ -350,6 +373,9 @@ packages/
     src/payment-review.ts  D-107: staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
     src/deadlines.ts       D-105: expire_due_stays(), the sweep before every staff list
     src/changes.ts         D-108: cancel and reschedule requests: the guest asks, staff decide
+    src/notify.ts          D-116: the drain (notify_claim → sendPush → notify_done) and pushMessage(), the ONE wording of a notification
+    src/notifications.ts   D-116 § 8: the member's feed and read marks (notification_feed, notification_read)
+    src/push-devices.ts    D-116: this member's devices: one, or all (R-51)
     tools/rooms.mjs        50 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b) and references on staff stays (4f, 4g)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
@@ -365,6 +391,8 @@ packages/
     src/members.ts         list (with emails), add an existing account, change a role, remove — shared by owners and the platform
     src/dashboard.ts       the dashboard's typed shapes over tenant_dashboard() and platform_dashboard(), the parser, the days clamp (D-098)
     tools/isolation.mjs    24 cross-tenant checks through the pipeline (21 and 22, RLS only: a platform token reads nothing, and gets 403 from a tenant's dashboard; 23: each tenant's dashboard counts equal its own truth; 24: a chat is listed and read by its own tenant's staff only)
+  push/                @rag/push — Web Push by hand (D-116): encrypt.ts RFC 8291 (Appendix A's vector, byte for byte), vapid.ts RFC 8292, endpoint.ts the push-service allowlist (no SSRF), send.ts → ok | gone | retry; vapidKeys() the ONE reader of VAPID_PRIVATE_JWK; server-only, zero other dependencies
+    tools/vapid.mjs        a new key pair for .env
   tsconfig/            shared base config
 fixtures/northwind.json  tenant northwind's corpus, for the eval battery
 sample-documents/        tenant villa's corpus (01–08 only), for the battery too
@@ -386,14 +414,14 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 172 checks, no API key needed
+pnpm --filter @rag/db verify    # 187 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 22 of them, code filters alone (RLS bypassed)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
-pnpm --filter @rag/bookings isolation   # 39 cross-tenant booking checks, on operator staff tokens, no API key
-pnpm --filter @rag/bookings isolation -- --filters-only   # the same 39, code filters alone
+pnpm --filter @rag/bookings isolation   # 40 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation -- --filters-only   # the same 40, code filters alone
 pnpm --filter @rag/bookings rooms       # 50 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
 pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)
@@ -402,6 +430,7 @@ pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 d
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
 node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (in packages/db) six login and three role cases, needs pnpm dev
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/conversations-walk.mjs)   # 12 checks of S-16 as a STAFF member, HTTP and browser, screenshots in plan/conversations/walk/; needs pnpm dev; conversations-a11y.mjs is axe over its four pages (16 states)
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/notifications-inbox-walk.mjs)   # 12 checks in a browser: a HIDDEN tab chimes, the ONE badge, read on open, Mark all read; also notifications-sound-walk.mjs (5), notifications-devices-walk.mjs (4, HTTP), notifications-phase5-walk.mjs (real pushes, two Chrome profiles), notifications-a11y.mjs (8 states); needs pnpm dev with VAPID_* set
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/unanswered-bulk-walk.mjs)   # 11 HTTP checks of resolving several unanswered questions at once, needs pnpm dev; unanswered-bulk-browser-walk.mjs the same 12 in a browser
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/tenant-management-phase4-walk.mjs)   # the platform and members routes over HTTP, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
@@ -477,8 +506,11 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
      off env.ts's REQUIRED list, and `next build` passes without it.
    - `@rag/db` imports `server-only`, so a Client Component importing it is a
      build error.
-   - Before shipping, `grep -ri "service_role\|SUPABASE_SECRET\|TENANT_SIGNING_JWK\|guest_phone"
-     apps/web/.next/static/` must return nothing. Grep for the key VALUES too,
+   - Before shipping, `grep -ri "service_role\|SUPABASE_SECRET\|TENANT_SIGNING_JWK\|guest_phone\|VAPID_PRIVATE"
+     apps/web/.next/static/` must return nothing (D-116 added the last).
+   - `VAPID_PRIVATE_JWK` is read in ONE function, `vapidKeys()` in
+     `@rag/push`, which is `server-only`; the public key reaches the browser
+     from `GET /admin/push`. Grep for the key VALUES too,
      on a build that had them (Phase 7).
 3. **Every Route Handler is wrapped in `withTenantRoute()`**, which resolves the
    slug (404 on a miss, never a fallback) and wraps `withRoute()`. Nothing
@@ -559,8 +591,11 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    guest's, each matching through `guest_group()`), `review_payment`,
    `record_refund`, `set_payment_settings`, `decide_change` (owners and
    admins, each asking `app_is_admin()`), `expire_due_stays` (staff or
-   service_role); and trigger-only definers that no token can call (the
-   stay row, the event log, the terms, the holds) (`booking_reference` also admits a direct session, `session_user
+   service_role); since D-116 two more, `notify_claim` and `notify_done`
+   (any token of the tenant, each checking the token's tenant; a claimed
+   row is consumed, so the claim cannot list devices twice); and
+   trigger-only definers that no token can call (the stay row, the event
+   log, the terms, the holds, `booking_events_notify`) (`booking_reference` also admits a direct session, `session_user
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
    is `security invoker`, so it reads under the token's own RLS, and it
    refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a

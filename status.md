@@ -66,8 +66,10 @@
   member), `schema-notification-reads.sql` (the 30th file, applied), a tapped
   push marks itself read, the poll runs while hidden, the sound on by default.
 - [ ] Phase 6, the phone walk: gated on deployment or a tunnel (§ 7 q8).
-- [ ] Phase 7, the record: D-116 (now with § 8), R-51, CLAUDE.md (30 sql
-  files, verify 187, S-17 in the layout), whats-done, `pnpm eval` once.
+- [x] Phase 7, the record (2026-10-14): D-116, R-51, CLAUDE.md (header
+  paragraph, layout, 30 sql files, verify 187, isolation 40, rule 2's grep,
+  rule 8's definers), flow.md § 5 routes, the plan marked done; "Turn off on
+  all my devices" built (R-51 named it, it did not exist); `pnpm eval` once.
 - [x] VAPID keys back in `.env` (2026-10-14, a new pair from
   `packages/push/tools/vapid.mjs`, subject still the placeholder
   `mailto:you@example.com`); dev restarted by touching next.config.mjs; GET
@@ -1893,6 +1895,26 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
   FAIL ("Sound on · click to allow"): the walk catches the bug. Typecheck
   exit 0, web tests 158, the inbox walk 12/12 again. `openBrowser()` takes
   optional extra Chrome `args`.
+- **Phase 7, the record (2026-10-14):** D-116 and R-51 written. R-51 said
+  "Turn off on all my devices" exists; it did NOT, so it was built:
+  `deviceCount()` / `removeAllDevices()` (filtered on the session's member
+  in code, RLS behind), `GET /admin/push` returns `devices`, `DELETE
+  { all: true }`, the sidebar button when another device would be reached;
+  `StaffContext` carries `userId`.
+- **Observed:** bookings isolation **40/40 both ways** (31g: off-all in A
+  removed 1, the member's B device and B's staff device stay);
+  `plan/notifications-devices-walk.mjs` 4/4 (GET devices 2; a bad body 400
+  "Send { endpoint } or { all: true }"; DELETE all removed 2, the other
+  member's 1 stays; then 0, anon 401); typecheck exit 0, web tests 158.
+- **`pnpm eval` once: 56/61**, `original 8/10 · tool 9/9 · lang 9/10 · date
+  11/11 · rooms 12/13 · book 4/5 · price 3/3`. Failures: `antecedent`
+  (D-017), `leak-2` and `book-for-me-harbor` (the known flips, trap 24),
+  `lang-followup` (D-043, ~1 in 3), `rt-leak-2` (4 of 4 on repeat: villa's
+  tool rows hold 0 harbor rows, the model says "the Garden Room is
+  available" of the whole property; in the known set since manage booking).
+  No chatbot code differs from `master` (`git diff` of packages/rag and
+  packages/openai empty), the three baselines are byte-identical: nothing
+  reworded (Rule 5).
 - **Still true, and said by the toggle:** after a full reload, a browser
   that does NOT allow the site sound needs one click per tab (Chrome's
   rule). Chrome → site settings → Sound → Allow removes even that.

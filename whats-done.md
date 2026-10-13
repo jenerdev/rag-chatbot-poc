@@ -9252,3 +9252,43 @@ the audio as soon as it opens, and any click or key wakes it.
 - One click per freshly loaded tab is still Chrome's rule when the site
   is not allowed sound. Setting the site's Sound to Allow in Chrome
   removes even that.
+
+## 2026-10-14 — notifications Phase 7: the record, and the button R-51 needed
+
+**What was done:**
+- **D-116** records the whole plan, § 8 included. **R-51** is the push
+  risk:
+  - pushes leave through Google, Apple and Mozilla;
+  - the payload is minimal and encrypted;
+  - a lost phone keeps hearing until its subscription goes.
+- CLAUDE.md gained the header paragraph, the layout lines, the counts
+  (30 SQL files, verify 187, isolation 40), `VAPID_PRIVATE` in rule 2's
+  grep, and the two new definers in rule 8. flow.md § 5 lists the five
+  new routes. The plan is marked done but for the phone walk.
+- **Built here: "Turn off on all my devices."** R-51 relies on it, and
+  the plan said it would exist, but it did not. Writing the risk as if it
+  did would have recorded a mitigation nobody could use.
+  - It removes every device of the signed-in member in that tenant.
+  - The member comes from the session, never from the request, and the
+    code filters on it (wall 1); RLS allows only a member's own rows
+    anyway (wall 2).
+  - The sidebar offers it whenever another device would be reached.
+
+**What the observed values prove:**
+- Isolation 31g removed exactly the member's device in A. Their device in
+  B and B's staff device stayed, with RLS on and with the code filters
+  alone.
+- Over HTTP, "all" removed two devices of one member and left the other
+  member's one. A malformed body is a 400 that says what to send.
+
+**The battery, once:** 56/61. Four failures are the known set:
+- `antecedent`;
+- `leak-2` and `book-for-me-harbor`, which flip with identical inputs
+  (trap 24);
+- `lang-followup`.
+
+`rt-leak-2` failed 4 times out of 4, and has been in the known set since
+manage booking. Villa's tool rows held no harbor row; the model calls
+villa's whole property "the Garden Room". This branch changes no chatbot
+code, and the prompt and tool baselines are byte-identical. So it is the
+model, and nothing was reworded.

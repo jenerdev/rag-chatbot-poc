@@ -3731,3 +3731,80 @@ Axe 0 violations over 16 page states (`plan/conversations-a11y.mjs`).
 that floor (add `pg_trgm` on `messages.content`), or staff need to see
 what an answer was built from (store sources per turn: a write-path
 change and a plan of its own).
+
+## D-116 · Staff hear what waits on them: in the app, and on their devices by Web Push · **Added 2026-10-14 (schema-notifications.sql, schema-notification-reads.sql)**
+
+**Decision:** three things that wait on staff are news:
+- a guest's booking request (`created`, by a guest, pending; one per
+  stay);
+- a proof of payment (`payment:submitted`);
+- a guest's change request (`<kind>:pending`).
+
+The `booking_events` log is the ONE source (Rule 1). An AFTER INSERT
+trigger, `booking_events_notify`, writes a `notification_outbox` row in
+the event's transaction, and no route "also sends a push". Staff-made
+stays, decisions, the expiry sweep and refunds are not news (plan § 7 q3).
+
+**Two layers:**
+- **In the app:** every open staff tab polls `GET /admin/attention` every
+  30 s, hidden or not (§ 8 reversed § 2b.9's pause). A new arrival is a
+  toast and a two-tone `OscillatorNode` chime; the sound is on unless the
+  device turned it off, and is woken by the first click or key in a tab.
+- **Web Push:** VAPID (RFC 8292) and `aes128gcm` (RFC 8291), hand-written
+  in `@rag/push` over `node:crypto` (§ 7 q6). It equals RFC 8291
+  Appendix A byte for byte, so `web-push` was not needed. There is no
+  Firebase: each browser's own push service delivers.
+  - **Subscribing:** a member subscribes a device per tenant from the
+    sidebar, with per-kind boxes (§ 7 q9). One service worker per
+    tenant, scope `/t/<slug>/`, and a per-tenant manifest for iPhone's
+    Home Screen.
+  - **Sending:** the drain is `notify_claim()` → `sendPush()` →
+    `notify_done()`, run with `after()` behind the guest's response and
+    swept by the staff poll (§ 7 q5).
+  - **Recipients:** decided from the membership row at send time
+    (Rule 3). A request or change reaches every role; a proof reaches
+    owners and admins only (`NOTIFY_PERMISSION`, tested against the SQL).
+
+**S-17 Notifications (§ 8, the user's walk on 2026-10-14):**
+- The sidebar has ONE badge: what this member has not READ, on every
+  device at once (`notification_reads`). Bookings and Payments carry none.
+  Phase 1 had badged them with what WAITS, which only deciding could
+  lower, so opening a notification never cleared a number.
+- The list is the last 30 days, in the push's own words. Opening a row,
+  or tapping its push (the outbox id is in the payload), marks it read.
+  "Mark all read" clears the rest.
+- `notification_feed()` and `notification_read()` are security invoker
+  and refuse non-staff. Staff read their tenant's outbox under the push's
+  role rule.
+
+**Payload (Rule 2):** kind, reference, first night, nights, path and
+outbox id. Never a guest's name, phone, email or amount (§ 7 q4); a lock
+screen shows it, and the push service is a third party.
+
+**Secrets (Rule 4):** `VAPID_PRIVATE_JWK` is read in ONE function,
+`vapidKeys()`, which is `server-only`. Unset, push is off and says so,
+and the in-app layer still works. The public key reaches the browser from
+`GET /admin/push`, not as a page prop. That is a deviation, because
+threading one non-secret string through every staff screen was not worth
+it.
+
+**Not done, on purpose:**
+- email (§ 7 q7: the outbox can gain a channel);
+- guests notified of anything;
+- custom push sounds (the OS chooses, § 2b.5);
+- a cron drain (§ 7 q5: revisit at deployment).
+
+**Measured:**
+- verify **187** (173–186);
+- bookings isolation **40/40** both ways (31a–g);
+- RFC 8291's vector byte for byte; the build's static files clean of
+  every secret by name and by value;
+- walks: Phase 4 5/5 off and on, Phase 5 4/4 in two real Chrome profiles
+  (Google accepted both pushes 3–4 s after the response), inbox 12/12 (a
+  hidden tab chimed 28 s after a request), sound 5/5 (and on the old code
+  it fails as reported), devices 4/4;
+- axe: 8 states, 0 violations;
+- the three chatbot baselines byte-identical.
+
+**Owed:** the phone walk (Android with Chrome closed; iPhone from the Home
+Screen), gated on deployment or a tunnel (§ 7 q8).

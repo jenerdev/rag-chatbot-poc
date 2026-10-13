@@ -21,7 +21,7 @@
 > and Safari through their own push services.
 >
 > Written 2026-10-13, against `107d6fb` on `feat/conversations`.
-> **Status: not started; § 7 decided 2026-10-13 (every recommendation taken).** The record will be
+> **Status: Phases 0–7 and § 8 done (2026-10-14), recorded as D-116 and R-51; the phone walk (Phase 6) is owed, gated on deployment or a tunnel.** § 7 decided 2026-10-13 (every recommendation taken). The record will be
 > D-116 (D-115 is the conversations plan's), R-51, and the SQL file the
 > 29th (`schema-notifications.sql`; the 28th is conversations').
 >
