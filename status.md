@@ -67,7 +67,7 @@
   selectors to the bell; typecheck exit 0, web tests 159. Screenshots in
   `plan/nav-layout/` (before and after). `ui-refresh-phase2-walk.mjs`'s
   footer checks are superseded.
-- [ ] The user's look; then commit and merge on their word.
+- [x] Committed `eef5f3f` and merged into `master` by fast-forward on 2026-10-14, by the user's word.
 
 **Notifications (`feat/notifications`, plan/notifications.md).** Merged into `master` by fast-forward at `46e261f` on 2026-10-14, by the user's word; the phone walk is owed on `master`.
 - [x] Phases 0–5 (2026-10-13): in-app badges, SQL, @rag/push, worker and
