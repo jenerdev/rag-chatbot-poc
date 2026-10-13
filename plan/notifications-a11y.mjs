@@ -88,8 +88,8 @@ try {
       await audit(`notifications @${width}`);
       await page.shot(join(dirname(fileURLToPath(import.meta.url)), 'notifications', `inbox-${scheme}-${width}.png`));
       await page.goto(`${BASE}/t/${SLUG}/admin/dashboard`);
-      // At 375 the sidebar is a drawer: the badge is on the menu button.
-      await page.until(width === 1280 ? "!!document.querySelector('.sidebar-link .nav-badge')" : "!!document.querySelector('.menu-badge')", 60000);
+      // The badge is on the top bar's bell at both widths (plan/nav-layout.md).
+      await page.until("!!document.querySelector('.topbar-bell .nav-badge')", 60000);
       await sleep(400);
       await audit(`dashboard with the badge @${width}`);
     }

@@ -1,11 +1,17 @@
 'use client';
 
-// The frame around every staff screen (plan/ui-refresh.md Phase 2).
+// The frame around every staff screen (plan/ui-refresh.md Phase 2,
+// rearranged by plan/nav-layout.md).
 //
-// Signed in, it is a sidebar and a content column: the sidebar holds the
-// business, the staff links in sections (groupNavItems), and a footer with
-// the public pages, the role and Log out; the content column holds the page
-// title and the screen. Below 900 px the sidebar is a drawer behind a menu
+// Signed in, it is a sidebar, a top bar and a content column:
+//   - the sidebar is NAVIGATION only: the business, then the staff pages in
+//     sections (groupNavItems: Overview, Front desk, Assistant, Setup);
+//   - the top bar says where you are (section > page) and holds what is
+//     about you, not a place: the Notifications bell with the ONE badge,
+//     and the account menu (role, the guest pages, this device's sound and
+//     push, Log out);
+//   - the content column holds the page title and the screen.
+// Below 900 px the sidebar is a drawer behind a menu
 // button: it takes focus when it opens, Escape or the backdrop closes it, and
 // the page behind it is `inert` while it is open, so neither a keyboard nor a
 // screen reader can wander out of it.
@@ -22,12 +28,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SoundToggle, useAttention, useSound } from './attention';
 import { BrandHeader } from './brand-header';
+import { AccountMenu } from './account-menu';
 import { PushControl } from './push-control';
 import { Icon, type IconName } from './icons';
 import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
-import { groupNavItems, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
-import { ROLE_LABELS, type Role } from '@/lib/permissions';
+import { groupNavItems, groupOf, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
+import type { Role } from '@/lib/permissions';
 import { titleWithCount } from '@/lib/attention';
 
 const ICON_OF: Readonly<Record<NavPage, IconName>> = {
@@ -144,7 +151,11 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
     );
   }
 
-  const { groups, publicItems } = groupNavItems(navItems(slug, features, session.role, attention));
+  const { groups, topItems, publicItems } = groupNavItems(navItems(slug, features, session.role, attention));
+  const bell = topItems.find((item) => item.page === 'notifications');
+  const section = groupOf(current);
+  const here = groups.flatMap((g) => g.items).find((item) => item.page === current)?.label ?? title;
+  const guestPages = publicItems.map((item) => ({ label: item.page === 'book' ? 'Booking page' : 'Chat page', href: item.href, icon: ICON_OF[item.page] }));
   const link = (item: { page: NavPage; label: string; href: string; badge?: number }) => (
     <Link
       key={item.page}
@@ -187,46 +198,55 @@ export function StaffFrame({ slug, businessName, logoUrl, bannerUrl, features, c
             </div>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          {publicItems.map(link)}
-          {features.bookings && (
-            <div className="sidebar-notify">
-              <SoundToggle on={sound.on} awake={sound.awake} onToggle={sound.toggle} />
-              <PushControl slug={slug} role={session.role} />
-            </div>
-          )}
-          <div className="sidebar-account">
-            {session.role && <span className="badge accent">{ROLE_LABELS[session.role]}</span>}
-            <button type="button" className="ghost sm" onClick={session.onLogout}>
-              <Icon name="logout" size={16} /> Log out
-            </button>
-          </div>
-        </div>
       </aside>
       <div className="sidebar-backdrop" aria-hidden="true" onClick={close} />
 
       <div className="staff-main" inert={open || undefined}>
         {/* role, not <header>: the element selector would restyle it as the
-            public header. The landmark keeps the phone's top bar inside one
-            (Phase 10's audit). */}
+            public header. The landmark keeps the top bar inside one (Phase
+            10's audit). On every width since plan/nav-layout.md: where you
+            are on the left; the bell and the account menu on the right. */}
         <div className="staff-topbar" role="banner">
-          <button
-            ref={menuButton}
-            type="button"
-            className="ghost"
-            aria-label={waiting > 0 ? `Open menu, ${waiting} unread` : 'Open menu'}
-            aria-controls="staff-sidebar"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
-          >
+          <button ref={menuButton} type="button" className="ghost topbar-menu" aria-label="Open menu" aria-controls="staff-sidebar" aria-expanded={open} onClick={() => setOpen(true)}>
             <Icon name="menu" />
-            {waiting > 0 && (
-              <span className="nav-badge menu-badge" aria-hidden="true">
-                {waiting}
-              </span>
-            )}
           </button>
           <span className="staff-topbar-title">{businessName}</span>
+          <nav className="topbar-crumbs" aria-label="Breadcrumb">
+            {section && (
+              <>
+                <span className="topbar-section">{section}</span>
+                <Icon name="chevron-right" size={14} />
+              </>
+            )}
+            <span className="topbar-here" aria-current="page">
+              {here}
+            </span>
+          </nav>
+          <div className="topbar-actions">
+            {bell && (
+              <Link href={bell.href} className="button ghost topbar-bell" aria-current={current === 'notifications' ? 'page' : undefined} aria-label={waiting > 0 ? `Notifications, ${waiting} unread` : 'Notifications'}>
+                <Icon name="bell" size={18} />
+                {waiting > 0 && (
+                  <span className="nav-badge bell-badge" aria-hidden="true">
+                    {waiting > 99 ? '99+' : waiting}
+                  </span>
+                )}
+              </Link>
+            )}
+            <AccountMenu
+              role={session.role}
+              links={guestPages}
+              onLogout={session.onLogout}
+              device={
+                features.bookings ? (
+                  <>
+                    <SoundToggle on={sound.on} awake={sound.awake} onToggle={sound.toggle} />
+                    <PushControl slug={slug} role={session.role} />
+                  </>
+                ) : null
+              }
+            />
+          </div>
         </div>
         {bannerUrl && (
           // eslint-disable-next-line @next/next/no-img-element

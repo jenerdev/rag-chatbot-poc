@@ -9292,3 +9292,39 @@ manage booking. Villa's tool rows held no harbor row; the model calls
 villa's whole property "the Garden Room". This branch changes no chatbot
 code, and the prompt and tool baselines are byte-identical. So it is the
 model, and nothing was reworded.
+
+## 2026-10-14 — nav layout: a sidebar of places, a top bar for you (D-117)
+
+**What was done:**
+- **The sidebar is navigation only,** regrouped by the work: Overview,
+  Front desk (Bookings, Calendar, Payments), Assistant (Conversations,
+  Unanswered, Knowledge base), Setup (Rooms, Slots, Holidays, Promos,
+  Members).
+- **A top bar on every width.** It holds a breadcrumb, the Notifications
+  bell with its badge, and an account menu: the role, the guest pages, this
+  device's sound and push, Log out.
+
+**Why:**
+- The old groups put daily work beside setup, and the chat inbox beside
+  documents.
+- The footer mixed places, device settings and the account, and on a phone
+  it pushed Log out out of sight.
+- A bell belongs in a top bar, not a list.
+
+**What the observed values prove:**
+- **The walk:** in a browser,
+  - the owner sees four sections and a staff member three, with no footer;
+  - the breadcrumb starts at the same x as the page title (316 px);
+  - the account menu opens closed, holds what it says, and closes on
+    Escape (focus back on its button), on a press outside, and when focus
+    leaves it;
+  - on a 375 × 812 phone every drawer link fits (the last ends at 644 px),
+    and the menu panel fits the screen;
+  - Log out works from the menu.
+- **One thing it caught:** the harness's `click()` fires no pointerdown,
+  so the outside press is now a real mouse press. Closing on focus-out
+  was added after.
+- **axe:** 10 frame states, light and dark, show 0 violations.
+- **The notification walks** still pass with the badge on the bell.
+- **Unchanged:** which links a role sees is still `navItems()` alone, and
+  every route still checks the permission.

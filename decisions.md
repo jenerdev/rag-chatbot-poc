@@ -3808,3 +3808,29 @@ it.
 
 **Owed:** the phone walk (Android with Chrome closed; iPhone from the Home
 Screen), gated on deployment or a tunnel (§ 7 q8).
+
+## D-117 · The sidebar holds places; the top bar holds you · **Added 2026-10-14 (plan/nav-layout.md)**
+
+**Decision:** the staff frame's sidebar is navigation only.
+
+- **Four sections, by the work:**
+  - Overview: Dashboard
+  - Front desk: Bookings, Calendar, Payments
+  - Assistant: Conversations, Unanswered, Knowledge base
+  - Setup: Rooms, Slots, Holidays, Promos, Members
+- **A top bar on every width.** It holds a breadcrumb, the Notifications
+  bell with the ONE badge (D-116), and an account menu: the role, the
+  guest pages, this device's sound and push, and Log out.
+- **This amends ui-refresh Phase 2's sections:** Overview, Content,
+  Bookings, Team, with a footer.
+
+**Why:** the user's call. The old groups mixed daily work with setup, and
+the chat inbox with documents. The footer mixed places, settings and the
+account, and on a phone it pushed Log out out of sight.
+
+**Not changed:** which links a role and a tenant get (`navItems()`, every
+route's `requireAdmin()`); the signed-out header; no SQL, no route.
+
+**Measured:** nav-layout walk 19/19; axe 10 states, 0 violations; the
+notification walks moved to the bell (inbox 12/12, sound 5/5, a11y 8/0);
+typecheck exit 0, web tests 159.

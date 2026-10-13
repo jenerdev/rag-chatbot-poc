@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupNavItems, navItems, type NavFeatures } from './nav-items';
+import { groupNavItems, groupOf, navItems, type NavFeatures } from './nav-items';
 
 // The header offers exactly the pages a role may open, and only the pages the
 // tenant has (so a button never leads to a 404).
@@ -16,20 +16,20 @@ describe('navItems', () => {
   });
 
   it('shows staff the daily work, and no admin-only page', () => {
-    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments']);
+    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base']);
   });
 
   it('adds rooms and holidays for an admin, but not members', () => {
-    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos']);
+    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos']);
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Rooms', 'Holidays', 'Slots', 'Promos', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos', 'Members']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Knowledge base', 'Unanswered', 'Conversations', 'Bookings', 'Calendar', 'Payments', 'Holidays', 'Slots', 'Promos', 'Members']);
-    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Knowledge base', 'Unanswered', 'Conversations', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Slots', 'Holidays', 'Promos', 'Members']);
+    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Conversations', 'Unanswered', 'Knowledge base', 'Members']);
   });
 
   it('links each page under the tenant', () => {
@@ -38,15 +38,15 @@ describe('navItems', () => {
       '/t/harbor/book',
       '/t/harbor/admin/dashboard',
       '/t/harbor/admin/notifications',
-      '/t/harbor/admin/documents',
-      '/t/harbor/admin/unanswered',
-      '/t/harbor/admin/conversations',
       '/t/harbor/admin/bookings',
       '/t/harbor/admin/calendar',
       '/t/harbor/admin/payments',
+      '/t/harbor/admin/conversations',
+      '/t/harbor/admin/unanswered',
+      '/t/harbor/admin/documents',
       '/t/harbor/admin/accommodations',
-      '/t/harbor/admin/holidays',
       '/t/harbor/admin/slots',
+      '/t/harbor/admin/holidays',
       '/t/harbor/admin/promos',
       '/t/harbor/admin/members',
     ]);
@@ -59,22 +59,36 @@ describe('groupNavItems', () => {
     return { groups: groups.map((g) => `${g.group}: ${g.items.map((i) => i.label).join(', ')}`), publicItems: publicItems.map((i) => i.label) };
   };
 
-  it("sections an owner's harbor links, Chat and Book apart", () => {
+  it("sections an owner's harbor links by the work: the daily work first, then the assistant, then setup", () => {
     expect(sections(HARBOR, 'owner')).toEqual({
-      groups: ['Overview: Dashboard, Notifications', 'Content: Knowledge base, Unanswered, Conversations', 'Bookings: Bookings, Calendar, Payments, Rooms, Holidays, Slots, Promos', 'Team: Members'],
+      groups: ['Overview: Dashboard', 'Front desk: Bookings, Calendar, Payments', 'Assistant: Conversations, Unanswered, Knowledge base', 'Setup: Rooms, Slots, Holidays, Promos, Members'],
       publicItems: ['Chat', 'Book'],
     });
   });
 
-  it('leaves out an empty section: northwind has no bookings, a staff member no Team', () => {
-    expect(sections(NORTHWIND, 'staff').groups.map((g) => g.split(':')[0])).toEqual(['Overview', 'Content']);
+  it('puts the bell in the top bar, not in a section', () => {
+    const { groups, topItems } = groupNavItems(navItems('t', HARBOR, 'staff'));
+    expect(topItems.map((i) => i.label)).toEqual(['Notifications']);
+    expect(groups.flatMap((g) => g.items).some((i) => i.page === 'notifications')).toBe(false);
+  });
+
+  it('leaves out an empty section: northwind has no Front desk, a staff member no Setup', () => {
+    expect(sections(NORTHWIND, 'staff').groups.map((g) => g.split(':')[0])).toEqual(['Overview', 'Assistant']);
+    expect(sections(HARBOR, 'staff').groups.map((g) => g.split(':')[0])).toEqual(['Overview', 'Front desk', 'Assistant']);
+  });
+
+  it('names the section of a page for the breadcrumb, and none for a page in no section', () => {
+    expect(groupOf('bookings')).toBe('Front desk');
+    expect(groupOf('documents')).toBe('Assistant');
+    expect(groupOf('members')).toBe('Setup');
+    expect(groupOf('notifications')).toBeNull();
   });
 
   it('keeps every link navItems gave, and only those', () => {
     for (const role of ['owner', 'admin', 'staff', null] as const) {
       const items = navItems('t', VILLA, role);
-      const { groups, publicItems } = groupNavItems(items);
-      expect([...publicItems, ...groups.flatMap((g) => g.items)].map((i) => i.page).sort()).toEqual(items.map((i) => i.page).sort());
+      const { groups, topItems, publicItems } = groupNavItems(items);
+      expect([...publicItems, ...topItems, ...groups.flatMap((g) => g.items)].map((i) => i.page).sort()).toEqual(items.map((i) => i.page).sort());
     }
   });
 });
@@ -99,8 +113,5 @@ describe('navItems badges', () => {
     expect(navItems('t', NORTHWIND, 'owner', unread).filter((i) => i.page === 'notifications' || i.badge)).toEqual([]);
   });
 
-  it('lists Notifications in Overview, after the Dashboard', () => {
-    const { groups } = groupNavItems(navItems('t', HARBOR, 'staff'));
-    expect(groups[0]!.items.map((i) => i.label)).toEqual(['Dashboard', 'Notifications']);
-  });
+
 });

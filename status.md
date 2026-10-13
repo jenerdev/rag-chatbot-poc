@@ -56,6 +56,19 @@
 
 ## ▶ Next up (do this next)
 
+**Nav layout (`feat/nav-layout`, plan/nav-layout.md, D-117, 2026-10-14).**
+- [x] The sidebar holds places in four sections (Overview · Front desk ·
+  Assistant · Setup); a top bar on every width holds the breadcrumb, the
+  Notifications bell (the ONE badge) and the account menu (role, guest
+  pages, this device's sound and push, Log out). No SQL, no route, no
+  permission changed.
+- [x] Observed: nav-layout walk 19/19; axe 10 states 0 violations; inbox
+  walk 12/12, sound walk 5/5, notifications-a11y 8/0 after moving their
+  selectors to the bell; typecheck exit 0, web tests 159. Screenshots in
+  `plan/nav-layout/` (before and after). `ui-refresh-phase2-walk.mjs`'s
+  footer checks are superseded.
+- [ ] The user's look; then commit and merge on their word.
+
 **Notifications (`feat/notifications`, plan/notifications.md).** Merged into `master` by fast-forward at `46e261f` on 2026-10-14, by the user's word; the phone walk is owed on `master`.
 - [x] Phases 0–5 (2026-10-13): in-app badges, SQL, @rag/push, worker and
   subscribe, the drain.

@@ -88,15 +88,16 @@ try {
   check(woke.pressed === 'true' && woke.text === 'Sound on' && woke.osc === 0, '2. the sound is on by default, and a click anywhere wakes it (no chime for the click)', JSON.stringify(woke));
 
   // The link's own label is its first plain <span>; the badge and the screen-reader words are apart.
+  // Since plan/nav-layout.md the ONE badge is on the top bar's bell; the sidebar must carry none.
   const badges = "Object.fromEntries([...document.querySelectorAll('.sidebar-link')].filter(l => l.querySelector('.nav-badge')).map(l => [l.querySelector('span:not(.nav-badge):not(.visually-hidden)').textContent, Number(l.querySelector('.nav-badge').textContent)]))";
   const startBadges = await page.eval(badges);
   const startTitle = await page.eval('document.title');
-  const order = await page.eval("[...document.querySelectorAll('.sidebar-group')][0].textContent");
+  const bellAtStart = await page.eval("Number(document.querySelector('.topbar-bell .nav-badge')?.textContent ?? 0)");
   check(
-    (before.unread === 0 ? Object.keys(startBadges).length === 0 : JSON.stringify(startBadges) === JSON.stringify({ Notifications: before.unread }))
-      && (before.unread === 0 ? !/^\(\d+\)/.test(startTitle) : startTitle.startsWith(`(${before.unread}) `)) && /Dashboard.*Notifications/.test(order),
-    '3. on load: the ONE badge is on Notifications (Overview, after Dashboard), and the title says it',
-    `${JSON.stringify(startBadges)} · "${startTitle}"`,
+    Object.keys(startBadges).length === 0 && bellAtStart === before.unread
+      && (before.unread === 0 ? !/^\(\d+\)/.test(startTitle) : startTitle.startsWith(`(${before.unread}) `)),
+    '3. on load: the ONE badge is on the bell in the top bar (none in the sidebar), and the title says it',
+    `sidebar ${JSON.stringify(startBadges)} · bell ${bellAtStart} · "${startTitle}"`,
   );
 
   // 3. The tab goes to the background. Before the fix the poll stopped here.
@@ -111,11 +112,12 @@ try {
   const made = await request.json();
   check(request.status === 201, '4. a guest sends a web request', `${request.status} ${made.reference ?? made.error}`);
 
-  const notifBadge = "Number([...document.querySelectorAll('.sidebar-link')].find(l => l.getAttribute('href')?.endsWith('/admin/notifications'))?.querySelector('.nav-badge')?.textContent ?? 0)";
+  const notifBadge = "Number(document.querySelector('.topbar-bell .nav-badge')?.textContent ?? 0)";
   const heard = await page.until(`${notifBadge} === ${before.unread + 1}`, 40000);
   const after = await page.eval(`({ badges: ${badges}, title: document.title, toast: [...document.querySelectorAll('.toast-message')].map(t => t.textContent), osc: window.__oscillators, hidden: document.visibilityState })`);
+  after.badges.Notifications = await page.eval(notifBadge);
   check(heard && after.badges.Notifications === before.unread + 1 && after.hidden === 'hidden', '5. a HIDDEN tab still hears it: Notifications +1 within 40 s', `${before.unread} → ${after.badges.Notifications} after ${Math.round((Date.now() - sent) / 1000)} s, ${after.hidden}`);
-  check(!('Bookings' in after.badges) && !('Payments' in after.badges) && after.title.startsWith(`(${before.unread + 1}) `), '6. no badge on Bookings or Payments; the title counts the unread', `${JSON.stringify(after.badges)} · "${after.title}"`);
+  check(Object.keys(after.badges).join() === 'Notifications' && after.title.startsWith(`(${before.unread + 1}) `), '6. no badge on Bookings or Payments; the title counts the unread', `${JSON.stringify(after.badges)} · "${after.title}"`);
   check(after.toast.some((t) => t.startsWith('New booking request · ') && t.includes(made.reference)), '7. a toast names it', JSON.stringify(after.toast));
   check(after.osc === 2, '8. the chime played (two tones) without the toggle ever being clicked', `oscillators ${after.osc}`);
 
