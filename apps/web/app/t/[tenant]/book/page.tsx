@@ -4,6 +4,7 @@ import { BookingPageScreen } from '@/components/booking-page';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-6 · the customer booking page (plan/customer-booking.md § 2.8). PUBLIC,
@@ -21,6 +22,8 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'booking_page'))) notFound();
 
   let page;
   try {

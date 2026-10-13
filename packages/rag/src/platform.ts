@@ -108,6 +108,8 @@ export interface TenantSummary {
 /** One tenant in full: the summary plus each application's config. */
 export interface TenantDetail extends TenantSummary {
   applicationConfigs: Partial<Record<ApplicationKey, Json>>;
+  /** D-127: the feature rows this tenant has, key → enabled; a key with no row is on. */
+  features: Record<string, boolean>;
 }
 
 type TenantRow = {
@@ -170,15 +172,17 @@ export async function listTenants(platform: PlatformContext): Promise<TenantSumm
 
 /** One tenant with each application's config, or a 404. By id, not slug: an archived tenant still has to be reachable to unarchive. */
 export async function getTenant(platform: PlatformContext, tenantId: number): Promise<TenantDetail> {
-  const [tenant, apps, members] = await Promise.all([
+  const [tenant, apps, members, features] = await Promise.all([
     platform.db.from('tenants').select(TENANT_COLUMNS).eq('id', tenantId).maybeSingle(),
     platform.db.from('tenant_applications').select('application_key, config').eq('tenant_id', tenantId),
     platform.db.from('memberships').select('user_id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+    platform.db.from('tenant_features').select('feature, enabled').eq('tenant_id', tenantId),
   ]);
   if (tenant.error) throw fromPostgrest(tenant.error, 'Could not load the tenant');
   if (!tenant.data) throw new PlatformNotFoundError(`No tenant ${tenantId}.`);
   if (apps.error) throw fromPostgrest(apps.error, 'Could not load the applications');
   if (members.error) throw fromPostgrest(members.error, 'Could not count members');
+  if (features.error) throw fromPostgrest(features.error, 'Could not load the feature flags');
 
   const keys: ApplicationKey[] = [];
   const configs: Partial<Record<ApplicationKey, Json>> = {};
@@ -187,7 +191,11 @@ export async function getTenant(platform: PlatformContext, tenantId: number): Pr
     keys.push(a.application_key);
     configs[a.application_key] = a.config;
   }
-  return { ...summary(tenant.data, keys, members.count ?? 0), applicationConfigs: configs };
+  return {
+    ...summary(tenant.data, keys, members.count ?? 0),
+    applicationConfigs: configs,
+    features: Object.fromEntries(features.data.map((f) => [f.feature, f.enabled])),
+  };
 }
 
 /** The fields a tenant is born with. The slug's shape and reserved words are Postgres's to refuse. */
@@ -283,5 +291,19 @@ export async function removeApplication(platform: PlatformContext, tenantId: num
   if (error) throw fromPostgrest(error, `Could not switch off ${key}`);
   if (data.length === 0) throw new PlatformNotFoundError(`Tenant ${tenantId} does not have the ${key} application.`);
   console.log(`[platform] ${platform.userId} switched ${key} off for tenant ${tenantId}`);
+  return getTenant(platform, tenantId);
+}
+
+/**
+ * Switch a feature on or off for a tenant (D-127). The key is Postgres's to
+ * refuse (tenant_features_key, a 400 with its name); the row is kept either
+ * way, so the platform can see that someone decided.
+ */
+export async function setFeature(platform: PlatformContext, tenantId: number, feature: string, enabled: boolean): Promise<TenantDetail> {
+  const { error } = await platform.db
+    .from('tenant_features')
+    .upsert({ tenant_id: tenantId, feature, enabled, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,feature' });
+  if (error) throw fromPostgrest(error, `Could not switch ${feature}`);
+  console.log(`[platform] ${platform.userId} switched ${feature} ${enabled ? 'on' : 'off'} for tenant ${tenantId}`);
   return getTenant(platform, tenantId);
 }

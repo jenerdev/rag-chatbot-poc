@@ -82,7 +82,9 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
   // What is new for this member (plan/notifications.md § 8): polled while
   // signed in on a tenant with bookings, the only one with anything to say.
   const sound = useSound();
-  const attention = useAttention(slug, session.auth === 'in' && features.bookings, sound.on);
+  // With notifications switched off (D-127) nothing is polled, chimed or pushed.
+  const notices = features.bookings && features.flags.notifications;
+  const attention = useAttention(slug, session.auth === 'in' && notices, sound.on);
   const waiting = attention?.unread ?? 0;
   // "(2) Bookings · Villa" while two are unread; the title as it was when none are, and on the way out.
   useEffect(() => {
@@ -237,7 +239,7 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
               links={guestPages}
               onLogout={session.onLogout}
               device={
-                features.bookings ? (
+                notices ? (
                   <>
                     <SoundToggle on={sound.on} awake={sound.awake} onToggle={sound.toggle} />
                     <PushControl slug={slug} role={session.role} />

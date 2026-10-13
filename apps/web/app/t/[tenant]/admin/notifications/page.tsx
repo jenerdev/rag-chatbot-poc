@@ -3,6 +3,7 @@ import { NotificationsScreen } from '@/components/notifications-screen';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-17 · Notifications (plan/notifications.md § 8). Like the other admin
@@ -16,6 +17,8 @@ export default async function TenantNotificationsPage({ params }: { params: Prom
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'notifications'))) notFound();
 
   const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 

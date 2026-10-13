@@ -3,6 +3,7 @@ import { quoteRequest } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
 import { bookQuoteSchema, firstError } from '@/lib/schemas';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,7 @@ export const dynamic = 'force-dynamic';
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'booking_page');
 
   const parsed = bookQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));

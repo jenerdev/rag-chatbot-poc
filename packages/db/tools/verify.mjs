@@ -3712,6 +3712,135 @@ async function notificationChecks() {
   }
 }
 
+// --- schema-features.sql (D-127): feature flags per tenant --------------------
+// On a THROWAWAY tenant (deleted at the end; the cascade takes its rows):
+// 192. a super user switches a feature off and the tenant's own chat token
+//      reads it back (the twin); its owner and its chat token cannot write one;
+// 193. another tenant's chat token reads none of its rows, while its own reads them;
+// 194. booking_page off: a web request is refused (23514), and on it is accepted;
+// 195. manage_booking off: a guest's proof and a change request are refused;
+// 196. notifications off: a web request queues no notice, and on it queues one.
+{
+  const users = [];
+  let probe = null;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const { data: t, error: tError } = await supabase.from('tenants').insert({ slug: `feat-${randomBytes(3).toString('hex')}`, business_name: 'Feature Probe', assistant_name: 'Probe' }).select('id').single();
+    if (tError) throw new Error(`tenant: ${tError.message}`);
+    probe = t.id;
+    const app = await supabase.from('tenant_applications').insert({ tenant_id: probe, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+    if (app.error) throw new Error(`application: ${app.error.message}`);
+    const { data: unit } = await supabase.from('units').insert({ tenant_id: probe, name: 'Room', capacity: 4, sort_order: 1, active: true }).select('id').single();
+    const { data: slot } = await supabase.from('slots').insert({ tenant_id: probe, name: 'Day', start_time: '08:00', duration: '8 hours' }).select('id').single();
+    const rate = await supabase.from('unit_rates').insert({ tenant_id: probe, unit_id: unit.id, slot_id: slot.id, weekday_price: 100000, weekend_price: 100000 });
+    if (rate.error) throw new Error(`rate: ${rate.error.message}`);
+    const user = async () => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `feat-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      return data.user.id;
+    };
+    const superId = await user();
+    const ownerId = await user();
+    const pa = await supabase.from('platform_admins').insert({ user_id: superId });
+    if (pa.error) throw new Error(`platform_admins: ${pa.error.message}`);
+    const m = await supabase.from('memberships').insert({ user_id: ownerId, tenant_id: probe, role: 'owner' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const superDb = asToken(platformToken(superId));
+    const ownerDb = asToken(staffToken(probe, ownerId));
+    const chatDb = asToken(chatToken(probe));
+    const flip = (feature, enabled) =>
+      superDb.from('tenant_features').upsert({ tenant_id: probe, feature, enabled }, { onConflict: 'tenant_id,feature' }).select('feature');
+    // On the chat token, the real door: the event log then names a guest, which is what queues a notice.
+    const request = (day) =>
+      chatDb.rpc('request_booking', {
+        p_tenant_id: probe, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: day, p_nights: 1,
+        p_name: 'Feature Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `feat-${randomUUID()}@example.com`, p_notes: null,
+      });
+    const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const outbox = async () => (await supabase.from('notification_outbox').select('id', { count: 'exact', head: true }).eq('tenant_id', probe)).count;
+
+    // 192
+    {
+      const off = await flip('calendar', false);
+      const { data: seen } = await chatDb.from('tenant_features').select('feature, enabled').eq('tenant_id', probe);
+      const { data: on } = await chatDb.rpc('tenant_feature_on', { p_tenant_id: probe, p_feature: 'calendar' });
+      const ownerWrite = await ownerDb.from('tenant_features').upsert({ tenant_id: probe, feature: 'dashboard', enabled: false }, { onConflict: 'tenant_id,feature' }).select('feature');
+      const chatWrite = await chatDb.from('tenant_features').insert({ tenant_id: probe, feature: 'dashboard', enabled: false }).select('feature');
+      const { count: dashboardRows } = await supabase.from('tenant_features').select('feature', { count: 'exact', head: true }).eq('tenant_id', probe).eq('feature', 'dashboard');
+      const badKey = await flip('no_such_feature', false);
+      check(
+        !off.error && off.data?.length === 1 && seen?.length === 1 && seen[0].enabled === false && on === false
+          && (!!ownerWrite.error || (ownerWrite.data ?? []).length === 0) && !!chatWrite.error && dashboardRows === 0 && badKey.error?.code === '23514',
+        "features: a super user switches one off and the tenant's chat token reads it back (off); its owner and chat token write none; an unknown key is 23514",
+        `super ${off.error?.message ?? off.data?.length} · read ${JSON.stringify(seen)} · on() ${on} · owner ${ownerWrite.error?.message ?? ownerWrite.data?.length} · chat ${chatWrite.error?.message ?? 'WROTE'} · rows ${dashboardRows} · bad key ${badKey.error?.code}`,
+      );
+    }
+
+    // 193
+    {
+      const { data: theirs } = await asToken(chatToken(villaRow.id)).from('tenant_features').select('feature').eq('tenant_id', probe);
+      const { data: mine } = await chatDb.from('tenant_features').select('feature').eq('tenant_id', probe);
+      check((theirs ?? []).length === 0 && (mine ?? []).length === 1, "features: another tenant's chat token reads none of this tenant's rows; its own reads its one", `villa ${(theirs ?? []).length} · own ${(mine ?? []).length}`);
+    }
+
+    // 194
+    let group = null;
+    {
+      const accepted = await request(day(20));
+      const reference = accepted.data?.[0]?.reference ?? null;
+      if (reference) group = (await supabase.from('bookings').select('group_id').eq('tenant_id', probe).eq('reference', reference).limit(1).single()).data?.group_id ?? null;
+      await flip('booking_page', false);
+      const refused = await request(day(21));
+      await flip('booking_page', true);
+      check(
+        !accepted.error && !!group && refused.error?.code === '23514' && /Online booking is switched off/.test(refused.error.message),
+        'features: with booking_page on a web request is accepted; off, it is refused (23514) in words',
+        `on ${accepted.error?.message ?? 'ok'} group ${group} · off ${refused.error?.code} ${refused.error?.message ?? 'ACCEPTED'}`,
+      );
+    }
+
+    // 195
+    {
+      await flip('manage_booking', false);
+      const proof = { tenant_id: probe, group_id: group, kind: 'payment', method: 'GCash', claimed_amount: 100, paid_on: day(0), proof_path: `${probe}/feat-${randomUUID()}.png`, idempotency_key: randomUUID() };
+      const payOff = await supabase.from('payments').insert(proof).select('id');
+      const changeOff = await supabase.from('change_requests').insert({ tenant_id: probe, group_id: group, kind: 'cancel' }).select('id');
+      await flip('manage_booking', true);
+      const payOn = await supabase.from('payments').insert({ ...proof, idempotency_key: randomUUID() }).select('id');
+      check(
+        payOff.error?.code === '23514' && changeOff.error?.code === '23514' && !payOn.error && payOn.data?.length === 1,
+        'features: with manage_booking off a guest proof and a change request are refused (23514); on, the proof is accepted',
+        `proof off ${payOff.error?.code ?? 'ACCEPTED'} · change off ${changeOff.error?.code ?? 'ACCEPTED'} · proof on ${payOn.error?.message ?? payOn.data?.length}`,
+      );
+    }
+
+    // 196
+    {
+      const before = await outbox();
+      await flip('notifications', false);
+      const quiet = await request(day(22));
+      const afterOff = await outbox();
+      await flip('notifications', true);
+      const loud = await request(day(23));
+      const afterOn = await outbox();
+      check(
+        before >= 1 && !quiet.error && afterOff === before && !loud.error && afterOn === before + 1,
+        'features: with notifications off a web request queues no notice; on, it queues one (the twin)',
+        `before ${before} · off ${quiet.error?.message ?? 'ok'} → ${afterOff} · on ${loud.error?.message ?? 'ok'} → ${afterOn}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'features: setup', error.message);
+  } finally {
+    if (probe) await supabase.from('tenants').delete().eq('id', probe);
+    for (const id of users) {
+      await supabase.from('platform_admins').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+    }
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +

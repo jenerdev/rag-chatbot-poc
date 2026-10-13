@@ -6,6 +6,7 @@ import { notifyAfter } from '@/lib/notify';
 import { parseMoneyInput } from '@/lib/money';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -30,6 +31,7 @@ export const dynamic = 'force-dynamic';
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'manage_booking');
 
   const declared = Number(request.headers.get('content-length') ?? '0');
   if (declared > MAX_PROOF_BYTES + 64 * 1024) {

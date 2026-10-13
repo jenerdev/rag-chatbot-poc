@@ -4,6 +4,7 @@ import { ManageBookingScreen } from '@/components/manage-booking';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-13 · Manage booking (plan/manage-booking.md). PUBLIC, like the booking
@@ -30,6 +31,8 @@ export default async function TenantManagePage({
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'manage_booking'))) notFound();
 
   const ref = (await searchParams).ref;
   const initialReference = typeof ref === 'string' && REFERENCE.test(ref) ? ref.toUpperCase() : '';

@@ -23,6 +23,7 @@ import { useMemo, useState } from 'react';
 import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { BrandImageField } from '@/components/brand-image-field';
+import { FeaturesPanel } from '@/components/features-panel';
 import { MembersPanel } from '@/components/members-panel';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
@@ -713,6 +714,18 @@ export function TenantForm({
         tabs={[
           { id: 'profile', label: 'Profile', panel: profile },
           { id: 'applications', label: 'Applications', panel: applications },
+          {
+            id: 'features',
+            label: 'Features',
+            panel: (
+              <FeaturesPanel
+                switches={tenant.features}
+                bookingsOn={bookingsOn}
+                busy={busy}
+                onSwitch={(key, enabled) => void send('PUT', `/tenants/${id}/features/${key}`, { enabled }, `${enabled ? 'Switched on' : 'Switched off'}.`)}
+              />
+            ),
+          },
           { id: 'members', label: 'Members', panel: <MembersPanel api={`${api}/tenants/${id}/members`} selfUserId={selfUserId} onUnauthorized={onUnauthorized} /> },
           { id: 'archive', label: tenant.archivedAt ? 'Archived' : 'Archive', panel: archive },
         ]}

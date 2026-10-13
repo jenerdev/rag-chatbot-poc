@@ -5,6 +5,7 @@ import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { isView } from '@/lib/calendar-range';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-12 · Calendar (plan/calendar.md, D-103). Like the other admin pages it
@@ -28,6 +29,8 @@ export default async function TenantCalendarPage({
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   if (!(await hasApplication(tenant, 'bookings'))) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'calendar'))) notFound();
 
   const [branding, nav, config, units, query] = await Promise.all([
     loadBranding(tenant),

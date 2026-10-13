@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest } from '@/lib/route';
 import { firstError, pushDeviceSchema, pushRemoveSchema } from '@/lib/schemas';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -26,6 +27,7 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
   const staff = await requireAdmin(request, tenant, 'session');
   tenant = staff;
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'notifications');
   const endpoint = new URL(request.url).searchParams.get('endpoint');
   const [device, devices] = await Promise.all([endpoint && /^https:\/\//.test(endpoint) ? deviceOf(tenant, endpoint) : null, deviceCount(tenant, staff.userId)]);
   return NextResponse.json({ publicKey: vapidKeys()?.publicKey ?? null, kinds: device?.kinds ?? null, devices }, { headers: { 'Cache-Control': 'no-store' } });
@@ -34,6 +36,7 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
 export const POST = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'session');
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'notifications');
   if (!vapidKeys()) return NextResponse.json({ error: 'Push notifications are not set up on this server.' }, { status: 503 });
   const parsed = pushDeviceSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
@@ -46,6 +49,7 @@ export const DELETE = withTenantRoute(async (request, { tenant }) => {
   const staff = await requireAdmin(request, tenant, 'session');
   tenant = staff;
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'notifications');
   const parsed = pushRemoveSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
   // { all: true }: every device of THIS member (R-51, a lost phone); the member is the session's.

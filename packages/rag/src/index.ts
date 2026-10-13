@@ -16,6 +16,7 @@
 //   dates.ts       relative dates ("bukas", "next Friday") resolved in code
 //   tenant.ts      a slug -> the TenantContext every call above requires
 //   applications.ts  which applications (bookings, …) a tenant has switched on
+//   features.ts    which features a tenant has switched OFF (D-127; on by default)
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
 //   unanswered.ts  the questions the documents could not answer, for staff
 //   conversations.ts  every chat of a tenant, listed and read back, for staff (D-115)
@@ -62,6 +63,7 @@ export { answerQuestion, answerQuestionStream, getMessages } from './answer.js';
 export { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText } from './refusal.js';
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
+export { featureSwitches } from './features.js';
 export { executeTool, toolsFor } from './tools.js';
 export { listUnanswered, reopenUnanswered, reopenUnansweredMany, resolveUnanswered, resolveUnansweredMany, UNANSWERED_LIMIT } from './unanswered.js';
 export {
@@ -75,6 +77,7 @@ export {
   PlatformInputError,
   PlatformNotFoundError,
   removeApplication,
+  setFeature,
   setApplication,
   updateTenant,
 } from './platform.js';

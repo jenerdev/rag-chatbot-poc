@@ -441,6 +441,11 @@ export const applicationConfigSchema = z.object({
   config: z.record(z.unknown(), { required_error: 'A config object is required', invalid_type_error: 'A config object is required' }),
 });
 
+/** PUT /api/platform/tenants/[id]/features/[key] (D-127): on or off. The key is in the URL, checked against lib/features.ts. */
+export const featureSwitchSchema = z.object({
+  enabled: z.boolean({ required_error: 'Say whether the feature is on (enabled: true or false)', invalid_type_error: 'enabled is true or false' }),
+});
+
 const role = z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) });
 const userId = z.string({ required_error: 'A user id is required' }).uuid('That is not a user id');
 

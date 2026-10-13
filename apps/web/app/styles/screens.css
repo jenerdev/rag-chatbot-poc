@@ -1307,6 +1307,22 @@ button.link.back-link:hover:not(:disabled) { color: var(--ink); }
 .settings-about h2 { margin: 0 0 var(--space-1); font-size: var(--text-base); }
 .settings-about p { margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .settings-fields > .field:last-child, .settings-fields > .field-row:last-child > .field { margin-bottom: 0; }
+/* The Features tab (D-127): one row per feature, its switch on the right. */
+.feature-list { list-style: none; margin: 0; padding: 0; }
+.feature-row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; }
+.feature-row + .feature-row { border-top: 1px solid var(--line); }
+.feature-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.feature-name { font-weight: 600; }
+/* A switch: a button with role="switch"; the word beside the track says the
+   state, so it is never the colour alone. */
+button.switch { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; min-height: var(--control-h-sm); padding: 0 var(--space-1); border: 0; background: transparent; box-shadow: none; color: var(--ink); }
+button.switch:hover:not(:disabled) { background: transparent; }
+.switch-track { position: relative; width: 36px; height: 20px; border-radius: var(--radius-full); background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong); transition: background 120ms; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--panel); box-shadow: var(--shadow-1); transition: transform 120ms; }
+button.switch[aria-checked="true"] .switch-track { background: var(--accent-fill); box-shadow: none; }
+button.switch[aria-checked="true"] .switch-thumb { transform: translateX(16px); }
+.switch-word { min-width: 2.2em; font-size: var(--text-sm); font-weight: 500; text-align: left; }
+@media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
 .settings .field-label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-1); }
 /* Theme: the colours beside their preview. */
 .theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listConversations } from '@rag/pipeline';
 import { requireAdmin } from '@/lib/admin-auth';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -21,6 +22,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'conversations:read');
+  await requireFeature(tenant, 'conversations');
   const params = new URL(request.url).searchParams;
   const before = params.get('before');
   const beforeId = params.get('beforeId');

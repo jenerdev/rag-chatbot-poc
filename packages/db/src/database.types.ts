@@ -306,6 +306,32 @@ export interface Database {
         Relationships: [];
       };
       /**
+       * sql/schema-features.sql (D-127) — a feature switched on or off for a
+       * tenant by a super user. No row = on.
+       */
+      tenant_features: {
+        Row: {
+          tenant_id: number;
+          /** `check (feature in (...))`, the same keys as apps/web/lib/features.ts */
+          feature: string;
+          enabled: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          feature: string;
+          enabled: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          feature?: string;
+          enabled?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      /**
        * sql/schema-bookings.sql § 3 — a thing that can be booked; a room, for a
        * per_room tenant (schema-booking-types.sql § 2). Never deleted by a token:
        * deactivated, so the bookings that name it keep their unit.

@@ -4013,3 +4013,22 @@ the price behind a click while the guest paid, and left most of a desktop
 screen empty. One column in DOM order on a phone keeps the reading and
 focus order equal to what is seen (WCAG 1.3.2, 2.4.3).
 
+## D-127 · Feature flags per tenant, on by default · **Added 2026-10-14**
+
+**Decision:** eight features (lib/features.ts) can be switched off per
+tenant by a super user. A row in `tenant_features` says off (or on); no row
+means on. Off, a page 404s, its routes 404, its links go, and Postgres
+refuses the public writes that depend on it.
+
+**Why:** the user asked for features enabled or disabled per tenant,
+configured on the platform page. On-by-default keeps every tenant as it was
+and lets a new feature reach everyone without a backfill. The flags are not
+applications (D-033): an application brings tables and tools; a feature is
+a part of what already exists. Only writes get a SQL guard, because a
+switched-off screen's data is still readable by the same tokens as before;
+there is nothing new for Postgres to hide.
+
+**Not flagged (yet):** promos (a promo's discount is applied by the price
+trigger, so switching it off means a SQL change to `promo_discount()`),
+holidays and slots (they decide prices and times, not just a screen).
+

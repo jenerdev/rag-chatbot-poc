@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { isView, rangeFor } from '@/lib/calendar-range';
 import { badRequest } from '@/lib/route';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -25,6 +26,7 @@ export const dynamic = 'force-dynamic';
 export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'bookings:read');
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'calendar');
 
   const params = new URL(request.url).searchParams;
   const rawView = params.get('view');

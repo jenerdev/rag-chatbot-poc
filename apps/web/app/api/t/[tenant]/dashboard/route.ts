@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { tenantDashboard } from '@rag/pipeline';
 import { requireAdmin } from '@/lib/admin-auth';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'dashboard:read');
+  await requireFeature(tenant, 'dashboard');
   const days = new URL(request.url).searchParams.get('days');
   return NextResponse.json(await tenantDashboard(tenant, days ?? undefined));
 });

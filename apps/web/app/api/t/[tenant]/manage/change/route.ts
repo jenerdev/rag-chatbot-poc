@@ -6,6 +6,7 @@ import { notifyAfter } from '@/lib/notify';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { changeRequestSchema, firstError } from '@/lib/schemas';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -21,6 +22,7 @@ export const dynamic = 'force-dynamic';
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireApplication(tenant, 'bookings');
+  await requireFeature(tenant, 'manage_booking');
   const parsed = changeRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
   if (!allow(`manage|${tenant.id}|${clientIp(request)}`)) {

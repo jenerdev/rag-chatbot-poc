@@ -3,6 +3,7 @@ import { reopenUnansweredMany, resolveUnansweredMany, UNANSWERED_LIMIT } from '@
 import { requireAdmin } from '@/lib/admin-auth';
 import { badRequest } from '@/lib/route';
 import { firstError, unansweredIdsSchema } from '@/lib/schemas';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,7 @@ const idsSchema = unansweredIdsSchema(UNANSWERED_LIMIT);
 
 export const PUT = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'unanswered:write');
+  await requireFeature(tenant, 'unanswered');
   const parsed = idsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
   return NextResponse.json({ resolved: await resolveUnansweredMany(tenant, parsed.data.ids) });
@@ -27,6 +29,7 @@ export const PUT = withTenantRoute(async (request, { tenant }) => {
 
 export const DELETE = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'unanswered:write');
+  await requireFeature(tenant, 'unanswered');
   const parsed = idsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
   return NextResponse.json({ reopened: await reopenUnansweredMany(tenant, parsed.data.ids) });

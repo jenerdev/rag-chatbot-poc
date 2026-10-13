@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listUnanswered } from '@rag/pipeline';
 import { requireAdmin } from '@/lib/admin-auth';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withTenantRoute(async (request, { tenant }) => {
   tenant = await requireAdmin(request, tenant, 'unanswered:read');
+  await requireFeature(tenant, 'unanswered');
   const resolved = new URL(request.url).searchParams.get('resolved') === '1';
   return NextResponse.json(await listUnanswered(tenant, { resolved }));
 });

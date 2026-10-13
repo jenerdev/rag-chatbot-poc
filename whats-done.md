@@ -9512,3 +9512,38 @@ logo is drawn in grey, like its initial.
 `platform-header-check.mjs` 5/5 and axe 16 states, 0 violations; web tests
 163. `ui-refresh-phase9-walk.mjs` check 6 now selects `.tenant-mark`.
 
+## 2026-10-14 — Feature flags per tenant (D-127)
+
+**What was done:** a super user switches eight features on or off per
+tenant on the platform tenant form's new Features tab: Dashboard,
+Conversations, Unanswered questions, Calendar, Notifications (staff
+screens), Suggested questions, Online booking page, Manage booking (guest
+pages). `sql/schema-features.sql` (the 33rd file) holds them in
+`tenant_features`, where no row means ON, so every tenant kept what it had.
+`apps/web/lib/features.ts` is the one registry (pure, shared by the form,
+the header and the guard); `lib/feature-flags.ts` reads a tenant's rows
+once per request.
+
+**Two walls.** Code: a switched-off page `notFound()`s, its routes answer
+404 (`requireFeature()`, after `requireAdmin()`), the header and footers
+drop its links, the staff frame stops polling and chiming, `/admin` opens
+on Bookings when the dashboard is off. Postgres: four BEFORE INSERT
+triggers refuse what a stranger could still write with the page gone: a web
+booking (booking_page), a guest proof and a change request
+(manage_booking), and the notification outbox row (notifications; dropped
+quietly, so nothing is pushed). No function was replaced, so no older file
+needed a guard.
+
+**Observed:** verify 196/196 (192–196 new: only a super user writes a flag,
+the tenant's own chat token reads it back, another tenant's reads none;
+each trigger refused with its feature off and accepted with it on, the
+outbox 2 → 2 off, 2 → 3 on). `plan/features-walk.mjs` 5/5 on a throwaway
+tenant and axe 4 states, 0 violations. Typecheck clean; tests web 165,
+pipeline 369, bookings 132. Isolation both suites, both ways: pass. The
+three chatbot baselines byte-identical. The eval battery was not run: no
+prompt, tool or retrieval code changed.
+
+**Trap met:** the walk's first "no suggestions" passed on an empty
+knowledge base, which hides suggestions anyway (trap 12); the probe tenant
+now has a document, and the on-state twin shows them.
+

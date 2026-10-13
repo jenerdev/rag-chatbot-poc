@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { reopenUnanswered, resolveUnanswered } from '@rag/pipeline';
 import { requireAdmin } from '@/lib/admin-auth';
 import { badRequest, parseId } from '@/lib/route';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
   tenant = await requireAdmin(request, tenant, 'unanswered:write');
+  await requireFeature(tenant, 'unanswered');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid question id');
 
@@ -26,6 +28,7 @@ export const PUT = withTenantRoute<{ id: string }>(async (request, { tenant, par
 
 export const DELETE = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
   tenant = await requireAdmin(request, tenant, 'unanswered:write');
+  await requireFeature(tenant, 'unanswered');
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid question id');
 

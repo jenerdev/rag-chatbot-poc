@@ -7,6 +7,7 @@
 // button is never the guard.
 
 import type { Attention } from './attention';
+import type { FeatureFlags } from './features';
 import { can, type Role } from './permissions';
 
 /**
@@ -19,8 +20,12 @@ export interface NavFeatures {
   bookings: boolean;
   /** bookings, per_room: S-5 Rooms */
   rooms: boolean;
-  /** bookings and a priced unit: S-6, the public booking page */
+  /** bookings, a priced unit and the booking_page feature: S-6, the public booking page */
   book: boolean;
+  /** bookings and the manage_booking feature: S-13, Manage booking */
+  manage: boolean;
+  /** the tenant's feature flags (D-127, lib/features.ts): a switched-off screen has no link */
+  flags: FeatureFlags;
 }
 
 export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'notifications' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
@@ -50,17 +55,17 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null,
   // first, then the chat assistant, then what is set up once.
   const staff: [NavPage, string, string, boolean][] = [
     // First (plan/dashboard.md § 7 q1): the page to land on; /admin redirects here.
-    ['dashboard', 'Dashboard', '/admin/dashboard', can(role, 'dashboard:read')],
+    ['dashboard', 'Dashboard', '/admin/dashboard', features.flags.dashboard && can(role, 'dashboard:read')],
     // S-17 (plan/notifications.md § 8): what arrived, read or not; the ONE badge. The top bar's bell.
-    ['notifications', 'Notifications', '/admin/notifications', features.bookings && can(role, 'bookings:read')],
+    ['notifications', 'Notifications', '/admin/notifications', features.bookings && features.flags.notifications && can(role, 'bookings:read')],
     ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],
     // S-12 (plan/calendar.md, D-103): a view of the same bookings, so the same permission.
-    ['calendar', 'Calendar', '/admin/calendar', features.bookings && can(role, 'bookings:read')],
+    ['calendar', 'Calendar', '/admin/calendar', features.bookings && features.flags.calendar && can(role, 'bookings:read')],
     // S-14 (plan/manage-booking.md): proofs to verify, refunds, the payment settings.
     ['payments', 'Payments', '/admin/payments', features.bookings && can(role, 'payments:read')],
     // S-16 (plan/conversations.md, D-115): every chat, every tenant.
-    ['conversations', 'Conversations', '/admin/conversations', can(role, 'conversations:read')],
-    ['unanswered', 'Unanswered', '/admin/unanswered', can(role, 'unanswered:read')],
+    ['conversations', 'Conversations', '/admin/conversations', features.flags.conversations && can(role, 'conversations:read')],
+    ['unanswered', 'Unanswered', '/admin/unanswered', features.flags.unanswered && can(role, 'unanswered:read')],
     ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read')],
     ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read')],
     ['slots', 'Slots', '/admin/slots', features.bookings && can(role, 'slots:read')],

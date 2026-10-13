@@ -3,6 +3,7 @@ import { ConversationsScreen } from '@/components/conversations-screen';
 import { loadBranding } from '@/lib/branding';
 import { parseListFilters } from '@/lib/conversation-words';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-16 · Conversations (D-115): every chat visitors had with the assistant.
@@ -21,6 +22,8 @@ export default async function TenantConversationsPage({
 }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'conversations'))) notFound();
 
   const [branding, nav, query] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant), searchParams]);
 

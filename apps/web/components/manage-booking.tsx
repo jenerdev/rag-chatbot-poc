@@ -345,7 +345,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
             />
           </div>
         </main>
-        <PublicFooter slug={slug} businessName={businessName} manage={false} book />
+        <PublicFooter slug={slug} businessName={businessName} manage={false} book={nav.book} />
       </>
     );
   }
@@ -411,7 +411,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
           </p>
         </section>
       </main>
-      <PublicFooter slug={slug} businessName={businessName} manage={false} book />
+      <PublicFooter slug={slug} businessName={businessName} manage={false} book={nav.book} />
     </>
   );
 }

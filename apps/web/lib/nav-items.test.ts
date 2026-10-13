@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { ALL_ON } from './features';
 import { groupNavItems, groupOf, navItems, type NavFeatures } from './nav-items';
 
 // The header offers exactly the pages a role may open, and only the pages the
 // tenant has (so a button never leads to a 404).
 const labels = (features: NavFeatures, role: Parameters<typeof navItems>[2]) => navItems('t', features, role).map((i) => i.label);
 
-const NORTHWIND: NavFeatures = { bookings: false, rooms: false, book: false };
-const VILLA: NavFeatures = { bookings: true, rooms: false, book: true };
-const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true };
+const NORTHWIND: NavFeatures = { bookings: false, rooms: false, book: false, manage: false, flags: ALL_ON };
+const VILLA: NavFeatures = { bookings: true, rooms: false, book: true, manage: true, flags: ALL_ON };
+const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true, manage: true, flags: ALL_ON };
 
 describe('navItems', () => {
   it('shows a visitor the public pages only', () => {
@@ -111,6 +112,25 @@ describe('navItems badges', () => {
 
   it('has no Notifications item, and so no badge, for a tenant without bookings', () => {
     expect(navItems('t', NORTHWIND, 'owner', unread).filter((i) => i.page === 'notifications' || i.badge)).toEqual([]);
+  });
+});
+
+describe('navItems feature flags (D-127)', () => {
+  const off = (...keys: (keyof typeof ALL_ON)[]): NavFeatures => ({ ...HARBOR, flags: { ...ALL_ON, ...Object.fromEntries(keys.map((k) => [k, false])) } });
+
+  it('leaves out the link of every switched-off staff screen, for every role', () => {
+    const features = off('dashboard', 'conversations', 'unanswered', 'calendar', 'notifications');
+    for (const role of ['owner', 'admin', 'staff'] as const) {
+      const pages = navItems('t', features, role).map((i) => i.page);
+      for (const gone of ['dashboard', 'conversations', 'unanswered', 'calendar', 'notifications']) expect(pages).not.toContain(gone);
+      expect(pages).toContain('bookings');
+    }
+  });
+
+  it('switching one off leaves the others', () => {
+    const pages = navItems('t', off('calendar'), 'owner').map((i) => i.page);
+    expect(pages).not.toContain('calendar');
+    expect(pages).toEqual(expect.arrayContaining(['dashboard', 'notifications', 'conversations', 'unanswered']));
   });
 
 

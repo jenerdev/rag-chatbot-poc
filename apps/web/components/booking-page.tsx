@@ -395,7 +395,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   </li>
                 ))}
               </ol>
-              {pay && (
+              {pay && nav.manage && (
                 <Link className="button confirm-pay" href={manageHref}>
                   <Icon name="tag" size={16} /> See the amount and how to pay
                 </Link>
@@ -441,13 +441,15 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 Make another request
               </button>
               {/* The reference only: the guest still types the email or number they booked with (plan Rule 4). */}
-              <Link className="button primary" href={manageHref}>
-                Manage this booking <Icon name="chevron-right" size={16} />
-              </Link>
+              {nav.manage && (
+                <Link className="button primary" href={manageHref}>
+                  Manage this booking <Icon name="chevron-right" size={16} />
+                </Link>
+              )}
             </div>
           </section>
         </main>
-        <PublicFooter slug={slug} businessName={businessName} manage={true} />
+        <PublicFooter slug={slug} businessName={businessName} manage={nav.manage} />
       </>
     );
   }
@@ -539,7 +541,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
         <h1 className="page-title">Request a booking</h1>
         <p className="book-intro">
           Choose a date and see the price. Sending a request does not book the date: {businessName} confirms it and contacts you.{' '}
-          <Link href={`/t/${slug}/manage`}>Already sent one? Manage your booking.</Link>
+          {nav.manage && <Link href={`/t/${slug}/manage`}>Already sent one? Manage your booking.</Link>}
         </p>
 
         <nav aria-label="Booking steps">
@@ -919,7 +921,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
           </aside>
         </form>
       </main>
-      <PublicFooter slug={slug} businessName={businessName} manage={true} />
+      <PublicFooter slug={slug} businessName={businessName} manage={nav.manage} />
       <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} to={lightbox.to} />
     </>
   );

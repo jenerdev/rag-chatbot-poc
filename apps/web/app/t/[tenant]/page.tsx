@@ -31,7 +31,7 @@ export default async function TenantChatPage({ params }: { params: Promise<{ ten
       assistantAvatarUrl={branding.assistantAvatarUrl}
       documentCount={documentCount}
       nav={nav}
-      suggestedQuestions={tenant.suggestedQuestions}
+      suggestedQuestions={nav.flags.suggested_questions ? tenant.suggestedQuestions : []}
     />
   );
 }

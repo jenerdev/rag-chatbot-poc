@@ -56,6 +56,12 @@
 
 ## ▶ Next up (do this next)
 
+**Three items (2026-10-14, asked to run unattended; one commit each).**
+- [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.
+- [ ] 2 · Role permissions per tenant, set on the platform (D-128).
+- [ ] 3 · The legal groundwork, plan/legal-prompt.md (D-129…).
+- [ ] The user's look; then merge on their word.
+
 **Five items (`feat/landing-and-media`, 2026-10-14), one commit each.**
 - [x] 1 · A landing page at `/` (D-121): mockups, no pricing, still no tenant list. axe 4/0.
 - [x] 2 · Room photos on the booking page's room step (D-122), the viewer on a click. walk 3/3, axe 8/0.

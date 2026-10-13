@@ -3,6 +3,7 @@ import { TranscriptScreen } from '@/components/transcript-screen';
 import { loadBranding } from '@/lib/branding';
 import { listQuery, parseListFilters } from '@/lib/conversation-words';
 import { loadNavFeatures } from '@/lib/nav';
+import { featureOn } from '@/lib/feature-flags';
 import { getTenant } from '@/lib/tenant';
 
 // S-16a · one conversation's transcript (D-115). The page holds no data; the
@@ -23,6 +24,8 @@ export default async function ConversationPage({
   const { tenant: slug, id } = await params;
   const tenant = await getTenant(slug);
   if (!tenant) notFound();
+  // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
+  if (!(await featureOn(tenant, 'conversations'))) notFound();
 
   const [branding, nav, query] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant), searchParams]);
   const m = Number(Array.isArray(query.m) ? query.m[0] : query.m);

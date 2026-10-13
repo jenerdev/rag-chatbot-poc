@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTranscript } from '@rag/pipeline';
 import { requireAdmin } from '@/lib/admin-auth';
+import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withTenantRoute<{ id: string }>(async (request, { tenant, params }) => {
   tenant = await requireAdmin(request, tenant, 'conversations:read');
+  await requireFeature(tenant, 'conversations');
   const transcript = await getTranscript(tenant, params.id);
   if (!transcript) return NextResponse.json({ error: 'No such conversation' }, { status: 404 });
   return NextResponse.json(transcript);

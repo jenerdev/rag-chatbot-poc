@@ -253,6 +253,16 @@
 > read. "Turn off on all my devices" is R-51's answer to a lost phone. The
 > chatbot is untouched.
 
+> **A super user switches features per tenant** since 2026-10-14 (D-127):
+> eight features in ONE registry, `apps/web/lib/features.ts` (Dashboard,
+> Conversations, Unanswered, Calendar, Notifications, Suggested questions,
+> Online booking page, Manage booking), on the platform form's Features tab.
+> `tenant_features` (`sql/schema-features.sql`, the 33rd file): no row = ON.
+> Off, the page and its routes 404 (`requireFeature()`, `lib/feature-flags.ts`)
+> and its links go; Postgres refuses the stranger's writes by trigger (a web
+> booking, a guest proof, a change request) and queues no notice. A new
+> screen that should be switchable gets a key in both lists.
+
 ## What this is
 
 A **retrieval-augmented chatbot** that answers questions from documents you
@@ -350,11 +360,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (32 files; the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (33 files; the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     191 checks (188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     196 checks (192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -416,7 +426,7 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 191 checks, no API key needed
+pnpm --filter @rag/db verify    # 196 checks, no API key needed
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
