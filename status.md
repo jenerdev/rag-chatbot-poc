@@ -56,7 +56,7 @@
 
 ## ▶ Next up (do this next)
 
-**Notifications (`feat/notifications`, plan/notifications.md).**
+**Notifications (`feat/notifications`, plan/notifications.md).** Merged into `master` by fast-forward at `46e261f` on 2026-10-14, by the user's word; the phone walk is owed on `master`.
 - [x] Phases 0–5 (2026-10-13): in-app badges, SQL, @rag/push, worker and
   subscribe, the drain.
 - [x] Phase 6, the walls (2026-10-14): bookings isolation 38/38 both ways
