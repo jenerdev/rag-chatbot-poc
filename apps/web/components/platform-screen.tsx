@@ -14,6 +14,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
 import { TenantForm } from '@/components/tenant-form';
+import { TenantMark } from '@/components/tenant-mark';
 import { Drawer } from '@/components/dialogs';
 import { Toaster } from '@/components/toast';
 import { AccountMenu } from '@/components/account-menu';
@@ -366,9 +367,7 @@ function TenantRow({ tenant: t, pulse: p, onEdit }: { tenant: TenantSummary; pul
   const since = new Date(t.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
   return (
     <li className={t.archivedAt ? 'tenant-row archived' : 'tenant-row'}>
-      <span className="member-avatar" aria-hidden="true">
-        {t.businessName.charAt(0).toUpperCase()}
-      </span>
+      <TenantMark businessName={t.businessName} logoUrl={t.logoUrl} />
       <div className="tenant-who">
         <div className="tenant-name">
           <button type="button" className="link tenant-open" onClick={onEdit}>

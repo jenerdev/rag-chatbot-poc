@@ -9498,3 +9498,17 @@ stays) photographed 16 states before and after; axe over the 16 after:
 order differ from what is seen; the DOM order is the phone order, and the
 desktop column is a grid placement of the second card, so the two agree.
 
+## 2026-10-14 — The tenant's logo on the platform pages
+
+**What was done:** /platform showed every tenant as its initial. Now the
+tenant list's rows and the tenant form's heading show the tenant's logo,
+contained (never cropped) on a white tile (`--logo-tile`, a token, since a
+logo is drawn for a light background), and the initial as before when there
+is none. One component, `components/tenant-mark.tsx`; an archived tenant's
+logo is drawn in grey, like its initial.
+
+**Observed:** `platform-header-shots.mjs logo "Alteza Hillside Resort"`
+(alteza is the one tenant with a logo) at 1280 and 375, light and dark;
+`platform-header-check.mjs` 5/5 and axe 16 states, 0 violations; web tests
+163. `ui-refresh-phase9-walk.mjs` check 6 now selects `.tenant-mark`.
+

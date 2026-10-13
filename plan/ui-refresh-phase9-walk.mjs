@@ -173,7 +173,7 @@ try {
       await go('/platform', "!!document.querySelector('.tenant-row')");
       await shot('platform');
       if (first) {
-        check(await page.eval("document.querySelectorAll('.tenant-row .member-avatar').length >= 3"), '6. platform: tenants as rows with an initial', `${await page.eval("document.querySelectorAll('.tenant-row').length")} tenants`);
+        check(await page.eval("document.querySelectorAll('.tenant-row .tenant-mark').length >= 3"), '6. platform: tenants as rows with a mark (the logo, or an initial)', `${await page.eval("document.querySelectorAll('.tenant-row').length")} tenants`);
         await page.eval("[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
         await page.until("!!document.querySelector('#theme-accent')", 15000);
         check(await page.eval("/passes the 4.5:1/.test(document.querySelector('.hint.met')?.textContent ?? '')"), '6b. harbor\'s colours pass the contrast check');

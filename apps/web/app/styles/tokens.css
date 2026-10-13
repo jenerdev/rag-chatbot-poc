@@ -39,6 +39,9 @@
   /* Text on a filled accent, and on the photo overlay (dark in every theme). */
   --on-accent: #ffffff;
   --on-overlay: #ffffff;
+  /* The tile under a tenant's logo on the platform pages: white in light and
+     dark alike, since a logo is drawn for a light background. */
+  --logo-tile: #ffffff;
   --overlay: rgb(0 0 0 / 0.88);
   /* The photo viewer's backdrop (plan/room-cards.md): near-solid, so its bar's
      words never sit over the page's (0.88 let the header show through). */

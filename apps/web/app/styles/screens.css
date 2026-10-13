@@ -570,7 +570,14 @@ button.link.tenant-open:hover:not(:disabled) { color: var(--accent-text); text-d
 .tenant-figure.attention dt, .tenant-figure.attention dd { color: var(--warn); }
 .tenant-row .list-row-actions { margin-left: 0; }
 /* An archived tenant is dimmed by colour, never opacity (D-101). */
-.tenant-row.archived .member-avatar { background: var(--surface-3); color: var(--muted); }
+/* A tenant's mark (tenant-mark.tsx): its initial on the soft accent, or its
+   logo, contained on a white tile; one square either way. */
+.tenant-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.tenant-mark.lg { width: 56px; height: 56px; border-radius: var(--radius-lg); font-size: var(--text-lg); }
+.tenant-mark.has-logo { padding: 4px; border: 1px solid var(--line); background: var(--logo-tile); }
+.tenant-mark img { width: 100%; height: 100%; object-fit: contain; }
+.tenant-row.archived .tenant-mark { background: var(--surface-3); color: var(--muted); }
+.tenant-row.archived .tenant-mark img { filter: grayscale(1); }
 .tenant-row.archived button.link.tenant-open, .tenant-row.archived .tenant-figure dd { color: var(--muted); }
 /* Narrower: the figures take their own line under the name, as a grid of three. */
 @media (max-width: 960px) {
@@ -1291,7 +1298,6 @@ button.link.back-link { display: inline-flex; align-items: center; gap: var(--sp
 button.link.back-link:hover:not(:disabled) { color: var(--ink); }
 .tenant-edit-head { margin-bottom: var(--space-4); }
 .tenant-edit-title { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.tenant-edit-mark { width: 48px; height: 48px; font-size: var(--text-lg); }
 .tenant-edit-name { flex: 1 1 260px; min-width: 0; }
 .tenant-edit-name .page-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); overflow-wrap: anywhere; }
 .tenant-edit-name .tenant-meta { margin: var(--space-1) 0 0; }

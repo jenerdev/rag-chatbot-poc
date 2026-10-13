@@ -29,6 +29,7 @@ import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
+import { TenantMark } from '@/components/tenant-mark';
 import { useNotice } from '@/components/toast';
 
 type Languages = 'english' | 'taglish' | 'tagalog';
@@ -690,9 +691,7 @@ export function TenantForm({
           </button>
         )}
         <div className="tenant-edit-title">
-          <span className="member-avatar tenant-edit-mark" aria-hidden="true">
-            {tenant.businessName.charAt(0).toUpperCase()}
-          </span>
+          <TenantMark businessName={tenant.businessName} logoUrl={tenant.logoUrl} size="lg" />
           <div className="tenant-edit-name">
             <h1 className="page-title">
               {tenant.businessName}{' '}

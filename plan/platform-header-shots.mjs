@@ -2,7 +2,9 @@
 // signed out (the login), the tenant list, and one tenant's form, at 1280
 // and 375, light and dark.
 //
-//   (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/platform-header-shots.mjs <label>)
+//   (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/platform-header-shots.mjs <label> [business name])
+//
+// The form photographed is the first tenant's, or the one named (e.g. a tenant with a logo).
 //
 // Writes plan/platform-header/<label>-<state>-<scheme>-<width>.png. A
 // throwaway SUPER USER (an auth user and a platform_admins row), deleted at
@@ -18,6 +20,7 @@ import { openBrowser } from './ui-refresh-cdp.mjs';
 
 const BASE = 'http://localhost:3000';
 const LABEL = process.argv[2] ?? 'shot';
+const OPEN = process.argv[3] ?? null;
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'platform-header');
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,7 +62,9 @@ try {
       await page.until("!!document.querySelector('.platform-tenants') && !document.querySelector('.skeleton')", 30000);
       await sleep(1200);
       await page.shot(join(OUT, `${LABEL}-list-${scheme}-${width}.png`));
-      await page.eval("[...document.querySelectorAll('.platform-tenants button, .platform-tenants a')].find(b => b.textContent.trim() === 'Edit')?.click(); true");
+      await page.eval(OPEN
+        ? `document.querySelector(${JSON.stringify(`[aria-label="Edit ${OPEN}"]`)})?.click(); true`
+        : "[...document.querySelectorAll('.platform-tenants button, .platform-tenants a')].find(b => b.textContent.trim() === 'Edit')?.click(); true");
       await page.until("!!document.querySelector('.tenant-edit') && !document.querySelector('.skeleton')", 30000);
       await sleep(1200);
       await page.shot(join(OUT, `${LABEL}-tenant-${scheme}-${width}.png`));
