@@ -3905,3 +3905,16 @@ and no way to jump to a photo.
 **Measured:** walk 7/7 and axe 8 states, 0 violations (after the photo
 button's name took its badge's words, WCAG 2.5.3); typecheck exit 0, web
 tests 163.
+
+## D-121 · The root is a landing page, drawn with mockups · **Added 2026-10-14 (plan/landing.md)**
+
+**Decision:** `/` describes the product: what it does, how it works, why
+it helps, with no pricing yet. Its pictures are HTML/CSS mockups with
+made-up content, not screenshots. It still lists no tenant and redirects
+to none (plan.md Phase 7). The name `StayDesk` is a working one, in one
+constant.
+
+**Why:** the user's call (item 1 of 5). Screenshots would publish real
+tenants' names, prices and guests on a public page.
+
+**Measured:** axe 4 states, 0 violations.

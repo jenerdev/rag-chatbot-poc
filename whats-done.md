@@ -9396,3 +9396,15 @@ guests.
   they see would miss it, so the name now carries the badge's words.
 - **The chips:** the unit test showed a short sentence ("Opens onto the
   garden.") becoming a chip; sentences are now text whatever their length.
+
+## 2026-10-14 — a landing page at the root (D-121)
+
+**What was done:** `/` is now a landing page: a hero, six features, how
+it works, six advantages, and no pricing. Its product pictures are drawn
+in HTML and CSS with made-up content, because a screenshot would have put
+a real tenant's prices and names on a public page.
+
+**What the observed values prove:** axe is clean at both widths in both
+schemes. The screenshots found two layout bugs before they shipped: a
+section out of line, and a mockup card covering a mockup button on a
+phone.
