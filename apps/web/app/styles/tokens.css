@@ -161,6 +161,14 @@
   --accent-fill: var(--accent);
   --accent-fill-hover: var(--accent-hover);
   --danger-fill: var(--danger);
+  /* The public pages' brand band and welcome cover (plan/public-brand.md):
+     with no banner, a gradient from the accent to a deep shade of it; over
+     a banner, a scrim of that deep shade, darkest where the text sits.
+     White (--on-overlay) is the text on both: the deep end is 45% black,
+     dark enough under any accent a tenant picks. */
+  --hero-deep: color-mix(in srgb, var(--accent) 55%, black);
+  --hero-scrim: color-mix(in srgb, var(--hero-deep) 78%, transparent);
+  --hero-scrim-light: color-mix(in srgb, var(--hero-deep) 18%, transparent);
 }
 
 /* On a dark page the accent is light, and white on it measured 3.68:1

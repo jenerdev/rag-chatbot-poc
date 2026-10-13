@@ -9328,3 +9328,28 @@ model, and nothing was reworded.
 - **The notification walks** still pass with the badge on the bell.
 - **Unchanged:** which links a role sees is still `navItems()` alone, and
   every route still checks the permission.
+
+## 2026-10-14 — the public pages wear the tenant's brand (D-118)
+
+**What was done:**
+- **The chat's welcome is a card:** the tenant's banner, or a gradient of
+  its accent, as the cover; the assistant's mark over its edge; "Hi, I'm
+  Lia"; the suggested questions; "Request a booking" where bookings exist.
+- **The booking page and Manage booking open on a brand band:** the banner
+  under a scrim, or the gradient, with the business name large.
+- **Every header:** an accent stripe and a mark, the logo or the initial.
+- **A footer:** "Staff login" moved there, and the Book button left the
+  header at the user's word.
+
+**Why:** the pages a guest sees looked the same for every tenant, the
+banner was a strip on one page, and the chat spoke to staff in front of
+guests.
+
+**What the observed values prove:**
+- **axe** ran over all three pages for four tenants, one of them a
+  throwaway with a logo, a banner and bookings: 48 states.
+- **It caught one real problem:** the assistant's role line in an orange
+  accent on a dark page was under 4.5:1. A tenant's accent can be any
+  colour, so small text no longer uses it. After the fix, 0 violations.
+- **The banner is an `<img>`:** it is never a CSS url() built from the
+  stored string, so a URL cannot reach a style rule.

@@ -3834,3 +3834,34 @@ route's `requireAdmin()`); the signed-out header; no SQL, no route.
 **Measured:** nav-layout walk 19/19; axe 10 states, 0 violations; the
 notification walks moved to the bell (inbox 12/12, sound 5/5, a11y 8/0);
 typecheck exit 0, web tests 159.
+
+## D-118 · The public pages wear the tenant's brand · **Added 2026-10-14 (plan/public-brand.md)**
+
+**Decision:** the chat, the booking page and Manage booking draw on the
+brand a tenant already configures. Nothing new is stored.
+
+- **Every header:** an accent stripe and a mark (the logo, or the initial
+  on the accent).
+- **The booking page and Manage booking:** a brand band. It shows the
+  banner under a scrim of the accent's deep shade, or, with no banner, a
+  gradient of the accent, with the business name large and the header
+  inside it.
+- **The chat:** a welcome card with that cover, "Hi, I'm {assistant}", a
+  guest's sentence, the suggested questions, and "Request a booking" where
+  bookings exist.
+- **A public footer** carries "Staff login", moved from the header, and the
+  header has no Book button.
+
+**Why:** the user's call. The banner was a strip on one page, every header
+looked alike, and the chat's empty state spoke to staff ("chunks", "your
+knowledge base is empty") in front of guests.
+
+**Rules kept:** the banner is an `<img>`, never a CSS url() built from the
+stored string. Colours come only from the five theme keys; the three new
+tokens are mixed from `--accent` in tokens.css. Text on the band is
+`--on-overlay`.
+
+**Measured:** axe over 48 public states (4 tenants, 3 pages, 2 widths, 2
+schemes), 0 violations after one fix (the role line in a tenant's accent
+failed 4.5:1 on a dark page, so it is `--ink`). Typecheck exit 0, web tests
+159.

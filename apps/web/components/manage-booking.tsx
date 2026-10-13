@@ -27,6 +27,7 @@ import { CopyButton } from '@/components/copy-button';
 import { ProofThumb, proofKind } from '@/components/proof-viewer';
 import { Icon } from '@/components/icons';
 import { Tabs } from '@/components/tabs';
+import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import { timeLeft } from '@/lib/countdown';
 import { centavosToInput, formatMoney } from '@/lib/money';
@@ -195,7 +196,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
   }
 
   const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Manage booking">
+    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} hero="Your booking">
       <TenantNav slug={slug} features={nav} current="manage" />
     </BrandHeader>
   );
@@ -352,6 +353,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
             )}
           </section>
         </main>
+        <PublicFooter slug={slug} businessName={businessName} manage={false} book />
       </>
     );
   }
@@ -409,6 +411,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
           </form>
         </section>
       </main>
+      <PublicFooter slug={slug} businessName={businessName} manage={false} book />
     </>
   );
 }

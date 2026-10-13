@@ -6,8 +6,9 @@
 // A staff screen already asks /admin/session for itself, so it passes what it
 // learned as `session`, and its own logout, which also clears its data. The
 // public pages (chat, book, manage, reset) pass nothing, and the nav asks for itself:
-// a visitor with no cookie gets `admin: false` and sees the public links and,
-// on every public page but the chat, "Staff login".
+// a visitor with no cookie gets `admin: false` and sees the public links. Since
+// plan/public-brand.md "Staff login" is in the public footer, not here: the
+// header is the guest's.
 //
 // Since plan/ui-refresh.md Phase 2 a SIGNED-IN staff page draws its links in
 // the sidebar (staff-frame.tsx), so this header is only ever the public one
@@ -60,15 +61,14 @@ export function TenantNav({
   const auth = session?.auth ?? own.auth;
   const role = auth === 'in' ? (session?.role ?? own.role) : null;
   const logout = session?.onLogout ?? ownLogout;
-  // A staff page shows its own login form when logged out, so "Staff login"
-  // is offered only from the public pages, and not from the chat: that is the
-  // visitor's page, and staff reach /t/<slug>/admin by its address.
   const publicPage = current === 'chat' || current === 'book' || current === 'manage' || current === 'reset';
-  const offerLogin = publicPage && current !== 'chat';
 
   const all = navItems(slug, features, role);
   const isPublic = (page: NavPage) => page === 'chat' || page === 'book';
-  const shown = publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all;
+  // No "Book" button in the header (the user, 2026-10-14: redundant). The
+  // chat's welcome card offers "Request a booking", the booking page is
+  // itself, and Manage booking's footer has "Book a stay".
+  const shown = (publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all).filter((item) => item.page !== 'book');
   const staffHome = publicPage ? all.find((item) => !isPublic(item.page)) : undefined;
 
   return (
@@ -87,12 +87,6 @@ export function TenantNav({
         <Link className="button" href={staffHome.href}>
           <Icon name="chart" size={16} />
           <span className="narrow-hidden">{staffHome.label}</span>
-        </Link>
-      )}
-      {auth === 'out' && offerLogin && (
-        <Link className="button" href={`/t/${slug}/admin`}>
-          <Icon name="user" size={16} />
-          <span className="narrow-hidden">Staff login</span>
         </Link>
       )}
       {auth === 'in' && (

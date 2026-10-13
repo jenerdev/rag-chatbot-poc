@@ -56,6 +56,16 @@
 
 ## ▶ Next up (do this next)
 
+**Public brand (`feat/public-brand`, plan/public-brand.md, D-118, 2026-10-14).**
+- [x] The chat's welcome card (banner or accent cover, "Hi, I'm …", the
+  suggested questions, Request a booking); the booking page and Manage
+  booking's brand band; the accent stripe and the mark on every header; a
+  public footer with Staff login; no Book button in the header (the user's
+  word). No SQL, no route, no new setting.
+- [x] Observed: axe 48 public states, 0 violations (after the role line
+  moved to --ink: 2 contrast failures on a dark page with an orange accent);
+  typecheck exit 0, web tests 159. Screenshots in `plan/public-brand/`.
+
 **Nav layout (`feat/nav-layout`, plan/nav-layout.md, D-117, 2026-10-14).**
 - [x] The sidebar holds places in four sections (Overview · Front desk ·
   Assistant · Setup); a top bar on every width holds the breadcrumb, the

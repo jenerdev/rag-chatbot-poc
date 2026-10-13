@@ -339,3 +339,28 @@
 .tool-call .day-head { padding: 2px 0; }
 .tool-call .day-label { width: 86px; font-size: var(--text-sm); }
 .tool-error { font-size: var(--text-sm); color: var(--danger); }
+
+/* The welcome (plan/public-brand.md, which replaced Phase 3's centred
+   sentence): a card with the tenant's banner, or a gradient of its accent,
+   as its cover; the assistant's mark over the cover's edge; the assistant
+   introducing itself; the suggested questions; the way to the booking page. */
+.welcome { max-width: 640px; margin: var(--space-6) auto var(--space-4); overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
+.welcome-cover { position: relative; height: 112px; background: linear-gradient(135deg, var(--accent-fill) 0%, var(--hero-deep) 100%); }
+.welcome-cover.has-image { height: 168px; background: var(--hero-deep); }
+.welcome-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.welcome-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, var(--hero-scrim-light) 100%); }
+.welcome-body { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 var(--space-6) var(--space-6); }
+.welcome .assistant-mark { position: relative; z-index: 1; width: 72px; height: 72px; margin-top: -36px; border: 4px solid var(--panel); font-size: var(--text-xl); background: var(--accent-fill); color: var(--on-accent); box-shadow: var(--shadow-1); }
+.welcome h2 { margin: var(--space-3) 0 0; font-size: var(--text-xl); font-weight: 650; letter-spacing: -0.02em; }
+/* --ink, not the accent: a tenant's accent as small text failed 4.5:1 on a dark page (an orange, the a11y run). */
+.welcome-role { margin: 2px 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
+.welcome-text { max-width: 46ch; margin: var(--space-3) 0 0; color: var(--muted); text-wrap: pretty; }
+.welcome .suggestions { margin-top: var(--space-5); max-width: none; }
+.welcome-book { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--space-3); width: 100%; margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); font-size: var(--text-sm); color: var(--muted); }
+@media (max-width: 560px) {
+  .welcome { margin-top: var(--space-2); }
+  .welcome-cover { height: 88px; }
+  .welcome-cover.has-image { height: 128px; }
+  .welcome-body { padding: 0 var(--space-4) var(--space-5); }
+  .welcome .suggestions { margin-top: var(--space-4); }
+}

@@ -31,6 +31,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
+import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
@@ -283,7 +284,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   }
 
   const header = (
-    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} subtitle="Book">
+    <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} hero="Online booking">
       <TenantNav slug={slug} features={nav} current="book" />
     </BrandHeader>
   );
@@ -442,6 +443,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
             </div>
           </section>
         </main>
+        <PublicFooter slug={slug} businessName={businessName} manage={true} />
       </>
     );
   }
@@ -897,6 +899,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
           </aside>
         </form>
       </main>
+      <PublicFooter slug={slug} businessName={businessName} manage={true} />
     </>
   );
 }

@@ -337,7 +337,8 @@ export function ChatScreen({
 
   return (
     <div className="chat-layout">
-      <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl}>
+      {/* The banner is the welcome's cover here, not a strip over the header. */}
+      <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={null}>
         <button className="ghost" type="button" onClick={newChat}>
           <Icon name="plus" size={16} />
           <span className="narrow-hidden">New chat</span>
@@ -348,33 +349,48 @@ export function ChatScreen({
       {/* <main>: the page's main landmark (Phase 10's audit found none on the chat). */}
       <main id="messages" ref={messagesRef} onScroll={onScroll}>
         <div className="messages-inner">
+          {/* The welcome (plan/public-brand.md): the tenant's banner, or a
+              gradient of its accent, as a cover; its mark; the assistant
+              introducing itself in a guest's words; the suggested questions;
+              and, where the tenant takes bookings, the way to the booking
+              page. It gives way to the conversation at the first message. */}
           {turns.length === 0 && (
-            <div className="empty-state">
-              <AssistantMark name={assistantName} logoUrl={logoUrl} />
-              <h2>
-                Ask {assistantName} a question about {businessName}.
-              </h2>
-              <p>
-                {emptyKb
-                  ? 'Your knowledge base is empty — add a document first.'
-                  : 'The answer will show the chunks it came from.'}
-              </p>
-              {!emptyKb && suggestedQuestions.length > 0 && (
-                <div className="suggestions" aria-label="Suggested questions">
-                  {suggestedQuestions.map((question) => (
-                    <button key={question} type="button" disabled={busy} onClick={() => void send(question)}>
-                      <span>{question}</span>
-                      <Icon name="chevron-right" size={16} />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {emptyKb && (
-                <Link className="button empty-state-action" href={`/t/${slug}/admin/documents`}>
-                  Go to the knowledge base
-                </Link>
-              )}
-            </div>
+            <section className="welcome" aria-labelledby="welcome-title">
+              <div className={bannerUrl ? 'welcome-cover has-image' : 'welcome-cover'}>
+                {bannerUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={bannerUrl} alt="" />
+                )}
+              </div>
+              <div className="welcome-body">
+                <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                <h2 id="welcome-title">Hi, I&rsquo;m {assistantName}</h2>
+                <p className="welcome-role">{businessName}&rsquo;s assistant</p>
+                <p className="welcome-text">
+                  {emptyKb
+                    ? 'I am still being set up, so I cannot answer questions yet. Please check back soon.'
+                    : `Ask me anything about ${businessName}. I answer from ${businessName}'s own information, and show where each answer came from.`}
+                </p>
+                {!emptyKb && suggestedQuestions.length > 0 && (
+                  <div className="suggestions" role="group" aria-label="Suggested questions">
+                    {suggestedQuestions.map((question) => (
+                      <button key={question} type="button" disabled={busy} onClick={() => void send(question)}>
+                        <span>{question}</span>
+                        <Icon name="chevron-right" size={16} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {nav.book && (
+                  <div className="welcome-book">
+                    <span>Know your dates?</span>
+                    <Link className="button primary" href={`/t/${slug}/book`}>
+                      <Icon name="calendar" size={16} /> Request a booking
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </section>
           )}
 
           <div id="turns">
