@@ -9476,3 +9476,25 @@ name's first letter.
 instant confirmation the booking page cannot give: a request waits for
 staff. Observed in the served page: "Book your stay" present, "Request a
 booking" gone from the chat.
+
+## 2026-10-14 — Manage booking's layout (D-126)
+
+**What was done:** S-13's found stay was one 640 px card with two tabs
+(Payment, Booking details). It is now four cards: the status (badges,
+reference, the next step and the countdown), "Your stay" (dates, rooms,
+price, "Look up another booking"), Payment, and Change your booking. From
+900 px the stay summary is a second column, sticky; below it everything
+stacks in DOM order. The amount to pay now leads the Payment card, the two
+steps are numbered, and the band's eyebrow says "Manage booking" instead of
+repeating the h1. The look-up form gained a mark and a line on where the
+reference is. No route, no figure and no wording of a state changed.
+
+**Observed:** `plan/manage-layout-shots.mjs` (a throwaway pending stay with
+two rooms, two ways to pay and terms, plus villa's confirmed and declined
+stays) photographed 16 states before and after; axe over the 16 after:
+0 violations. Typecheck clean; web tests 163.
+
+**Trap avoided:** a grid that only reorders visually would make the focus
+order differ from what is seen; the DOM order is the phone order, and the
+desktop column is a grid placement of the second card, so the two agree.
+

@@ -4001,3 +4001,15 @@ booking page's own heading stays "Request a booking".
 - "Book your stay" invites just as directly without promising
   confirmation. The page it opens says plainly that the request waits for
   the resort.
+
+## D-126 · Manage booking is cards, not tabs · **Added 2026-10-14**
+
+**Decision:** S-13's found stay shows every part at once, as cards: the
+status, the stay summary, Payment, Change. From 900 px the summary is a
+sticky right-hand column. The Payment / Booking details tabs are gone.
+
+**Why:** the user asked for a better layout. The tabs hid the dates and
+the price behind a click while the guest paid, and left most of a desktop
+screen empty. One column in DOM order on a phone keeps the reading and
+focus order equal to what is seen (WCAG 1.3.2, 2.4.3).
+
