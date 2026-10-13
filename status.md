@@ -64,7 +64,7 @@
 - [x] 5 · The chat's button says "Book your stay" (D-125).
 - [x] No tenant banner on the staff pages (368aa26): the frame and its 15 screens no longer take it; the guest pages keep it.
 - [x] Manage booking's layout (D-126): cards in two columns from 900 px (the stay summary sticky on the right), no tabs, numbered pay steps. `plan/manage-layout-shots.mjs`: axe 16 states, 0 violations.
-- [ ] The user's look; then merge on their word. The product name on the landing page, `StayDesk`, is a working one.
+- [x] Merged to `master` (82b1258) on the user's word, 2026-10-14. The product name on the landing page, `StayDesk`, is a working one.
 
 **Room cards and the photo viewer (`feat/room-cards`, plan/room-cards.md, D-120, 2026-10-14).**
 - [x] Cards: fact chips and text, a sideways row on a phone, the photo
