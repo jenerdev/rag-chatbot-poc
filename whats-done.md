@@ -9468,3 +9468,11 @@ name's first letter.
   tenant failed until it named the avatar, as it should: nothing becomes
   public by accident.
 - **The chatbot:** its prompt and tool texts are unchanged.
+
+## 2026-10-14 — "Book your stay" (D-125)
+
+**What was done:** the chat's welcome button now says "Book your stay".
+"Book now" and "Reserve now" were set aside because they promise an
+instant confirmation the booking page cannot give: a request waits for
+staff. Observed in the served page: "Book your stay" present, "Request a
+booking" gone from the chat.

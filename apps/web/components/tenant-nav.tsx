@@ -66,7 +66,7 @@ export function TenantNav({
   const all = navItems(slug, features, role);
   const isPublic = (page: NavPage) => page === 'chat' || page === 'book';
   // No "Book" button in the header (the user, 2026-10-14: redundant). The
-  // chat's welcome card offers "Request a booking", the booking page is
+  // chat's welcome card offers "Book your stay", the booking page is
   // itself, and Manage booking's footer has "Book a stay".
   const shown = (publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all).filter((item) => item.page !== 'book');
   const staffHome = publicPage ? all.find((item) => !isPublic(item.page)) : undefined;

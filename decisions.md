@@ -3986,3 +3986,18 @@ resized to 384 px, or pasted as an address.
   is refused (23514); the public-columns check now names it.
 - The upload walk's step 7: an uploaded avatar is the chat's mark.
 - The chatbot's three baselines byte-identical.
+
+## D-125 · The chat's booking button says "Book your stay" · **Added 2026-10-14**
+
+**Decision:** the chat welcome's button to the booking page reads "Book
+your stay", not "Request a booking", "Book now" or "Reserve now". The
+booking page's own heading stays "Request a booking".
+
+**Why:** the user asked which (item 5 of 5).
+- "Request a booking" is accurate but reads like paperwork.
+- "Book now" and "Reserve now" promise an instant, confirmed booking. Here
+  a request holds nothing until staff confirm it (D-070), so the guest
+  would learn otherwise one screen later.
+- "Book your stay" invites just as directly without promising
+  confirmation. The page it opens says plainly that the request waits for
+  the resort.

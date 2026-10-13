@@ -389,8 +389,11 @@ export function ChatScreen({
                 {nav.book && (
                   <div className="welcome-book">
                     <span>Know your dates?</span>
+                    {/* "Book your stay" (D-125): an invitation, not "Book now" or "Reserve now",
+                        which promise an instant confirmation the page does not give: a
+                        request waits for staff (D-070), as the booking page says. */}
                     <Link className="button primary" href={`/t/${slug}/book`}>
-                      <Icon name="calendar" size={16} /> Request a booking
+                      <Icon name="calendar" size={16} /> Book your stay
                     </Link>
                   </div>
                 )}
