@@ -561,7 +561,7 @@ async function authChecks(probeId, anyChunk) {
     const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
     const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
     check(
-      !pub.error && keys === 'assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,suggested_questions,theme',
+      !pub.error && keys === 'assistant_avatar_url,assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,suggested_questions,theme' /* D-124 added the avatar, public by design */,
       "auth: tenant_public('villa') has only public columns",
       pub.error ? pub.error.message : `keys: ${keys}`,
     );
@@ -3687,6 +3687,28 @@ async function notificationChecks() {
       await supabase.from('platform_admins').delete().eq('user_id', id);
       await supabase.auth.admin.deleteUser(id);
     }
+  }
+}
+
+// --- schema-assistant-avatar.sql (D-124) ------------------------------------
+// 190. tenant_public() hands the avatar to a visitor (anon), and the twin:
+//      the value set is the value read; 191. an http:// avatar is refused.
+{
+  const { data: villaRow } = await supabase.from('tenants').select('id, assistant_avatar_url').eq('slug', 'villa').single();
+  const was = villaRow.assistant_avatar_url;
+  const url = 'https://example.com/avatar-verify.webp';
+  try {
+    const set = await supabase.from('tenants').update({ assistant_avatar_url: url }).eq('id', villaRow.id);
+    const { data: pub } = await anonClient().rpc('tenant_public', { p_slug: 'villa' });
+    check(
+      !set.error && pub?.[0]?.assistant_avatar_url === url,
+      'assistant avatar: tenant_public() gives a visitor the avatar that was set',
+      `${set.error?.message ?? 'set'} · read ${pub?.[0]?.assistant_avatar_url}`,
+    );
+    const http = await supabase.from('tenants').update({ assistant_avatar_url: 'http://example.com/a.png' }).eq('id', villaRow.id);
+    check(http.error?.code === '23514', 'assistant avatar: an http:// address is refused (23514, tenants_assistant_avatar_https)', http.error?.code ?? 'ACCEPTED');
+  } finally {
+    await supabase.from('tenants').update({ assistant_avatar_url: was }).eq('id', villaRow.id);
   }
 }
 

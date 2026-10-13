@@ -3964,3 +3964,25 @@ image somewhere else first.
   object gone, banner, Remove and Save with its object gone, a fake image
   refused in words) and axe 2 states, 0 violations.
 - Tests: pipeline 369 (`brandObjectPath`).
+
+## D-124 · The assistant has its own avatar, set on the platform page · **Added 2026-10-14 (schema-assistant-avatar.sql)**
+
+**Decision:** a tenant has `assistant_avatar_url`, https only like the logo
+and banner (the 32nd SQL file). It is uploaded on the platform form beside
+the assistant's name, through D-123's route as a third kind, `avatar`,
+resized to 384 px, or pasted as an address.
+- **Where it shows:** wherever the assistant speaks, the chat's welcome
+  card and beside every reply. Without one: the logo, then the first
+  letter of the name.
+- **Reaching guests:** it reaches the public through `tenant_public()`,
+  re-created with the column. The older file's drop-and-create
+  (schema-suggested-questions.sql) is now guarded on the column (trap 20):
+  re-running it afterwards was observed to keep the avatar.
+
+**Why:** the user's call (item 3 of 5).
+
+**Measured:**
+- verify **191**: 190, a visitor reads the avatar that was set; 191, http
+  is refused (23514); the public-columns check now names it.
+- The upload walk's step 7: an uploaded avatar is the chat's mark.
+- The chatbot's three baselines byte-identical.

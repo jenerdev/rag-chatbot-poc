@@ -9451,3 +9451,20 @@ room without choosing it.
     problem. It now says the file is not an image;
   - the upload control was a `<label class="button">`, which the base
     styles do not draw as a button.
+
+## 2026-10-14 — the AI assistant's avatar (D-124)
+
+**What was done:** the platform form has an "Assistant avatar" upload
+beside the assistant's name. The chat shows it on the welcome card and
+beside every reply. Without one it falls back to the logo, then to the
+name's first letter.
+
+**What the observed values prove:**
+- **The path:** the walk uploaded an avatar and found it as the chat's
+  mark, so the bucket, the row, `tenant_public()` and the page all agree.
+- **The guard:** re-running the older SQL file afterwards left the new
+  column in place, so trap 20's guard holds.
+- **The public boundary:** the check that pins what is public about a
+  tenant failed until it named the avatar, as it should: nothing becomes
+  public by accident.
+- **The chatbot:** its prompt and tool texts are unchanged.

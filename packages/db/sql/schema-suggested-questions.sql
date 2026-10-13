@@ -42,7 +42,19 @@ alter table tenants add  constraint tenants_suggested_questions_shape check (
 --    search_path = '', still no archived tenant. Its column list is the
 --    boundary of what a token may read about a tenant (auth-rls § 1.3), and
 --    suggested questions are meant for every visitor.
-drop function if exists public.tenant_public(text);
+-- GUARDED (D-124, 2026-10-14): schema-assistant-avatar.sql replaces this
+-- with an assistant_avatar_url column. Re-run after it, this drop and
+-- create would quietly take the avatar away again (CLAUDE.md trap 20), so it
+-- is skipped once tenant_public() returns that column.
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'tenant_public'
+       and 'assistant_avatar_url' = any(p.proargnames)
+  ) then
+    execute 'drop function if exists public.tenant_public(text)';
+    execute $ddl$
 create function public.tenant_public(p_slug text)
 returns table (
   id                  bigint,
@@ -63,7 +75,11 @@ as $$
          t.suggested_questions
   from public.tenants t
   where t.slug = p_slug and t.archived_at is null
-$$;
+$$
+    $ddl$;
+  end if;
+end
+$guard$;
 
 -- 4. A dropped function loses its grants: re-applied as schema-roles.sql had them.
 revoke all on function public.tenant_public(text) from public, anon, authenticated;

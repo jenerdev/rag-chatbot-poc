@@ -10,7 +10,9 @@
 // 3 upload a banner: two objects
 // 4 Remove the logo and Save: the row's logo is null, its object gone
 // 5 a text file named .png: refused, nothing changes
-// 6 axe over the form with both previews, 1280 and 375. Needs pnpm dev.
+// 6 axe over the form with both previews, 1280 and 375
+// 7 (D-124) upload an assistant avatar: saved, and the chat's welcome and
+//   its mark show it. Needs pnpm dev.
 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -86,26 +88,30 @@ try {
     await page.send('DOM.setFileInputFiles', { nodeId: nodeIds[index], files: [path] });
   };
   const toasts = "[...document.querySelectorAll('.toast-message')].map(t => t.textContent)";
+  // The fields in the form's order: the assistant avatar (D-124), the logo, the banner.
+  const AVATAR = 0;
+  const LOGO = 1;
+  const BANNER = 2;
   const preview = (i) => `document.querySelectorAll('.brand-image-preview')[${i}].querySelector('img')?.getAttribute('src') ?? null`;
 
   // 1
-  await choose(0, files.logo1);
+  await choose(LOGO, files.logo1);
   await page.until(`(${toasts}).some(t => t.startsWith('Logo uploaded'))`, 20000);
   const first = await row();
   const objs1 = await objects();
-  const shown1 = await page.eval(preview(0));
+  const shown1 = await page.eval(preview(LOGO));
   check(/\/storage\/v1\/object\/public\/brand-images\/\d+\/logo-.+\.webp$/.test(first.logo_url ?? '') && shown1 === first.logo_url && objs1.length === 1, '1. a logo uploads, is saved at once (WebP, in the bucket) and shown', `${first.logo_url?.split('/').slice(-2).join('/')} · objects ${objs1.length}`);
 
   // 2
-  await choose(0, files.logo2);
-  await page.until(`document.querySelectorAll('.brand-image-preview')[0].querySelector('img')?.getAttribute('src') !== ${JSON.stringify(first.logo_url)}`, 20000);
+  await choose(LOGO, files.logo2);
+  await page.until(`document.querySelectorAll('.brand-image-preview')[${LOGO}].querySelector('img')?.getAttribute('src') !== ${JSON.stringify(first.logo_url)}`, 20000);
   await sleep(500);
   const second = await row();
   const objs2 = await objects();
   check(second.logo_url !== first.logo_url && objs2.length === 1 && second.logo_url.endsWith(objs2[0].name), '2. Replace: a new URL, the old object removed (still one)', `objects ${objs2.map((o) => o.name).join(', ')}`);
 
   // 3
-  await choose(1, files.banner);
+  await choose(BANNER, files.banner);
   await page.until(`(${toasts}).some(t => t.startsWith('Banner uploaded'))`, 20000);
   const third = await row();
   const objs3 = await objects();
@@ -126,7 +132,7 @@ try {
   await page.viewport(1280);
 
   // 4
-  await page.eval("[...document.querySelectorAll('.brand-image-field')][0].querySelector('.brand-image-actions button').click(); true");
+  await page.eval(`[...document.querySelectorAll('.brand-image-field')][${LOGO}].querySelector('.brand-image-actions button').click(); true`);
   await sleep(300);
   await page.eval("[...document.querySelectorAll('form.settings button[type=submit]')].find(b => b.textContent.trim() === 'Save').click(); true");
   await page.until(`(${toasts}).some(t => t === 'Saved.')`, 20000);
@@ -136,11 +142,21 @@ try {
   check(fourth.logo_url === null && fourth.banner_url === third.banner_url && objs4.length === 1 && objs4[0].name.startsWith('banner-'), '4. Remove and Save: the logo is null and its object gone; the banner stays', `objects ${objs4.map((o) => o.name).join(', ')}`);
 
   // 5
-  await choose(0, files.fake);
+  await choose(LOGO, files.fake);
   await page.until(`(${toasts}).length > 0 && (${toasts}).some(t => !t.startsWith('Saved') && !t.includes('uploaded'))`, 20000);
   const fifth = await row();
   const errorToast = await page.eval(`(${toasts}).filter(t => !t.startsWith('Saved') && !t.includes('uploaded')).pop()`);
   check(fifth.logo_url === null && (await objects()).length === 1 && /not an image/.test(errorToast ?? ''), '5. a text file named .png is refused in words that say so; nothing changes', errorToast);
+
+  // 7
+  await choose(AVATAR, files.logo2);
+  await page.until(`(${toasts}).some(t => t.startsWith('Assistant avatar uploaded'))`, 20000);
+  const seventh = (await supabase.from('tenants').select('slug, assistant_avatar_url').eq('id', tenantId).single()).data;
+  await page.goto(`${BASE}/t/${seventh.slug}`);
+  await page.until("!!document.querySelector('.welcome .assistant-mark')", 30000);
+  const mark = await page.eval("document.querySelector('.welcome .assistant-mark').getAttribute('src')");
+  check(/avatar-.+\.webp$/.test(seventh.assistant_avatar_url ?? '') && mark === seventh.assistant_avatar_url && (await objects()).length === 2, "7. an assistant avatar uploads, and the chat's welcome shows it as the assistant's mark", `${seventh.assistant_avatar_url?.split('/').pop()} · mark ${mark === seventh.assistant_avatar_url}`);
+  await page.shot(join(TMP, 'chat-avatar-1280.png'));
 } finally {
   browser?.close();
   if (tenantId) {

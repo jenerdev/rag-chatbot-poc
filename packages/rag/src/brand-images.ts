@@ -1,5 +1,5 @@
-// brand-images.ts — a tenant's logo and banner, UPLOADED on the platform page
-// (D-123), into the public `brand-images` bucket (sql/schema-brand-images.sql).
+// brand-images.ts — a tenant's logo, banner and assistant avatar (D-124),
+// UPLOADED on the platform page (D-123), into the public `brand-images` bucket (sql/schema-brand-images.sql).
 //
 // Who may: a super user, on the platform token (D-076). Storage's policies
 // ask app_is_super() for every insert, select and delete; the route asks
@@ -25,9 +25,9 @@ export const BRAND_BUCKET = 'brand-images';
 /** The bucket's own file_size_limit; the route refuses a bigger body first. */
 export const MAX_BRAND_BYTES = 2 * 1024 * 1024;
 /** What may be uploaded, and the tenant field each sets. */
-export const BRAND_IMAGE_KINDS = ['logo', 'banner'] as const;
+export const BRAND_IMAGE_KINDS = ['logo', 'banner', 'avatar'] as const;
 export type BrandImageKind = (typeof BRAND_IMAGE_KINDS)[number];
-const FIELD: Readonly<Record<BrandImageKind, 'logoUrl' | 'bannerUrl'>> = { logo: 'logoUrl', banner: 'bannerUrl' };
+const FIELD: Readonly<Record<BrandImageKind, 'logoUrl' | 'bannerUrl' | 'assistantAvatarUrl'>> = { logo: 'logoUrl', banner: 'bannerUrl', avatar: 'assistantAvatarUrl' };
 
 /** The object path of a URL in our bucket, or null for any other URL. Pure, tested. */
 export function brandObjectPath(publicPrefix: string, url: string | null | undefined): string | null {

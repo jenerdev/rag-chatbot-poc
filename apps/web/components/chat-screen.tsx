@@ -46,6 +46,8 @@ export interface ChatScreenProps {
   assistantName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  /** The assistant's own picture (D-124), set on the platform page; null: the logo, else its initial. */
+  assistantAvatarUrl?: string | null;
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
   /**
@@ -121,10 +123,13 @@ export function ChatScreen({
   assistantName,
   logoUrl,
   bannerUrl,
+  assistantAvatarUrl = null,
   documentCount,
   nav,
   suggestedQuestions,
 }: ChatScreenProps) {
+  // Who speaks: the assistant's own picture, else the business's logo, else its initial (AssistantMark).
+  const markUrl = assistantAvatarUrl ?? logoUrl;
   const api = `/api/t/${slug}`;
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -363,7 +368,7 @@ export function ChatScreen({
                 )}
               </div>
               <div className="welcome-body">
-                <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                <AssistantMark name={assistantName} logoUrl={markUrl} />
                 <h2 id="welcome-title">Hi, I&rsquo;m {assistantName}</h2>
                 <p className="welcome-role">{businessName}&rsquo;s assistant</p>
                 <p className="welcome-text">
@@ -406,7 +411,7 @@ export function ChatScreen({
               if (turn.kind === 'pending') {
                 return (
                   <div className="turn assistant" key={turn.id}>
-                    <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                    <AssistantMark name={assistantName} logoUrl={markUrl} />
                     <div className="assistant-body">
                       <div className="speaker">{assistantName}</div>
                       <Thinking />
@@ -418,7 +423,7 @@ export function ChatScreen({
               if (turn.kind === 'failed') {
                 return (
                   <div className="turn assistant" key={turn.id}>
-                    <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                    <AssistantMark name={assistantName} logoUrl={markUrl} />
                     <div className="assistant-body">
                       <div className="speaker">{assistantName}</div>
                       <div className="turn-error" role="alert">
@@ -435,7 +440,7 @@ export function ChatScreen({
 
               return (
                 <div className="turn assistant" key={turn.id}>
-                  <AssistantMark name={assistantName} logoUrl={logoUrl} />
+                  <AssistantMark name={assistantName} logoUrl={markUrl} />
                   <div className="assistant-body">
                     <div className="speaker">{assistantName}</div>
                     {turn.text === '' && !turn.error ? (

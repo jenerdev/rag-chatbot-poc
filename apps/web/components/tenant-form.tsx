@@ -135,6 +135,7 @@ interface ProfileFields {
   assistantName: string;
   logoUrl: string;
   bannerUrl: string;
+  avatarUrl: string;
   theme: Theme;
   fallbacks: Record<Languages, string>;
   suggestions: string[];
@@ -146,13 +147,14 @@ function profileFieldsOf(tenant: TenantDetail): ProfileFields {
     assistantName: tenant.assistantName,
     logoUrl: tenant.logoUrl ?? '',
     bannerUrl: tenant.bannerUrl ?? '',
+    avatarUrl: tenant.assistantAvatarUrl ?? '',
     theme: themeOf(tenant.theme),
     fallbacks: fallbacksOf(tenant.fallbackMessages),
     suggestions: suggestionsOf(tenant.suggestedQuestions),
   };
 }
 
-/** The PATCH body: the same seven keys as always. Also what "unsaved" compares. */
+/** The PATCH body: the same eight keys every time. Also what "unsaved" compares. */
 function profileBodyOf(f: ProfileFields) {
   const theme: Theme = {};
   for (const k of THEME_KEY_LIST) if (f.theme[k]) theme[k] = f.theme[k];
@@ -164,6 +166,7 @@ function profileBodyOf(f: ProfileFields) {
     assistantName: f.assistantName.trim(),
     logoUrl: f.logoUrl.trim() || null,
     bannerUrl: f.bannerUrl.trim() || null,
+    assistantAvatarUrl: f.avatarUrl.trim() || null,
     theme,
     fallbackMessages: Object.keys(fb).length ? fb : null,
     suggestedQuestions: questions.length ? questions : null,
@@ -200,6 +203,7 @@ export function TenantForm({
   const [assistantName, setAssistantName] = useState(tenant?.assistantName ?? '');
   const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '');
   const [bannerUrl, setBannerUrl] = useState(tenant?.bannerUrl ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(tenant?.assistantAvatarUrl ?? '');
   const [theme, setTheme] = useState<Theme>(themeOf(tenant?.theme));
   const [fallbacks, setFallbacks] = useState(fallbacksOf(tenant?.fallbackMessages));
   const [suggestions, setSuggestions] = useState<string[]>(suggestionsOf(tenant?.suggestedQuestions));
@@ -210,7 +214,7 @@ export function TenantForm({
   const preview = useMemo(() => themeVars(theme), [theme]);
   const contrast = useMemo(() => contrastProblems(theme), [theme]);
   const { ask, dialog } = useConfirmDialog();
-  const profileFields: ProfileFields = { businessName, assistantName, logoUrl, bannerUrl, theme, fallbacks, suggestions };
+  const profileFields: ProfileFields = { businessName, assistantName, logoUrl, bannerUrl, avatarUrl, theme, fallbacks, suggestions };
 
   /** One request; the tenant the route hands back becomes the form's tenant. */
   async function send(method: string, path: string, body: object | undefined, done: string) {
@@ -299,6 +303,7 @@ export function TenantForm({
     setAssistantName(saved.assistantName);
     setLogoUrl(saved.logoUrl);
     setBannerUrl(saved.bannerUrl);
+    setAvatarUrl(saved.avatarUrl);
     setTheme(saved.theme);
     setFallbacks(saved.fallbacks);
     setSuggestions(saved.suggestions);
@@ -332,6 +337,25 @@ export function TenantForm({
               <label htmlFor="tenant-assistant">Assistant name</label>
               <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
             </div>
+          </div>
+          {/* The assistant's own picture (D-124): beside every reply, and on the chat's welcome. */}
+          <div className="field-row">
+            <BrandImageField
+              api={api}
+              tenantId={id}
+              kind="avatar"
+              label="Assistant avatar"
+              hint={`JPEG, PNG or WebP, shown round beside ${assistantName.trim() || 'the assistant'}'s replies. Empty: the logo, else the first letter of the name.`}
+              maxEdge={384}
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              onUploaded={(saved) => {
+                setAvatarUrl(saved.assistantAvatarUrl ?? '');
+                onSaved(saved);
+              }}
+              onMessage={(message, kind) => setNotice({ message, kind })}
+              onUnauthorized={onUnauthorized}
+            />
           </div>
           {/* Uploaded (D-123), or an address pasted as before. An upload saves at once; Remove waits for Save. */}
           <div className="field-row">

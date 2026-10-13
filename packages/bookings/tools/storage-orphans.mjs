@@ -156,7 +156,7 @@ if (proofOrphans.length > 0 && remove) {
 }
 
 // ─── brand-images (D-123) ─────────────────────────────────────────────────
-// A tenant's uploaded logo and banner,
+// A tenant's uploaded logo, banner and assistant avatar,
 // <tenant_id>/<kind>-<uuid>.<ext>. An object is in use when some tenant's
 // row holds its public URL; one that is not, and over an hour old (an upload
 // may be between its object and its row), is an orphan. The upload route
@@ -164,7 +164,7 @@ if (proofOrphans.length > 0 && remove) {
 // the rest, and a removed tenant's images (tenant:remove runs it).
 const BRAND_BUCKET = 'brand-images';
 // Named, never select('*') on tenants (CLAUDE.md conventions).
-const BRAND_COLUMNS = ['logo_url', 'banner_url'];
+const BRAND_COLUMNS = ['logo_url', 'banner_url', 'assistant_avatar_url'];
 const { data: brandRows, error: brandRowError } = await supabase.from('tenants').select(BRAND_COLUMNS.join(', '));
 if (brandRowError) throw new Error(brandRowError.message);
 const inUse = new Set(brandRows.flatMap((t) => BRAND_COLUMNS.map((c) => t[c]).filter(Boolean)));
