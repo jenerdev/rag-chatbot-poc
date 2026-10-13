@@ -45,7 +45,6 @@ export interface AccommodationsScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
   /** From @rag/bookings, via the server page: the one copy of each limit. */
@@ -487,7 +486,6 @@ export function AccommodationsScreen({
   slug,
   businessName,
   logoUrl,
-  bannerUrl,
   nav,
   maxImageBytes,
   maxImageEdge,
@@ -612,7 +610,7 @@ export function AccommodationsScreen({
     }
   };
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'rooms' as const, title: 'Rooms', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'rooms' as const, title: 'Rooms', session: { auth, role, onLogout: logout } };
 
   if (auth !== 'in') {
     return (

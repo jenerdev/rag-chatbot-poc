@@ -52,7 +52,6 @@ export interface AdminScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
 }
@@ -213,7 +212,7 @@ function DocumentRow({
 }
 
 
-export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: AdminScreenProps) {
+export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is (tenant management Phase 3). Staff reads the knowledge
@@ -430,7 +429,7 @@ export function AdminScreen({ slug, businessName, logoUrl, bannerUrl, nav }: Adm
     setSource((current) => (current.trim() === '' ? file.name : current));
   }, [setNotice]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'documents' as const, title: 'Knowledge base', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'documents' as const, title: 'Knowledge base', session: { auth, role, onLogout: logout } };
   // Closing abandons an edit (the row must not stay "being edited"), but a
   // new document's draft is kept for when the drawer opens again.
   const closeForm = () => {

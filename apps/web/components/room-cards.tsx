@@ -78,7 +78,7 @@ export function RoomCards({ header, rows, cards }: { header: string[]; rows: str
             <article className="room-card" key={i}>
               {photo && card ? (
                 // The name contains the badge's words ("2 photos"): WCAG 2.5.3, what you see is what you say.
-                <button type="button" className="room-card-photo" onClick={() => lightbox.show(card.name, card.photos)} aria-label={`See ${photoCount(card.photos.length)} of ${card.name}`}>
+                <button type="button" className="room-card-photo" onClick={(event) => lightbox.show(card.name, card.photos, event.currentTarget)} aria-label={`See ${photoCount(card.photos.length)} of ${card.name}`}>
                   {/* A plain <img>, not next/image: the URL is the tenant's bucket, not a configured host. */}
                   <img src={photo} alt={card.name} loading="lazy" />
                   <span className="room-card-count">

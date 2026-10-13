@@ -80,7 +80,7 @@ export function fromPostgrest(error: { code?: string; message: string }, what: s
 }
 
 /** The tenants columns a platform read selects. EXPLICIT, never `*` (CLAUDE.md § Conventions). */
-const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, theme, fallback_messages, suggested_questions, archived_at, created_at';
+const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at';
 
 /** One row of the platform's tenant list. */
 export interface TenantSummary {
@@ -90,6 +90,8 @@ export interface TenantSummary {
   assistantName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  /** the assistant's picture (D-124): beside its replies; null = its initial, or the logo */
+  assistantAvatarUrl: string | null;
   theme: Json;
   fallbackMessages: Json | null;
   /** D-089: the questions a new chat offers as buttons, or null. */
@@ -115,6 +117,7 @@ type TenantRow = {
   assistant_name: string;
   logo_url: string | null;
   banner_url: string | null;
+  assistant_avatar_url: string | null;
   theme: Json;
   fallback_messages: Json | null;
   suggested_questions: Json | null;
@@ -132,6 +135,7 @@ function summary(row: TenantRow, applications: ApplicationKey[], members: number
     assistantName: row.assistant_name,
     logoUrl: row.logo_url,
     bannerUrl: row.banner_url,
+    assistantAvatarUrl: row.assistant_avatar_url,
     theme: row.theme,
     fallbackMessages: row.fallback_messages,
     suggestedQuestions: row.suggested_questions,
@@ -210,6 +214,7 @@ export interface TenantPatch {
   assistantName?: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  assistantAvatarUrl?: string | null;
   theme?: Json;
   fallbackMessages?: Json | null;
   suggestedQuestions?: Json | null;
@@ -222,6 +227,7 @@ export async function updateTenant(platform: PlatformContext, tenantId: number, 
   if (patch.assistantName !== undefined) row.assistant_name = patch.assistantName;
   if (patch.logoUrl !== undefined) row.logo_url = patch.logoUrl;
   if (patch.bannerUrl !== undefined) row.banner_url = patch.bannerUrl;
+  if (patch.assistantAvatarUrl !== undefined) row.assistant_avatar_url = patch.assistantAvatarUrl;
   if (patch.theme !== undefined) row.theme = patch.theme;
   if (patch.fallbackMessages !== undefined) row.fallback_messages = patch.fallbackMessages;
   if (patch.suggestedQuestions !== undefined) row.suggested_questions = patch.suggestedQuestions;

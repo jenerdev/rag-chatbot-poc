@@ -15,5 +15,5 @@ export default async function TenantMembersPage({ params }: { params: Promise<{ 
   if (!tenant) notFound();
   const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
-  return <MembersScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} nav={nav} />;
+  return <MembersScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />;
 }

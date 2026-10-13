@@ -5,6 +5,7 @@
    base.css     the page, type, buttons, controls, cards, notices, badges, header
    chat.css     the chat and everything a reply contains
    screens.css  the staff screens and the booking page
+   landing.css  the root landing page (D-121)
 
    Order matters: tokens first, then the elements, then the screens that
    refine them. No file after tokens.css writes a colour as a literal. */
@@ -13,3 +14,4 @@
 @import "./styles/base.css";
 @import "./styles/chat.css";
 @import "./styles/screens.css";
+@import "./styles/landing.css";

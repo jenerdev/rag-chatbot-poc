@@ -42,7 +42,6 @@ export interface UnansweredScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
   /** The list route's cap (UNANSWERED_LIMIT), from the server page: at the cap, a search says "of N loaded". */
@@ -62,7 +61,7 @@ function askedLabel(askedAt: string): string {
   });
 }
 
-export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, limit }: UnansweredScreenProps) {
+export function UnansweredScreen({ slug, businessName, logoUrl, nav, limit }: UnansweredScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   // What this member is, for the header's links only; the routes decide for themselves.
@@ -191,7 +190,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, bannerUrl, nav, 
     unauthorized();
   }, [api, unauthorized]);
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'unanswered' as const, title: 'Unanswered questions', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'unanswered' as const, title: 'Unanswered questions', session: { auth, role, onLogout: logout } };
   // "Add answer" is for a member who may write documents; the others resolve only.
   const canAnswer = role !== null && can(role, 'documents:write');
   const answerHref = (question: string) => `/t/${slug}/admin/documents?question=${encodeURIComponent(question)}`;

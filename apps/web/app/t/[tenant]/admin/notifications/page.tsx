@@ -19,5 +19,5 @@ export default async function TenantNotificationsPage({ params }: { params: Prom
 
   const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
-  return <NotificationsScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} nav={nav} />;
+  return <NotificationsScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />;
 }

@@ -3905,3 +3905,111 @@ and no way to jump to a photo.
 **Measured:** walk 7/7 and axe 8 states, 0 violations (after the photo
 button's name took its badge's words, WCAG 2.5.3); typecheck exit 0, web
 tests 163.
+
+## D-121 · The root is a landing page, drawn with mockups · **Added 2026-10-14 (plan/landing.md)**
+
+**Decision:** `/` describes the product: what it does, how it works, why
+it helps, with no pricing yet. Its pictures are HTML/CSS mockups with
+made-up content, not screenshots. It still lists no tenant and redirects
+to none (plan.md Phase 7). The name `StayDesk` is a working one, in one
+constant.
+
+**Why:** the user's call (item 1 of 5). Screenshots would publish real
+tenants' names, prices and guests on a public page.
+
+**Measured:** axe 4 states, 0 violations.
+
+## D-122 · The booking page shows each room's photos · **Added 2026-10-14**
+
+**Decision:** at a per_room tenant, the booking page's room step shows each
+room's first photo with its count. A click opens the chat's photo viewer
+(D-120) on that room; the thumbnail is outside the room's checkbox label,
+so looking never chooses.
+- **The read:** the photos are read on the guest's CHAT token by
+  `unitPhotos()`, keyed by room ID, filtered by tenant, with RLS behind.
+- **Focus:** the viewer now takes the control that opened it
+  (`show(room, photos, from)`). A click does not always focus a button
+  (Safari, a scripted click), and focus must go back there.
+
+**Measured:** `plan/book-photos-check.mjs` walk 3/3 (a named thumbnail per
+room; it opens its room and does not tick it; Escape returns focus); axe 8
+states, 0 violations.
+
+## D-123 · A tenant's logo and banner are uploaded on the platform page · **Added 2026-10-14 (schema-brand-images.sql)**
+
+**Decision:** the platform's tenant form uploads a logo or banner, and
+pasting an address remains as an alternative.
+- **The browser** resizes and re-encodes the image (512 px for a logo,
+  2000 px for a banner, WebP, EXIF dropped). Then `POST
+  /api/platform/tenants/<id>/images` checks the bytes (JPEG, PNG or WebP,
+  ≤ 2 MiB), stores them as `<tenant_id>/<kind>-<uuid>.<ext>` in a public
+  bucket, `brand-images`, and points the tenant's field at the public URL
+  through `updateTenant()`, so the https rule still applies.
+- **The bucket:** its insert, select and delete policies ask
+  `app_is_super()`, the 31st SQL file. Only a super user, on the platform
+  token, can write to it.
+- **Cleanup:** a replaced image, and one cleared on the form and saved, is
+  removed. Only an object in our bucket, named as an upload names it
+  (`brandObjectPath()`, tested), is ever deleted. `storage-orphans` sweeps
+  the bucket too, so `tenant:remove` clears a tenant's images.
+
+**Why:** the user's call (item 4 of 5). Pasting a URL meant hosting the
+image somewhere else first.
+
+**Measured:**
+- verify **189**: 188, a super user uploads (served publicly) and removes;
+  189, a tenant owner, a chat token and anon cannot upload, and the owner
+  cannot remove the super user's image.
+- `plan/brand-upload-check.mjs` walk 5/5 (upload, replace with the old
+  object gone, banner, Remove and Save with its object gone, a fake image
+  refused in words) and axe 2 states, 0 violations.
+- Tests: pipeline 369 (`brandObjectPath`).
+
+## D-124 · The assistant has its own avatar, set on the platform page · **Added 2026-10-14 (schema-assistant-avatar.sql)**
+
+**Decision:** a tenant has `assistant_avatar_url`, https only like the logo
+and banner (the 32nd SQL file). It is uploaded on the platform form beside
+the assistant's name, through D-123's route as a third kind, `avatar`,
+resized to 384 px, or pasted as an address.
+- **Where it shows:** wherever the assistant speaks, the chat's welcome
+  card and beside every reply. Without one: the logo, then the first
+  letter of the name.
+- **Reaching guests:** it reaches the public through `tenant_public()`,
+  re-created with the column. The older file's drop-and-create
+  (schema-suggested-questions.sql) is now guarded on the column (trap 20):
+  re-running it afterwards was observed to keep the avatar.
+
+**Why:** the user's call (item 3 of 5).
+
+**Measured:**
+- verify **191**: 190, a visitor reads the avatar that was set; 191, http
+  is refused (23514); the public-columns check now names it.
+- The upload walk's step 7: an uploaded avatar is the chat's mark.
+- The chatbot's three baselines byte-identical.
+
+## D-125 · The chat's booking button says "Book your stay" · **Added 2026-10-14**
+
+**Decision:** the chat welcome's button to the booking page reads "Book
+your stay", not "Request a booking", "Book now" or "Reserve now". The
+booking page's own heading stays "Request a booking".
+
+**Why:** the user asked which (item 5 of 5).
+- "Request a booking" is accurate but reads like paperwork.
+- "Book now" and "Reserve now" promise an instant, confirmed booking. Here
+  a request holds nothing until staff confirm it (D-070), so the guest
+  would learn otherwise one screen later.
+- "Book your stay" invites just as directly without promising
+  confirmation. The page it opens says plainly that the request waits for
+  the resort.
+
+## D-126 · Manage booking is cards, not tabs · **Added 2026-10-14**
+
+**Decision:** S-13's found stay shows every part at once, as cards: the
+status, the stay summary, Payment, Change. From 900 px the summary is a
+sticky right-hand column. The Payment / Booking details tabs are gone.
+
+**Why:** the user asked for a better layout. The tabs hid the dates and
+the price behind a click while the guest paid, and left most of a desktop
+screen empty. One column in DOM order on a phone keeps the reading and
+focus order equal to what is seen (WCAG 1.3.2, 2.4.3).
+

@@ -9396,3 +9396,105 @@ guests.
   they see would miss it, so the name now carries the badge's words.
 - **The chips:** the unit test showed a short sentence ("Opens onto the
   garden.") becoming a chip; sentences are now text whatever their length.
+
+## 2026-10-14 — a landing page at the root (D-121)
+
+**What was done:** `/` is now a landing page: a hero, six features, how
+it works, six advantages, and no pricing. Its product pictures are drawn
+in HTML and CSS with made-up content, because a screenshot would have put
+a real tenant's prices and names on a public page.
+
+**What the observed values prove:** axe is clean at both widths in both
+schemes. The screenshots found two layout bugs before they shipped: a
+section out of line, and a mockup card covering a mockup button on a
+phone.
+
+## 2026-10-14 — room photos on the booking page (D-122)
+
+**What was done:** guests choosing rooms on the booking page now see each
+room's photo and how many there are. A tap opens the photo viewer on that
+room without choosing it.
+
+**What the observed values prove:**
+- **The walk:** the six rooms each have a thumbnail named with its count,
+  a tap opens the right room and leaves it unticked, and Escape gives
+  focus back; axe is clean in 8 states.
+- **What the walk taught:**
+  - its first version passed on a HIDDEN step: a scripted click works on
+    hidden buttons, and alteza books only about 20 days ahead, so the
+    date never took. It now waits for the step to be visible and picks a
+    date in the tenant's own range;
+  - finding that showed the viewer relied on the button having focus, so
+    the opener is now passed in explicitly.
+
+## 2026-10-14 — upload a tenant's logo and banner (D-123)
+
+**What was done:**
+- **The form:** the platform's tenant form has Upload / Replace / Remove
+  for the logo and the banner, with a preview, and "paste an image
+  address" folded away. An upload is saved at once.
+- **Storage:** the images go to a new public bucket that only a super
+  user may write to. A replaced or removed image is deleted from it, and
+  the orphan sweeper and `tenant:remove` know the bucket.
+
+**What the observed values prove:**
+- **The walk:** in the real form, uploading set the row and left one
+  object; replacing changed the URL and still left one; Remove and Save
+  left only the banner.
+- **verify:** a super user can write and the public can read; a tenant
+  owner, a chat token and anon are refused by the database itself. The
+  owner cannot delete what the super user put there: 0 removed, and it is
+  still there.
+- **Two problems the checks caught:**
+  - a text file named `.png` reported "Cannot reach the server": the
+    generic error helper reads every failure with no response as a network
+    problem. It now says the file is not an image;
+  - the upload control was a `<label class="button">`, which the base
+    styles do not draw as a button.
+
+## 2026-10-14 — the AI assistant's avatar (D-124)
+
+**What was done:** the platform form has an "Assistant avatar" upload
+beside the assistant's name. The chat shows it on the welcome card and
+beside every reply. Without one it falls back to the logo, then to the
+name's first letter.
+
+**What the observed values prove:**
+- **The path:** the walk uploaded an avatar and found it as the chat's
+  mark, so the bucket, the row, `tenant_public()` and the page all agree.
+- **The guard:** re-running the older SQL file afterwards left the new
+  column in place, so trap 20's guard holds.
+- **The public boundary:** the check that pins what is public about a
+  tenant failed until it named the avatar, as it should: nothing becomes
+  public by accident.
+- **The chatbot:** its prompt and tool texts are unchanged.
+
+## 2026-10-14 — "Book your stay" (D-125)
+
+**What was done:** the chat's welcome button now says "Book your stay".
+"Book now" and "Reserve now" were set aside because they promise an
+instant confirmation the booking page cannot give: a request waits for
+staff. Observed in the served page: "Book your stay" present, "Request a
+booking" gone from the chat.
+
+## 2026-10-14 — Manage booking's layout (D-126)
+
+**What was done:** S-13's found stay was one 640 px card with two tabs
+(Payment, Booking details). It is now four cards: the status (badges,
+reference, the next step and the countdown), "Your stay" (dates, rooms,
+price, "Look up another booking"), Payment, and Change your booking. From
+900 px the stay summary is a second column, sticky; below it everything
+stacks in DOM order. The amount to pay now leads the Payment card, the two
+steps are numbered, and the band's eyebrow says "Manage booking" instead of
+repeating the h1. The look-up form gained a mark and a line on where the
+reference is. No route, no figure and no wording of a state changed.
+
+**Observed:** `plan/manage-layout-shots.mjs` (a throwaway pending stay with
+two rooms, two ways to pay and terms, plus villa's confirmed and declined
+stays) photographed 16 states before and after; axe over the 16 after:
+0 violations. Typecheck clean; web tests 163.
+
+**Trap avoided:** a grid that only reorders visually would make the focus
+order differ from what is seen; the DOM order is the phone order, and the
+desktop column is a grid placement of the second card, so the two agree.
+

@@ -39,7 +39,6 @@ export interface StayDetailScreenProps {
   reference: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   nav: NavFeatures;
 }
 
@@ -76,7 +75,7 @@ function outcome(stay: StayDetail): { words: string; tone: string } | null {
   return { words: `${what}${at}${note}`, tone: stay.status === 'expired' ? 'warn' : 'error' };
 }
 
-export function StayDetailScreen({ slug, reference, businessName, logoUrl, bannerUrl, nav }: StayDetailScreenProps) {
+export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }: StayDetailScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -161,7 +160,6 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, banne
     slug,
     businessName,
     logoUrl,
-    bannerUrl,
     features: nav,
     current: 'bookings' as const,
     title: `Booking ${reference}`,

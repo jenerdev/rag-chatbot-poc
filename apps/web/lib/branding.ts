@@ -35,6 +35,8 @@ export interface Branding {
   assistantName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  /** the assistant's picture (D-124); null: the logo, else its initial */
+  assistantAvatarUrl: string | null;
   /** Ready for a `style` prop: only allowlisted custom properties, only valid colours. */
   themeStyle: CSSProperties;
 }
@@ -58,6 +60,7 @@ export async function loadBranding(tenant: TenantContext): Promise<Branding> {
     assistantName: tenant.assistantName,
     logoUrl: httpsUrl(data.logo_url),
     bannerUrl: httpsUrl(data.banner_url),
+    assistantAvatarUrl: httpsUrl((data as { assistant_avatar_url?: unknown }).assistant_avatar_url),
     themeStyle: themeVars(data.theme),
   };
 }

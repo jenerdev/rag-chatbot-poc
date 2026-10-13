@@ -28,6 +28,7 @@ export default async function TenantChatPage({ params }: { params: Promise<{ ten
       assistantName={branding.assistantName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
+      assistantAvatarUrl={branding.assistantAvatarUrl}
       documentCount={documentCount}
       nav={nav}
       suggestedQuestions={tenant.suggestedQuestions}

@@ -64,7 +64,6 @@ export interface BookingsScreenProps {
   slug: string;
   businessName: string;
   logoUrl: string | null;
-  bannerUrl: string | null;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
 }
@@ -248,7 +247,7 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
   );
 }
 
-export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: BookingsScreenProps) {
+export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScreenProps) {
   const api = `/api/t/${slug}`;
   const router = useRouter();
   const [auth, setAuth] = useState<Auth>('checking');
@@ -545,7 +544,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, bannerUrl, nav }: 
   const activeUnits = setup?.units.filter((u) => u.active) ?? [];
   const multipleUnits = activeUnits.length > 1;
 
-  const frame = { slug, businessName, logoUrl, bannerUrl, features: nav, current: 'bookings' as const, title: 'Bookings', session: { auth, role, onLogout: logout } };
+  const frame = { slug, businessName, logoUrl, features: nav, current: 'bookings' as const, title: 'Bookings', session: { auth, role, onLogout: logout } };
   const newBooking = (
     <button type="button" className="primary" onClick={() => setFormOpen(true)}>
       <Icon name="plus" size={16} /> New booking

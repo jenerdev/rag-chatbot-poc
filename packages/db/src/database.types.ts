@@ -67,6 +67,7 @@ export interface Database {
           assistant_name: string;
           logo_url: string | null;
           banner_url: string | null;
+          assistant_avatar_url: string | null;
           theme: Json;
           /** what the chat shows when the documents cannot answer, per reply language (D-047, D-048); a missing key or null = the built-in default */
           fallback_messages: Json | null;
@@ -83,6 +84,7 @@ export interface Database {
           assistant_name: string;
           logo_url?: string | null;
           banner_url?: string | null;
+          assistant_avatar_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -96,6 +98,7 @@ export interface Database {
           assistant_name?: string;
           logo_url?: string | null;
           banner_url?: string | null;
+          assistant_avatar_url?: string | null;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -1114,6 +1117,7 @@ export interface Database {
           assistant_name: string;
           logo_url: string | null;
           banner_url: string | null;
+          assistant_avatar_url: string | null;
           theme: Json;
           fallback_messages: Json | null;
           /** sql/schema-suggested-questions.sql (D-089) */

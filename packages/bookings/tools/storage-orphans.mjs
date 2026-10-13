@@ -1,4 +1,5 @@
-// storage-orphans.mjs — objects in the `unit-images` bucket that no
+// storage-orphans.mjs — objects in the `unit-images` bucket (and, since D-123,
+// `brand-images`) that no
 // `unit_images` row names (R-30), and rows that name no object.
 //
 // A photo lives in two places: a row (deleted by cascade when its room or
@@ -152,6 +153,41 @@ if (proofOrphans.length > 0 && remove) {
   if (error || count !== paths.length) process.exitCode = 1;
 } else if (proofOrphans.length > 0) {
   console.log(`${proofOrphans.length} ORPHANED PROOF(S); nothing removed (dry run).`);
+}
+
+// ─── brand-images (D-123) ─────────────────────────────────────────────────
+// A tenant's uploaded logo, banner and assistant avatar,
+// <tenant_id>/<kind>-<uuid>.<ext>. An object is in use when some tenant's
+// row holds its public URL; one that is not, and over an hour old (an upload
+// may be between its object and its row), is an orphan. The upload route
+// and the platform's Save already remove what they replace; this catches
+// the rest, and a removed tenant's images (tenant:remove runs it).
+const BRAND_BUCKET = 'brand-images';
+// Named, never select('*') on tenants (CLAUDE.md conventions).
+const BRAND_COLUMNS = ['logo_url', 'banner_url', 'assistant_avatar_url'];
+const { data: brandRows, error: brandRowError } = await supabase.from('tenants').select(BRAND_COLUMNS.join(', '));
+if (brandRowError) throw new Error(brandRowError.message);
+const inUse = new Set(brandRows.flatMap((t) => BRAND_COLUMNS.map((c) => t[c]).filter(Boolean)));
+const brandPrefix = supabase.storage.from(BRAND_BUCKET).getPublicUrl('').data.publicUrl.replace(/\/?$/, '/');
+const brandOrphans = [];
+let brandCount = 0;
+for (const folder of await listAll('', BRAND_BUCKET)) {
+  for (const file of await listAll(folder.name, BRAND_BUCKET)) {
+    brandCount++;
+    const path = `${folder.name}/${file.name}`;
+    const young = file.created_at && Date.now() - new Date(file.created_at).getTime() < 3600000;
+    if (!inUse.has(`${brandPrefix}${path}`) && !young) brandOrphans.push(path);
+  }
+}
+console.log(`\nbucket ${BRAND_BUCKET}: ${brandCount} objects · ${inUse.size} brand URLs in tenants' rows`);
+for (const path of brandOrphans) console.log(`  orphan brand image: ${path}`);
+if (brandOrphans.length > 0 && remove) {
+  const { data, error } = await supabase.storage.from(BRAND_BUCKET).remove(brandOrphans);
+  const count = data?.length ?? 0;
+  console.log(error ? `remove FAILED: ${error.message}` : `removed ${count} of ${brandOrphans.length} orphan brand images`);
+  if (error || count !== brandOrphans.length) process.exitCode = 1;
+} else if (brandOrphans.length > 0) {
+  console.log(`${brandOrphans.length} ORPHANED BRAND IMAGE(S); nothing removed (dry run).`);
 }
 
 // Retention: the stays whose LAST booked date is older than the period.

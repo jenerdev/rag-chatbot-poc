@@ -56,6 +56,16 @@
 
 ## ▶ Next up (do this next)
 
+**Five items (`feat/landing-and-media`, 2026-10-14), one commit each.**
+- [x] 1 · A landing page at `/` (D-121): mockups, no pricing, still no tenant list. axe 4/0.
+- [x] 2 · Room photos on the booking page's room step (D-122), the viewer on a click. walk 3/3, axe 8/0.
+- [x] 4 · Upload a tenant's logo and banner on the platform page (D-123): the brand-images bucket (31st SQL file, super users only). verify 189, walk 5/5.
+- [x] 3 · An AI assistant avatar (D-124): tenants.assistant_avatar_url (32nd file), tenant_public() re-created, the old drop guarded. verify 191, walk step 7.
+- [x] 5 · The chat's button says "Book your stay" (D-125).
+- [x] No tenant banner on the staff pages (368aa26): the frame and its 15 screens no longer take it; the guest pages keep it.
+- [x] Manage booking's layout (D-126): cards in two columns from 900 px (the stay summary sticky on the right), no tabs, numbered pay steps. `plan/manage-layout-shots.mjs`: axe 16 states, 0 violations.
+- [ ] The user's look; then merge on their word. The product name on the landing page, `StayDesk`, is a working one.
+
 **Room cards and the photo viewer (`feat/room-cards`, plan/room-cards.md, D-120, 2026-10-14).**
 - [x] Cards: fact chips and text, a sideways row on a phone, the photo
   badge with an icon and a name that contains it. Viewer: a bar (room,

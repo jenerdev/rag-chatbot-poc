@@ -18,5 +18,5 @@ export default async function TenantSlotsPage({ params }: { params: Promise<{ te
 
   const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
 
-  return <SlotsScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={branding.bannerUrl} nav={nav} />;
+  return <SlotsScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />;
 }

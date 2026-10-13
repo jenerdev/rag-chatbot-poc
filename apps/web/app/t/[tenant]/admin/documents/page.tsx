@@ -22,7 +22,6 @@ export default async function TenantAdminPage({ params }: { params: Promise<{ te
       slug={tenant.slug}
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
-      bannerUrl={branding.bannerUrl}
       nav={nav}
     />
   );

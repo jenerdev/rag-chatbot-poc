@@ -37,6 +37,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { Icon } from '@/components/icons';
 import { StayLines } from '@/components/stay-lines';
+import { Lightbox, useLightbox } from '@/components/lightbox';
 
 export interface BookingPageScreenProps {
   slug: string;
@@ -46,6 +47,8 @@ export interface BookingPageScreenProps {
   page: BookingPage;
   /** What the tenant has, for the header's links (lib/nav.ts). */
   nav: NavFeatures;
+  /** Each room's photo URLs by room id (per_room; {} otherwise): a thumbnail on the room step, the viewer on a click. */
+  photos?: Record<number, string[]>;
 }
 
 /** YYYY-MM-DD plus n days, on UTC midnights, so no DST edge shifts the date. */
@@ -135,7 +138,8 @@ function CheckTimes({ checkIn, checkOut }: { checkIn: { date: string; time: stri
 
 type Sent = { receipt: RequestReceipt } | null;
 
-export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav }: BookingPageScreenProps) {
+export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav, photos = {} }: BookingPageScreenProps) {
+  const lightbox = useLightbox();
   const api = `/api/t/${slug}`;
   const perRoom = page.bookingType === 'per_room';
 
@@ -671,6 +675,22 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                       const picked = chosen[u.id] !== undefined;
                       return (
                         <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
+                          {/* The room's photo, OUTSIDE the label: a tap looks, it does not choose. */}
+                          {(photos[u.id]?.length ?? 0) > 0 && (
+                            <button
+                              type="button"
+                              className="room-pick-photo"
+                              onClick={(event) => lightbox.show(u.name, photos[u.id]!, event.currentTarget)}
+                              aria-label={`See ${photos[u.id]!.length === 1 ? '1 photo' : `${photos[u.id]!.length} photos`} of ${u.name}`}
+                            >
+                              {/* A plain <img>, not next/image: the URL is the tenant's bucket, not a configured host. */}
+                              <img src={photos[u.id]![0]} alt="" loading="lazy" />
+                              <span className="room-pick-count" aria-hidden="true">
+                                <Icon name="image" size={12} />
+                                {photos[u.id]!.length}
+                              </span>
+                            </button>
+                          )}
                           <label>
                             <input
                               type="checkbox"
@@ -900,6 +920,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
         </form>
       </main>
       <PublicFooter slug={slug} businessName={businessName} manage={true} />
+      <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} to={lightbox.to} />
     </>
   );
 }

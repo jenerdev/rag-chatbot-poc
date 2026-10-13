@@ -428,6 +428,7 @@ export const updateTenantSchema = z
     assistantName: z.string().trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters').optional(),
     logoUrl: httpsUrl.optional(),
     bannerUrl: httpsUrl.optional(),
+    assistantAvatarUrl: httpsUrl.optional(),
     theme: themeSchema.optional(),
     fallbackMessages: fallbackMessagesSchema.optional(),
     suggestedQuestions: suggestedQuestionsSchema.optional(),
