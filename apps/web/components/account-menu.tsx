@@ -28,12 +28,13 @@ export interface AccountMenuLink {
   icon: IconName;
 }
 
-export function AccountMenu({ role, links, device, onLogout }: { role: Role | null; links: AccountMenuLink[]; device: ReactNode; onLogout: () => void }) {
+export function AccountMenu({ role, label, links, device, onLogout }: { role: Role | null; label?: string; links: AccountMenuLink[]; device: ReactNode; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const roleLabel = role ? ROLE_LABELS[role] : 'Staff';
+  // `label` for an account that is not a tenant role: the platform's super user.
+  const roleLabel = label ?? (role ? ROLE_LABELS[role] : 'Staff');
 
   const close = useCallback((focusButton: boolean) => {
     setOpen(false);
@@ -62,7 +63,7 @@ export function AccountMenu({ role, links, device, onLogout }: { role: Role | nu
         </span>
         <span className="account-role">{roleLabel}</span>
         <Icon name="chevron-down" size={14} />
-        <span className="visually-hidden">, account and this device</span>
+        <span className="visually-hidden">{device ? ', account and this device' : ', account'}</span>
       </button>
       <div id={id} className="account-panel" hidden={!open}>
         <div className="account-section">

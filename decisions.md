@@ -3865,3 +3865,21 @@ tokens are mixed from `--accent` in tokens.css. Text on the band is
 schemes), 0 violations after one fix (the role line in a tenant's accent
 failed 4.5:1 on a dark page, so it is `--ink`). Typecheck exit 0, web tests
 159.
+
+## D-119 · The platform has the staff app's top bar · **Added 2026-10-14 (plan/platform-header.md)**
+
+**Decision:** /platform's header is the staff top bar (D-117).
+- **Left:** a platform mark, "Platform", and a breadcrumb (Tenants, or
+  Tenants › the tenant, its first step a way back).
+- **Right:** the account menu labelled "Super user", with Log out.
+- **Edges:** the page's under it.
+- **Signed out:** "Platform" is the page's h1.
+
+**Why:** the user's call. The header was a bare "Platform · Tenants" with a
+"Log out" link: nothing said who was signed in, and nothing in it led back
+from a tenant.
+
+**Not changed:** the platform token, its routes, what a super user may do.
+
+**Measured:** walk 5/5; axe 16 states, 0 violations (after restoring the
+login's h1, twice); typecheck exit 0, web tests 159.

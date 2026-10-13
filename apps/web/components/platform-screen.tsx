@@ -16,6 +16,7 @@ import { matches } from '@/lib/search';
 import { TenantForm } from '@/components/tenant-form';
 import { Drawer } from '@/components/dialogs';
 import { Toaster } from '@/components/toast';
+import { AccountMenu } from '@/components/account-menu';
 
 type Auth = 'checking' | 'out' | 'in';
 const API = '/api/platform';
@@ -127,20 +128,40 @@ export function PlatformScreen() {
     </button>
   );
 
+  // The platform's top bar (plan/platform-header.md): the staff app's (D-117)
+  // in the platform's own colours, with no tenant theme. Left, the mark and
+  // where you are: Tenants, or Tenants › the tenant, its first step a way
+  // back. Right, the account menu: the super user and Log out. Its edges are
+  // the page's below it (the list is wider than a tenant's form).
   const header = (
-    <header>
-      <h1 className="brand">
-        <span>Platform</span>
-        <span className="brand-subtitle">{selected === null ? 'Tenants' : detail?.businessName ?? '…'}</span>
-      </h1>
-      <nav>
-        {auth === 'in' && (
-          <button type="button" className="link" onClick={logout}>
-            <Icon name="logout" size={16} /> <span className="narrow-hidden">Log out</span>
-          </button>
-        )}
-      </nav>
-    </header>
+    <div className={`staff-topbar platform-topbar ${typeof selected === 'number' ? 'narrow' : 'wide'}`} role="banner">
+      <span className="platform-mark" aria-hidden="true">
+        <Icon name="home" size={16} />
+      </span>
+      {/* Signed out, "Platform" is the page's h1 (the login card's title is an
+          h2); signed in, the list and a tenant have their own h1. */}
+      {auth === 'in' ? <span className="platform-name">Platform</span> : <h1 className="platform-name">Platform</h1>}
+      {auth === 'in' && (
+        <nav className="topbar-crumbs" aria-label="Breadcrumb">
+          {selected === null ? (
+            <span className="topbar-here" aria-current="page">
+              Tenants
+            </span>
+          ) : (
+            <>
+              <button type="button" className="link crumb-link" onClick={() => setSelected(null)}>
+                Tenants
+              </button>
+              <Icon name="chevron-right" size={14} />
+              <span className="topbar-here" aria-current="page">
+                {detail?.businessName ?? '…'}
+              </span>
+            </>
+          )}
+        </nav>
+      )}
+      <div className="topbar-actions">{auth === 'in' && <AccountMenu role={null} label="Super user" links={[]} device={null} onLogout={logout} />}</div>
+    </div>
   );
   // Every branch draws the header, so the page's ONE toast region rides with
   // it (components/toast.tsx): the tenant form and its members panel share it.

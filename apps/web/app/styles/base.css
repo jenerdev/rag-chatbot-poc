@@ -605,3 +605,27 @@ button.danger.solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
 .public-footer nav { display: flex; gap: var(--space-4); }
 .public-footer a { color: var(--muted); }
 .public-footer a:hover { color: var(--ink); }
+
+/* The platform's top bar (plan/platform-header.md): the staff top bar
+   (D-117) with the platform's mark and name, its breadcrumb's first step a
+   way back to the list. Its edges follow the page under it: the list is
+   1120 px wide, a tenant's form 1040 (screens.css), each with the base
+   main's 20 px gutter. */
+.platform-topbar.wide { padding-inline: max(var(--space-5), calc((100% - 1120px) / 2 + var(--space-5))); }
+.platform-topbar.narrow { padding-inline: max(var(--space-5), calc((100% - 1040px) / 2 + var(--space-5))); }
+.platform-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border-radius: var(--radius-md); background: var(--accent-fill); color: var(--on-accent); }
+.platform-name { font-weight: 650; letter-spacing: -0.01em; }
+.platform-topbar .topbar-crumbs { margin-left: var(--space-3); padding-left: var(--space-3); border-left: 1px solid var(--line); }
+.crumb-link { padding: 0; min-height: 0; color: var(--muted); font-size: var(--text-sm); font-weight: 400; text-decoration: none; }
+.crumb-link:hover { color: var(--ink); text-decoration: underline; }
+@media (max-width: 899px) {
+  /* No drawer here: the breadcrumb stays, the name gives way to it. */
+  .platform-topbar.wide, .platform-topbar.narrow { padding-inline: var(--space-3); }
+  .platform-topbar .topbar-crumbs { display: flex; margin-left: var(--space-1); padding-left: var(--space-2); }
+  /* Only beside a breadcrumb (signed in); signed out it is the page h1. */
+  .platform-topbar span.platform-name { display: none; }
+}
+@media (min-width: 900px) and (max-width: 1100px) {
+  .platform-topbar .platform-name { white-space: nowrap; }
+}
+h1.platform-name { margin: 0; font-size: var(--text-base); }

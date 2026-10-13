@@ -9353,3 +9353,19 @@ guests.
   colour, so small text no longer uses it. After the fix, 0 violations.
 - **The banner is an `<img>`:** it is never a CSS url() built from the
   stored string, so a URL cannot reach a style rule.
+
+## 2026-10-14 — the platform's header is the staff top bar (D-119)
+
+**What was done:** /platform now has the staff app's top bar.
+- **Left:** a mark, "Platform", and a breadcrumb that leads back from a
+  tenant to the list.
+- **Right:** the account menu, saying "Super user", with Log out.
+
+**What the observed values prove:**
+- The bar's left edge is the page's (140 px both).
+- Clicking "Tenants" returns to the list, and Log out from the menu returns
+  to the login.
+- axe over 16 states is clean.
+- **What axe caught twice:** the login page had lost its only h1 (the old
+  header had been it). Then the phone rule that hides the name beside the
+  breadcrumb hid the restored h1 too. Now only the signed-in name hides.

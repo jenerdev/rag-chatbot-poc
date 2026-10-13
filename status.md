@@ -56,6 +56,13 @@
 
 ## ▶ Next up (do this next)
 
+**Platform header (`feat/platform-header`, plan/platform-header.md, D-119, 2026-10-14).**
+- [x] /platform has the staff top bar: the mark, "Platform", the breadcrumb
+  (Tenants › the tenant, a way back), the account menu ("Super user", Log
+  out), its edges the page's. No SQL, no route.
+- [x] Observed: walk 5/5; axe 16 states 0 violations (the login's h1 restored);
+  typecheck exit 0, web tests 159. Screenshots in `plan/platform-header/`.
+
 **Public brand (`feat/public-brand`, plan/public-brand.md, D-118, 2026-10-14).**
 - [x] The chat's welcome card (banner or accent cover, "Hi, I'm …", the
   suggested questions, Request a booking); the booking page and Manage
