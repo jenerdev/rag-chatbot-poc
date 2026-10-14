@@ -342,14 +342,44 @@
 }
 .composer textarea:focus { box-shadow: none; }
 .composer-send { flex: none; width: 36px; min-height: 36px; padding: 0; border-radius: var(--radius-full); }
-.composer-hint { max-width: 760px; margin: 6px auto 0; text-align: center; font-size: var(--text-xs); color: var(--muted); }
-/* D-129: the chat's notice of what happens to a message, under the hint. */
-.composer-notice { max-width: 760px; margin: 4px auto 0; text-align: center; font-size: var(--text-xs); line-height: 1.5; color: var(--muted); }
-.composer-notice a { color: inherit; }
+/* The fine print under the field: one row, inset to the field's text so
+   both edges line up with what is typed. */
+.composer-foot {
+  max-width: 760px;
+  margin: var(--space-2) auto 0;
+  padding: 0 var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* D-129: the chat's notice of what happens to a message. */
+.composer-notice { flex: 1; min-width: 0; margin: 0; text-wrap: pretty; }
+.composer-notice a { color: inherit; text-underline-offset: 2px; }
+.composer-notice a:hover { color: var(--ink); }
+/* The links never break apart from each other. */
+.composer-links { white-space: nowrap; }
+.composer-hint { flex: none; margin: 0; white-space: nowrap; }
+.composer-hint kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  font: inherit;
+  font-size: 0.92em;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--ink);
+}
 /* Scrolled up while an answer arrived: the way back down. */
 .jump-down { position: absolute; left: 50%; top: calc(-1 * var(--space-10)); transform: translateX(-50%); border-radius: var(--radius-full); box-shadow: var(--shadow-2); }
 @media (max-width: 560px) {
   .composer { padding: var(--space-2) var(--space-3) var(--space-3); }
+  .composer-foot { padding: 0 var(--space-2); }
   .composer-hint { display: none; }
 }
 @media (pointer: coarse) {

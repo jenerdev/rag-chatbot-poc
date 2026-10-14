@@ -520,13 +520,21 @@ export function ChatScreen({
             <Icon name="arrow-up" size={18} />
           </button>
         </form>
-        <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
-        {/* D-129: what happens to what is typed here, at the moment it is typed. Page text, not prompt text. */}
-        <p className="composer-notice">
-          {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by OpenAI.
-          Don&apos;t share passwords or card numbers. <Link href={`/t/${slug}/privacy`}>Privacy</Link> ·{' '}
-          <Link href={`/t/${slug}/terms`}>Terms</Link>
-        </p>
+        {/* One row under the field, its edges on the field's text: the notice
+            on the left, the keys on the right (the keys go on a phone). */}
+        <div className="composer-foot">
+          {/* D-129: what happens to what is typed here, at the moment it is typed. Page text, not prompt text. */}
+          <p className="composer-notice">
+            {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by
+            OpenAI. Don&apos;t share passwords or card numbers.{' '}
+            <span className="composer-links">
+              <Link href={`/t/${slug}/privacy`}>Privacy</Link> · <Link href={`/t/${slug}/terms`}>Terms</Link>
+            </span>
+          </p>
+          <p className="composer-hint">
+            <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
+          </p>
+        </div>
       </section>
     </div>
   );

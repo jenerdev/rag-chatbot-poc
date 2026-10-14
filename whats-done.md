@@ -9647,3 +9647,9 @@ commit:
 **Stale walk found, not fixed:** `plan/ui-refresh-phase5-walk.mjs` stops at
 its step 1. It expects three sections, but the booking page has had four
 steps since an earlier redesign. It learned to tick the consent box anyway.
+
+## 2026-10-14 · The chat's footer, one row (`feat/chat-footer`)
+
+- **What:** the hint ("Enter to send · Shift+Enter for a new line") and the D-129 notice were two centred lines of tiny text stacked under the field, and the Privacy · Terms links wrapped onto a third. They are now ONE row, `.composer-foot`, inset by the field's own left padding so both edges line up with the typed text. The notice is on the left, left-aligned (`text-wrap: pretty`), and `.composer-links` keeps Privacy · Terms together. The hint is on the right, drawn as `<kbd>` keycaps. Below 560 px the hint is still hidden, as `ui-refresh-phase3-walk` 8b expects.
+- **Why it matters:** the two lines were different lengths and both centred, so neither lined up with the field or with each other. The class names `.composer-hint` and `.composer-notice` are the same, and the notice's text and links are unchanged, so `legal-walk.mjs`'s notice check still reads the same element.
+- **Observed:** `plan/public-brand-a11y.mjs` 48 states, 0 violations; `pnpm typecheck` 13/13. Shots: `plan/public-brand/footer-{villa,harbor}-chat-*`. The chatbot is untouched: no prompt text and no tool text changed.
