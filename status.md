@@ -79,7 +79,7 @@
 
 **Staff notes on a booking (`feat/stay-notes`, 2026-10-15, D-132).**
 - [x] S-15 has a **Staff notes** card: any number of notes per stay, newest first, author and time; anyone with `bookings:write` adds one, only its author deletes it; never shown to the guest. `stay_notes` (36th SQL file, applied by Claude, a second run a no-op), `POST/DELETE /bookings/stay/[reference]/notes[/id]`, `staffNotes` in the stay's read. verify 211 (207–211 new), `plan/stay-notes-walk.mjs` 5/5 (HTTP), `plan/stay-notes-browser-walk.mjs` 4/4 (shots `plan/stay-notes/`), typecheck 13/13, web tests 174.
-- [ ] Not committed and not merged: waits on the user's word. Not run: axe, rooms, isolation, eval (no query outside `stay_notes` changed, no prompt text).
+- [x] Committed (57bd3ab) and merged to `master` (fast-forward) on the user's word, 2026-10-15. Not run: axe, rooms, isolation, eval (no query outside `stay_notes` changed, no prompt text).
 
 **The chat's footer (`feat/chat-footer`, 2026-10-14).**
 - [x] The fine print under the field is one row aligned to the field's text: the D-129 notice on the left (wording unchanged, Privacy · Terms kept together), the keys on the right as keycaps; the keys still go on a phone. Shots `plan/public-brand/footer-*`, public-brand-a11y 48/0, typecheck green.
