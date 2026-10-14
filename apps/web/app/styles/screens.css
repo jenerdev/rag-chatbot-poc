@@ -1008,6 +1008,14 @@ button.toggle.on { border-color: var(--accent); background: var(--accent-soft); 
 .stay-price { margin: 0; }
 .stay-note { margin-top: var(--space-3); }
 .stay-note p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Staff notes (D-132): the form on top, then each note, newest first. */
+.stay-note-form { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+.stay-note-form textarea { width: 100%; resize: vertical; }
+.stay-note-form-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.stay-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.stay-notes li { padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.stay-notes-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 28px; }
+.stay-notes p { margin: var(--space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .stay-contact { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
 .stay-contact .button { justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stay-side .small.muted { margin: 0; }
@@ -1033,7 +1041,8 @@ button.toggle.on { border-color: var(--accent); background: var(--accent-soft); 
   .stay-card-contact { order: 2; }
   .stay-card-payment { order: 3; }
   .stay-card-changes { order: 4; }
-  .stay-card-history { order: 5; }
+  .stay-card-notes { order: 5; }
+  .stay-card-history { order: 6; }
 }
 @media (max-width: 560px) {
   .stay-head-total { align-items: flex-start; }

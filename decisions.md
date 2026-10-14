@@ -4149,3 +4149,15 @@ decides.
 either.
 
 **Provisional (plan/legal.md § 0):** both default periods wait on the user.
+
+## D-132 · Staff notes on a stay: many per stay, append and delete your own · **Added 2026-10-15**
+
+**Decision:**
+- A stay has any number of staff notes (`stay_notes`, `sql/schema-stay-notes.sql`, the 36th file), on S-15's **Staff notes** card. They are for staff: never on Manage booking, never in a prompt or a tool result.
+- Read with `bookings:read`, add with `bookings:write`, through `app_can()` in the policies themselves, so D-128's per-tenant overrides reach them with no twin policy.
+- No edit. A correction is a new note. Only the author deletes a note, an owner neither, so a colleague's note cannot be quietly removed.
+- The author is the token's user: the column default, and the insert policy demands it.
+- Retention (D-131): a note may hold guest details, so a trigger deletes a stay's notes when its guest is removed. `remove_guest_details()` is not replaced (traps 20, 25).
+
+**Why not reuse `bookings.notes`:** that is one text per ROW, written on the booking form and repeated on every night; a log of many dated, attributed entries is a table.
+

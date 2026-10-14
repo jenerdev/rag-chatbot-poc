@@ -77,6 +77,10 @@
 - [ ] Fix later: `plan/ui-refresh-phase5-walk.mjs` is stale (three sections; the page has four steps) and stops at step 1. `schema-manage-booking.sql` cannot be re-run (`booking_events_kind`).
 - [x] Merged to `master` (fast-forward to b5f38a5) on the user's word, 2026-10-14.
 
+**Staff notes on a booking (`feat/stay-notes`, 2026-10-15, D-132).**
+- [x] S-15 has a **Staff notes** card: any number of notes per stay, newest first, author and time; anyone with `bookings:write` adds one, only its author deletes it; never shown to the guest. `stay_notes` (36th SQL file, applied by Claude, a second run a no-op), `POST/DELETE /bookings/stay/[reference]/notes[/id]`, `staffNotes` in the stay's read. verify 211 (207–211 new), `plan/stay-notes-walk.mjs` 5/5 (HTTP), `plan/stay-notes-browser-walk.mjs` 4/4 (shots `plan/stay-notes/`), typecheck 13/13, web tests 174.
+- [ ] Not committed and not merged: waits on the user's word. Not run: axe, rooms, isolation, eval (no query outside `stay_notes` changed, no prompt text).
+
 **The chat's footer (`feat/chat-footer`, 2026-10-14).**
 - [x] The fine print under the field is one row aligned to the field's text: the D-129 notice on the left (wording unchanged, Privacy · Terms kept together), the keys on the right as keycaps; the keys still go on a phone. Shots `plan/public-brand/footer-*`, public-brand-a11y 48/0, typecheck green.
 - [x] Merged to `master` (fast-forward to 81b3178) on the user's word, 2026-10-14.
@@ -1805,6 +1809,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-15 — staff notes on a booking (`feat/stay-notes`, D-132)
+- **Asked:** "on booking details page, add a section for notes; can add multiple notes."
+- **Did:** `schema-stay-notes.sql` (36th): `stay_notes` (FK to the stay, `author default auth.uid()`, body 1–2000), RLS on `app_can('bookings:read'|'bookings:write')` with author = the token's user for insert and delete, no update; a trigger deletes a stay's notes when retention sets `guest_removed_at`. `@rag/bookings` `stay-notes.ts`; two routes; the S-15 card; the old "Notes" line under Price now says "Notes on the booking".
+- **Observed:** verify OK, 207–211 PASS (forged author, chat token, other tenant's owner: 42501 and 0 rows read; a colleague's delete 0 rows, mine 1; a staff override without bookings:write 42501; remove_guest_details 1 → 0 notes). HTTP walk 5/5, browser walk 4/4, no sideways scroll at 390.
+- **Caught by looking at the shots:** the phone layout orders every card explicitly; the new card had no `order` and jumped above Price. Now `order: 5`, before History, and the desktop column matches.
 
 ### 2026-10-13 — notifications Phases 0–1 (`feat/notifications`)
 - **Phase 0, baseline (before anything moved):** tests 13+14+5+124+366+140,

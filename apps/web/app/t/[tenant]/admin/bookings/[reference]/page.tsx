@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { MAX_STAY_NOTE } from '@rag/bookings';
 import { StayDetailScreen } from '@/components/stay-detail-screen';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
@@ -27,6 +28,7 @@ export default async function StayDetailPage({ params }: { params: Promise<{ ten
       businessName={branding.businessName}
       logoUrl={branding.logoUrl}
       nav={nav}
+      maxNote={MAX_STAY_NOTE}
     />
   );
 }

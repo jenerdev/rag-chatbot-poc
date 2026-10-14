@@ -17,13 +17,13 @@ export const dynamic = 'force-dynamic';
  * Read-only. The actions go to the routes that already make them:
  * PATCH /bookings/requests/[groupId] (confirm, decline, cancel),
  * PATCH /payments/[id] (verify, reject), PATCH /payments/changes/[id],
- * POST /payments/refund.
+ * POST /payments/refund, and the staff notes: POST and DELETE .../notes.
  */
 export const GET = withTenantRoute<{ reference: string }>(async (request, { tenant, params }) => {
-  tenant = await requireAdmin(request, tenant, 'bookings:read');
-  await requireApplication(tenant, 'bookings');
+  const staff = await requireAdmin(request, tenant, 'bookings:read');
+  await requireApplication(staff, 'bookings');
 
-  const stay = await stayDetail(tenant, params.reference);
+  const stay = await stayDetail(staff, params.reference, staff.userId);
   if (!stay) return NextResponse.json({ error: 'No such booking' }, { status: 404 });
   return NextResponse.json(stay);
 });

@@ -805,6 +805,27 @@ export interface Database {
         Update: Record<never, never>;
         Relationships: [];
       };
+      /** schema-stay-notes.sql (D-132): staff notes on a stay, many per stay; read bookings:read, add and delete your own bookings:write */
+      stay_notes: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          group_id: string;
+          /** the staff user who wrote it; null once that account is deleted */
+          author: string | null;
+          body: string;
+          created_at: string;
+        };
+        /** author defaults to auth.uid(), and the insert policy demands it be that */
+        Insert: {
+          tenant_id: number;
+          group_id: string;
+          body: string;
+        };
+        /** no update: a correction is a new note */
+        Update: Record<never, never>;
+        Relationships: [];
+      };
       /** schema-manage-booking.sql § 14: proofs a guest sent (and refunds staff record); staff read, nobody writes through a policy */
       payments: {
         Row: {

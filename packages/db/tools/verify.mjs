@@ -4103,6 +4103,127 @@ async function notificationChecks() {
   }
 }
 
+// --- schema-stay-notes.sql (D-132): staff notes on a stay ----------------------
+// On a THROWAWAY tenant (and a second one, the stranger), deleted at the end:
+// 207. a staff member adds two notes to one stay (author = itself, by
+//      default) and reads both; a colleague reads them too (the positive twin);
+// 208. a note in someone else's name is refused, and so is one from a chat
+//      token and from the other tenant's owner, who also read 0 (RLS alone);
+// 209. a colleague's delete of my note removes 0 rows; my own removes 1;
+// 210. staff whose role lost bookings:write (D-128) cannot add one; an admin
+//      whose role lost bookings:read reads 0 (and before, 1: trap 12);
+// 211. retention: clearing the stay's guest (guest_removed_at) deletes its notes.
+{
+  const users = [];
+  const probes = [];
+  try {
+    const tenant = async () => {
+      const { data, error } = await supabase.from('tenants').insert({ slug: `notes-${randomBytes(3).toString('hex')}`, business_name: 'Notes Probe', assistant_name: 'Probe' }).select('id, slug').single();
+      if (error) throw new Error(`tenant: ${error.message}`);
+      probes.push(data.id);
+      return data;
+    };
+    const member = async (tenantId, role) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `notes-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      const m = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: tenantId, role });
+      if (m.error) throw new Error(`membership: ${m.error.message}`);
+      return { id: data.user.id, db: asToken(staffToken(tenantId, data.user.id)) };
+    };
+    const probe = await tenant();
+    const other = await tenant();
+    const app = await supabase.from('tenant_applications').insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+    if (app.error) throw new Error(`app: ${app.error.message}`);
+    const { data: unit } = await supabase.from('units').insert({ tenant_id: probe.id, name: 'Room', capacity: 4, sort_order: 1, active: true }).select('id').single();
+    const { data: slot } = await supabase.from('slots').insert({ tenant_id: probe.id, name: 'Day', start_time: '08:00', duration: '8 hours' }).select('id').single();
+    const stay = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.id, slot_id: slot.id, booked_date: '2026-01-10', guest_name: 'Notes Guest', status: 'confirmed' }).select('id, group_id').single();
+    if (stay.error) throw new Error(`booking: ${stay.error.message}`);
+    const groupId = stay.data.group_id;
+    const me = await member(probe.id, 'staff');
+    const colleague = await member(probe.id, 'admin');
+    const stranger = await member(other.id, 'owner');
+    const notesOf = (db) => db.from('stay_notes').select('id, author, body').eq('tenant_id', probe.id).eq('group_id', groupId).order('id');
+    const add = (db, body, extra = {}) => db.from('stay_notes').insert({ tenant_id: probe.id, group_id: groupId, body, ...extra }).select('id, author');
+
+    // 207
+    let mine = [];
+    {
+      const a = await add(me.db, 'Asked for an early check-in');
+      const b = await add(me.db, 'Paid the balance in cash');
+      mine = [...(a.data ?? []), ...(b.data ?? [])];
+      const own = await notesOf(me.db);
+      const theirs = await notesOf(colleague.db);
+      check(
+        !a.error && !b.error && mine.length === 2 && mine.every((n) => n.author === me.id) && own.data?.length === 2 && theirs.data?.length === 2,
+        'stay notes: staff add two notes to one stay, authored as themselves by default; they and a colleague read both',
+        `adds ${a.error?.message ?? 'ok'}/${b.error?.message ?? 'ok'} · own author ${mine.map((n) => n.author === me.id).join(',')} · read ${own.data?.length}/${theirs.data?.length}`,
+      );
+    }
+
+    // 208
+    {
+      const forged = await add(me.db, 'in your name', { author: colleague.id });
+      const chat = await add(asToken(chatToken(probe.id)), 'from the chat');
+      const chatRead = await notesOf(asToken(chatToken(probe.id)));
+      const foreign = await add(stranger.db, 'from next door');
+      const foreignRead = await notesOf(stranger.db);
+      check(
+        forged.error?.code === '42501' && chat.error?.code === '42501' && chatRead.data?.length === 0 && foreign.error?.code === '42501' && foreignRead.data?.length === 0,
+        "stay notes: a note in a colleague's name, one from a chat token and one from another tenant's owner are refused (42501); neither token reads any",
+        `forged ${forged.error?.code ?? 'STORED'} · chat ${chat.error?.code ?? 'STORED'} reads ${chatRead.data?.length} · stranger ${foreign.error?.code ?? 'STORED'} reads ${foreignRead.data?.length}`,
+      );
+    }
+
+    // 209
+    {
+      const byColleague = await colleague.db.from('stay_notes').delete().eq('tenant_id', probe.id).eq('id', mine[0]?.id).select('id');
+      const byMe = await me.db.from('stay_notes').delete().eq('tenant_id', probe.id).eq('id', mine[0]?.id).select('id');
+      const left = await notesOf(supabase);
+      check(
+        !byColleague.error && byColleague.data?.length === 0 && !byMe.error && byMe.data?.length === 1 && left.data?.length === 1,
+        'stay notes: a colleague (an admin) deletes 0 of my notes; I delete my own (1); 1 note is left',
+        `colleague ${byColleague.error?.message ?? byColleague.data?.length} · me ${byMe.error?.message ?? byMe.data?.length} · left ${left.data?.length}`,
+      );
+    }
+
+    // 210
+    {
+      const before = await notesOf(colleague.db);
+      const rows = await supabase.from('role_permissions').insert([
+        { tenant_id: probe.id, role: 'staff', permission: 'bookings:write', allowed: false },
+        { tenant_id: probe.id, role: 'admin', permission: 'bookings:read', allowed: false },
+      ]);
+      const refused = await add(me.db, 'without bookings:write');
+      const blind = await notesOf(colleague.db);
+      const stillReads = await notesOf(me.db);
+      await supabase.from('role_permissions').delete().eq('tenant_id', probe.id);
+      check(
+        !rows.error && before.data?.length === 1 && refused.error?.code === '42501' && blind.data?.length === 0 && stillReads.data?.length === 1,
+        'stay notes: staff without bookings:write (a tenant override) cannot add one (42501) and still read 1; an admin without bookings:read reads 0 (1 before)',
+        `rows ${rows.error?.message ?? 'ok'} · admin before ${before.data?.length} · add ${refused.error?.code ?? 'STORED'} · admin after ${blind.data?.length} · staff reads ${stillReads.data?.length}`,
+      );
+    }
+
+    // 211
+    {
+      const before = await notesOf(supabase);
+      const removed = await supabase.rpc('remove_guest_details', { p_tenant_id: probe.id, p_before: '2026-02-01' });
+      const after = await notesOf(supabase);
+      check(
+        before.data?.length === 1 && !removed.error && removed.data === 1 && after.data?.length === 0,
+        "stay notes: remove_guest_details() on the ended stay (1 row) deletes its notes too (1 → 0)",
+        `before ${before.data?.length} · removed ${removed.error?.message ?? removed.data} · after ${after.data?.length}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'stay notes: setup', error.message);
+  } finally {
+    for (const id of probes) await supabase.from('tenants').delete().eq('id', id);
+    for (const id of users) await supabase.auth.admin.deleteUser(id);
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +

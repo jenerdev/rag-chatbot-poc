@@ -25,6 +25,7 @@
 //                  confirm or decline a request (customer booking)
 //   staff-stay.ts  a stay booked by staff on the booking page's rules, with Walk in (D-111)
 //   stay-detail.ts one stay for its staff page: nights, money, proofs, changes, history (D-114)
+//   stay-notes.ts  staff notes on a stay, many per stay; add, delete your own (D-132)
 //   guest.ts       the guest's own stay, by reference + email or phone (manage booking)
 //   payments.ts    a guest's proof of payment: checked, uploaded, submitted (manage booking)
 //   payment-review.ts  staff: the queue, signed proof URLs, verify/reject, refunds, settings, a stay's history
@@ -97,6 +98,7 @@ export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from '
 export { bookingPage, cancelStay, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
 export { createStaffStay, quoteStaffStay, type NewStaffStay } from './staff-stay.js';
 export { stayDetail, type StayDetail } from './stay-detail.js';
+export { addStayNote, deleteStayNote, listStayNotes, MAX_STAY_NOTE, type StayNote } from './stay-notes.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';
 export { expireDueStays } from './deadlines.js';

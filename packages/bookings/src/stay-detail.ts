@@ -4,9 +4,9 @@
 // on a stay's own page, /t/<slug>/admin/bookings/<reference>, which reads
 // this. ONE read, on the staff token, for: the nights with their STORED
 // prices (never re-priced), the guest, the deadlines, stay_payment(), the
-// proofs and refunds, the change requests, the history, and whether a
-// pending stay can be confirmed at all (a night taken by another stay, or on
-// a closed date).
+// proofs and refunds, the change requests, the history, the staff notes
+// (D-132), and whether a pending stay can be confirmed at all (a night taken
+// by another stay, or on a closed date).
 //
 // It decides nothing. The page offers an action only when it applies, and
 // the routes (and Postgres behind them) refuse it anyway when it does not.
@@ -22,6 +22,7 @@ import { expireDueStays } from './deadlines.js';
 import type { StayPayment } from './guest.js';
 import { listPayments, stayHistory, stayPayment, type PaymentRow, type StayEvent } from './payment-review.js';
 import { clashes, parseSpan, takingRows } from './requests.js';
+import { listStayNotes, type StayNote } from './stay-notes.js';
 import type { BookingStatus, BookingTenant, RequestLine } from './types.js';
 import { addDays, localDate } from './validate.js';
 
@@ -64,6 +65,8 @@ export interface StayDetail {
   payments: PaymentRow[];
   changes: ChangeRow[];
   history: StayEvent[];
+  /** staff notes, oldest first (D-132): many per stay, never the guest's */
+  staffNotes: StayNote[];
   /** pending only: a night is taken by another stay (confirmed, or held for another guest) */
   clash: boolean;
   /** pending only: a night is on a closed date */
@@ -77,8 +80,11 @@ export interface StayDetail {
 /** The stay's own rows by status: the live ones first (confirmed, then pending), else the last word. */
 const RANK: BookingStatus[] = ['confirmed', 'pending', 'expired', 'cancelled'];
 
-/** One stay by its reference, or null (not this tenant's, or not there). Staff only: guest data. */
-export async function stayDetail(tenant: BookingTenant, reference: string): Promise<StayDetail | null> {
+/**
+ * One stay by its reference, or null (not this tenant's, or not there). Staff
+ * only: guest data. `userId` is the member asking, so its own notes say so.
+ */
+export async function stayDetail(tenant: BookingTenant, reference: string, userId: string | null): Promise<StayDetail | null> {
   const ref = reference.trim().toUpperCase();
   if (!/^[A-Z0-9-]{3,20}$/.test(ref)) return null;
   const config = await requireConfig(tenant);
@@ -109,7 +115,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string): Prom
   const dates = [...new Set(rows.map((r) => r.booked_date))];
   const lastNight = dates[dates.length - 1]!;
 
-  const [units, slots, promo, walkIns, calendar, payment, payments, changes, history, closed] = await Promise.all([
+  const [units, slots, promo, walkIns, calendar, payment, payments, changes, history, staffNotes, closed] = await Promise.all([
     tenant.db.from('units').select('id, name').eq('tenant_id', tenant.id),
     listSlots(tenant, { retired: true }),
     first.promo_id === null
@@ -121,6 +127,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string): Prom
     listPayments(tenant, 'all', groupId),
     listChanges(tenant, 'all', groupId),
     stayHistory(tenant, groupId),
+    listStayNotes(tenant, groupId, userId),
     status === 'pending' ? closedDays(tenant, dates[0]!, lastNight) : Promise.resolve(new Map<string, string>()),
   ]);
   if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
@@ -193,6 +200,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string): Prom
     payments,
     changes,
     history,
+    staffNotes,
     clash,
     closed: status === 'pending' && dates.some((d) => closed.has(d)),
     currency: config.currency,

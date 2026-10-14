@@ -11,6 +11,9 @@
 // Approve / Reject a change request that waits, Record a refund when money
 // is no longer owed. Postgres refuses the rest whatever this page shows.
 //
+// Staff notes (D-132): any number per stay, newest first, for staff only.
+// Anyone with bookings:write adds one; only its author deletes it.
+//
 // No money is computed here: every figure is a stored row's or
 // stay_payment()'s. Amounts typed by staff are pesos, parsed by string on
 // the server (lib/money.ts).
@@ -25,12 +28,13 @@ import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { CopyButton, CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
+import { Tip } from '@/components/tooltip';
 import { StayLines } from '@/components/stay-lines';
 import { ReviewProof, type ReviewDecision } from '@/components/review-proof';
 import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
-import { isRole, type Role } from '@/lib/permissions';
+import { can, isRole, type Role } from '@/lib/permissions';
 import { stayActions } from '@/lib/stay-actions';
 import { STAY_PAYMENT, eventWords, pendingState, when } from '@/lib/stay-words';
 
@@ -40,6 +44,8 @@ export interface StayDetailScreenProps {
   businessName: string;
   logoUrl: string | null;
   nav: NavFeatures;
+  /** a staff note's length limit, @rag/bookings' MAX_STAY_NOTE, from the server page */
+  maxNote: number;
 }
 
 type Auth = 'checking' | 'out' | 'in';
@@ -75,7 +81,7 @@ function outcome(stay: StayDetail): { words: string; tone: string } | null {
   return { words: `${what}${at}${note}`, tone: stay.status === 'expired' ? 'warn' : 'error' };
 }
 
-export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }: StayDetailScreenProps) {
+export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, maxNote }: StayDetailScreenProps) {
   const api = `/api/t/${slug}`;
   const [auth, setAuth] = useState<Auth>('checking');
   const [role, setRole] = useState<Role | null>(null);
@@ -89,6 +95,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }
   const [proof, setProof] = useState<string | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refund, setRefund] = useState({ amount: '', method: '', note: '' });
+  const [noteDraft, setNoteDraft] = useState('');
   const { notice, setNotice } = useNotice(reviewing !== null || refundOpen);
 
   const unauthorized = useCallback(() => {
@@ -288,6 +295,20 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }
     if (await write('POST', '/payments/refund', { groupId: stay.groupId, ...refund }, `Recorded a refund on ${stay.reference}.`)) setRefundOpen(false);
   }
 
+  async function addNote(event: React.FormEvent) {
+    event.preventDefault();
+    if (stay === null || stay === 'missing' || noteDraft.trim() === '') return;
+    if (await write('POST', `/bookings/stay/${encodeURIComponent(stay.reference)}/notes`, { body: noteDraft }, 'Note added.')) setNoteDraft('');
+  }
+
+  async function deleteNote(id: number) {
+    if (stay === null || stay === 'missing') return;
+    const sure = await ask({ title: 'Delete this note?', body: 'It is removed for everyone. A deleted note cannot be brought back.', actionLabel: 'Delete note', backLabel: 'Keep it', danger: true });
+    if (sure === null) return;
+    await write('DELETE', `/bookings/stay/${encodeURIComponent(stay.reference)}/notes/${id}`, {}, 'Note deleted.');
+  }
+
+  const canNote = role !== null && can(role, 'bookings:write', nav.access);
   const anyAction = actions.confirm || actions.decline || actions.cancel || actions.refund || actions.review.length > 0 || actions.decide.length > 0 || actions.confirmBlocked !== null;
   const waitingProof = stay.payments.find((p) => actions.review.includes(p.id));
   const ended = outcome(stay);
@@ -467,7 +488,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }
             )}
             {stay.notes && (
               <div className="stay-note">
-                <span className="small muted">Notes</span>
+                <span className="small muted">Notes on the booking</span>
                 <p>{stay.notes}</p>
               </div>
             )}
@@ -491,6 +512,56 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }
               </ul>
             </section>
           )}
+
+          <section className="card stay-card-notes" aria-labelledby="stay-notes-title">
+            <h3 id="stay-notes-title">
+              Staff notes{stay.staffNotes.length > 0 && <span className="muted"> · {stay.staffNotes.length}</span>}
+            </h3>
+            {canNote && (
+              <form className="stay-note-form" onSubmit={addNote}>
+                <label htmlFor="stay-note-body" className="visually-hidden">
+                  New note
+                </label>
+                <textarea
+                  id="stay-note-body"
+                  rows={2}
+                  maxLength={maxNote}
+                  placeholder="Add a note for the team, e.g. Asked for an early check-in"
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                />
+                <div className="stay-note-form-foot">
+                  <span className="small muted">Only staff see notes.</span>
+                  <button type="submit" className="primary sm" disabled={busy || noteDraft.trim() === ''}>
+                    <Icon name="plus" size={14} /> Add note
+                  </button>
+                </div>
+              </form>
+            )}
+            {stay.staffNotes.length === 0 ? (
+              <p className="small muted">No notes yet.</p>
+            ) : (
+              <ul className="stay-notes">
+                {[...stay.staffNotes].reverse().map((n) => (
+                  <li key={n.id}>
+                    <div className="stay-notes-head">
+                      <span className="small muted">
+                        {n.mine ? 'You' : (n.author ?? 'A former member')} · {when(n.createdAt, stay.timezone)}
+                      </span>
+                      {n.mine && canNote && (
+                        <Tip label="Delete">
+                          <button type="button" className="ghost sm danger" disabled={busy} onClick={() => void deleteNote(n.id)} aria-label={`Delete your note from ${when(n.createdAt, stay.timezone)}`}>
+                            <Icon name="trash" size={14} />
+                          </button>
+                        </Tip>
+                      )}
+                    </div>
+                    <p>{n.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           <section className="card stay-card-history">
             <h3>History</h3>

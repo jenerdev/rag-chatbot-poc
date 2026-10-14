@@ -308,6 +308,11 @@ export const updatePromoSchema = createPromoSchema.partial().extend({
 });
 
 /** Staff decide a request: the whole group, one action, an optional note. */
+/** A staff note on a stay (D-132): POST /bookings/stay/[reference]/notes. Empty and too long are @rag/bookings' to say, in words. */
+export const stayNoteSchema = z.object({
+  body: z.string({ required_error: 'Write the note first.', invalid_type_error: 'The note must be text.' }),
+});
+
 export const decideRequestSchema = z.object({
   action: z.enum(['confirm', 'decline', 'cancel'], {
     errorMap: () => ({ message: 'action is "confirm", "decline" or "cancel"' }),
