@@ -75,7 +75,7 @@
   Have a lawyer replace the texts in `lib/legal.ts`, and record a DPA date for villa, harbor and alteza (`plan/legal-dpa-missing.mjs`).
 - [ ] On deployment: a daily `pnpm --filter @rag/db retention -- --remove` and `storage-orphans -- --expired --remove`.
 - [ ] Fix later: `plan/ui-refresh-phase5-walk.mjs` is stale (three sections; the page has four steps) and stops at step 1. `schema-manage-booking.sql` cannot be re-run (`booking_events_kind`).
-- [ ] The user's look; then merge on their word.
+- [x] Merged to `master` (fast-forward to b5f38a5) on the user's word, 2026-10-14.
 
 **Five items (`feat/landing-and-media`, 2026-10-14), one commit each.**
 - [x] 1 · A landing page at `/` (D-121): mockups, no pricing, still no tenant list. axe 4/0.
