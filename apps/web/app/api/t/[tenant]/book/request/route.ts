@@ -33,7 +33,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 
   const parsed = bookRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
-  const { website, ...input } = parsed.data;
+  const { website, consent: _ticked, ...input } = parsed.data;
   if (website) return badRequest('The request could not be sent.');
 
   if (!allow(`${tenant.id}|${clientIp(request)}`)) {

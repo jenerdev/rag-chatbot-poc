@@ -176,6 +176,9 @@ export const bookRequestSchema = bookQuoteSchema.extend({
   email: z.string({ required_error: 'Your email is required', invalid_type_error: 'Your email is required' }),
   notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
   website: z.string().optional(),
+  /** D-129: the box ticked, and the version of the policy it was ticked for. Postgres checks the version is current. */
+  consent: z.literal(true, { errorMap: () => ({ message: 'Please read and agree to the Privacy Policy and Terms.' }) }),
+  consentVersion: z.string({ required_error: 'Please read and agree to the Privacy Policy and Terms.' }).min(1).max(20),
 });
 
 /**

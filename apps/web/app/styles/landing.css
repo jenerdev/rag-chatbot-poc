@@ -90,3 +90,5 @@
 }
 /* A section reached from the bar's links stops below the sticky bar, not under it. */
 .landing-section { scroll-margin-top: 64px; }
+.landing-footer-links { display: flex; gap: var(--space-4); }
+.landing-footer-links a { color: var(--muted); }

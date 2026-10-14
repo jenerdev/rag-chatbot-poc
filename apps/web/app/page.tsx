@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
 
 // The root: a static landing page for the product (plan/landing.md, D-121).
@@ -259,6 +260,11 @@ export default function Home() {
           © {new Date().getFullYear()} {PRODUCT}
         </span>
         <span>An AI front desk and booking system for resorts.</span>
+        {/* D-129: the platform's own privacy policy and terms. */}
+        <nav className="landing-footer-links" aria-label="Legal">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </nav>
       </footer>
     </div>
   );

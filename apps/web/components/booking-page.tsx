@@ -49,6 +49,8 @@ export interface BookingPageScreenProps {
   nav: NavFeatures;
   /** Each room's photo URLs by room id (per_room; {} otherwise): a thumbnail on the room step, the viewer on a click. */
   photos?: Record<number, string[]>;
+  /** D-129: the version of the tenant's privacy policy and terms the consent box agrees to (tenant_public()). */
+  policyVersion: string;
 }
 
 /** YYYY-MM-DD plus n days, on UTC midnights, so no DST edge shifts the date. */
@@ -138,7 +140,7 @@ function CheckTimes({ checkIn, checkOut }: { checkIn: { date: string; time: stri
 
 type Sent = { receipt: RequestReceipt } | null;
 
-export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav, photos = {} }: BookingPageScreenProps) {
+export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav, photos = {}, policyVersion }: BookingPageScreenProps) {
   const lightbox = useLightbox();
   const api = `/api/t/${slug}`;
   const perRoom = page.bookingType === 'per_room';
@@ -157,6 +159,8 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   const [notes, setNotes] = useState('');
   // The honeypot (plan § 2.1): hidden from people, so only a bot fills it.
   const [website, setWebsite] = useState('');
+  // D-129: unticked until the guest ticks it; the route and the database both need it.
+  const [consent, setConsent] = useState(false);
   // D-097: a promo code, sent with the quote (which says whether it applies,
   // in words) and with the request (which resolves it again under the lock).
   const [promoCode, setPromoCode] = useState('');
@@ -258,7 +262,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
       const response = await fetch(`${api}/book/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, name, phone, email, notes: notes || null, website, promoCode: promoCode.trim() || null }),
+        body: JSON.stringify({ slotId, rooms, checkIn, nights: nightCount, name, phone, email, notes: notes || null, website, promoCode: promoCode.trim() || null, consent, consentVersion: policyVersion }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -454,7 +458,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     );
   }
 
-  const canSend = !sending && !!quote.quote && quote.quote.available && !!name && !!phone && !!email;
+  const canSend = !sending && !!quote.quote && quote.quote.available && !!name && !!phone && !!email && consent;
 
   // What each step still needs, in words; '' when it is complete. The
   // server checks all of it again; this only decides when Continue is on.
@@ -910,6 +914,20 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
             {step === STEPS.length - 1 && (
               <>
                 {error && <div className="notice error">{error}</div>}
+                <label className="consent-check" htmlFor="book-consent">
+                  <input type="checkbox" id="book-consent" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+                  <span>
+                    I have read the{' '}
+                    <Link href={`/t/${slug}/privacy`} target="_blank">
+                      Privacy Policy
+                    </Link>{' '}
+                    and agree to the{' '}
+                    <Link href={`/t/${slug}/terms`} target="_blank">
+                      Terms
+                    </Link>
+                    .
+                  </span>
+                </label>
                 <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={!canSend}>
                   {sending ? 'Sending…' : 'Send request'}
                 </button>

@@ -61,7 +61,7 @@ export function TenantNav({
   const auth = session?.auth ?? own.auth;
   const role = auth === 'in' ? (session?.role ?? own.role) : null;
   const logout = session?.onLogout ?? ownLogout;
-  const publicPage = current === 'chat' || current === 'book' || current === 'manage' || current === 'reset';
+  const publicPage = current === 'chat' || current === 'book' || current === 'manage' || current === 'reset' || current === 'legal';
 
   const all = navItems(slug, features, role);
   const isPublic = (page: NavPage) => page === 'chat' || page === 'book';

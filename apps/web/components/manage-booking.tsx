@@ -42,7 +42,7 @@ export interface ManageBookingScreenProps {
   /** from `?ref=`, already checked for shape by the page; '' for none */
   initialReference: string;
   /** the proof's limits, from @rag/bookings through the server page (never a copy) */
-  limits: { maxProofBytes: number; maxProofEdge: number; maxPayerReference: number };
+  limits: { maxProofBytes: number; maxProofEdge: number; maxPayerReference: number; proofRetentionDays: number };
 }
 
 type Found = GuestStay & { guestStatus: GuestStatus };
@@ -656,7 +656,13 @@ function PaymentPanel({
                 required
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                aria-describedby="pay-file-kept"
               />
+              {/* D-129: what happens to the file, before it is sent. */}
+              <p className="hint" id="pay-file-kept">
+                Kept only to check your payment, and deleted {limits.proofRetentionDays} days after your stay. A photo&apos;s location
+                data is removed before it is sent.
+              </p>
               {file && preview && (
                 <div className="proof-picked">
                   <ProofThumb src={preview} kind={proofKind(file.type)} label="Your proof of payment" />

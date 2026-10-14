@@ -521,6 +521,12 @@ export function ChatScreen({
           </button>
         </form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
+        {/* D-129: what happens to what is typed here, at the moment it is typed. Page text, not prompt text. */}
+        <p className="composer-notice">
+          {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by OpenAI.
+          Don&apos;t share passwords or card numbers. <Link href={`/t/${slug}/privacy`}>Privacy</Link> ·{' '}
+          <Link href={`/t/${slug}/terms`}>Terms</Link>
+        </p>
       </section>
     </div>
   );

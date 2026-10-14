@@ -17,6 +17,9 @@ export function PublicFooter({ slug, businessName, manage, book = false }: { slu
       <nav aria-label="More">
         {book && <Link href={`/t/${slug}/book`}>Book a stay</Link>}
         {manage && <Link href={`/t/${slug}/manage`}>Manage booking</Link>}
+        {/* D-129: the resort's own privacy policy and terms, on every guest page with a footer. */}
+        <Link href={`/t/${slug}/privacy`}>Privacy</Link>
+        <Link href={`/t/${slug}/terms`}>Terms</Link>
         <Link href={`/t/${slug}/admin`}>Staff login</Link>
       </nav>
     </footer>

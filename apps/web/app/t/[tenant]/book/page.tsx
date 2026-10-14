@@ -44,6 +44,7 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
       nav={nav}
       page={page}
       photos={photos}
+      policyVersion={branding.legal.policyVersion}
     />
   );
 }

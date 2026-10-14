@@ -320,6 +320,13 @@ export async function requestBooking(
     notes?: unknown;
     /** a promo code the customer typed (D-097); resolved by request_booking() under the lock */
     promoCode?: unknown;
+    /**
+     * D-129: the version of the privacy policy and terms the guest agreed to.
+     * Given, the request goes through request_booking_with_consent(), which
+     * refuses a version that is not the tenant's current one and records the
+     * consent on the stay. The booking page always gives it; the tools do not.
+     */
+    consentVersion?: string;
   },
 ): Promise<RequestReceipt> {
   const config = await requireConfig(tenant);
@@ -337,7 +344,7 @@ export async function requestBooking(
     Array.from({ length: request.nights }, (_, n) => addDays(request.checkIn, n)),
   );
 
-  const { data, error } = await tenant.db.rpc('request_booking', {
+  const args = {
     p_tenant_id: tenant.id,
     p_slot_id: request.slotId,
     p_unit_ids: request.rooms.map((r) => r.unitId),
@@ -349,7 +356,11 @@ export async function requestBooking(
     p_email: request.email,
     p_notes: request.notes,
     p_promo_code: promoCode,
-  });
+  };
+  const { data, error } =
+    input.consentVersion === undefined
+      ? await tenant.db.rpc('request_booking', args)
+      : await tenant.db.rpc('request_booking_with_consent', { ...args, p_consent_version: input.consentVersion });
   if (error) throw requestError(error);
   if (!data || data.length === 0) throw new Error('The request was saved but nothing came back');
 
@@ -659,5 +670,9 @@ function requestError(error: { code?: string; message: string }): Error {
   // A unit that is not this tenant's, inactive, or gone: one answer.
   if (error.code === '23503') return new BookingInputError('No such unit or slot.');
   if (error.code === '23514' && /holds at most/.test(error.message)) return new BookingInputError('That is more guests than the room holds.');
+  // D-129: the box unticked, or a policy that changed while the page was open.
+  if (error.code === '23514' && /Privacy Policy and Terms/.test(error.message)) return new BookingInputError(error.message);
+  // D-127: the booking page switched off between the page and the request.
+  if (error.code === '23514' && /switched off/.test(error.message)) return new BookingInputError(error.message);
   return new Error(`Could not send the request: ${error.message}`);
 }

@@ -39,6 +39,8 @@ export interface Branding {
   assistantAvatarUrl: string | null;
   /** Ready for a `style` prop: only allowlisted custom properties, only valid colours. */
   themeStyle: CSSProperties;
+  /** What the privacy page states (D-129): tenant_public()'s legal columns. */
+  legal: { contactName: string | null; contactEmail: string | null; policyVersion: string; chatRetentionDays: number; guestRetentionDays: number };
 }
 
 export { themeVars };
@@ -62,5 +64,12 @@ export async function loadBranding(tenant: TenantContext): Promise<Branding> {
     bannerUrl: httpsUrl(data.banner_url),
     assistantAvatarUrl: httpsUrl((data as { assistant_avatar_url?: unknown }).assistant_avatar_url),
     themeStyle: themeVars(data.theme),
+    legal: {
+      contactName: data.privacy_contact_name ?? null,
+      contactEmail: data.privacy_contact_email ?? null,
+      policyVersion: data.policy_version ?? '1',
+      chatRetentionDays: data.chat_retention_days ?? 365,
+      guestRetentionDays: data.guest_retention_days ?? 1095,
+    },
   };
 }

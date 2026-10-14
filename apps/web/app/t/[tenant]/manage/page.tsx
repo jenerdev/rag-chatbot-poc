@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE } from '@rag/bookings';
+import { MAX_PAYER_REFERENCE, MAX_PROOF_BYTES, MAX_PROOF_EDGE, PROOF_RETENTION_DAYS } from '@rag/bookings';
 import { ManageBookingScreen } from '@/components/manage-booking';
 import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
@@ -46,7 +46,7 @@ export default async function TenantManagePage({
       bannerUrl={branding.bannerUrl}
       nav={nav}
       initialReference={initialReference}
-      limits={{ maxProofBytes: MAX_PROOF_BYTES, maxProofEdge: MAX_PROOF_EDGE, maxPayerReference: MAX_PAYER_REFERENCE }}
+      limits={{ maxProofBytes: MAX_PROOF_BYTES, maxProofEdge: MAX_PROOF_EDGE, maxPayerReference: MAX_PAYER_REFERENCE, proofRetentionDays: PROOF_RETENTION_DAYS }}
     />
   );
 }

@@ -55,6 +55,7 @@ const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   promos: 'tag',
   members: 'users',
   reset: 'user',
+  legal: 'file',
 };
 
 /** The drawer's breakpoint; the same number as the media query in base.css. */
