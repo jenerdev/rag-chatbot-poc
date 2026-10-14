@@ -104,7 +104,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, tim
   // All payments: a search and a status filter, over the rows loaded.
   const [allQuery, setAllQuery] = useState('');
   const [allFilter, setAllFilter] = useState<'all' | 'submitted' | 'verified' | 'rejected' | 'refund'>('all');
-  const canSettings = role !== null && can(role, 'payments:settings');
+  const canSettings = role !== null && can(role, 'payments:settings', nav.access);
 
   const unauthorized = useCallback(() => {
     setAuth('out');

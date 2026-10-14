@@ -58,7 +58,7 @@
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**
 - [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.
-- [ ] 2 · Role permissions per tenant, set on the platform (D-128).
+- [x] 2 · Role permissions per tenant, set on the platform (D-128): `role_permissions` (34th SQL file), a Permissions tab and a Knowledge base tab for the super user; app_can() and can() agree, pinned by test. verify 201, permissions-walk 6/6, axe 8/0, rooms, isolation, staff-cases pass.
 - [ ] 3 · The legal groundwork, plan/legal-prompt.md (D-129…).
 - [ ] The user's look; then merge on their word.
 

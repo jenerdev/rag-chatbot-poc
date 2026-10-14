@@ -24,6 +24,9 @@ import type { TenantDetail } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { BrandImageField } from '@/components/brand-image-field';
 import { FeaturesPanel } from '@/components/features-panel';
+import { KnowledgePanel } from '@/components/knowledge-panel';
+import { PermissionsPanel } from '@/components/permissions-panel';
+import { SaveBar } from '@/components/save-bar';
 import { MembersPanel } from '@/components/members-panel';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
@@ -726,41 +729,34 @@ export function TenantForm({
               />
             ),
           },
+          {
+            id: 'permissions',
+            label: 'Permissions',
+            panel: (
+              <PermissionsPanel
+                key={JSON.stringify(tenant.rolePermissions)}
+                rows={tenant.rolePermissions}
+                busy={busy}
+                onSave={(rows) => void send('PUT', `/tenants/${id}/permissions`, { rows }, rows.length ? 'Permissions saved.' : 'Permissions back on the defaults.')}
+              />
+            ),
+          },
+          {
+            id: 'knowledge',
+            label: 'Knowledge base',
+            panel: (
+              <KnowledgePanel
+                api={`${api}/tenants/${id}/documents`}
+                tenantName={tenant.businessName}
+                onMessage={(message, kind) => setNotice({ message, kind })}
+                onUnauthorized={onUnauthorized}
+              />
+            ),
+          },
           { id: 'members', label: 'Members', panel: <MembersPanel api={`${api}/tenants/${id}/members`} selfUserId={selfUserId} onUnauthorized={onUnauthorized} /> },
           { id: 'archive', label: tenant.archivedAt ? 'Archived' : 'Archive', panel: archive },
         ]}
       />
     </>
-  );
-}
-
-/**
- * The bottom of a settings form, kept in view while it scrolls: whether
- * anything is unsaved, Discard, and the ONE submit. Save stays enabled when
- * nothing changed (a re-save is harmless), but says so.
- */
-function SaveBar({ dirty, busy, onDiscard, label }: { dirty: boolean; busy: boolean; onDiscard?: () => void; label: string }) {
-  return (
-    <div className={dirty ? 'save-bar dirty' : 'save-bar'}>
-      <span className="save-bar-state" role="status">
-        {dirty ? (
-          <>
-            <span className="save-dot" aria-hidden="true" /> Unsaved changes
-          </>
-        ) : (
-          <>
-            <Icon name="check" size={14} /> Everything is saved
-          </>
-        )}
-      </span>
-      {dirty && onDiscard && (
-        <button type="button" disabled={busy} onClick={onDiscard}>
-          Discard
-        </button>
-      )}
-      <button type="submit" className="primary" disabled={busy}>
-        {busy ? 'Saving…' : label}
-      </button>
-    </div>
   );
 }

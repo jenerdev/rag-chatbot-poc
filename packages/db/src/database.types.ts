@@ -306,6 +306,34 @@ export interface Database {
         Relationships: [];
       };
       /**
+       * sql/schema-role-permissions.sql (D-128) — where a tenant's role
+       * permissions differ from apps/web/lib/permissions.ts's default.
+       */
+      role_permissions: {
+        Row: {
+          tenant_id: number;
+          role: string;
+          permission: string;
+          allowed: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          role: string;
+          permission: string;
+          allowed: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          tenant_id?: number;
+          role?: string;
+          permission?: string;
+          allowed?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      /**
        * sql/schema-features.sql (D-127) — a feature switched on or off for a
        * tenant by a super user. No row = on.
        */
@@ -1055,6 +1083,21 @@ export interface Database {
       record_refund: {
         Args: { p_tenant_id: number; p_group_id: string; p_amount: number; p_method: string; p_note: string };
         Returns: number;
+      };
+      /** schema-role-permissions.sql § 4 (D-128): a super user replaces a tenant's overrides; the row count */
+      set_role_permissions: {
+        Args: { p_tenant_id: number; p_rows: Json };
+        Returns: number;
+      };
+      /** schema-role-permissions.sql § 3 (D-128): may this member do that, in this tenant? */
+      app_can: {
+        Args: { p_permission: string };
+        Returns: boolean;
+      };
+      /** schema-features.sql (D-127): is the feature on for the tenant? no row = on */
+      tenant_feature_on: {
+        Args: { p_tenant_id: number; p_feature: string };
+        Returns: boolean;
       };
       /** schema-manage-booking.sql § 22: owner/admin write config.payments and nothing else; null turns payments off */
       set_payment_settings: {

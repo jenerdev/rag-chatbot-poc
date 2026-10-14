@@ -69,7 +69,7 @@ export function MembersScreen({
     );
   }
 
-  if (!role || !can(role, 'members:manage')) {
+  if (!role || !can(role, 'members:manage', nav.access)) {
     return (
       <>
         <StaffFrame {...frame}>

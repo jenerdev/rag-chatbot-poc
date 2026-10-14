@@ -9547,3 +9547,42 @@ prompt, tool or retrieval code changed.
 knowledge base, which hides suggestions anyway (trap 12); the probe tenant
 now has a document, and the on-state twin shows them.
 
+## 2026-10-14 — Role permissions per tenant, and the platform's knowledge base (D-128)
+
+**What was done:**
+- **Permissions tab** on the platform tenant form: a table of all 21
+  permissions by role.
+  - Ticked is allowed; changed cells are tinted.
+  - Fixed rows and impossible grants are disabled, with the reason.
+  - One Save sends only the cells that differ from the default, through
+    `set_role_permissions()`. "Use the defaults" clears them.
+- **Knowledge base tab:** the super user lists, adds (paste, or read a
+  .txt/.md into the box) and deletes a tenant's documents. It uses the same
+  ingest as the staff screen, on the platform token.
+- **Code wall:** `requireAdmin()` asks `can(role, permission, overrides)`
+  with the tenant's rows (`lib/role-access.ts`, once per request). The
+  header and every screen that hides a button get the same rows through
+  `nav.access`.
+- **SQL wall:** `app_can()`, plus 38 restrictive and 23 permissive twin
+  policies (including the storage buckets), and super policies on documents
+  and chunks.
+
+**Observed:**
+- **verify 201/201.** Checks 197–201 are new:
+  - the owner adds a document by default, then is refused with the row;
+  - staff gain promos:write and add a promo;
+  - staff given members:manage still add no member;
+  - a fixed permission is 23514;
+  - the owner cannot set rows (42501);
+  - the super user adds and deletes a document and its chunk.
+- **Check 99 updated:** the platform reads 22 of 22 documents and still 0
+  bookings, messages or payments.
+- **`plan/permissions-walk.mjs` 6/6 and axe 8/0.** The owner's 403 names
+  documents:write; the owner's screen hides "Add a document" and says why.
+- **Other suites:** rooms all pass, isolation both suites both ways pass,
+  staff-cases all pass (the 403 wording now points to the platform for what
+  a role may do), typecheck clean, web tests 169.
+
+**Trap met:** a restrictive policy on promos' SELECT broke staff reading
+promos (the booking form's picker). Only verify 198's positive twin showed
+it; the negative half had passed.

@@ -351,7 +351,7 @@ export function firstError(error: z.ZodError): string {
 // schema-roles.sql), and the routes pass its message through. The regexes
 // repeated here exist to say so FIRST, in the form, with the same rule.
 
-import { ROLES } from './permissions';
+import { CONFIGURABLE_PERMISSIONS, ROLES } from './permissions';
 import { COLOUR, THEME_KEYS } from './theme';
 
 /** The same shape as tenants_slug_shape: lower-case, digits and hyphens, 3–32, no hyphen at either end. */
@@ -439,6 +439,24 @@ export const updateTenantSchema = z
 /** An application's config: an object. What it must hold is the trigger's to say. */
 export const applicationConfigSchema = z.object({
   config: z.record(z.unknown(), { required_error: 'A config object is required', invalid_type_error: 'A config object is required' }),
+});
+
+/**
+ * PUT /api/platform/tenants/[id]/permissions (D-128): the rows where a
+ * tenant differs from the default, all of them; [] = the default. Postgres
+ * checks the same shapes (role_permissions_role, _configurable).
+ */
+export const rolePermissionsSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        role: z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) }),
+        permission: z.enum(CONFIGURABLE_PERMISSIONS as [string, ...string[]], { errorMap: () => ({ message: 'That permission cannot be changed per tenant' }) }),
+        allowed: z.boolean({ invalid_type_error: 'allowed is true or false' }),
+      }),
+      { required_error: 'The rows are required', invalid_type_error: 'The rows are a list' },
+    )
+    .max(ROLES.length * CONFIGURABLE_PERMISSIONS.length, 'Too many rows'),
 });
 
 /** PUT /api/platform/tenants/[id]/features/[key] (D-127): on or off. The key is in the URL, checked against lib/features.ts. */

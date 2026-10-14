@@ -1737,7 +1737,10 @@ async function rolesChecks() {
 
     // 99. tenants: a chat token and a staff token read 0 rows; a platform token
     //     WITH its platform_admins row reads every tenant (the count matches
-    //     service_role's), archived included, and reads 0 rows of any tenant table.
+    //     service_role's), archived included, and reads 0 rows of a tenant's
+    //     bookings, messages or payments. Since D-128 it DOES read the
+    //     knowledge base (documents and chunks): the platform may be the one
+    //     who adds documents. The count then matches service_role's.
     // 100. The claim without the row: the same token, once the row is gone,
     //     reads 0 tenants. Without this twin, 99 would prove only that the
     //     claim is honoured, not that the row is required (plan Rule 1).
@@ -1751,12 +1754,16 @@ async function rolesChecks() {
       const documents = await superClient.from('documents').select('id');
       const chunks = await superClient.from('chunks').select('id');
       const bookings = await superClient.from('bookings').select('id');
+      const messages = await superClient.from('messages').select('id');
+      const payments = await superClient.from('payments').select('id');
+      const { count: allDocuments } = await supabase.from('documents').select('id', { count: 'exact', head: true });
       check(
         !chatRows.error && chatRows.data.length === 0 && !staffRows.error && staffRows.data.length === 0
           && !all.error && all.data.length === count && count >= 5
-          && documents.data?.length === 0 && chunks.data?.length === 0 && bookings.data?.length === 0,
-        'roles: tenants read by the platform only, and the platform reads no tenant table',
-        `chat ${chatRows.data?.length} · staff ${staffRows.data?.length} · platform ${all.error ? all.error.message : all.data.length} of ${count} · documents ${documents.data?.length} chunks ${chunks.data?.length} bookings ${bookings.data?.length}`,
+          && documents.data?.length === allDocuments && allDocuments > 0 && (chunks.data?.length ?? 0) > 0
+          && bookings.data?.length === 0 && messages.data?.length === 0 && payments.data?.length === 0,
+        'roles: tenants read by the platform only; the platform reads the knowledge base (D-128) and no bookings, messages or payments',
+        `chat ${chatRows.data?.length} · staff ${staffRows.data?.length} · platform ${all.error ? all.error.message : all.data.length} of ${count} · documents ${documents.data?.length} of ${allDocuments} chunks ${chunks.data?.length} · bookings ${bookings.data?.length} messages ${messages.data?.length} payments ${payments.data?.length}`,
       );
       await supabase.from('platform_admins').delete().eq('user_id', ids.super);
       const none = await asToken(platformToken(ids.super)).from('tenants').select('id');
@@ -3832,6 +3839,130 @@ async function notificationChecks() {
     }
   } catch (error) {
     check(false, 'features: setup', error.message);
+  } finally {
+    if (probe) await supabase.from('tenants').delete().eq('id', probe);
+    for (const id of users) {
+      await supabase.from('platform_admins').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+    }
+  }
+}
+
+// --- schema-role-permissions.sql (D-128): role permissions per tenant ---------
+// On a THROWAWAY tenant with an owner, an admin and a staff member:
+// 197. by default the owner adds a document (the twin); once the super user
+//      takes documents:write from owner and admin, both are refused by
+//      Postgres, still READ the documents, and app_can() says so;
+// 198. a GRANT: staff may not add a promo until the tenant grants
+//      promos:write to staff, and then may;
+// 199. a grant Postgres cannot honour does nothing (staff given
+//      members:manage still adds no member), and a FIXED permission cannot
+//      be stored at all (payments:write: 23514);
+// 200. only a super user sets them: the owner's set_role_permissions() is
+//      42501 and its direct insert is refused, nothing written;
+// 201. the super user adds, reads and deletes a document AND its chunk for
+//      the tenant on the platform token (D-128), naming the tenant.
+{
+  const users = [];
+  let probe = null;
+  try {
+    const { data: t, error: tError } = await supabase.from('tenants').insert({ slug: `roles-${randomBytes(3).toString('hex')}`, business_name: 'Roles Probe', assistant_name: 'Probe' }).select('id').single();
+    if (tError) throw new Error(`tenant: ${tError.message}`);
+    probe = t.id;
+    const user = async () => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `roles-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      return data.user.id;
+    };
+    const ids = { super: await user(), owner: await user(), admin: await user(), staff: await user() };
+    const pa = await supabase.from('platform_admins').insert({ user_id: ids.super });
+    if (pa.error) throw new Error(`platform_admins: ${pa.error.message}`);
+    for (const role of ['owner', 'admin', 'staff']) {
+      const m = await supabase.from('memberships').insert({ user_id: ids[role], tenant_id: probe, role });
+      if (m.error) throw new Error(`membership ${role}: ${m.error.message}`);
+    }
+    const superDb = asToken(platformToken(ids.super));
+    const db = { owner: asToken(staffToken(probe, ids.owner)), admin: asToken(staffToken(probe, ids.admin)), staff: asToken(staffToken(probe, ids.staff)) };
+    const setRows = (rows) => superDb.rpc('set_role_permissions', { p_tenant_id: probe, p_rows: rows });
+    const addDoc = (client, title) => client.from('documents').insert({ tenant_id: probe, title, content: 'probe' }).select('id');
+    const promo = (client) =>
+      client.from('promos').insert({ tenant_id: probe, name: 'Probe', kind: 'fixed', value: 100, valid_from: '2026-01-01', valid_to: '2026-12-31' }).select('id');
+
+    // 197
+    {
+      const before = await addDoc(db.owner, 'by default');
+      const set = await setRows([{ role: 'owner', permission: 'documents:write', allowed: false }, { role: 'admin', permission: 'documents:write', allowed: false }]);
+      const ownerAfter = await addDoc(db.owner, 'refused');
+      const adminAfter = await addDoc(db.admin, 'refused');
+      const ownerReads = await db.owner.from('documents').select('id').eq('tenant_id', probe);
+      const { data: canWrite } = await db.owner.rpc('app_can', { p_permission: 'documents:write' });
+      const { data: canRead } = await db.owner.rpc('app_can', { p_permission: 'documents:read' });
+      const { count } = await supabase.from('documents').select('id', { count: 'exact', head: true }).eq('tenant_id', probe);
+      check(
+        !before.error && before.data?.length === 1 && !set.error && set.data === 2
+          && !!ownerAfter.error && !!adminAfter.error && ownerReads.data?.length === 1 && canWrite === false && canRead === true && count === 1,
+        'role permissions: the owner adds a document by default; with documents:write taken from owner and admin both are refused, the owner still reads, app_can() agrees',
+        `before ${before.error?.message ?? 'ok'} · set ${set.error?.message ?? set.data} · owner ${ownerAfter.error?.message ?? 'ADDED'} · admin ${adminAfter.error?.message ?? 'ADDED'} · reads ${ownerReads.data?.length} · can write ${canWrite} read ${canRead} · rows ${count}`,
+      );
+    }
+
+    // 198
+    {
+      const refused = await promo(db.staff);
+      const set = await setRows([{ role: 'staff', permission: 'promos:write', allowed: true }]);
+      const granted = await promo(db.staff);
+      check(
+        !!refused.error && !set.error && !granted.error && granted.data?.length === 1,
+        'role permissions: staff cannot add a promo by default; granted promos:write, it can (and the earlier owner rows were replaced)',
+        `default ${refused.error?.message ?? 'ADDED'} · set ${set.error?.message ?? set.data} · granted ${granted.error?.message ?? granted.data?.length}`,
+      );
+    }
+
+    // 199
+    {
+      const set = await setRows([{ role: 'staff', permission: 'members:manage', allowed: true }]);
+      const extra = await user();
+      const add = await db.staff.from('memberships').insert({ user_id: extra, tenant_id: probe, role: 'staff' }).select('user_id');
+      const { data: canManage } = await db.staff.rpc('app_can', { p_permission: 'members:manage' });
+      const fixed = await setRows([{ role: 'admin', permission: 'payments:write', allowed: false }]);
+      check(
+        !set.error && (!!add.error || (add.data ?? []).length === 0) && canManage === false && fixed.error?.code === '23514',
+        'role permissions: a grant Postgres cannot honour does nothing (staff + members:manage adds no member, app_can false); a fixed permission is refused (23514)',
+        `set ${set.error?.message ?? set.data} · add ${add.error?.message ?? add.data?.length} · app_can ${canManage} · fixed ${fixed.error?.code ?? 'STORED'}`,
+      );
+    }
+
+    // 200
+    {
+      const before = (await supabase.from('role_permissions').select('permission').eq('tenant_id', probe)).data?.length;
+      const viaFunction = await db.owner.rpc('set_role_permissions', { p_tenant_id: probe, p_rows: [] });
+      const direct = await db.owner.from('role_permissions').insert({ tenant_id: probe, role: 'owner', permission: 'promos:read', allowed: false }).select('role');
+      const after = (await supabase.from('role_permissions').select('permission').eq('tenant_id', probe)).data?.length;
+      check(
+        viaFunction.error?.code === '42501' && !!direct.error && before === after && before === 1,
+        "role permissions: only a super user sets them: the owner's function call is 42501, its insert refused, the row count unchanged",
+        `function ${viaFunction.error?.code ?? 'RAN'} · insert ${direct.error?.message ?? 'WROTE'} · rows ${before} → ${after}`,
+      );
+    }
+
+    // 201
+    {
+      const doc = await superDb.from('documents').insert({ tenant_id: probe, title: 'from the platform', content: 'probe' }).select('id').single();
+      const chunk = doc.data
+        ? await superDb.from('chunks').insert({ tenant_id: probe, document_id: doc.data.id, chunk_index: 0, content: 'probe', embedding: `[${new Array(VECTOR_DIMENSIONS).fill(0).join(',')}]` }).select('id')
+        : { error: { message: 'no document' } };
+      const read = await superDb.from('chunks').select('id').eq('tenant_id', probe);
+      const gone = await superDb.from('documents').delete({ count: 'exact' }).eq('tenant_id', probe).eq('id', doc.data?.id ?? 0);
+      const { count: chunksLeft } = await supabase.from('chunks').select('id', { count: 'exact', head: true }).eq('tenant_id', probe);
+      check(
+        !doc.error && !chunk.error && read.data?.length === 1 && gone.count === 1 && chunksLeft === 0,
+        'role permissions: a super user adds a document and its chunk for a tenant, reads it, and deletes it (the chunk goes with it)',
+        `doc ${doc.error?.message ?? 'ok'} · chunk ${chunk.error?.message ?? 'ok'} · read ${read.data?.length} · deleted ${gone.count} · chunks left ${chunksLeft}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'role permissions: setup', error.message);
   } finally {
     if (probe) await supabase.from('tenants').delete().eq('id', probe);
     for (const id of users) {

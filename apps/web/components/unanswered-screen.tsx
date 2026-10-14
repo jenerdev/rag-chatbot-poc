@@ -192,7 +192,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, nav, limit }: Un
 
   const frame = { slug, businessName, logoUrl, features: nav, current: 'unanswered' as const, title: 'Unanswered questions', session: { auth, role, onLogout: logout } };
   // "Add answer" is for a member who may write documents; the others resolve only.
-  const canAnswer = role !== null && can(role, 'documents:write');
+  const canAnswer = role !== null && can(role, 'documents:write', nav.access);
   const answerHref = (question: string) => `/t/${slug}/admin/documents?question=${encodeURIComponent(question)}`;
 
   if (auth !== 'in') {

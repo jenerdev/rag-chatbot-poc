@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { signInStaff, staffClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
 import { can, type Permission, type Role } from './permissions';
+import { loadRoleOverrides } from './role-access';
 
 // Staff sessions (auth-rls Phase 5, D-040; the cookie is D-028's).
 //
@@ -151,8 +152,9 @@ export async function requireAdmin(request: Request, tenant: TenantContext, perm
   if (!userId) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
   const staff = await staffClient(tenant.id, userId);
   if (!staff) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
-  if (!can(staff.role, permission)) {
-    throw new PermissionError(`Your role (${staff.role}) may not do this (${permission}). Ask an owner of "${tenant.slug}" to change it.`);
+  // The tenant's own permissions (D-128): the default, as the platform has changed it. Postgres asks app_can() again.
+  if (!can(staff.role, permission, await loadRoleOverrides(tenant))) {
+    throw new PermissionError(`Your role (${staff.role}) may not do this (${permission}) in "${tenant.slug}". An owner can change your role; what each role may do is set by the platform.`);
   }
   return { ...tenant, db: staff.db, role: staff.role, userId };
 }

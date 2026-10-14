@@ -64,6 +64,8 @@ export { DEFAULT_REFUSALS, displayReply, isRefusal, refusalFilter, refusalText }
 export { loadTenant } from './tenant.js';
 export { APPLICATIONS, enabledApplications } from './applications.js';
 export { featureSwitches } from './features.js';
+export { rolePermissionRows, setRolePermissions } from './role-permissions.js';
+export type { RolePermissionRow } from './role-permissions.js';
 export { executeTool, toolsFor } from './tools.js';
 export { listUnanswered, reopenUnanswered, reopenUnansweredMany, resolveUnanswered, resolveUnansweredMany, UNANSWERED_LIMIT } from './unanswered.js';
 export {
@@ -78,6 +80,7 @@ export {
   PlatformNotFoundError,
   removeApplication,
   setFeature,
+  platformTenantContext,
   setApplication,
   updateTenant,
 } from './platform.js';

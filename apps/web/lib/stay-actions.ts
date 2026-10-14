@@ -16,7 +16,7 @@
 // stay's own decisions, payments:write for proofs, changes and refunds.
 
 import type { StayDetail } from '@rag/bookings';
-import { can, type Role } from './permissions';
+import { can, type Role, type RoleOverrides } from './permissions';
 
 export interface StayActions {
   confirm: boolean;
@@ -35,9 +35,9 @@ export interface StayActions {
 
 type ActionInput = Pick<StayDetail, 'status' | 'checkOut' | 'today' | 'clash' | 'closed' | 'payment' | 'payments' | 'changes'>;
 
-export function stayActions(stay: ActionInput, role: Role | null): StayActions {
-  const stayWrite = role !== null && can(role, 'bookings:write');
-  const payWrite = role !== null && can(role, 'payments:write');
+export function stayActions(stay: ActionInput, role: Role | null, access?: RoleOverrides): StayActions {
+  const stayWrite = role !== null && can(role, 'bookings:write', access);
+  const payWrite = role !== null && can(role, 'payments:write', access);
   const pending = stay.status === 'pending';
   const confirmBlocked = !pending
     ? null

@@ -3,6 +3,7 @@ import { bookingsConfig, hasBookingPage } from '@rag/bookings';
 import type { TenantContext } from '@rag/pipeline';
 import { hasApplication } from '@/lib/applications';
 import { loadFeatures } from '@/lib/feature-flags';
+import { loadRoleOverrides } from '@/lib/role-access';
 import type { NavFeatures } from '@/lib/nav-items';
 
 /**
@@ -12,8 +13,8 @@ import type { NavFeatures } from '@/lib/nav-items';
  * (D-127) has no page at all.
  */
 export async function loadNavFeatures(tenant: TenantContext): Promise<NavFeatures> {
-  const [bookings, flags] = await Promise.all([hasApplication(tenant, 'bookings'), loadFeatures(tenant)]);
-  if (!bookings) return { bookings: false, rooms: false, book: false, manage: false, flags };
+  const [bookings, flags, access] = await Promise.all([hasApplication(tenant, 'bookings'), loadFeatures(tenant), loadRoleOverrides(tenant)]);
+  if (!bookings) return { bookings: false, rooms: false, book: false, manage: false, flags, access };
   const [config, book] = await Promise.all([bookingsConfig(tenant), hasBookingPage(tenant)]);
-  return { bookings: true, rooms: config?.bookingType === 'per_room', book: book && flags.booking_page, manage: flags.manage_booking, flags };
+  return { bookings: true, rooms: config?.bookingType === 'per_room', book: book && flags.booking_page, manage: flags.manage_booking, flags, access };
 }

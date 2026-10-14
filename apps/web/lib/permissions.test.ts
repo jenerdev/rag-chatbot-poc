@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { NOTIFY_PERMISSION, PERMISSIONS, ROLES, ROLE_PERMISSIONS, can, isRole, type Permission, type Role } from './permissions';
+import { CONFIGURABLE_PERMISSIONS, GRANTABLE_PERMISSIONS, NOTIFY_PERMISSION, PERMISSIONS, PERMISSION_LABELS, ROLES, ROLE_PERMISSIONS, can, isRole, overridesFrom, type Permission, type Role } from './permissions';
 import { COLOUR, parseTheme, themeVars } from './theme';
 
 // The two walls must agree (plan/tenant-management.md Rule 2, § 3.2). This
@@ -94,3 +94,45 @@ describe('NOTIFY_PERMISSION', () => {
     expect(ROLES.filter((r) => can(r, NOTIFY_PERMISSION.change))).toEqual([...ROLES]);
   });
 });
+
+describe('per-tenant role permissions (D-128): the code and app_can() agree', () => {
+  const sql = readFileSync(new URL('../../../packages/db/sql/schema-role-permissions.sql', import.meta.url), 'utf8');
+  const between = (from: string, to: string) => sql.slice(sql.indexOf(from), sql.indexOf(to, sql.indexOf(from)));
+  const quoted = (text: string) => [...text.matchAll(/'([a-z]+:[a-z]+)'/g)].map((m) => m[1]);
+
+  it("app_default_can()'s matrix is ROLE_PERMISSIONS, pair for pair", () => {
+    const body = between('function public.app_default_can', '$$;');
+    const pairs = [...body.matchAll(/\('(owner|admin|staff)', '([a-z]+:[a-z]+|session)'\)/g)].map((m) => `${m[1]} ${m[2]}`).sort();
+    const code = ROLES.flatMap((role) => ROLE_PERMISSIONS[role].map((p) => `${role} ${p}`)).sort();
+    expect(pairs).toEqual(code);
+  });
+
+  it('the configurable check and the grantable list are the code lists', () => {
+    expect(quoted(between('role_permissions_configurable check', '));')).sort()).toEqual([...CONFIGURABLE_PERMISSIONS].sort());
+    expect(quoted(between('function public.app_permission_grantable', '$$;')).sort()).toEqual([...GRANTABLE_PERMISSIONS].sort());
+    for (const p of GRANTABLE_PERMISSIONS) expect(CONFIGURABLE_PERMISSIONS).toContain(p);
+    for (const fixed of ['session', 'payments:write', 'payments:settings'] as const) expect(CONFIGURABLE_PERMISSIONS).not.toContain(fixed);
+  });
+
+  it('a row takes a configurable permission away, and grants only a grantable one', () => {
+    const o = overridesFrom([
+      { role: 'owner', permission: 'documents:write', allowed: false },
+      { role: 'staff', permission: 'promos:write', allowed: true },
+      { role: 'staff', permission: 'members:manage', allowed: true }, // not grantable
+      { role: 'admin', permission: 'payments:write', allowed: false }, // fixed
+      { role: 'super', permission: 'documents:write', allowed: true }, // no such role
+    ]);
+    expect(can('owner', 'documents:write', o)).toBe(false);
+    expect(can('owner', 'documents:read', o)).toBe(true);
+    expect(can('staff', 'promos:write', o)).toBe(true);
+    expect(can('staff', 'members:manage', o)).toBe(false);
+    expect(can('admin', 'payments:write', o)).toBe(true);
+    expect(can('admin', 'documents:write', o)).toBe(true);
+    expect(can('owner', 'documents:write')).toBe(true);
+  });
+
+  it('every permission has a label', () => {
+    for (const p of PERMISSIONS) expect(PERMISSION_LABELS[p].label.length).toBeGreaterThan(0);
+  });
+});
+

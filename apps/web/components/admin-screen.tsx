@@ -219,7 +219,7 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
   // base and gets no form and no Edit or Delete; the routes refuse a staff
   // write with a 403 whatever the screen shows (lib/permissions.ts).
   const [role, setRole] = useState<Role | null>(null);
-  const canWrite = role !== null && can(role, 'documents:write');
+  const canWrite = role !== null && can(role, 'documents:write', nav.access);
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [title, setTitle] = useState('');
@@ -288,7 +288,7 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
   // as the title and a question-and-answer start, for a member who may write.
   // The address is cleaned so a reload does not open it again.
   useEffect(() => {
-    if (auth !== 'in' || role === null || !can(role, 'documents:write')) return;
+    if (auth !== 'in' || role === null || !can(role, 'documents:write', nav.access)) return;
     const params = new URLSearchParams(window.location.search);
     const question = params.get('question')?.trim();
     if (!question) return;
@@ -481,7 +481,7 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
           <section className="card">
             <p className="small muted">
               You are {ROLE_LABELS[role].toLowerCase()} here: you can read the knowledge base and see what each answer was
-              built from. Adding or editing documents is for an admin or owner.
+              built from. Adding or editing documents is not part of your role in this workspace.
             </p>
           </section>
         )}

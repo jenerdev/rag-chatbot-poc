@@ -6,9 +6,9 @@ import { groupNavItems, groupOf, navItems, type NavFeatures } from './nav-items'
 // tenant has (so a button never leads to a 404).
 const labels = (features: NavFeatures, role: Parameters<typeof navItems>[2]) => navItems('t', features, role).map((i) => i.label);
 
-const NORTHWIND: NavFeatures = { bookings: false, rooms: false, book: false, manage: false, flags: ALL_ON };
-const VILLA: NavFeatures = { bookings: true, rooms: false, book: true, manage: true, flags: ALL_ON };
-const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true, manage: true, flags: ALL_ON };
+const NORTHWIND: NavFeatures = { bookings: false, rooms: false, book: false, manage: false, flags: ALL_ON, access: {} };
+const VILLA: NavFeatures = { bookings: true, rooms: false, book: true, manage: true, flags: ALL_ON, access: {} };
+const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true, manage: true, flags: ALL_ON, access: {} };
 
 describe('navItems', () => {
   it('shows a visitor the public pages only', () => {

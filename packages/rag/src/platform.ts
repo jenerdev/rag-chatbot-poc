@@ -23,6 +23,7 @@
 
 import type { Database, DbClient, Json } from '@rag/db';
 import { APPLICATIONS, type ApplicationKey } from './applications.js';
+import type { TenantContext } from './types.js';
 
 /** What a platform route runs on. No tenant, by design. */
 export interface PlatformContext {
@@ -110,6 +111,8 @@ export interface TenantDetail extends TenantSummary {
   applicationConfigs: Partial<Record<ApplicationKey, Json>>;
   /** D-127: the feature rows this tenant has, key → enabled; a key with no row is on. */
   features: Record<string, boolean>;
+  /** D-128: where its role permissions differ from the default. */
+  rolePermissions: { role: string; permission: string; allowed: boolean }[];
 }
 
 type TenantRow = {
@@ -172,17 +175,19 @@ export async function listTenants(platform: PlatformContext): Promise<TenantSumm
 
 /** One tenant with each application's config, or a 404. By id, not slug: an archived tenant still has to be reachable to unarchive. */
 export async function getTenant(platform: PlatformContext, tenantId: number): Promise<TenantDetail> {
-  const [tenant, apps, members, features] = await Promise.all([
+  const [tenant, apps, members, features, roles] = await Promise.all([
     platform.db.from('tenants').select(TENANT_COLUMNS).eq('id', tenantId).maybeSingle(),
     platform.db.from('tenant_applications').select('application_key, config').eq('tenant_id', tenantId),
     platform.db.from('memberships').select('user_id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
     platform.db.from('tenant_features').select('feature, enabled').eq('tenant_id', tenantId),
+    platform.db.from('role_permissions').select('role, permission, allowed').eq('tenant_id', tenantId).order('permission').order('role'),
   ]);
   if (tenant.error) throw fromPostgrest(tenant.error, 'Could not load the tenant');
   if (!tenant.data) throw new PlatformNotFoundError(`No tenant ${tenantId}.`);
   if (apps.error) throw fromPostgrest(apps.error, 'Could not load the applications');
   if (members.error) throw fromPostgrest(members.error, 'Could not count members');
   if (features.error) throw fromPostgrest(features.error, 'Could not load the feature flags');
+  if (roles.error) throw fromPostgrest(roles.error, 'Could not load the role permissions');
 
   const keys: ApplicationKey[] = [];
   const configs: Partial<Record<ApplicationKey, Json>> = {};
@@ -195,6 +200,7 @@ export async function getTenant(platform: PlatformContext, tenantId: number): Pr
     ...summary(tenant.data, keys, members.count ?? 0),
     applicationConfigs: configs,
     features: Object.fromEntries(features.data.map((f) => [f.feature, f.enabled])),
+    rolePermissions: roles.data,
   };
 }
 
@@ -307,3 +313,25 @@ export async function setFeature(platform: PlatformContext, tenantId: number, fe
   console.log(`[platform] ${platform.userId} switched ${feature} ${enabled ? 'on' : 'off'} for tenant ${tenantId}`);
   return getTenant(platform, tenantId);
 }
+
+/**
+ * The tenant AS the platform (D-128): a TenantContext whose client is the
+ * PLATFORM token, for the knowledge-base functions in ingest.ts, which
+ * filter on `tenant.id` in every query (wall 1) while the super policies on
+ * documents and chunks let the platform token reach the rows at all
+ * (wall 2, app_is_super()). Only the knowledge base is reached this way;
+ * the platform token still reads no booking, message or payment.
+ */
+export async function platformTenantContext(platform: PlatformContext, tenantId: number): Promise<TenantContext> {
+  const detail = await getTenant(platform, tenantId);
+  return {
+    id: detail.id,
+    slug: detail.slug,
+    businessName: detail.businessName,
+    assistantName: detail.assistantName,
+    fallbackMessages: {},
+    suggestedQuestions: [],
+    db: platform.db,
+  };
+}
+

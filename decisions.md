@@ -2264,6 +2264,8 @@ policies need no change unless the new role's writes cut across
 
 ## D-076 · The platform is a table and a second, tenant-less token shape; it manages every tenant's record and reads no tenant's content · **Added 2026-09-29 (tenant management Phases 1–4). Amends D-039 and D-042, and CLAUDE.md rule 8**
 
+> **Amended 2026-10-14 by D-128:** the platform now reads, adds and deletes a tenant's knowledge-base documents and chunks (`documents_super_all`, `chunks_super_all`). It still reads no booking, guest, message or payment.
+
 **Decision:** a super user is a `platform_admins` row, not a membership.
 `mintPlatformToken({ userId })` mints `{ role: authenticated, sub,
 app_super: true }` with NO `tenant_id`, from the same signer as the tenant
@@ -4032,3 +4034,44 @@ there is nothing new for Postgres to hide.
 trigger, so switching it off means a SQL change to `promo_discount()`),
 holidays and slots (they decide prices and times, not just a screen).
 
+## D-128 · What each role may do is set per tenant, on the platform · **Added 2026-10-14. Amends D-075, D-076 and D-079**
+
+**Decision:** `lib/permissions.ts`'s table stays as the DEFAULT. A super user
+changes it per tenant on the platform form's Permissions tab, stored as
+`role_permissions` rows (`sql/schema-role-permissions.sql`, the 34th file):
+- any CONFIGURABLE permission can be taken from a role (18 of 21);
+- a GRANTABLE one can also be given to a role that lacks it (documents,
+  rooms, holidays, slots and promos);
+- three are FIXED: session, payments:write and payments:settings.
+
+`can(role, permission, overrides)` in code and `app_can()` in SQL compute
+the same answer from the same rows, and `permissions.test.ts` pins the two
+lists and the default matrix to the SQL file. The super user may also manage
+a tenant's knowledge base from the platform (a Knowledge base tab; super
+policies on `documents` and `chunks`).
+
+**Why:** the user asked for role permissions configured on the platform,
+with the example "only the super user uploads knowledge-base documents; the
+owner only reads". That is two rows (owner and admin lose documents:write)
+plus the platform's own upload.
+
+**Why not everything is grantable:** a permission checked inside a SECURITY
+DEFINER function (verify a proof, payment settings) or a trigger that names
+a role (members) cannot be widened by a row: one wall would allow what the
+other refuses. Restricting is always safe, because a RESTRICTIVE policy is
+ANDed with what exists.
+
+**How:** the existing policies are untouched, so no older file needed a
+guard. Each gained a restrictive twin (`<table>_may_<cmd>`, through
+`app_may()`, which passes any non-member token), and each grantable one a
+permissive twin (`<table>_can_<cmd>`).
+
+**Found on the way:** the first version also restricted promos' SELECT on
+promos:read. That is the Promos SCREEN, admin-only by default, but the
+database lets every member read promos for the staff form's picker. verify
+198's positive twin caught it, and the policy was removed.
+
+**Code-only (stated, not hidden):** dashboard:read, conversations:read and
+the rooms/holidays/slots reads guard screens over data that every token of
+the tenant can already read (the chat reads rooms, slots and every message).
+Withholding them is wall 1's job; Postgres keeps its old rule for that data.

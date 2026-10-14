@@ -8,7 +8,7 @@
 
 import type { Attention } from './attention';
 import type { FeatureFlags } from './features';
-import { can, type Role } from './permissions';
+import { can, type Role, type RoleOverrides } from './permissions';
 
 /**
  * What the TENANT has, worked out on the server (lib/nav.ts) and passed down
@@ -26,6 +26,8 @@ export interface NavFeatures {
   manage: boolean;
   /** the tenant's feature flags (D-127, lib/features.ts): a switched-off screen has no link */
   flags: FeatureFlags;
+  /** the tenant's role permissions where they differ from the default (D-128); {} = the default */
+  access: RoleOverrides;
 }
 
 export type NavPage = 'chat' | 'book' | 'manage' | 'payments' | 'dashboard' | 'notifications' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
@@ -55,23 +57,23 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null,
   // first, then the chat assistant, then what is set up once.
   const staff: [NavPage, string, string, boolean][] = [
     // First (plan/dashboard.md § 7 q1): the page to land on; /admin redirects here.
-    ['dashboard', 'Dashboard', '/admin/dashboard', features.flags.dashboard && can(role, 'dashboard:read')],
+    ['dashboard', 'Dashboard', '/admin/dashboard', features.flags.dashboard && can(role, 'dashboard:read', features.access)],
     // S-17 (plan/notifications.md § 8): what arrived, read or not; the ONE badge. The top bar's bell.
-    ['notifications', 'Notifications', '/admin/notifications', features.bookings && features.flags.notifications && can(role, 'bookings:read')],
-    ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read')],
+    ['notifications', 'Notifications', '/admin/notifications', features.bookings && features.flags.notifications && can(role, 'bookings:read', features.access)],
+    ['bookings', 'Bookings', '/admin/bookings', features.bookings && can(role, 'bookings:read', features.access)],
     // S-12 (plan/calendar.md, D-103): a view of the same bookings, so the same permission.
-    ['calendar', 'Calendar', '/admin/calendar', features.bookings && features.flags.calendar && can(role, 'bookings:read')],
+    ['calendar', 'Calendar', '/admin/calendar', features.bookings && features.flags.calendar && can(role, 'bookings:read', features.access)],
     // S-14 (plan/manage-booking.md): proofs to verify, refunds, the payment settings.
-    ['payments', 'Payments', '/admin/payments', features.bookings && can(role, 'payments:read')],
+    ['payments', 'Payments', '/admin/payments', features.bookings && can(role, 'payments:read', features.access)],
     // S-16 (plan/conversations.md, D-115): every chat, every tenant.
-    ['conversations', 'Conversations', '/admin/conversations', features.flags.conversations && can(role, 'conversations:read')],
-    ['unanswered', 'Unanswered', '/admin/unanswered', features.flags.unanswered && can(role, 'unanswered:read')],
-    ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read')],
-    ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read')],
-    ['slots', 'Slots', '/admin/slots', features.bookings && can(role, 'slots:read')],
-    ['holidays', 'Holidays', '/admin/holidays', features.bookings && can(role, 'holidays:read')],
-    ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read')],
-    ['members', 'Members', '/admin/members', can(role, 'members:manage')],
+    ['conversations', 'Conversations', '/admin/conversations', features.flags.conversations && can(role, 'conversations:read', features.access)],
+    ['unanswered', 'Unanswered', '/admin/unanswered', features.flags.unanswered && can(role, 'unanswered:read', features.access)],
+    ['documents', 'Knowledge base', '/admin/documents', can(role, 'documents:read', features.access)],
+    ['rooms', 'Rooms', '/admin/accommodations', features.rooms && can(role, 'rooms:read', features.access)],
+    ['slots', 'Slots', '/admin/slots', features.bookings && can(role, 'slots:read', features.access)],
+    ['holidays', 'Holidays', '/admin/holidays', features.bookings && can(role, 'holidays:read', features.access)],
+    ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read', features.access)],
+    ['members', 'Members', '/admin/members', can(role, 'members:manage', features.access)],
   ];
   // What this member has not read, on Notifications alone; a zero is no badge.
   for (const [page, label, path, allowed] of staff) {

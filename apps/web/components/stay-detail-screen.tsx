@@ -212,7 +212,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav }
     );
   }
 
-  const actions = stayActions(stay, role);
+  const actions = stayActions(stay, role, nav.access);
   const badge = statusBadge(stay);
   const money = (n: number) => formatMoney(n, stay.currency);
   const stayWhen = `${stay.slot}, ${stay.nights > 1 ? `${stay.nights} nights from ` : ''}${dayLabel(stay.checkIn)}`;
