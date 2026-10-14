@@ -1459,4 +1459,4 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 /* The booking page's consent box (D-129), above Send. */
 .consent-check { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-3) 0; font-size: var(--text-sm); font-weight: 400; line-height: 1.5; cursor: pointer; }
 .consent-check input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent-fill); }
-
+.dpa-needed { margin: 0 var(--space-6) var(--space-4); }

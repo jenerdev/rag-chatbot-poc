@@ -435,6 +435,13 @@ export const updateTenantSchema = z
     theme: themeSchema.optional(),
     fallbackMessages: fallbackMessagesSchema.optional(),
     suggestedQuestions: suggestedQuestionsSchema.optional(),
+    // D-129–D-131, the Legal tab. The shapes are checked again by Postgres.
+    privacyContactName: z.string().trim().min(1, 'The contact name is empty').max(100, 'The contact name is at most 100 characters').nullable().optional(),
+    privacyContactEmail: z.string().trim().email('The privacy contact is an email address').max(254).nullable().optional(),
+    dpaSignedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'The DPA date is YYYY-MM-DD').nullable().optional(),
+    policyVersion: z.string().trim().regex(/^[A-Za-z0-9._-]{1,20}$/, 'The version is 1–20 letters, digits, dots, dashes or underscores').optional(),
+    chatRetentionDays: z.number().int().min(30, 'Chats are kept at least 30 days').max(1825, 'Chats are kept at most 1,825 days').optional(),
+    guestRetentionDays: z.number().int().min(180, 'Guest details are kept at least 180 days').max(3650, 'Guest details are kept at most 3,650 days').optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');

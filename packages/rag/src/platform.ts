@@ -81,7 +81,7 @@ export function fromPostgrest(error: { code?: string; message: string }, what: s
 }
 
 /** The tenants columns a platform read selects. EXPLICIT, never `*` (CLAUDE.md § Conventions). */
-const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at';
+const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at, privacy_contact_name, privacy_contact_email, dpa_signed_on, policy_version, chat_retention_days, guest_retention_days';
 
 /** One row of the platform's tenant list. */
 export interface TenantSummary {
@@ -100,6 +100,15 @@ export interface TenantSummary {
   /** ISO timestamp, or null while live. An archived tenant is a 404 everywhere but here. */
   archivedAt: string | null;
   createdAt: string;
+  /** D-129–D-131: the privacy contact, the DPA date (YYYY-MM-DD), the policy version, the retention periods in days */
+  legal: {
+    privacyContactName: string | null;
+    privacyContactEmail: string | null;
+    dpaSignedOn: string | null;
+    policyVersion: string;
+    chatRetentionDays: number;
+    guestRetentionDays: number;
+  };
   /** The application keys switched on. */
   applications: ApplicationKey[];
   /** How many memberships, any role. */
@@ -128,6 +137,12 @@ type TenantRow = {
   suggested_questions: Json | null;
   archived_at: string | null;
   created_at: string;
+  privacy_contact_name: string | null;
+  privacy_contact_email: string | null;
+  dpa_signed_on: string | null;
+  policy_version: string;
+  chat_retention_days: number;
+  guest_retention_days: number;
 };
 
 const isApplicationKey = (key: string): key is ApplicationKey => Object.hasOwn(APPLICATIONS, key);
@@ -146,6 +161,14 @@ function summary(row: TenantRow, applications: ApplicationKey[], members: number
     suggestedQuestions: row.suggested_questions,
     archivedAt: row.archived_at,
     createdAt: row.created_at,
+    legal: {
+      privacyContactName: row.privacy_contact_name,
+      privacyContactEmail: row.privacy_contact_email,
+      dpaSignedOn: row.dpa_signed_on,
+      policyVersion: row.policy_version,
+      chatRetentionDays: row.chat_retention_days,
+      guestRetentionDays: row.guest_retention_days,
+    },
     applications,
     members,
   };
@@ -232,6 +255,13 @@ export interface TenantPatch {
   theme?: Json;
   fallbackMessages?: Json | null;
   suggestedQuestions?: Json | null;
+  /** D-129–D-131: the Legal tab's fields; each is Postgres's to check (tenants_privacy_contact, _policy_version, _retention) */
+  privacyContactName?: string | null;
+  privacyContactEmail?: string | null;
+  dpaSignedOn?: string | null;
+  policyVersion?: string;
+  chatRetentionDays?: number;
+  guestRetentionDays?: number;
 }
 
 export async function updateTenant(platform: PlatformContext, tenantId: number, patch: TenantPatch): Promise<TenantDetail> {
@@ -245,6 +275,12 @@ export async function updateTenant(platform: PlatformContext, tenantId: number, 
   if (patch.theme !== undefined) row.theme = patch.theme;
   if (patch.fallbackMessages !== undefined) row.fallback_messages = patch.fallbackMessages;
   if (patch.suggestedQuestions !== undefined) row.suggested_questions = patch.suggestedQuestions;
+  if (patch.privacyContactName !== undefined) row.privacy_contact_name = patch.privacyContactName;
+  if (patch.privacyContactEmail !== undefined) row.privacy_contact_email = patch.privacyContactEmail;
+  if (patch.dpaSignedOn !== undefined) row.dpa_signed_on = patch.dpaSignedOn;
+  if (patch.policyVersion !== undefined) row.policy_version = patch.policyVersion;
+  if (patch.chatRetentionDays !== undefined) row.chat_retention_days = patch.chatRetentionDays;
+  if (patch.guestRetentionDays !== undefined) row.guest_retention_days = patch.guestRetentionDays;
   if (Object.keys(row).length === 0) throw new PlatformInputError('Nothing to change.');
 
   const { data, error } = await platform.db.from('tenants').update(row).eq('id', tenantId).select('id');

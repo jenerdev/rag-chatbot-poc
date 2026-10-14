@@ -25,6 +25,7 @@ import { describeFailure } from '@/components/admin-login';
 import { BrandImageField } from '@/components/brand-image-field';
 import { FeaturesPanel } from '@/components/features-panel';
 import { KnowledgePanel } from '@/components/knowledge-panel';
+import { LegalPanel } from '@/components/legal-panel';
 import { PermissionsPanel } from '@/components/permissions-panel';
 import { SaveBar } from '@/components/save-bar';
 import { MembersPanel } from '@/components/members-panel';
@@ -640,6 +641,13 @@ export function TenantForm({
         </div>
       </section>
 
+      {!bookingsOn && !tenant.legal.dpaSignedOn && (
+        // D-130: said here first; Postgres refuses the switch without it anyway (tenant_applications_dpa).
+        <p className="notice warn dpa-needed">
+          Bookings holds guests&apos; personal data, so it needs a signed data processing agreement. Record its date on the Legal
+          tab first.
+        </p>
+      )}
       <SaveBar dirty={bookingsDirty} busy={busy} onDiscard={bookingsOn ? () => setBookings(savedBookings) : undefined} label={bookingsOn ? 'Save config' : 'Switch on'} />
     </form>
   );
@@ -750,6 +758,19 @@ export function TenantForm({
                 tenantName={tenant.businessName}
                 onMessage={(message, kind) => setNotice({ message, kind })}
                 onUnauthorized={onUnauthorized}
+              />
+            ),
+          },
+          {
+            id: 'legal',
+            label: 'Legal',
+            panel: (
+              <LegalPanel
+                key={JSON.stringify(tenant.legal)}
+                legal={tenant.legal}
+                slug={tenant.slug}
+                busy={busy}
+                onSave={(body) => void send('PATCH', `/tenants/${id}`, body, 'Legal details saved.')}
               />
             ),
           },

@@ -121,6 +121,15 @@ try {
   // 5. Applications: bookings with no timezone → 400 (the trigger's sentence);
   //    with a timezone → 200 and the key is on; max_stay_nights 0 → 400;
   //    3 nights and 60 days → 200; an unknown key → 400.
+  //    D-130 first: without a signed DPA the switch is refused, in words; the
+  //    date recorded on the Legal tab's PATCH, the checks below run as before.
+  const noDpa = await call('PUT', `/api/platform/tenants/${tenantId}/applications/bookings`, { cookie, json: { config: { timezone: 'Asia/Manila' } } });
+  const dpa = await call('PATCH', `/api/platform/tenants/${tenantId}`, { cookie, json: { dpaSignedOn: '2026-10-01' } });
+  check(
+    noDpa.status === 400 && /data processing agreement/.test(err(noDpa) ?? '') && dpa.status === 200 && dpa.data.legal?.dpaSignedOn === '2026-10-01',
+    '5a. D-130: bookings without a signed DPA → 400 in words; the DPA date recorded → 200',
+    `${noDpa.status} "${err(noDpa)}" · dpa ${dpa.status} ${dpa.data?.legal?.dpaSignedOn}`,
+  );
   const noTz = await call('PUT', `/api/platform/tenants/${tenantId}/applications/bookings`, { cookie, json: { config: {} } });
   const on = await call('PUT', `/api/platform/tenants/${tenantId}/applications/bookings`, { cookie, json: { config: { timezone: 'Asia/Manila' } } });
   const zero = await call('PUT', `/api/platform/tenants/${tenantId}/applications/bookings`, { cookie, json: { config: { timezone: 'Asia/Manila', max_stay_nights: 0 } } });
