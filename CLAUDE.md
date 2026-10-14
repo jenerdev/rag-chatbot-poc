@@ -279,6 +279,21 @@
 > - The platform also reads and writes a tenant's knowledge base (its
 >   Knowledge base tab, D-076 amended), and still no booking, message or
 >   payment.
+>
+> **The legal groundwork** since 2026-10-14 (D-129–D-131,
+> [`plan/legal.md`](./plan/legal.md); the Data Privacy Act, RA 10173).
+> - **Texts:** `/t/<slug>/privacy` and `/terms` and the platform's own come
+>   from ONE file, `apps/web/lib/legal.ts`. They are placeholders for a
+>   lawyer, filled with the tenant's privacy contact, periods and policy
+>   version (`tenant_public()`; never the DPA date).
+> - **Consent:** the booking page's box is required by the route and
+>   recorded on the stay by `request_booking_with_consent()`, a wrapper,
+>   because `request_booking()` is not replaced.
+> - **DPA gate:** bookings cannot be switched on without `dpa_signed_on`
+>   (a trigger; service_role exempt).
+> - **Retention:** `retention` removes chats and guest details past each
+>   tenant's period.
+> - **Chatbot:** the chat's notice is page text; no prompt changed.
 
 ## What this is
 
@@ -377,11 +392,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (34 files; the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (35 files; the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     201 checks (197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     206 checks (202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -443,7 +458,8 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 201 checks, no API key needed
+pnpm --filter @rag/db verify    # 206 checks, no API key needed
+pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period; a dry run unless --remove, counted
 pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
@@ -750,6 +766,17 @@ All are expanded in `risks.md`.
     it. `tool-leak` and `book-for-me-harbor` flip with the DATE the battery
     asks about (Phase 0); read `[retrieve]` before deciding which kind of
     flip you have.
+25. **"Safe to re-run" means safe to re-run IN ORDER, not alone.** To test
+    a new guard, `schema-customer-booking.sql` was re-run by itself.
+    - It put back a price trigger that `schema-promos.sql` had replaced
+      with no guard, and three promo checks failed.
+    - Re-applying every later file in order restored it.
+    - `schema-manage-booking.sql` does not re-run at all: its
+      `booking_events_kind` is narrower than the rows later files allow.
+      The batch is one transaction, so it failed whole.
+
+    Re-run an older file only to test today's guard, then re-apply
+    everything after it (legal Phase 1).
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.

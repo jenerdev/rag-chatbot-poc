@@ -104,7 +104,7 @@ try {
   const r = await fetch(`${BASE}/api/t/${SLUG}/book/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...stay, name: 'Notify Walk', phone: '09180007711', email: guestEmail }),
+    body: JSON.stringify({ consent: true, consentVersion: '1', ...stay, name: 'Notify Walk', phone: '09180007711', email: guestEmail }),
   });
   const made = await r.json();
   if (r.status !== 201) throw new Error(`request ${r.status}: ${made.error}`);

@@ -4075,3 +4075,77 @@ database lets every member read promos for the staff form's picker. verify
 the rooms/holidays/slots reads guard screens over data that every token of
 the tenant can already read (the chat reads rooms, slots and every message).
 Withholding them is wall 1's job; Postgres keeps its old rule for that data.
+
+## D-129 · Privacy policy, terms and consent, per tenant · **Added 2026-10-14 (plan/legal.md)**
+
+**Decision:**
+- **The pages:** each tenant has `/t/<slug>/privacy` and `/t/<slug>/terms`,
+  and the platform has `/privacy` and `/terms`.
+  - The texts live in ONE file, `apps/web/lib/legal.ts`. They are
+    placeholders that say what the app does with personal data, filled
+    with the tenant's name, privacy contact, retention periods and policy
+    version.
+  - Each page is marked as a draft for a lawyer.
+- **The consent box:** the booking page requires a ticked box. The route
+  calls `request_booking_with_consent()` with the version shown; Postgres
+  checks it is the tenant's current version and records it on the stay
+  (`stays.consent_version`, `consented_at`).
+- **The notices:** the chat says it is an AI, that chats are saved, read by
+  staff and processed by OpenAI. The proof form says how long a receipt is
+  kept.
+
+**Why:** the Data Privacy Act (RA 10173) applies. The resort is the
+controller and the platform its processor; the user asked for the legal
+groundwork (plan/legal-prompt.md).
+
+**How consent is recorded without replacing `request_booking()`:** that
+function is defined across five files and runs about 200 lines (trap 20).
+- A definer wrapper sets the transaction-local `app.consent_version` and
+  calls it.
+- A BEFORE INSERT trigger on `stays` copies the setting onto the stay
+  created inside that call.
+- Postgres records the consent but does not REQUIRE it on a web stay,
+  because every tool and test books through `request_booking()` directly.
+  The route requires it, and the browser never holds a token, so the route
+  is the only web door. Stated, not hidden.
+
+**Provisional (plan/legal.md § 0):** the platform's legal name and contact
+are placeholders in `lib/legal.ts`. A guest's deletion request is by email
+for now.
+
+## D-130 · No bookings without a signed data processing agreement · **Added 2026-10-14**
+
+**Decision:**
+- `tenants.dpa_signed_on` is set on the platform form's Legal tab.
+- The `tenant_applications_dpa` trigger refuses a NEW bookings application
+  for a tenant without one, with words that say so.
+- service_role (the CLI, the walks) is exempt.
+- Existing tenants are listed by `plan/legal-dpa-missing.mjs`, not changed:
+  villa, harbor and alteza have bookings and no DPA date on record.
+
+**Why:** bookings is where guests' personal data enters, and a processor
+handles it only under an agreement. A gate on the switch, not on data that
+already exists, keeps the three test tenants working while the user
+decides.
+
+## D-131 · Retention: chats and guest details are removed after each tenant's period · **Added 2026-10-14**
+
+**Decision:**
+- **Two periods per tenant:** `chat_retention_days` (30–1,825, default 365)
+  and `guest_retention_days` (180–3,650, default 1,095). Both are set on the
+  Legal tab and stated on the privacy page.
+- **One command:** `pnpm --filter @rag/db retention [-- --remove]`. It is a
+  dry run by default, and every removal is counted.
+  - It deletes chats whose newest message is older than the period. Their
+    messages and resolution rows go by cascade.
+  - It clears name, phone, email and notes from stays that ended before
+    the period, and the guest's reason on change requests. Rows, dates,
+    amounts and references stay.
+- **Receipts:** unchanged (180 days, storage-orphans).
+- **Scheduling:** nothing schedules it yet. On deployment, a daily job runs
+  it.
+
+**Why:** R-50 kept transcripts forever, and guest details had no end
+either.
+
+**Provisional (plan/legal.md § 0):** both default periods wait on the user.

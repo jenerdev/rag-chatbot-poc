@@ -113,7 +113,10 @@ try {
   const book = await makeTenant('walk-book');
   const other = await makeTenant('walk-other');
   const contact = (n) => ({ name: 'Walk Probe', phone: `0918000${String(n).padStart(4, '0')}`, email: `walk-${n}@example.com` });
+  // D-129: every request ticks the consent box, for the tenant's version ('1', the default).
   const stay = (overrides = {}) => ({
+    consent: true,
+    consentVersion: '1',
     slotId: book.slotId,
     rooms: [{ unitId: book.unit['Family Room'], guests: 3 }],
     checkIn: THU,

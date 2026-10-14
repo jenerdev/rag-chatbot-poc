@@ -1398,6 +1398,11 @@ export interface Database {
         Args: { p_tenant_id: number; p_before: string };
         Returns: number;
       };
+      /** schema-legal.sql § 6 (D-131): the retention tool's; service_role only */
+      chats_older_than: {
+        Args: { p_tenant_id: number; p_before: string };
+        Returns: { id: string; last_at: string }[];
+      };
       /** sql/schema-customer-booking.sql § 7 — THE price arithmetic (holidays included); no row = no rate. */
       unit_quote: {
         Args: { p_tenant_id: number; p_unit_id: number; p_slot_id: number; p_date: string; p_guests: number | null };

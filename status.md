@@ -59,7 +59,22 @@
 **Three items (2026-10-14, asked to run unattended; one commit each).**
 - [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.
 - [x] 2 · Role permissions per tenant, set on the platform (D-128): `role_permissions` (34th SQL file), a Permissions tab and a Knowledge base tab for the super user; app_can() and can() agree, pinned by test. verify 201, permissions-walk 6/6, axe 8/0, rooms, isolation, staff-cases pass.
-- [ ] 3 · The legal groundwork, plan/legal-prompt.md (D-129…).
+- [x] 3 · The legal groundwork (D-129–D-131, `feat/legal`, plan/legal.md):
+  - privacy and terms pages, per tenant and for the platform;
+  - the booking consent box, recorded on the stay;
+  - the chat and proof notices;
+  - the Legal tab and the DPA gate;
+  - the retention command.
+
+  verify 206, legal-walk 5/5, axe 24/0, baselines identical.
+- [ ] **Waits on the user (legal):** confirm the three provisional answers in plan/legal.md § 0:
+  - chats kept 365 days and guest details 3 years;
+  - deletion requests by email;
+  - the platform's name and contact, placeholders in `lib/legal.ts`.
+
+  Have a lawyer replace the texts in `lib/legal.ts`, and record a DPA date for villa, harbor and alteza (`plan/legal-dpa-missing.mjs`).
+- [ ] On deployment: a daily `pnpm --filter @rag/db retention -- --remove` and `storage-orphans -- --expired --remove`.
+- [ ] Fix later: `plan/ui-refresh-phase5-walk.mjs` is stale (three sections; the page has four steps) and stops at step 1. `schema-manage-booking.sql` cannot be re-run (`booking_events_kind`).
 - [ ] The user's look; then merge on their word.
 
 **Five items (`feat/landing-and-media`, 2026-10-14), one commit each.**

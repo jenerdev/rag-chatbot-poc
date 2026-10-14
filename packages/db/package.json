@@ -24,6 +24,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "node --conditions=react-server --env-file=../../.env tools/verify.mjs",
+    "retention": "node --conditions=react-server --env-file=../../.env tools/retention.mjs",
     "tenant:add": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs add",
     "tenant:fallback": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs fallback",
     "tenant:booking-type": "node --conditions=react-server --env-file=../../.env tools/tenant.mjs booking-type",

@@ -12,7 +12,8 @@
 --      replaced (plan/legal.md Rule 2);
 --   4. the DPA gate: the platform cannot switch bookings on for a tenant
 --      without a signed agreement (D-130);
---   5. removing a stay's guest details after the retention period (D-131).
+--   5. removing a stay's guest details after the retention period (D-131);
+--   6. listing the chats past the period, for the retention tool (D-131).
 --      bookings_web_request is re-made to allow it; the older file's
 --      version is guarded on bookings.guest_removed_at.
 --
@@ -231,5 +232,33 @@ end;
 $$;
 revoke all on function public.remove_guest_details(bigint, date) from public, anon, authenticated;
 grant execute on function public.remove_guest_details(bigint, date) to service_role;
+
+-- 6. The chats past the tenant's period (D-131): each conversation whose
+--    NEWEST message (or, with none, its own creation) is older than p_before.
+--    The retention tool deletes them by id; a conversation's messages, and
+--    a refused question's resolution row, go with it by cascade.
+--    service_role only, like remove_guest_details().
+create or replace function public.chats_older_than(p_tenant_id bigint, p_before timestamptz)
+returns table (id uuid, last_at timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(auth.jwt() ->> 'role', '') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'Only the retention tool lists old chats.' using errcode = 'insufficient_privilege';
+  end if;
+  return query
+    select c.id, coalesce(max(m.created_at), c.created_at) as last_at
+    from public.conversations c
+    left join public.messages m on m.conversation_id = c.id and m.tenant_id = c.tenant_id
+    where c.tenant_id = p_tenant_id
+    group by c.id, c.created_at
+    having coalesce(max(m.created_at), c.created_at) < p_before;
+end;
+$$;
+revoke all on function public.chats_older_than(bigint, timestamptz) from public, anon, authenticated;
+grant execute on function public.chats_older_than(bigint, timestamptz) to service_role;
 
 notify pgrst, 'reload schema';

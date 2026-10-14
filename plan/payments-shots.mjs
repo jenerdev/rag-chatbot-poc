@@ -49,7 +49,7 @@ try {
   const requiredOf = [];
   for (const [i, name] of ['Rosa Garcia', 'Paolo Mendoza'].entries()) {
     const guest = { email: `pay.shots.${i}.${Date.now()}@example.com`, phone: `0918${String(Date.now() + i).slice(-7)}` };
-    const req = await fetch(`${BASE}/api/t/${SLUG}/book/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: day(6 + i * 3), nights: 1, name, phone: guest.phone, email: guest.email }) });
+    const req = await fetch(`${BASE}/api/t/${SLUG}/book/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, consentVersion: '1', slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: day(6 + i * 3), nights: 1, name, phone: guest.phone, email: guest.email }) });
     const receipt = await req.json();
     if (req.status !== 201) throw new Error(`request ${req.status} ${receipt.error}`);
     const { data: st } = await supabase.from('stays').select('group_id').eq('tenant_id', tenant.id).eq('reference', receipt.reference).single();

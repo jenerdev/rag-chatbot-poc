@@ -107,7 +107,7 @@ try {
   const request = await fetch(`${BASE}/api/t/${SLUG}/book/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn, nights: 1, name: 'Inbox Walk', phone: '09180009912', email: madeEmail }),
+    body: JSON.stringify({ consent: true, consentVersion: '1', slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn, nights: 1, name: 'Inbox Walk', phone: '09180009912', email: madeEmail }),
   });
   const made = await request.json();
   check(request.status === 201, '4. a guest sends a web request', `${request.status} ${made.reference ?? made.error}`);

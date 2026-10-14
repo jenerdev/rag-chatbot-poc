@@ -3972,6 +3972,137 @@ async function notificationChecks() {
   }
 }
 
+// --- schema-legal.sql (D-129 – D-131): consent, the DPA gate, retention -------
+// On THROWAWAY tenants (deleted at the end with everything they own):
+// 202. request_booking_with_consent(): an old policy version is refused
+//      (23514); the current one books and the stay records it; plain
+//      request_booking() leaves the stay without consent (the twin);
+// 203. the DPA gate: a platform token cannot switch bookings on for a tenant
+//      with no DPA date (23514), can once it has one; service_role is exempt;
+// 204. remove_guest_details(): refused to a chat token; for service_role it
+//      clears an ENDED stay and leaves a future one, then (a later cut-off)
+//      clears a WEB stay too, which bookings_web_request now allows;
+// 205. chats_older_than(): refused to a chat token; lists the old chat and
+//      not the recent one; deleting it takes its messages (counted);
+// 206. tenant_public() states the privacy contact and periods to anon; a bad
+//      email and a 10-day retention are refused (23514).
+{
+  const users = [];
+  const probes = [];
+  try {
+    const tenant = async (extra = {}) => {
+      const { data, error } = await supabase.from('tenants').insert({ slug: `legal-${randomBytes(3).toString('hex')}`, business_name: 'Legal Probe', assistant_name: 'Probe', ...extra }).select('id, slug').single();
+      if (error) throw new Error(`tenant: ${error.message}`);
+      probes.push(data.id);
+      return data;
+    };
+    const probe = await tenant({ policy_version: '3' });
+    const app = await supabase.from('tenant_applications').insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+    const { data: unit } = await supabase.from('units').insert({ tenant_id: probe.id, name: 'Room', capacity: 4, sort_order: 1, active: true }).select('id').single();
+    const { data: slot } = await supabase.from('slots').insert({ tenant_id: probe.id, name: 'Day', start_time: '08:00', duration: '8 hours' }).select('id').single();
+    const rate = await supabase.from('unit_rates').insert({ tenant_id: probe.id, unit_id: unit.id, slot_id: slot.id, weekday_price: 100000, weekend_price: 100000 });
+    if (rate.error) throw new Error(`rate: ${rate.error.message}`);
+    const chatDb = asToken(chatToken(probe.id));
+    const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const args = (d) => ({
+      p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: d, p_nights: 1,
+      p_name: 'Legal Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `legal-${randomUUID()}@example.com`, p_notes: 'a note', p_promo_code: null,
+    });
+    const stayOf = async (reference) => (await supabase.from('stays').select('group_id, consent_version, consented_at').eq('tenant_id', probe.id).eq('reference', reference).single()).data;
+
+    // 202
+    let webRef = null;
+    {
+      const old = await chatDb.rpc('request_booking_with_consent', { ...args(day(30)), p_consent_version: '2' });
+      const current = await chatDb.rpc('request_booking_with_consent', { ...args(day(31)), p_consent_version: '3' });
+      webRef = current.data?.[0]?.reference ?? null;
+      const plain = await chatDb.rpc('request_booking', args(day(32)));
+      const withConsent = webRef ? await stayOf(webRef) : null;
+      const without = plain.data?.[0]?.reference ? await stayOf(plain.data[0].reference) : null;
+      check(
+        !app.error && old.error?.code === '23514' && !current.error && withConsent?.consent_version === '3' && !!withConsent?.consented_at && !plain.error && without?.consent_version === null,
+        'legal: an old policy version is refused (23514); the current one books and the stay records "3" and when; plain request_booking() records none',
+        `old ${old.error?.code ?? 'BOOKED'} · current ${current.error?.message ?? webRef} → ${JSON.stringify(withConsent)} · plain ${plain.error?.message ?? 'ok'} → ${without?.consent_version}`,
+      );
+    }
+
+    // 203
+    {
+      const { data: s, error: sError } = await supabase.auth.admin.createUser({ email: `legal-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (sError) throw new Error(sError.message);
+      users.push(s.user.id);
+      await supabase.from('platform_admins').insert({ user_id: s.user.id });
+      const superDb = asToken(platformToken(s.user.id));
+      const bare = await tenant();
+      const refused = await superDb.from('tenant_applications').insert({ tenant_id: bare.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } }).select('tenant_id');
+      await supabase.from('tenants').update({ dpa_signed_on: '2026-10-01' }).eq('id', bare.id);
+      const allowed = await superDb.from('tenant_applications').insert({ tenant_id: bare.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } }).select('tenant_id');
+      check(
+        refused.error?.code === '23514' && /data processing agreement/.test(refused.error.message) && !allowed.error && allowed.data?.length === 1 && !app.error,
+        'legal: the platform cannot switch bookings on without a DPA date (23514, in words), can with one; service_role is exempt (the probe above)',
+        `no DPA ${refused.error?.code ?? 'SWITCHED ON'} · with DPA ${allowed.error?.message ?? allowed.data?.length} · service ${app.error?.message ?? 'ok'}`,
+      );
+    }
+
+    // 204
+    {
+      const asChat = await chatDb.rpc('remove_guest_details', { p_tenant_id: probe.id, p_before: day(0) });
+      const past = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.id, slot_id: slot.id, booked_date: day(-400), guest_name: 'Old Guest', guest_phone: '09170000000', status: 'confirmed' }).select('id, group_id').single();
+      const first = await supabase.rpc('remove_guest_details', { p_tenant_id: probe.id, p_before: day(-30) });
+      const oldRow = past.data ? (await supabase.from('bookings').select('guest_name, guest_phone, guest_removed_at').eq('id', past.data.id).single()).data : null;
+      const webGroup = webRef ? (await stayOf(webRef)).group_id : null;
+      const webBefore = (await supabase.from('bookings').select('guest_name').eq('tenant_id', probe.id).eq('group_id', webGroup).single()).data;
+      const second = await supabase.rpc('remove_guest_details', { p_tenant_id: probe.id, p_before: day(400) });
+      const webAfter = (await supabase.from('bookings').select('guest_name, guest_email, notes, guest_removed_at, price').eq('tenant_id', probe.id).eq('group_id', webGroup).single()).data;
+      check(
+        !!asChat.error && !past.error && first.data === 1 && oldRow?.guest_name === 'Removed' && oldRow.guest_phone === null && !!oldRow.guest_removed_at
+          && webBefore?.guest_name === 'Legal Probe' && !second.error && second.data >= 1 && webAfter?.guest_email === null && webAfter.notes === null && !!webAfter.guest_removed_at && webAfter.price > 0,
+        "legal: remove_guest_details() is refused to a chat token; it clears an ended stay (1 row) and leaves a future one; a later cut-off clears a web stay too, its price kept",
+        `chat ${asChat.error?.code ?? 'RAN'} · past ${past.error?.message ?? 'ok'} · first ${first.error?.message ?? first.data} → ${JSON.stringify(oldRow)} · web before ${webBefore?.guest_name} · second ${second.error?.message ?? second.data} → ${JSON.stringify(webAfter)}`,
+      );
+    }
+
+    // 205
+    {
+      const old = await supabase.from('conversations').insert({ tenant_id: probe.id, created_at: new Date(Date.now() - 500 * 86400000).toISOString() }).select('id').single();
+      const fresh = await supabase.from('conversations').insert({ tenant_id: probe.id }).select('id').single();
+      const oldMsg = await supabase.from('messages').insert({ tenant_id: probe.id, conversation_id: old.data?.id, role: 'user', content: 'old', created_at: new Date(Date.now() - 500 * 86400000).toISOString() });
+      const freshMsg = await supabase.from('messages').insert({ tenant_id: probe.id, conversation_id: fresh.data?.id, role: 'user', content: 'new' });
+      const asChat = await chatDb.rpc('chats_older_than', { p_tenant_id: probe.id, p_before: new Date(Date.now() - 365 * 86400000).toISOString() });
+      const listed = await supabase.rpc('chats_older_than', { p_tenant_id: probe.id, p_before: new Date(Date.now() - 365 * 86400000).toISOString() });
+      const gone = await supabase.from('conversations').delete({ count: 'exact' }).eq('tenant_id', probe.id).in('id', (listed.data ?? []).map((c) => c.id));
+      const { count: messagesLeft } = await supabase.from('messages').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      check(
+        !old.error && !oldMsg.error && !freshMsg.error && !!asChat.error && listed.data?.length === 1 && listed.data[0].id === old.data.id && gone.count === 1 && messagesLeft === 1,
+        'legal: chats_older_than() is refused to a chat token; it lists the old chat and not the recent one; deleting it takes its message (1 left)',
+        `chat ${asChat.error?.code ?? 'RAN'} · listed ${listed.error?.message ?? listed.data?.length} · deleted ${gone.count} · messages left ${messagesLeft} · inserts ${old.error?.message ?? 'ok'}/${oldMsg.error?.message ?? 'ok'}`,
+      );
+    }
+
+    // 206
+    {
+      await supabase.from('tenants').update({ privacy_contact_name: 'Data Protection Officer', privacy_contact_email: 'dpo@example.com' }).eq('id', probe.id);
+      const { data: pub } = await anonClient().rpc('tenant_public', { p_slug: probe.slug });
+      const badEmail = await supabase.from('tenants').update({ privacy_contact_email: 'not an email' }).eq('id', probe.id);
+      const shortKeep = await supabase.from('tenants').update({ chat_retention_days: 10 }).eq('id', probe.id);
+      check(
+        pub?.[0]?.privacy_contact_email === 'dpo@example.com' && pub[0].policy_version === '3' && pub[0].chat_retention_days === 365 && pub[0].guest_retention_days === 1095
+          && !('dpa_signed_on' in pub[0]) && badEmail.error?.code === '23514' && shortKeep.error?.code === '23514',
+        'legal: tenant_public() states the privacy contact, version and periods to anon (never the DPA date); a bad email and a 10-day retention are 23514',
+        `${JSON.stringify(pub?.[0] && { email: pub[0].privacy_contact_email, v: pub[0].policy_version, chat: pub[0].chat_retention_days, guest: pub[0].guest_retention_days, dpa: 'dpa_signed_on' in pub[0] })} · email ${badEmail.error?.code ?? 'STORED'} · days ${shortKeep.error?.code ?? 'STORED'}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'legal: setup', error.message);
+  } finally {
+    for (const id of probes) await supabase.from('tenants').delete().eq('id', id);
+    for (const id of users) {
+      await supabase.from('platform_admins').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+    }
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +

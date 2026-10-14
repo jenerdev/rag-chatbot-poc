@@ -127,7 +127,10 @@ for (const scheme of ['light', 'dark']) {
       await page.type('#name', 'Walk Five');
       await page.type('#phone', '0917 000 0005');
       await page.type('#email', 'walk5@example.com');
-      if (first) check(await page.until("!document.querySelector('.book-send').disabled", 3000), '4. details in: Send on');
+      // D-129: Send stays off until the consent box is ticked.
+      if (first) check(await page.eval("document.querySelector('.book-send').disabled"), '4a. details in, consent not ticked: Send still off');
+      await page.click('#book-consent');
+      if (first) check(await page.until("!document.querySelector('.book-send').disabled", 3000), '4. details in and consent ticked: Send on');
       await page.click('.book-send');
       await page.until("!!document.querySelector('.receipt')", 10000);
       await shot('receipt');

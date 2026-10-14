@@ -52,7 +52,7 @@ try {
     const req = await fetch(`${BASE}/api/t/${SLUG}/book/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: date, nights: 1, name: 'A11y Probe', phone: `0918000${String(made.length).padStart(4, '0')}`, email: madeEmail }),
+      body: JSON.stringify({ consent: true, consentVersion: '1', slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: date, nights: 1, name: 'A11y Probe', phone: `0918000${String(made.length).padStart(4, '0')}`, email: madeEmail }),
     });
     if (req.status === 201) made.push((await req.json()).reference);
   }

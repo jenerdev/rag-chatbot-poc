@@ -750,6 +750,11 @@ button (a delete would also cascade away Unanswered's history). The open
 uuid-keyed transcript route was removed at the same time. A retention
 policy is a decision for before real guests, like R-48's.
 
+**Mitigated 2026-10-14 (D-131):** each tenant has a chat retention period
+(default 365 days, provisional), stated on its privacy page, and
+`pnpm --filter @rag/db retention -- --remove` deletes older chats, counted.
+It runs by hand until deployment schedules it daily.
+
 ## R-51 · Pushes leave through Google, Apple and Mozilla, and a lost phone keeps hearing · **Mitigated 2026-10-14 (D-116)**
 
 Every push is POSTed to the push service of the member's browser (FCM for

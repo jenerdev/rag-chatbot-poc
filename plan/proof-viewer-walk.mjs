@@ -64,7 +64,7 @@ try {
   const req = await fetch(`${BASE}/api/t/${SLUG}/book/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: day(12), nights: 1, name: 'Proof Walk', phone: guest.phone, email: guest.email }),
+    body: JSON.stringify({ consent: true, consentVersion: '1', slotId: slot.id, rooms: [{ unitId: unit.id, guests: 2 }], checkIn: day(12), nights: 1, name: 'Proof Walk', phone: guest.phone, email: guest.email }),
   });
   const receipt = await req.json();
   if (req.status !== 201) throw new Error(`request ${req.status} ${receipt.error}`);

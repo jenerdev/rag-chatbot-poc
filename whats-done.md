@@ -9586,3 +9586,64 @@ now has a document, and the on-state twin shows them.
 **Trap met:** a restrictive policy on promos' SELECT broke staff reading
 promos (the booking form's picker). Only verify 198's positive twin showed
 it; the negative half had passed.
+
+## 2026-10-14 — The legal groundwork (D-129 – D-131, plan/legal.md)
+
+**What was done**, from plan/legal-prompt.md in five phases, each its own
+commit:
+- **Phase 1, the 35th SQL file** (`schema-legal.sql`):
+  - the tenants' legal columns, and `tenant_public()` stating the public
+    ones (never the DPA date);
+  - consent recorded on the stay through a wrapper and a stays trigger;
+  - the DPA gate;
+  - `remove_guest_details()`, `chats_older_than()`, and
+    `bookings_web_request` allowing a removed contact.
+- **Phase 2, the pages:** `/t/<slug>/privacy` and `/terms`, the platform's
+  own, and the links from the footer, the chat and the landing page.
+- **Phase 3, consent and notices:** the booking page's box (required by the
+  route, recorded by Postgres), the chat notice and the proof form's line.
+- **Phase 4, the platform:** a Legal tab; the DPA notice on Applications;
+  `plan/legal-dpa-missing.mjs`.
+- **Phase 5, retention:** `pnpm --filter @rag/db retention`, verify
+  202–206, `plan/legal-walk.mjs`.
+
+**Observed:**
+- **verify 206/206.** The new checks:
+  - an old policy version is refused, the current one is recorded as "3"
+    with its time, and plain `request_booking()` records none;
+  - the platform cannot switch bookings on without a DPA date and can with
+    one;
+  - `remove_guest_details()` clears an ended stay (1 row), keeps a future
+    one, and later clears a web stay with its price kept;
+  - `chats_older_than()` lists the 500-day-old chat and not the new one;
+  - `tenant_public()` states the contact and periods and never the DPA
+    date.
+- **`legal-walk` 5/5 and axe 24/0.** The consent box starts unticked with
+  Send off, and the sent stay records version 1. The Legal tab's contact
+  appears on the privacy page.
+- **Other suites:**
+  - `customer-booking-phase3-walk` 10/10 and `tenant-management-phase4-walk`
+    13/13, after the walks learned to tick the box and record a DPA date
+    (5a is new);
+  - `retention` dry run: 0 chats and 0 stays due on the real tenants;
+  - `legal-dpa-missing`: villa, harbor and alteza;
+  - rooms, isolation both suites both ways, typecheck: pass. Tests: web
+    174.
+  - The three chatbot baselines are byte-identical: the notice is page
+    text, not prompt text.
+
+**Trap met (now CLAUDE.md trap 25):** to check a guard, I re-ran
+`schema-customer-booking.sql`.
+- That put back an older price-trigger definition that
+  `schema-promos.sql` had replaced and nobody had guarded. Three promo
+  checks failed.
+- Re-applying every later file, in order, restored it. verify then passed.
+- `schema-manage-booking.sql` refused to re-run (its `booking_events_kind`
+  constraint is narrower than the rows later files allow). The batch is one
+  transaction, so it changed nothing.
+- Lesson: re-run an older file only to test a guard written today, and
+  re-apply every later file afterwards.
+
+**Stale walk found, not fixed:** `plan/ui-refresh-phase5-walk.mjs` stops at
+its step 1. It expects three sections, but the booking page has had four
+steps since an earlier redesign. It learned to tick the consent box anyway.
