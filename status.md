@@ -79,7 +79,7 @@
 
 **The chat's footer (`feat/chat-footer`, 2026-10-14).**
 - [x] The fine print under the field is one row aligned to the field's text: the D-129 notice on the left (wording unchanged, Privacy · Terms kept together), the keys on the right as keycaps; the keys still go on a phone. Shots `plan/public-brand/footer-*`, public-brand-a11y 48/0, typecheck green.
-- [ ] The user's look; then merge on their word.
+- [x] Merged to `master` (fast-forward to 81b3178) on the user's word, 2026-10-14.
 
 **Five items (`feat/landing-and-media`, 2026-10-14), one commit each.**
 - [x] 1 · A landing page at `/` (D-121): mockups, no pricing, still no tenant list. axe 4/0.
