@@ -68,6 +68,16 @@ export interface Database {
           logo_url: string | null;
           banner_url: string | null;
           assistant_avatar_url: string | null;
+          /** schema-legal.sql (D-129): the Data Protection Officer, named on the privacy page */
+          privacy_contact_name: string | null;
+          privacy_contact_email: string | null;
+          /** D-130: the data processing agreement's date; none = bookings cannot be switched on */
+          dpa_signed_on: string | null;
+          /** D-129: the version a guest agrees to; a booking must name the current one */
+          policy_version: string;
+          /** D-131: days a chat is kept after its last message, and guest details after check-out */
+          chat_retention_days: number;
+          guest_retention_days: number;
           theme: Json;
           /** what the chat shows when the documents cannot answer, per reply language (D-047, D-048); a missing key or null = the built-in default */
           fallback_messages: Json | null;
@@ -85,6 +95,12 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           assistant_avatar_url?: string | null;
+          privacy_contact_name?: string | null;
+          privacy_contact_email?: string | null;
+          dpa_signed_on?: string | null;
+          policy_version?: string;
+          chat_retention_days?: number;
+          guest_retention_days?: number;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -99,6 +115,12 @@ export interface Database {
           logo_url?: string | null;
           banner_url?: string | null;
           assistant_avatar_url?: string | null;
+          privacy_contact_name?: string | null;
+          privacy_contact_email?: string | null;
+          dpa_signed_on?: string | null;
+          policy_version?: string;
+          chat_retention_days?: number;
+          guest_retention_days?: number;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -648,6 +670,8 @@ export interface Database {
           /** for people, shared by the rows of one request; grants nothing */
           reference: string | null;
           guest_email: string | null;
+          /** schema-legal.sql (D-131): when the retention tool removed the guest's details */
+          guest_removed_at: string | null;
           /** schema-walk-in.sql (D-111): the staff form said the guest walked in; copied to the stay */
           walk_in: boolean;
           created_at: string;
@@ -680,6 +704,7 @@ export interface Database {
           source?: 'staff';
           reference?: never;
           guest_email?: string | null;
+          guest_removed_at?: string | null;
           /** staff rows only (bookings_walk_in) */
           walk_in?: boolean;
           created_at?: string;
@@ -708,6 +733,7 @@ export interface Database {
           source?: 'staff';
           reference?: never;
           guest_email?: string | null;
+          guest_removed_at?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -745,6 +771,9 @@ export interface Database {
           review_by: string | null;
           /** schema-walk-in.sql (D-111): set by bookings_ac_walk_in from the stay's first walk-in row; a label only */
           walk_in: boolean;
+          /** schema-legal.sql (D-129): the policy version the guest agreed to, and when; null = made by staff or a tool */
+          consent_version: string | null;
+          consented_at: string | null;
         };
         Insert: Record<never, never>;
         Update: Record<never, never>;
@@ -1187,6 +1216,11 @@ export interface Database {
           logo_url: string | null;
           banner_url: string | null;
           assistant_avatar_url: string | null;
+          privacy_contact_name: string | null;
+          privacy_contact_email: string | null;
+          policy_version: string;
+          chat_retention_days: number;
+          guest_retention_days: number;
           theme: Json;
           fallback_messages: Json | null;
           /** sql/schema-suggested-questions.sql (D-089) */
@@ -1324,6 +1358,45 @@ export interface Database {
           surcharge: number;
           price: number;
         }[];
+      };
+      /** schema-legal.sql (D-129): request_booking(), with the policy version the guest agreed to */
+      request_booking_with_consent: {
+        Args: {
+          p_tenant_id: number;
+          p_slot_id: number;
+          p_unit_ids: number[];
+          p_guests: number[];
+          /** "YYYY-MM-DD", the first night */
+          p_check_in: string;
+          p_nights: number;
+          p_name: string;
+          p_phone: string;
+          p_email: string;
+          p_notes: string | null;
+          /** schema-promos.sql (D-097): a code, or null for the automatic promo if any */
+          p_promo_code: string | null;
+          p_consent_version: string;
+        };
+        Returns: {
+          reference: string;
+          booked_date: string;
+          unit: string;
+          slot: string;
+          starts_at: string;
+          ends_at: string;
+          guests: number;
+          base_price: number;
+          /** schema-promos.sql (D-097): this night's discount, part of `price`; 0 or more */
+          discount: number | null;
+          extra_guest_price: number;
+          surcharge: number;
+          price: number;
+        }[];
+      };
+      /** schema-legal.sql (D-131): the retention tool's; service_role only. Booking rows cleared */
+      remove_guest_details: {
+        Args: { p_tenant_id: number; p_before: string };
+        Returns: number;
       };
       /** sql/schema-customer-booking.sql § 7 — THE price arithmetic (holidays included); no row = no rate. */
       unit_quote: {

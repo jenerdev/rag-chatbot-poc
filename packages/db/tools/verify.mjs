@@ -561,7 +561,7 @@ async function authChecks(probeId, anyChunk) {
     const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
     const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
     check(
-      !pub.error && keys === 'assistant_avatar_url,assistant_name,banner_url,business_name,fallback_messages,id,logo_url,slug,suggested_questions,theme' /* D-124 added the avatar, public by design */,
+      !pub.error && keys === 'assistant_avatar_url,assistant_name,banner_url,business_name,chat_retention_days,fallback_messages,guest_retention_days,id,logo_url,policy_version,privacy_contact_email,privacy_contact_name,slug,suggested_questions,theme' /* D-124 added the avatar; D-129 the privacy contact, the policy version and the retention periods, which the public privacy page states. Never the DPA date. */,
       "auth: tenant_public('villa') has only public columns",
       pub.error ? pub.error.message : `keys: ${keys}`,
     );

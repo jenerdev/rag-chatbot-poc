@@ -8,6 +8,8 @@
 --
 -- It REPLACES tenant_public() from schema-suggested-questions.sql, whose
 -- drop-and-create is now guarded on this column (CLAUDE.md trap 20).
+-- GUARDED (D-129, 2026-10-14): schema-legal.sql replaces it in turn, with
+-- the privacy contact; once that has run, step 2 and 3 are skipped.
 
 -- 1. The column, https only like the logo and banner (tenants_urls_https).
 alter table tenants add column if not exists assistant_avatar_url text;
@@ -21,6 +23,15 @@ alter table tenants add  constraint tenants_assistant_avatar_https check (
 --    search_path = '', still no archived tenant. Its column list is the
 --    boundary of what a token may read about a tenant; the avatar is meant
 --    for every visitor.
+do $guard$
+begin
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'tenant_public'
+       and 'privacy_contact_email' = any(p.proargnames)
+  ) then
+    return;
+  end if;
 drop function if exists public.tenant_public(text);
 create function public.tenant_public(p_slug text)
 returns table (
@@ -48,5 +59,7 @@ $$;
 -- 3. A dropped function loses its grants: re-applied as before.
 revoke all on function public.tenant_public(text) from public, anon, authenticated;
 grant execute on function public.tenant_public(text) to anon, authenticated, service_role;
+end;
+$guard$;
 
 notify pgrst, 'reload schema';

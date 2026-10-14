@@ -81,10 +81,20 @@ alter table bookings add column if not exists surcharge   bigint;
 alter table bookings drop constraint if exists bookings_source;
 alter table bookings add  constraint bookings_source check (source in ('staff', 'web'));
 -- A web request always has what staff need to call back and group it by.
-alter table bookings drop constraint if exists bookings_web_request;
-alter table bookings add  constraint bookings_web_request check (
-  source <> 'web' or (reference is not null and group_id is not null and guest_email is not null and guest_phone is not null)
-);
+-- GUARDED (D-131, 2026-10-14): schema-legal.sql re-makes this to allow a
+-- stay whose guest details were removed after the retention period; once
+-- bookings.guest_removed_at exists, this version is skipped (trap 20).
+do $guard$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'guest_removed_at') then
+    return;
+  end if;
+  alter table bookings drop constraint if exists bookings_web_request;
+  alter table bookings add  constraint bookings_web_request check (
+    source <> 'web' or (reference is not null and group_id is not null and guest_email is not null and guest_phone is not null)
+  );
+end;
+$guard$;
 alter table bookings drop constraint if exists bookings_breakdown_nonnegative;
 alter table bookings add  constraint bookings_breakdown_nonnegative check (
   (base_price is null or base_price >= 0)
