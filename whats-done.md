@@ -9664,3 +9664,15 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - `plan/stay-notes-walk.mjs` 5/5: 201s; 400 "Write the note first." and "…2000 characters at most."; `mine` true for the author and false for a colleague; 404/200/404 on delete; 404 for an unknown reference, 400 for a bad id, 401 without a session.
   - `plan/stay-notes-browser-walk.mjs` 4/4, light and dark at 1280 and 390, with no sideways scroll.
 - **Trap avoided:** retention clears guest details, and a note can hold them. Rather than re-define `remove_guest_details()` (traps 20 and 25), a trigger on `guest_removed_at` deletes the stay's notes.
+
+## 2026-10-16 · Room types, Phase 0: baseline and the spike file (`feat/room-types`)
+
+- **What:** wrote [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type, a new `unit_rooms` table holds the physical rooms, and `bookings_no_overlap` moves to `room_id`. The user took every recommendation in § 7. Wrote `plan/room-types-phase0-spike.sql`: one DO block that RAISES its findings, so it changes nothing.
+- **Why it matters:** the live rows (read 2026-10-16) have no quantity anywhere, admin included. Alteza's six units are six rooms, and "Kubo A"/"Kubo B" is the workaround of one row per physical room. A second Casa Uno could not exist without a second name, rate card and photo set.
+- **Observed (baseline, before any change):**
+  - tests: chunker 13, openai 14, push 10, db 5, bookings 132, pipeline 369, web 174, all pass; `pnpm typecheck` 13/13;
+  - verify **211/211**; rooms **50/50**; bookings isolation **40/40** on tokens and **40/40** on filters alone;
+  - `prompt-snapshot` byte-identical to `northwind-prompt-post-emoji.txt`; villa's definitions to `villa-tools-post-villa-prices.txt`; harbor's to `harbor-tools-tables-phase0.txt`.
+- **Not run:**
+  - **pipeline isolation** stopped after 6 PASS, at the first embedding. OpenAI answered HTTP 401, "Incorrect API key provided": `OPENAI_API_KEY` in `.env` is rejected. That is an environment fault, not code, and it blocks `pnpm eval` too.
+  - **The spike** needs the SQL editor, because the repo has no Postgres client.

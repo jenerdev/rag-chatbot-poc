@@ -56,6 +56,11 @@
 
 ## ▶ Next up (do this next)
 
+**Room types (2026-10-16, Phase 0 on `feat/room-types`):** [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type; new `unit_rooms` + `bookings.room_id`; `bookings_no_overlap` moves to the room; ONE SQL assigner, staff can move. The user chose room types, auto-assign and plan-first. § 7 answered 2026-10-16 (every recommendation taken).
+- [x] Phase 0 baseline (2026-10-16): verify 211, rooms 50, bookings isolation 40/40 both ways, tests all pass, typecheck 13/13, three baselines byte-identical.
+- [ ] Phase 0 owed: pipeline isolation and `pnpm eval` (OPENAI_API_KEY rejected, HTTP 401); the user runs `plan/room-types-phase0-spike.sql` in the SQL editor and pastes the result.
+- [ ] Phase 1: `schema-room-inventory.sql`, shaped by the spike.
+
 **Three items (2026-10-14, asked to run unattended; one commit each).**
 - [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.
 - [x] 2 · Role permissions per tenant, set on the platform (D-128): `role_permissions` (34th SQL file), a Permissions tab and a Knowledge base tab for the super user; app_can() and can() agree, pinned by test. verify 201, permissions-walk 6/6, axe 8/0, rooms, isolation, staff-cases pass.
