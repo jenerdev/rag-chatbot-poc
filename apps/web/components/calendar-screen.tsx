@@ -374,10 +374,16 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
                         <button
                           type="button"
                           className={`wk-cell ${cell.state}`}
-                          aria-label={`${name}, ${slotName}, ${short(day.day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${SLOT_WORD[cell.state].toLowerCase()}${cell.pending > 0 ? `, ${pendingWords(cell.pending)}` : ''}. Open the day.`}
+                          aria-label={`${name}, ${slotName}, ${short(day.day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${SLOT_WORD[cell.state].toLowerCase()}${cell.roomsTotal > 1 && cell.state !== 'closed' ? `, ${cell.roomsTaken} of ${cell.roomsTotal} rooms booked` : ''}${cell.pending > 0 ? `, ${pendingWords(cell.pending)}` : ''}. Open the day.`}
                           onClick={() => onPick(day.day)}
                         >
                           <span aria-hidden="true">{SLOT_WORD[cell.state]}</span>
+                          {/* D-133: a type of several rooms says how many are booked. */}
+                          {cell.roomsTotal > 1 && cell.state !== 'closed' && (
+                            <span className="small" aria-hidden="true">
+                              {cell.roomsTaken}/{cell.roomsTotal}
+                            </span>
+                          )}
                           {cell.pending > 0 && (
                             <span className="cal-pending sm" aria-hidden="true">
                               {cell.pending}
@@ -505,6 +511,7 @@ function DayView({ data, slug }: { data: CalendarData; slug: string }) {
                   {roomSlots.map((s) => (
                     <span key={s.slotId} className={`slot-chip ${s.state}`}>
                       {s.slot}: {s.state}
+                      {s.roomsTotal > 1 && s.state !== 'closed' ? ` (${s.roomsTaken} of ${s.roomsTotal} booked)` : ''}
                     </span>
                   ))}
                 </span>

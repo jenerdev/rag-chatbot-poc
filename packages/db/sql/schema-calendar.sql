@@ -76,6 +76,12 @@ end;
 $$;
 
 -- 2. Every (date, room, slot) with its state.
+-- GUARDED (room types, D-133): schema-room-views.sql replaces calendar_slots() (with rooms_taken and rooms_total);
+-- once it has run, a re-run of this file must not put the older one back (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.active_rooms(bigint)') is null then
+    execute $ddl$
 create or replace function public.calendar_slots(p_tenant_id bigint, p_from date, p_to date, p_unit_id bigint default null)
 returns table (day date, unit_id bigint, unit text, slot_id bigint, slot text, state text, pending int)
 language plpgsql stable
@@ -117,6 +123,11 @@ begin
     order by av.booked_date, u.sort_order, u.name, s.start_time, s.name;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
+
 
 -- 3. Every date with its roll-up.
 create or replace function public.calendar_days(p_tenant_id bigint, p_from date, p_to date, p_unit_id bigint default null)

@@ -268,6 +268,9 @@ export interface OccupancySlot {
   slot: string;
   state: 'closed' | 'taken' | 'open';
   pending: number;
+  /** D-133: rooms of the type confirmed or held on the slot's span, of its active rooms; `taken` when they are equal */
+  roomsTaken: number;
+  roomsTotal: number;
 }
 
 export interface RoomAvailability {

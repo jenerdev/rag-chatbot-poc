@@ -1375,7 +1375,8 @@ export interface Database {
       };
       calendar_slots: {
         Args: { p_tenant_id: number; p_from: string; p_to: string; p_unit_id?: number | null };
-        Returns: { day: string; unit_id: number; unit: string; slot_id: number; slot: string; state: 'closed' | 'taken' | 'open'; pending: number }[];
+        /** rooms_taken / rooms_total since schema-room-views.sql (D-133) */
+        Returns: { day: string; unit_id: number; unit: string; slot_id: number; slot: string; state: 'closed' | 'taken' | 'open'; pending: number; rooms_taken: number; rooms_total: number }[];
       };
       calendar_bookings: {
         Args: { p_tenant_id: number; p_day: string; p_unit_id?: number | null };

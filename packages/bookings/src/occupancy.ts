@@ -71,7 +71,17 @@ export async function calendarSlots(tenant: BookingTenant, range: Range, filter:
   const { from, to } = await checked(tenant, range);
   const { data, error } = await tenant.db.rpc('calendar_slots', { p_tenant_id: tenant.id, p_from: from, p_to: to, p_unit_id: unitFilter(filter.unitId) });
   if (error) throw new Error(`Could not read the calendar's slots: ${error.message}`);
-  return data.map((r) => ({ day: r.day, unitId: r.unit_id, unit: r.unit, slotId: r.slot_id, slot: r.slot, state: r.state, pending: r.pending }));
+  return data.map((r) => ({
+    day: r.day,
+    unitId: r.unit_id,
+    unit: r.unit,
+    slotId: r.slot_id,
+    slot: r.slot,
+    state: r.state,
+    pending: r.pending,
+    roomsTaken: r.rooms_taken,
+    roomsTotal: r.rooms_total,
+  }));
 }
 
 /**

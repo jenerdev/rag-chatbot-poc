@@ -23,6 +23,12 @@
 -- no tool (plan Rule 4).
 
 -- 1. The tenant's page.
+-- GUARDED (room types, D-133): schema-room-views.sql replaces tenant_dashboard() (occupancy and clashes in rooms);
+-- once it has run, a re-run of this file must not put the older one back (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.active_rooms(bigint)') is null then
+    execute $ddl$
 create or replace function tenant_dashboard(p_tenant_id bigint, p_days int default 30)
 returns jsonb
 language plpgsql stable
@@ -223,6 +229,11 @@ begin
   );
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
+
 
 -- 2. The platform's strip: counts only, one row per tenant.
 create or replace function platform_dashboard()
