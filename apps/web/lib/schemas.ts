@@ -321,6 +321,19 @@ export const decideRequestSchema = z.object({
 });
 
 /** Staff confirm or cancel ONE booking (D-095, D-096): PATCH /bookings/[id]. */
+/** A physical room of a room type (D-133): its name. @rag/bookings bounds it again. */
+export const unitRoomSchema = z.object({
+  name: z.string({ required_error: 'Name the room.', invalid_type_error: 'The name must be text.' }).trim().min(1, 'Name the room.').max(80, 'A room name is at most 80 characters.'),
+});
+
+/** Rename a room, or retire it / offer it again. */
+export const unitRoomUpdateSchema = z
+  .object({
+    name: unitRoomSchema.shape.name.optional(),
+    active: z.boolean({ invalid_type_error: 'active must be true or false.' }).optional(),
+  })
+  .refine((v) => v.name !== undefined || v.active !== undefined, { message: 'Nothing to change.' });
+
 /** Move a stay to another room of its type (D-133): the room, and why (required, like every decision, D-096). */
 export const roomMoveSchema = z.object({
   roomId: z.number({ required_error: 'Choose a room.', invalid_type_error: 'roomId must be a number.' }).int().positive('Choose a room.'),

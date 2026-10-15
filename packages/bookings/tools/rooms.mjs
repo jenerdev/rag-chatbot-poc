@@ -25,6 +25,9 @@ import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, supabase } from '@rag/db/service';
 import {
   addImage,
+  addUnitRoom,
+  deleteUnitRoom,
+  updateUnitRoom,
   BookingConflictError,
   BookingInputError,
   bookingPage,
@@ -1103,6 +1106,27 @@ try {
       viaPackage instanceof BookingConflictError && raw.error?.code === '23P01',
       'room moves: a pending booking is not moved onto a room confirmed that night, through moveStay() (409) or a raw update (23P01)',
       `package ${described(viaPackage)} · raw ${raw.error?.code ?? 'MOVED'} ${raw.error?.message ?? ''}`,
+    );
+
+    // 42. The Rooms screen's calls (D-133, Phase 4): a type's rooms are
+    //     listed; add, rename, retire and delete, each refusal in words.
+    const listed = (await listAccommodations(probe)).find((a) => a.id === twin.id)?.rooms.map((r) => r.name).join(',');
+    const thirdId = await addUnitRoom(probe, twin.id, 'Twin 3');
+    const dupe = await thrown(() => addUnitRoom(probe, twin.id, 'Twin 3'));
+    const foreignType = await addUnitRoom(probe, villaRoom.id, 'Not ours');
+    const renamed = await updateUnitRoom(probe, twin.id, thirdId, { name: 'Twin by the pool' });
+    const retired = await updateUnitRoom(probe, twin.id, thirdId, { active: false });
+    const busyRetire = await thrown(() => updateUnitRoom(probe, twin.id, two.id, { active: false }));
+    const bookedDelete = await thrown(() => deleteUnitRoom(probe, twin.id, two.id));
+    const deleted = await deleteUnitRoom(probe, twin.id, thirdId);
+    const again = await deleteUnitRoom(probe, twin.id, thirdId);
+    const afterRooms = (await listAccommodations(probe)).find((a) => a.id === twin.id)?.rooms.map((r) => `${r.name}${r.active ? '' : ' (retired)'}`).join(',');
+    check(
+      listed === 'Twin,Twin 2' && typeof thirdId === 'number' && dupe instanceof BookingInputError && foreignType === null && renamed && retired &&
+        busyRetire instanceof BookingInputError && /upcoming bookings/.test(busyRetire.message) &&
+        bookedDelete instanceof BookingInputError && /has bookings/.test(bookedDelete.message) && deleted && !again && afterRooms === 'Twin,Twin 2',
+      "type rooms: listed with the type; a room is added, renamed, retired and deleted; a duplicate name, a room with upcoming bookings and a booked room's delete are 400s in words; another tenant's type is null",
+      `listed ${listed} · dupe ${described(dupe)} · villa's ${foreignType} · busy ${described(busyRetire)} · booked ${described(bookedDelete)} · deleted ${deleted}/${again} · after ${afterRooms}`,
     );
   }
 

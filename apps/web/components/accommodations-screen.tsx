@@ -120,6 +120,162 @@ function guestsLine(room: Accommodation): string {
   return `Up to ${room.capacity} ${room.capacity === 1 ? 'guest' : 'guests'}`;
 }
 
+/**
+ * D-133: the physical rooms of this room type. Each takes one booking per
+ * slot and night, so the type is offered until all of them are taken. A
+ * room with history is retired, never deleted (the server says so in words).
+ */
+function TypeRooms({
+  room,
+  call,
+  busy,
+  run,
+  ask,
+}: {
+  room: Accommodation;
+  call: Call;
+  busy: boolean;
+  run: (action: () => Promise<string | null>) => Promise<void>;
+  ask: RoomCardProps['ask'];
+}) {
+  const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const offered = room.rooms.filter((r) => r.active).length;
+  const base = `/accommodations/${room.id}/rooms`;
+
+  const add = (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = newName.trim();
+    void run(async () => {
+      await call(base, { method: 'POST', body: JSON.stringify({ name }) });
+      setNewName('');
+      return `Added ${name} to ${room.name}.`;
+    });
+  };
+
+  const rename = (event: React.FormEvent, id: number, before: string) => {
+    event.preventDefault();
+    const name = editName.trim();
+    void run(async () => {
+      await call(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+      setEditing(null);
+      return `Renamed ${before} to ${name}.`;
+    });
+  };
+
+  const setActive = async (id: number, name: string, active: boolean) => {
+    if (!active) {
+      const sure = await ask({
+        title: `Retire ${name}?`,
+        body: `${room.name} will take one booking fewer per night. A room with an upcoming booking cannot be retired: move the booking first.`,
+        actionLabel: 'Retire',
+        backLabel: 'Keep it',
+      });
+      if (sure === null) return;
+    }
+    void run(async () => {
+      await call(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) });
+      return active ? `${name} is offered again.` : `${name} is retired.`;
+    });
+  };
+
+  const remove = async (id: number, name: string) => {
+    const sure = await ask({
+      title: `Delete ${name}?`,
+      body: 'Only a room that was never booked can be deleted. One with bookings is kept and can be retired instead.',
+      actionLabel: 'Delete',
+      backLabel: 'Keep it',
+      danger: true,
+    });
+    if (sure === null) return;
+    void run(async () => {
+      await call(`${base}/${id}`, { method: 'DELETE' });
+      return `${name} is deleted.`;
+    });
+  };
+
+  return (
+    <div className="room-section">
+      <div className="room-section-head">
+        <h3>Rooms of this type</h3>
+        <p className="small muted">
+          {offered === 1
+            ? `One room: ${room.name} takes one booking per slot and night. Add a room when there are more of them.`
+            : `${offered} rooms: ${room.name} takes ${offered} bookings per slot and night, and is offered until all are taken.`}
+        </p>
+      </div>
+      <ul className="unit-rooms">
+        {room.rooms.map((r) => (
+          <li key={r.id} className={`unit-room${r.active ? '' : ' retired'}`}>
+            {editing === r.id ? (
+              <form onSubmit={(event) => rename(event, r.id, r.name)}>
+                <input type="text" aria-label={`New name for ${r.name}`} required maxLength={80} value={editName} onChange={(e) => setEditName(e.target.value)} />
+                <button type="submit" className="sm primary" disabled={busy || editName.trim() === '' || editName.trim() === r.name}>
+                  Save
+                </button>
+                <button type="button" className="sm" disabled={busy} onClick={() => setEditing(null)}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <>
+                <span className="unit-room-name">{r.name}</span>
+                {!r.active && <span className="badge">Retired</span>}
+                <span className="unit-room-actions">
+                  <button
+                    type="button"
+                    className="ghost sm"
+                    disabled={busy}
+                    aria-label={`Rename ${r.name}`}
+                    onClick={() => {
+                      setEditing(r.id);
+                      setEditName(r.name);
+                    }}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost sm"
+                    disabled={busy}
+                    aria-label={`${r.active ? 'Retire' : 'Offer again'} ${r.name}`}
+                    onClick={() => void setActive(r.id, r.name, !r.active)}
+                  >
+                    {r.active ? 'Retire' : 'Offer again'}
+                  </button>
+                  <Tip label={`Delete ${r.name}`}>
+                    <button type="button" className="ghost sm danger" disabled={busy} aria-label={`Delete ${r.name}`} onClick={() => void remove(r.id, r.name)}>
+                      <Icon name="trash" size={16} />
+                    </button>
+                  </Tip>
+                </span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form onSubmit={add} className="unit-room-add">
+        <div className="field">
+          <label htmlFor={`new-room-${room.id}`}>Add a room</label>
+          <input
+            type="text"
+            id={`new-room-${room.id}`}
+            autoComplete="off"
+            maxLength={80}
+            placeholder={`${room.name} ${room.rooms.length + 1}`}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+        </div>
+        <button type="submit" disabled={busy || newName.trim() === ''}>
+          <Icon name="plus" size={16} /> Add room
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limits, ask, open, onToggle }: RoomCardProps) {
   // A photo dragged over the drop tile.
   const [dragging, setDragging] = useState(false);
@@ -148,6 +304,8 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
   );
   // The lowest stored price, for the closed row: what the cheapest stay starts at.
   const lowest = room.rates.length ? Math.min(...room.rates.flatMap((r) => [r.weekdayPrice, r.weekendPrice])) : null;
+  // D-133: how many bookings per slot and night the type takes.
+  const offeredRooms = room.rooms.filter((r) => r.active).length;
   const panelId = `room-${room.id}-panel`;
   const headId = `room-${room.id}-head`;
 
@@ -299,6 +457,7 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             <span className="room-meta">
               {guestsLine(room)}
               {lowest !== null && <> · from {formatMoney(lowest, setup.currency)}</>}
+              {offeredRooms > 1 && ` · ${offeredRooms} rooms`}
               {` · ${room.images.length} ${room.images.length === 1 ? 'photo' : 'photos'}`}
             </span>
           </span>
@@ -404,6 +563,8 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             </button>
           </div>
         </form>
+
+        <TypeRooms room={room} call={call} busy={busy} run={run} ask={ask} />
 
         <div className="room-section">
           <div className="room-section-head">
@@ -648,7 +809,7 @@ export function AccommodationsScreen({
     // after a save the card is rebuilt from the server's values rather
     // than keeping stale local text. Open or closed survives that: it is here.
     <RoomCard
-      key={`${room.id}:${room.name}:${room.capacity}:${room.standardCapacity}:${room.extraPersonRate}:${room.description}:${JSON.stringify(room.rates)}`}
+      key={`${room.id}:${room.name}:${room.capacity}:${room.standardCapacity}:${room.extraPersonRate}:${room.description}:${JSON.stringify(room.rates)}:${JSON.stringify(room.rooms)}`}
       room={room}
       setup={setup}
       call={call}

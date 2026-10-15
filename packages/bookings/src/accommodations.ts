@@ -40,12 +40,14 @@ const blank = (value: unknown) => value === null || value === '';
  */
 export async function listAccommodations(tenant: BookingTenant): Promise<Accommodation[]> {
   await requirePerRoom(tenant);
-  const [units, rates, slots] = await Promise.all([
+  const [units, rates, slots, rooms] = await Promise.all([
     tenant.db.from('units').select(UNIT_COLUMNS).eq('tenant_id', tenant.id).order('sort_order').order('name'),
     tenant.db.from('unit_rates').select('unit_id, slot_id, weekday_price, weekend_price, holiday_price').eq('tenant_id', tenant.id),
     tenant.db.from('slots').select('id, name, start_time').eq('tenant_id', tenant.id).order('start_time').order('name'),
+    tenant.db.from('unit_rooms').select('id, unit_id, name, active').eq('tenant_id', tenant.id).order('sort_order').order('id'),
   ]);
   if (units.error) throw new Error(`Could not load rooms: ${units.error.message}`);
+  if (rooms.error) throw new Error(`Could not load the rooms of each type: ${rooms.error.message}`);
   if (rates.error) throw new Error(`Could not load rates: ${rates.error.message}`);
   if (slots.error) throw new Error(`Could not load slots: ${slots.error.message}`);
   const images = await listImagesFor(tenant, null);
@@ -75,6 +77,7 @@ export async function listAccommodations(tenant: BookingTenant): Promise<Accommo
         }),
       ),
     images: images.filter((i) => i.unitId === u.id),
+    rooms: rooms.data.filter((r) => r.unit_id === u.id).map((r) => ({ id: r.id, name: r.name, active: r.active })),
   }));
 }
 

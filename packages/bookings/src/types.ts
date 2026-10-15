@@ -367,6 +367,16 @@ export interface Accommodation {
   sortOrder: number;
   rates: RateSummary[];
   images: ImageSummary[];
+  /** D-133: the type's physical rooms, retired ones included, in order; how many it has is how many are active */
+  rooms: UnitRoom[];
+}
+
+/** One physical room of a room type (unit_rooms, D-133). */
+export interface UnitRoom {
+  id: number;
+  name: string;
+  /** a retired room takes no new booking; a booked room is retired, never deleted */
+  active: boolean;
 }
 
 /** What createAccommodation / updateAccommodation accept. Loose, validated here. */

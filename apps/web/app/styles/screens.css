@@ -243,6 +243,17 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .room-section-foot { justify-content: flex-end; margin-top: var(--space-3); }
 .room-retire { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) 0 var(--space-5); border-top: 1px solid var(--line); }
 .room-retire p { margin: 0; }
+/* D-133: a room type's physical rooms, one row each, with the add form under them. */
+.unit-rooms { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+.unit-room { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.unit-room:first-child { border-top: 1px solid var(--line); }
+.unit-room-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.unit-room.retired .unit-room-name { color: var(--muted); }
+.unit-room-actions { display: flex; gap: var(--space-1); flex-wrap: wrap; justify-content: flex-end; }
+.unit-room form { display: flex; flex: 1; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.unit-room form input { flex: 1; min-width: 10ch; }
+.unit-room-add { display: flex; gap: var(--space-2); align-items: flex-end; flex-wrap: wrap; }
+.unit-room-add .field { flex: 1; min-width: 14ch; margin: 0; }
 .rates-grid { display: grid; grid-template-columns: minmax(120px, 1fr) 1fr 1fr; gap: 6px 10px; align-items: center; }
 .rates-row { display: contents; }
 .rates-cell { display: block; margin: 0; }

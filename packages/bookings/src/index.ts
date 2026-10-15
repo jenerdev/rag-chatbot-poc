@@ -100,6 +100,7 @@ export { createStaffStay, quoteStaffStay, type NewStaffStay } from './staff-stay
 export { stayDetail, type StayDetail } from './stay-detail.js';
 export { addStayNote, deleteStayNote, listStayNotes, MAX_STAY_NOTE, type StayNote } from './stay-notes.js';
 export { MAX_MOVE_NOTE, moveOptions, moveStay, type MoveOptions, type MoveRoom } from './room-move.js';
+export { addUnitRoom, deleteUnitRoom, MAX_ROOM_NAME, updateUnitRoom } from './unit-rooms.js';
 export { copyCalendarDays, listCalendar, removeCalendarDay, setCalendarDay } from './calendar.js';
 export { guestStatus, guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE, parseGuestStay } from './guest.js';
 export { expireDueStays } from './deadlines.js';
@@ -169,6 +170,7 @@ export type {
   SlotAvailability,
   SlotAdmin,
   SlotSummary,
+  UnitRoom,
   UnitSummary,
 } from './types.js';
 export { createSlot, deleteSlot, listSlotsAdmin, updateSlot } from './slots.js';
