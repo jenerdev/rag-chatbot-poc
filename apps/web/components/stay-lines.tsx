@@ -31,25 +31,27 @@ export function StayLines({
   promoName: string | null;
 }) {
   const dates = [...new Set(lines.map((l) => l.date))];
-  const multipleUnits = new Set(lines.map((l) => l.unitId)).size > 1;
+  // More than one line a night: each is named. Two rooms of ONE type count
+  // (D-133), so this asks the lines per night, not the distinct types.
+  const multipleUnits = dates.some((d) => lines.filter((l) => l.date === d).length > 1);
   return (
     <div className="stay-lines">
       {dates.map((date, night) =>
         lines
           .filter((l) => l.date === date)
-          .map((l) => {
+          .map((l, i) => {
             // One group per night (and room): the rate on the first line, each
             // addition or deduction on its own line under it, then the night's
             // total, the server's `price`, only when something was added.
             const extras = l.extraGuestPrice > 0 || l.surcharge > 0 || l.discount > 0;
             return (
-              <div key={`${date}-${l.unitId}`} className="quote-night">
+              <div key={`${date}-${l.unitId}-${i}`} className="quote-night">
                 <div className="quote-line">
                   {/* The dates are in Check-in / Check-out above: a night is named by its
                       number and weekday (weekday and weekend rates differ), not its date again. */}
                   <span>
                     {dates.length > 1 ? `Night ${night + 1} · ${weekday(date)}` : multipleUnits ? '' : 'Rate'}
-                    {multipleUnits ? `${dates.length > 1 ? ' · ' : ''}${l.unit}` : ''}
+                    {multipleUnits ? `${dates.length > 1 ? ' · ' : ''}${l.room && l.room !== l.unit ? `${l.unit} (${l.room})` : l.unit}` : ''}
                     {l.holiday && <span className="holiday-badge">{l.holiday}</span>}
                   </span>
                   <span>{formatMoney(l.basePrice, currency)}</span>

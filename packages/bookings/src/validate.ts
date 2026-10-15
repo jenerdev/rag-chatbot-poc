@@ -330,9 +330,8 @@ export function parseRequest(
     const r = (room ?? {}) as { unitId?: unknown; guests?: unknown };
     return { unitId: positiveInt(r.unitId, 'Room'), guests: positiveInt(r.guests, 'Guests') };
   });
-  if (new Set(rooms.map((r) => r.unitId)).size !== rooms.length) {
-    throw new BookingInputError('The same room is listed twice.');
-  }
+  // D-133: a room TYPE may be listed once per room wanted ("Casa Uno ×2");
+  // the database caps it at the type's free rooms, in words.
 
   if (!isIsoDate(input.checkIn)) throw new BookingInputError(`"${String(input.checkIn)}" is not a date. Use YYYY-MM-DD.`);
   const checkIn = input.checkIn;

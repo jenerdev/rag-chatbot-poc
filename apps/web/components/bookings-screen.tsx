@@ -280,7 +280,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
   // checked per room, plan/booking-types.md Phase 2), and the list's room
   // filter. Both types: the server's quote for the stay (D-111).
   const [rooms, setRooms] = useState<Accommodation[] | null>(null);
-  const [chosen, setChosen] = useState<Record<number, string>>({});
+  // Per picked room TYPE, the guests of each of its rooms wanted (D-133: a
+  // type of several rooms may be booked more than once in one stay).
+  const [chosen, setChosen] = useState<Record<number, string[]>>({});
   const [quote, setQuote] = useState<{ quote: RequestQuote | null; message: string | null }>({ quote: null, message: null });
   // While a price is being asked the footer shows a placeholder, never the
   // last price, which may no longer be true (the booking page's rule).
@@ -380,10 +382,12 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
   const perRoom = setup?.bookingType === 'per_room';
   const chosenRooms = useMemo(
     () =>
-      Object.entries(chosen).map(([id, guests]) => ({
-        unitId: Number(id),
-        guestCount: guests === '' ? null : Number(guests),
-      })),
+      Object.entries(chosen).flatMap(([id, list]) =>
+        list.map((guests) => ({
+          unitId: Number(id),
+          guestCount: guests === '' ? null : Number(guests),
+        })),
+      ),
     [chosen],
   );
   // What the stay books, in the booking page's shape, `[{ unitId, guests }]`;
@@ -778,6 +782,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                       .filter((r) => r.active)
                       .map((r) => {
                         const picked = chosen[r.id] !== undefined;
+                        const wanted = chosen[r.id] ?? [];
+                        // D-133: how many of this type there are; more than one offers a count.
+                        const roomsOfType = r.rooms.filter((x) => x.active).length;
                         return (
                           <div key={r.id} className={`room-pick${picked ? ' picked' : ''}`}>
                             <label>
@@ -787,7 +794,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                                 onChange={(e) =>
                                   setChosen((current) => {
                                     const next = { ...current };
-                                    if (e.target.checked) next[r.id] = '';
+                                    if (e.target.checked) next[r.id] = [''];
                                     else delete next[r.id];
                                     return next;
                                   })
@@ -808,21 +815,48 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                                 </span>
                               </span>
                             </label>
-                            {picked && (
+                            {picked && roomsOfType > 1 && (
                               <label className="room-pick-guests">
-                                <span className="small muted">Guests</span>
+                                <span className="small muted">Rooms</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={roomsOfType}
+                                  step={1}
+                                  aria-label={`How many ${r.name} rooms, of ${roomsOfType}`}
+                                  value={wanted.length}
+                                  onChange={(e) => {
+                                    const n = Math.max(1, Math.min(roomsOfType, Math.floor(Number(e.target.value) || 1)));
+                                    setChosen((current) => {
+                                      const list = [...(current[r.id] ?? [''])].slice(0, n);
+                                      while (list.length < n) list.push('');
+                                      return { ...current, [r.id]: list };
+                                    });
+                                  }}
+                                />
+                              </label>
+                            )}
+                            {wanted.map((guests, i) => (
+                              <label key={i} className="room-pick-guests">
+                                <span className="small muted">{wanted.length > 1 ? `Guests, room ${i + 1}` : 'Guests'}</span>
                                 <input
                                   type="number"
                                   min={1}
                                   max={r.capacity ?? undefined}
                                   step={1}
                                   required
-                                  aria-label={`Guests in ${r.name}`}
-                                  value={chosen[r.id]}
-                                  onChange={(e) => setChosen((current) => ({ ...current, [r.id]: e.target.value }))}
+                                  aria-label={wanted.length > 1 ? `Guests in ${r.name}, room ${i + 1}` : `Guests in ${r.name}`}
+                                  value={guests}
+                                  onChange={(e) =>
+                                    setChosen((current) => {
+                                      const list = [...(current[r.id] ?? [])];
+                                      list[i] = e.target.value;
+                                      return { ...current, [r.id]: list };
+                                    })
+                                  }
                                 />
                               </label>
-                            )}
+                            ))}
                           </div>
                         );
                       })}

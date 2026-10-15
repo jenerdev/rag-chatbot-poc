@@ -26,7 +26,9 @@ import { asOperator, supabase } from '@rag/db/service';
 import {
   addImage,
   addUnitRoom,
+  createStaffStay,
   deleteUnitRoom,
+  quoteStaffStay,
   updateUnitRoom,
   BookingConflictError,
   BookingInputError,
@@ -1127,6 +1129,29 @@ try {
         bookedDelete instanceof BookingInputError && /has bookings/.test(bookedDelete.message) && deleted && !again && afterRooms === 'Twin,Twin 2',
       "type rooms: listed with the type; a room is added, renamed, retired and deleted; a duplicate name, a room with upcoming bookings and a booked room's delete are 400s in words; another tenant's type is null",
       `listed ${listed} · dupe ${described(dupe)} · villa's ${foreignType} · busy ${described(busyRetire)} · booked ${described(bookedDelete)} · deleted ${deleted}/${again} · after ${afterRooms}`,
+    );
+
+    // 43. The staff form books a type twice (D-133, Phase 4): the quote counts
+    //     the type's FREE rooms, and the stay lands in two rooms, each kept on
+    //     both nights; with one of the two confirmed for someone else, the
+    //     quote says unavailable and the insert is refused in words.
+    const guest = { slotId: night.id, name: 'Two Rooms', phone: '09171234567', email: 'two@example.com' };
+    const N4 = day(210);
+    const N5 = day(214);
+    const twice = [{ unitId: twin.id, guests: 2 }, { unitId: twin.id, guests: 1 }];
+    const freeQuote = await quoteStaffStay(probe, { ...guest, rooms: twice, checkIn: N4, nights: 2 });
+    const stay2 = await createStaffStay(probe, { ...guest, rooms: twice, checkIn: N4, nights: 2 });
+    const { data: stay2Rows } = await probe.db.from('bookings').select('room_id, booked_date').eq('tenant_id', probe.id).eq('group_id', stay2.groupId).order('booked_date').order('room_id');
+    const roomsOn = (d) => stay2Rows.filter((r) => r.booked_date === d).map((r) => r.room_id).join(',');
+    await put([{ booked_date: N5, room_id: one.id }]);
+    const fullQuote = await quoteStaffStay(probe, { ...guest, rooms: twice, checkIn: N5, nights: 1 });
+    const fullCreate = await thrown(() => createStaffStay(probe, { ...guest, rooms: twice, checkIn: N5, nights: 1 }));
+    const oneQuote = await quoteStaffStay(probe, { ...guest, rooms: [twice[0]], checkIn: N5, nights: 1 });
+    check(
+      freeQuote.available && freeQuote.lines.length === 4 && stay2Rows.length === 4 && new Set(roomsOn(N4).split(',')).size === 2 && roomsOn(N4) === roomsOn(day(211)) &&
+        !fullQuote.available && fullCreate instanceof BookingConflictError && /every Twin/.test(fullCreate.message) && oneQuote.available,
+      'type twice: the staff quote counts free rooms; a stay of 2 Twin × 2 nights lands in 2 rooms, each kept; with 1 of 2 confirmed it is unavailable and refused in words, and 1 Twin is still available',
+      `free ${freeQuote.available} (${freeQuote.lines.length} lines) · rooms [${roomsOn(N4)}] [${roomsOn(day(211))}] · full ${fullQuote.available} · create ${described(fullCreate)} · one ${oneQuote.available}`,
     );
   }
 

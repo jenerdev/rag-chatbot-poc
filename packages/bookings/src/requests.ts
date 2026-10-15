@@ -204,8 +204,9 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
   ]);
   if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
   if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
-  // "Not yours" and "not there" are one message (CLAUDE.md conventions).
-  if (!slot.data || units.data.length !== request.rooms.length) throw new BookingInputError('No such unit or slot.');
+  // "Not yours" and "not there" are one message (CLAUDE.md conventions). A
+  // type may be named once per room wanted (D-133), so the DISTINCT ids count.
+  if (!slot.data || units.data.length !== new Set(request.rooms.map((r) => r.unitId)).size) throw new BookingInputError('No such unit or slot.');
   if (!slot.data.active) throw new BookingInputError(RETIRED);
   if (request.nights > 1 && !slot.data.nightly) {
     throw new BookingInputError(`${slot.data.name} cannot be booked for several nights.`);
@@ -222,13 +223,16 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
   await refuseClosedDays(tenant, dates);
   const [calendar, availability] = await Promise.all([
     listCalendar(tenant, { from: request.checkIn, to: lastNight }),
-    tenant.db.rpc('check_availability', { p_tenant_id: tenant.id, p_from: request.checkIn, p_to: lastNight }),
+    // D-133: the free ROOMS of each type that night, not open/taken: a stay
+    // naming Casa Uno twice needs two of them. Every line below is priced, so
+    // every unit here has a rate and a row in this read.
+    tenant.db.rpc('check_room_availability', { p_tenant_id: tenant.id, p_from: request.checkIn, p_to: lastNight, p_slot: slot.data.name, p_unit: null, p_guests: null }),
   ]);
   if (availability.error) throw new Error(`Could not check availability: ${availability.error.message}`);
   const holiday = new Map(calendar.map((c) => [c.day, c.label]));
-  const taken = new Set(
-    availability.data.filter((r) => r.status === 'taken' && r.slot === slot.data!.name).map((r) => `${r.booked_date}|${r.unit}`),
-  );
+  const free = new Map(availability.data.map((r) => [`${r.booked_date}|${r.unit}`, r.rooms_free]));
+  const wanted = new Map<number, number>();
+  for (const { unitId } of request.rooms) wanted.set(unitId, (wanted.get(unitId) ?? 0) + 1);
 
   const lines: RequestLine[] = [];
   let available = true;
@@ -245,7 +249,7 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
       if (error) throw new Error(`Could not price ${unit.name}: ${error.message}`);
       const [q] = data;
       if (!q) throw new BookingInputError(`${unit.name} has no price for ${slot.data.name} yet.`);
-      if (taken.has(`${date}|${unit.name}`)) available = false;
+      if ((free.get(`${date}|${unit.name}`) ?? 0) < wanted.get(unitId)!) available = false;
       lines.push({
         date,
         unitId,
