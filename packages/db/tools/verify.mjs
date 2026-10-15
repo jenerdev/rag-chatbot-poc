@@ -882,7 +882,7 @@ async function bookingTypeChecks(probeId) {
       const keys = all.data?.[0] ? Object.keys(all.data[0]).sort().join(',') : '';
       check(
         !all.error && got === 'Garden Room 2 taken 999900, Family Room 6 taken 600000'
-          && keys === 'booked_date,capacity,day_price,extra_guest_price,extra_person_rate,price,slot,standard_capacity,status,total,unit',
+          && keys === 'booked_date,capacity,day_price,extra_guest_price,extra_person_rate,price,rooms_free,rooms_total,slot,standard_capacity,status,total,unit',
         'check_room_availability: priced active rooms, no guest data',
         all.error ? all.error.message : `${got} · keys ${keys}`,
       );
@@ -4333,8 +4333,12 @@ async function notificationChecks() {
 
     // 215
     {
-      const stay = await book(admin, ['2027-04-05', '2027-04-06', '2027-04-07'].map((d) => ({ booked_date: d })));
-      const pair = await book(admin, ['2027-05-10', '2027-05-10', '2027-05-11', '2027-05-11'].map((d) => ({ booked_date: d })));
+      // One group per statement, as createStaffStay sends it: the assigner's
+      // "the room this stay had last night" is keyed on the group.
+      const stayGroup = randomUUID();
+      const pairGroup = randomUUID();
+      const stay = await book(admin, ['2027-04-05', '2027-04-06', '2027-04-07'].map((d) => ({ booked_date: d, group_id: stayGroup })));
+      const pair = await book(admin, ['2027-05-10', '2027-05-10', '2027-05-11', '2027-05-11'].map((d) => ({ booked_date: d, group_id: pairGroup })));
       const stayRooms = new Set((stay.data ?? []).map((r) => r.room_id));
       const byNight = (d) => (pair.data ?? []).filter((r) => r.booked_date === d).map((r) => r.room_id).sort().join(',');
       check(
@@ -4394,6 +4398,129 @@ async function notificationChecks() {
     for (const id of probes) {
       const { error } = await supabase.from('tenants').delete().eq('id', id);
       if (error) check(false, 'room inventory: a probe tenant deletes with its rooms and bookings', error.message);
+    }
+    for (const id of users) await supabase.auth.admin.deleteUser(id);
+  }
+}
+
+// --- schema-room-counts.sql (D-133): "taken" is a count of rooms --------------
+// On a THROWAWAY per_room tenant with one type of 2 rooms, deleted at the end:
+// 219. availability counts: 1 of 2 booked is open (rooms_free 1 of 2), 2 of 2
+//      is taken (0 of 2), in check_availability and check_room_availability;
+// 220. request_booking() (a chat token) names the type twice: 2 rooms × 2
+//      nights, each room kept on both nights; three times is refused in
+//      words; twice on a night with 1 free room is 23P01, once is fine;
+// 221. a staff pending row: on 1 free of 2 it is born in the free room; on
+//      0 free it is 23P01 "every <type>"; a stay of 2 rows on 1 free room is
+//      23P01 and writes nothing;
+// 222. Confirm re-picks: a pending row whose room was confirmed for someone
+//      else since moves to the free room; with none free, Confirm is 23P01.
+{
+  const users = [];
+  let probe = null;
+  try {
+    const one = async (q, what) => {
+      const { data, error } = await q;
+      if (error) throw new Error(`${what}: ${error.message}`);
+      return data;
+    };
+    probe = (await one(supabase.from('tenants').insert({ slug: `counts-${randomBytes(3).toString('hex')}`, business_name: 'Counts Probe', assistant_name: 'Probe' }).select('id').single(), 'tenant')).id;
+    await one(supabase.from('tenant_applications').insert({ tenant_id: probe, application_key: 'bookings', config: { timezone: 'Asia/Manila', booking_type: 'per_room' } }), 'app');
+    const { id: night } = await one(supabase.from('slots').insert({ tenant_id: probe, name: 'Overnight', start_time: '14:00', duration: '22 hours', nightly: true }).select('id').single(), 'slot');
+    const { id: casa } = await one(supabase.from('units').insert({ tenant_id: probe, name: 'Casa', capacity: 3, sort_order: 1, active: true }).select('id').single(), 'unit');
+    await one(supabase.from('unit_rates').insert({ tenant_id: probe, unit_id: casa, slot_id: night, weekday_price: 300000, weekend_price: 400000 }), 'rate');
+    await one(supabase.from('unit_rooms').insert({ tenant_id: probe, unit_id: casa, name: 'Casa 2', sort_order: 1 }), 'second room');
+    const { data: created, error: userError } = await supabase.auth.admin.createUser({ email: `counts-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+    if (userError) throw new Error(userError.message);
+    users.push(created.user.id);
+    await one(supabase.from('memberships').insert({ user_id: created.user.id, tenant_id: probe, role: 'admin' }), 'membership');
+    const admin = asToken(staffToken(probe, created.user.id));
+    const chat = asToken(chatToken(probe));
+    const insert = (rows) => admin.from('bookings').insert(rows.map((r) => ({ tenant_id: probe, unit_id: casa, slot_id: night, guest_name: 'Counts Guest', guest_count: 2, status: 'confirmed', ...r }))).select('id, room_id, booked_date, status');
+    const avail = async (day) => {
+      const plain = await chat.rpc('check_availability', { p_tenant_id: probe, p_from: day, p_to: day });
+      const priced = await chat.rpc('check_room_availability', { p_tenant_id: probe, p_from: day, p_to: day, p_slot: null, p_unit: null, p_guests: null });
+      const r = priced.data?.[0];
+      return `${plain.data?.[0]?.status ?? plain.error?.message}|${r ? `${r.status} ${r.rooms_free}/${r.rooms_total}` : priced.error?.message}`;
+    };
+    let phone = 0;
+    const request = (day, nights, units) => chat.rpc('request_booking', {
+      p_tenant_id: probe, p_slot_id: night, p_unit_ids: units, p_guests: units.map(() => 2), p_check_in: day, p_nights: nights,
+      p_name: 'Counts Guest', p_phone: `0917${String(1000000 + ++phone)}`, p_email: `counts${phone}@example.com`, p_notes: null, p_promo_code: null,
+    });
+    const groupRows = (reference) => supabase.from('bookings').select('room_id, booked_date').eq('tenant_id', probe).eq('reference', reference).order('booked_date').order('room_id');
+
+    // 219
+    {
+      const empty = await avail('2027-07-05');
+      await one(insert([{ booked_date: '2027-07-05' }]), 'first');
+      const half = await avail('2027-07-05');
+      await one(insert([{ booked_date: '2027-07-05' }]), 'second');
+      const full = await avail('2027-07-05');
+      check(
+        empty === 'open|open 2/2' && half === 'open|open 1/2' && full === 'taken|taken 0/2',
+        'room counts: a type of 2 rooms is open with 1 booked (1 of 2 free) and taken with 2 (0 of 2), in both availability reads',
+        `none ${empty} · one ${half} · two ${full}`,
+      );
+    }
+
+    // 220
+    {
+      const two = await request('2027-07-12', 2, [casa, casa]);
+      const rows = two.data?.[0] ? (await groupRows(two.data[0].reference)).data ?? [] : [];
+      const roomsOn = (d) => rows.filter((r) => r.booked_date === d).map((r) => r.room_id).join(',');
+      const three = await request('2027-07-19', 1, [casa, casa, casa]);
+      await one(insert([{ booked_date: '2027-07-26' }]), 'one taken');
+      const twoOnOne = await request('2027-07-26', 1, [casa, casa]);
+      const oneOnOne = await request('2027-07-26', 1, [casa]);
+      check(
+        !two.error && rows.length === 4 && new Set(roomsOn('2027-07-12').split(',')).size === 2 && roomsOn('2027-07-12') === roomsOn('2027-07-13') &&
+          three.error?.code === '22023' && three.error.message === 'Casa has 2 rooms; 3 were asked for' &&
+          twoOnOne.error?.code === '23P01' && !oneOnOne.error && oneOnOne.data?.length === 1,
+        'room counts: request_booking() takes a type twice (2 rooms × 2 nights, each room kept); three times is refused in words; twice on 1 free room is 23P01, once is fine',
+        `two ${two.error?.message ?? `[${roomsOn('2027-07-12')}] [${roomsOn('2027-07-13')}]`} · three ${three.error?.code} "${three.error?.message}" · two on one ${twoOnOne.error?.code ?? 'STORED'} · one on one ${oneOnOne.error?.message ?? oneOnOne.data?.length}`,
+      );
+    }
+
+    // 221
+    {
+      const [taken] = await one(insert([{ booked_date: '2027-08-02' }]), 'taken');
+      const born = await insert([{ booked_date: '2027-08-02', status: 'pending' }]);
+      await one(insert([{ booked_date: '2027-08-02' }]), 'fills');
+      const none = await insert([{ booked_date: '2027-08-02', status: 'pending' }]);
+      await one(insert([{ booked_date: '2027-08-09' }]), 'one of two');
+      const stayGroup = randomUUID();
+      const pair = await insert([{ booked_date: '2027-08-09', status: 'pending', group_id: stayGroup }, { booked_date: '2027-08-09', status: 'pending', group_id: stayGroup }]);
+      const left = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('tenant_id', probe).eq('booked_date', '2027-08-09').eq('status', 'pending');
+      check(
+        !born.error && born.data?.[0]?.room_id && born.data[0].room_id !== taken.room_id &&
+          none.error?.code === '23P01' && none.error.message === 'taken on 2027-08-02: every Casa is already confirmed for that slot' &&
+          pair.error?.code === '23P01' && left.count === 0,
+        'room counts: a staff pending row is born in the free room; on a full type it is 23P01 "every Casa"; a stay of 2 on 1 free room is 23P01 and writes nothing',
+        `born ${born.error?.message ?? `room ${born.data?.[0]?.room_id} (taken ${taken.room_id})`} · full ${none.error?.code} "${none.error?.message}" · pair ${pair.error?.code ?? 'STORED'} · pending left ${left.count}`,
+      );
+    }
+
+    // 222
+    {
+      const [p1] = await one(insert([{ booked_date: '2027-08-16', status: 'pending' }]), 'p1');
+      const [p2] = await one(insert([{ booked_date: '2027-08-16', status: 'pending' }]), 'p2');
+      await one(insert([{ booked_date: '2027-08-16', room_id: p1.room_id }]), 'someone else in p1\'s room');
+      const confirm = (id) => admin.from('bookings').update({ status: 'confirmed', decision_note: 'verify: confirm' }).eq('tenant_id', probe).eq('id', id).select('id, room_id, status');
+      const first = await confirm(p1.id);
+      const second = await confirm(p2.id);
+      check(
+        p1.room_id !== p2.room_id && !first.error && first.data?.[0]?.status === 'confirmed' && first.data[0].room_id === p2.room_id && second.error?.code === '23P01',
+        "room counts: Confirm moves a pending row whose room was confirmed for someone else to the free room; with none free, Confirm is 23P01",
+        `p1 room ${p1.room_id}, p2 room ${p2.room_id} · p1 confirmed ${first.error?.message ?? `in room ${first.data?.[0]?.room_id}`} · p2 ${second.error?.code ?? 'CONFIRMED'}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'room counts: setup', error.message);
+  } finally {
+    if (probe) {
+      const { error } = await supabase.from('tenants').delete().eq('id', probe);
+      if (error) check(false, 'room counts: the probe tenant deletes', error.message);
     }
     for (const id of users) await supabase.auth.admin.deleteUser(id);
   }

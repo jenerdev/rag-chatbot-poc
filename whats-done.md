@@ -9705,3 +9705,28 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - rooms 50; bookings isolation 40/40 both ways; pipeline isolation 24/24 and 22/22; unit tests all pass.
 - **Trap met:** an interrupted verify run leaves its `verify-probe` and `calendar-probe` tenants behind, and the next run fails 170 checks on "duplicate key … tenants_slug_key". They were deleted by slug and id. The delete cascaded through `unit_rooms_guard`, which lets a tenant's cascade through.
 
+## 2026-10-16 · Room types, Phase 2: "taken" is a count of rooms (`feat/room-types`, D-133)
+
+- **What:** `packages/db/sql/schema-room-counts.sql`, the 38th file:
+  - `room_for()`, the ONE picker;
+  - `bookings_room_assign` uses it, and `bookings_room_repick` (BEFORE UPDATE OF status, held) re-picks a room taken since the request;
+  - `check_availability` says `taken` only when no active room is free;
+  - `check_room_availability` adds `rooms_free`/`rooms_total` at the end (dropped and re-made, grants re-applied);
+  - `request_booking()` takes a type several times, up to its rooms ("Casa has 2 rooms; 3 were asked for"), counts free rooms per night, and refuses a foreign unit as 23503 "No such room";
+  - `bookings_pending_not_taken` counts free rooms less this stay's own (one room keeps the old words; more say "every Casa");
+  - `stay_taken()` counts.
+
+  The old definitions in `schema-holds.sql` (10–13) and `schema-stay-outcome.sql` are guarded on `room_for()`.
+- **Observed:**
+  - dry run, then applied; the catalog shows the new return type, the grant and the trigger. Re-running holds + stay-outcome in a rolled-back transaction kept all six new definitions and the per-room constraint (the guards hold);
+  - verify **222/222**:
+    - 219: none `open 2/2`, one `open 1/2`, two `taken 0/2`;
+    - 220: 2 rooms × 2 nights [110,111]/[110,111]; ×3 is 22023 in words; twice on 1 free is 23P01, once is fine;
+    - 221: born in room 111 beside 110; full is "taken on 2027-08-02: every Casa is already confirmed for that slot"; a stay of 2 on 1 free is 23P01 and leaves 0 rows;
+    - 222: P1 moved 110 → 111 at Confirm, then P2's Confirm is 23P01;
+  - `stay_taken()` (rolled back): null with 2 free, then "Casa is no longer free on Mon, 6 Sep 2027: another booking was confirmed for it.";
+  - rooms 50; bookings isolation 40/40 both ways; pipeline isolation 24/22; unit tests; typecheck 13/13; the three baselines byte-identical.
+- **Owed:** `pnpm eval`, stopped mid-run at the user's word. No fixture rows were left (checked by marker: 0 and 0).
+- **Found while testing:** `bookings_fill_group_and_reference` gives each row a NEW group unless the insert brings one. A staff stay is one group because `createStaffStay()` sends `group_id`, and the assigner's "this stay's room" depends on that. verify 215 and 221 now send it; 215 had passed for the wrong reason (free rooms in order).
+- **Two older checks moved:** check_room_availability's key list gains the counts; request_booking's foreign-unit refusal is 23503 again, by name.
+

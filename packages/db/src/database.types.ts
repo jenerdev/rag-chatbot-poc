@@ -1347,6 +1347,10 @@ export interface Database {
           total: number;
           /** sql/schema-day-price.sql (D-083): unit_quote()'s price with no guest count, the surcharge in */
           day_price: number;
+          /** sql/schema-room-counts.sql (D-133): active rooms of the type with no taking row on the span; status is 'taken' when 0 */
+          rooms_free: number;
+          /** the type's active rooms */
+          rooms_total: number;
         }[];
       };
       /**

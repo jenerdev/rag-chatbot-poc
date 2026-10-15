@@ -25,6 +25,13 @@
 
 -- 1. The first clash of a pending stay, in words, or null. Reads other
 --    groups' rows, so it runs inside definer functions only.
+-- GUARDED (room types, D-133): schema-room-counts.sql replaces
+-- stay_taken() with versions that count rooms. Once it has run, a re-run
+-- of this file must not put these back (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.room_for(bigint, bigint, uuid, date, tstzrange, bigint)') is null then
+    execute $ddl$
 create or replace function stay_taken(p_tenant_id bigint, p_group_id uuid)
 returns text
 language sql
@@ -48,6 +55,10 @@ as $$
   order by b.booked_date, (o.status = 'confirmed') desc, u.name
   limit 1
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 revoke all on function stay_taken(bigint, uuid) from public, anon, authenticated;
 
 -- 2. No proof for a stay that can no longer be confirmed. Payments only

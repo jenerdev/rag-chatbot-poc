@@ -260,6 +260,14 @@ create trigger payments_release_on_reject
 -- 10–13. The four reads and checks, each with ONE change: the taken test is
 --        booking_takes(). Everything else is the older file's text.
 
+-- GUARDED (room types, D-133): schema-room-counts.sql replaces
+-- check_availability, check_room_availability, request_booking and
+-- bookings_pending_not_taken with versions that count rooms. Once it has run, a re-run
+-- of this file must not put these back (trap 20).
+do $guard$
+begin
+  if to_regprocedure('public.room_for(bigint, bigint, uuid, date, tstzrange, bigint)') is null then
+    execute $ddl$
 -- 10. check_availability(), from schema-customer-booking.sql.
 create or replace function check_availability (
   p_tenant_id bigint,
@@ -320,7 +328,8 @@ begin
     order by d, u.name, s.start_time, s.name;
 end;
 $$;
-
+$ddl$;
+    execute $ddl$
 -- 11. check_room_availability(), from schema-day-price.sql (create OR
 --     REPLACE here: same signature, its grants are kept).
 create or replace function public.check_room_availability (
@@ -407,7 +416,8 @@ begin
     order by d, u.sort_order, u.name, s.start_time, s.name;
 end;
 $$;
-
+$ddl$;
+    execute $ddl$
 -- 12. request_booking(), from schema-staff-requests.sql.
 create or replace function request_booking (
   p_tenant_id  bigint,
@@ -617,7 +627,8 @@ begin
     order by b.booked_date, un.sort_order, un.name;
 end;
 $$;
-
+$ddl$;
+    execute $ddl$
 -- 13. bookings_pending_not_taken(), from schema-taken-span.sql, plus a
 --     hold's own words ("is held for another guest"), which taken.ts passes
 --     through like the confirmed ones.
@@ -659,5 +670,9 @@ begin
   return new;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 
 notify pgrst, 'reload schema';
