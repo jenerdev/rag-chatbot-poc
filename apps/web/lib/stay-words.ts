@@ -45,6 +45,7 @@ export function statusWords(from: string | null, to: string | null): string {
 export function eventWords(e: StayEvent, currency: string): string {
   if (e.kind === 'created') return `Booked ${e.note === 'web' ? 'on the booking page' : 'by staff'}${e.to === 'confirmed' ? ', confirmed' : ''}`;
   if (e.kind === 'status') return `${statusWords(e.from, e.to)}${e.note ? `: “${e.note}”` : ''}`;
+  if (e.kind === 'room') return `Moved from ${e.from ?? '?'} to ${e.to ?? '?'}${e.note ? `: “${e.note}”` : ''}`;
   if (e.kind === 'change') {
     const [kind, status] = (e.to ?? '').split(':');
     const what = kind === 'cancel' ? 'cancel' : `move${e.note && status === 'pending' ? ` to ${e.note}` : ''}`;

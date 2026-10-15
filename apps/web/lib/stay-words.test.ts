@@ -30,4 +30,8 @@ describe('eventWords', () => {
     expect(eventWords(ev({ kind: 'created', to: 'pending', note: 'staff' }), 'PHP')).toBe('Booked by staff');
     expect(eventWords(ev({ from: 'pending', to: 'cancelled', note: 'fully booked' }), 'PHP')).toBe('Declined: “fully booked”');
   });
+
+  it('says a room move from where to where, and why (D-133)', () => {
+    expect(eventWords(ev({ kind: 'room', from: 'Casa Uno 1', to: 'Casa Uno 2', note: 'by the pool' }), 'PHP')).toBe('Moved from Casa Uno 1 to Casa Uno 2: “by the pool”');
+  });
 });

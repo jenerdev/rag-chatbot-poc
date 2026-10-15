@@ -55,7 +55,7 @@ export interface StayEvent {
   actor: 'guest' | 'staff' | 'system';
   /** the staff member's id, for "you" on the screen */
   actorUser: string | null;
-  kind: 'created' | 'status' | 'payment' | 'change';
+  kind: 'created' | 'status' | 'payment' | 'change' | 'room';
   from: string | null;
   to: string | null;
   amount: number | null;

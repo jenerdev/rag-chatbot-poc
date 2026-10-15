@@ -9730,3 +9730,23 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Found while testing:** `bookings_fill_group_and_reference` gives each row a NEW group unless the insert brings one. A staff stay is one group because `createStaffStay()` sends `group_id`, and the assigner's "this stay's room" depends on that. verify 215 and 221 now send it; 215 had passed for the wrong reason (free rooms in order).
 - **Two older checks moved:** check_room_availability's key list gains the counts; request_booking's foreign-unit refusal is 23503 again, by name.
 
+## 2026-10-16 · Room types, Phase 3: staff move a stay to another room (`feat/room-types`, D-133)
+
+- **What:**
+  - `packages/db/sql/schema-room-move.sql`, the 39th file:
+    - `booking_events_kind` gains `room`;
+    - `move_room(p_tenant_id, p_booking_id, p_room_id, p_note)`, a definer function. It checks the token's tenant and `app_can('bookings:write')` itself, requires a note of 1–500 characters, and moves every live, not-yet-ended row of the stay in that booking's room in one UPDATE. It then writes one `booking_events` row (`room`, from/to room names, row count, note) and returns the count; null means not this tenant's;
+    - `bookings_room_move_guard` (BEFORE UPDATE OF room_id) refuses a retired room, a room of the same stay that night, or a room confirmed or held for that span, in `taken.ts`'s words. Raw updates by a staff token meet it too.
+  - `@rag/bookings/room-move.ts`: `moveOptions()` (the type's rooms, each `free` for every night that would move) and `moveStay()` (23P01 → 409 with the guard's words; 22023/23514 → 400).
+  - `GET|PATCH /api/t/[tenant]/bookings/[id]/room` (bookings:read / bookings:write) and `roomMoveSchema`.
+  - `eventWords()` says "Moved from Twin to Twin 2: “why”".
+- **Why it matters:** the assigner picks a room, and staff could not change it. A guest who asks for the room by the pool, or two stays that should swap, needed SQL by hand. The price never moves, because unit, slot, date, guests and promo are untouched (`bookings_compute_during`'s keep branch).
+- **Observed:**
+  - rooms **54/54**:
+    - 38: blocked `Twin*:busy,Twin 2:busy`, after the cancel `Twin*:busy,Twin 2:free`; villa's booking → null;
+    - 39: moved 2, rooms 197,197, prices 300000,300000 unchanged; event "Twin → Twin 2" with the note, by staff;
+    - 40: the same room, another type and a blank note are 400s; the taken room is "taken on …: Twin is already confirmed for that slot"; villa's → null;
+    - 41: a pending row onto a confirmed room is a 409 through the package and 23P01 through a raw update;
+  - verify 222; bookings isolation 40/40 both ways; web tests 175 (+1 for the words); typecheck 13/13.
+- **Trap met:** `listBookings()` needs a date range. The check reads one of villa's ids on the service client instead, to ask for it as the probe.
+

@@ -20,7 +20,7 @@
 //
 // Run:  pnpm --filter @rag/bookings rooms
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, supabase } from '@rag/db/service';
 import {
@@ -62,7 +62,10 @@ import {
   PerRoomOnlyError,
   quote,
   moveImage,
+  moveOptions,
+  moveStay,
   removeImage,
+  stayHistory,
   setRates,
   updateAccommodation,
 } from '../dist/index.js';
@@ -1024,6 +1027,82 @@ try {
       back && removed && rateRows === 0 && gone === false,
       'slots: a retired slot is offered again; one never booked is deleted with its rates; deleting it twice is "not there"',
       `offered again ${back} · deleted ${removed} · rate rows left ${rateRows} · again ${gone}`,
+    );
+  }
+
+  // 38–41. Room moves (D-133, plan/room-types.md Phase 3): a type of two
+  //         rooms, through moveOptions() and moveStay() on the staff token.
+  {
+    const twin = await createAccommodation(probe, { name: 'Twin', capacity: 2, sortOrder: 9 });
+    await setRates(probe, twin.id, [{ slotId: night.id, weekdayPrice: 300000, weekendPrice: 300000 }]);
+    const { data: second, error: secondError } = await probe.db.from('unit_rooms').insert({ tenant_id: probe.id, unit_id: twin.id, name: 'Twin 2', sort_order: 1 }).select('id').single();
+    if (secondError) throw new Error(`second room: ${secondError.message}`);
+    const { data: rooms } = await probe.db.from('unit_rooms').select('id, name').eq('tenant_id', probe.id).eq('unit_id', twin.id).order('sort_order');
+    const [one, two] = rooms;
+    const N1 = day(200);
+    const N2 = day(201);
+    const N3 = day(205);
+    const put = async (rows) => {
+      const { data, error } = await probe.db
+        .from('bookings')
+        .insert(rows.map((r) => ({ tenant_id: probe.id, unit_id: twin.id, slot_id: night.id, guest_name: 'Move Probe', guest_count: 2, status: 'confirmed', ...r })))
+        .select('id, room_id, group_id, price');
+      if (error) throw new Error(`insert: ${error.message}`);
+      return data;
+    };
+    const stayGroup = randomUUID();
+    const stay = await put([{ booked_date: N1, group_id: stayGroup, room_id: one.id }, { booked_date: N2, group_id: stayGroup, room_id: one.id }]);
+    const [blocker] = await put([{ booked_date: N2, room_id: two.id }]);
+    // Any of villa's booking ids, read on the tool's service client: asked for as the probe, it must be "not there".
+    const villaBooking = (await supabase.from('bookings').select('id').eq('tenant_id', villa.id).limit(1).maybeSingle()).data?.id ?? -1;
+
+    // 38
+    const blocked = await moveOptions(probe, stay[0].id);
+    await cancelBooking(probe, blocker.id);
+    const open = await moveOptions(probe, stay[0].id);
+    const foreign = await moveOptions(probe, villaBooking);
+    const shape = (o) => o?.rooms.map((r) => `${r.name}${r.current ? '*' : ''}:${r.free ? 'free' : 'busy'}`).join(',');
+    check(
+      blocked?.nights.join(',') === `${N1},${N2}` && shape(blocked) === 'Twin*:busy,Twin 2:busy' && shape(open) === 'Twin*:busy,Twin 2:free' && foreign === null,
+      "room moves: the options list the type's rooms; a room confirmed for another stay on one night is busy, free once that is cancelled; another tenant's booking is null",
+      `blocked ${shape(blocked)} · after cancel ${shape(open)} · nights ${open?.nights.join(',')} · villa's ${foreign}`,
+    );
+
+    // 39
+    const moved = await moveStay(probe, stay[0].id, two.id, 'Guest asked for the room by the pool');
+    const { data: after } = await probe.db.from('bookings').select('id, room_id, price').eq('tenant_id', probe.id).eq('group_id', stayGroup).order('booked_date');
+    const history = await stayHistory(probe, stayGroup);
+    const event = history.find((e) => e.kind === 'room');
+    check(
+      moved === 2 && after.every((r) => r.room_id === two.id) && after.map((r) => r.price).join(',') === stay.map((r) => r.price).join(',') &&
+        event?.from === 'Twin' && event?.to === 'Twin 2' && event?.note === 'Guest asked for the room by the pool' && event?.actor === 'staff',
+      'room moves: both nights move in one call, the price stays, and the history says from where to where and why',
+      `moved ${moved} · rooms ${after.map((r) => r.room_id).join(',')} (to ${two.id}) · prices ${after.map((r) => r.price).join(',')} · event ${event ? `${event.from} → ${event.to} "${event.note}" by ${event.actor}` : 'none'}`,
+    );
+
+    // 40
+    const same = await thrown(() => moveStay(probe, stay[0].id, two.id, 'again'));
+    const otherType = await thrown(() => moveStay(probe, stay[0].id, garden.id, 'wrong type'));
+    const silent = await thrown(() => moveStay(probe, stay[0].id, one.id, '   '));
+    await put([{ booked_date: N1, room_id: one.id }]);
+    const taken = await thrown(() => moveStay(probe, stay[0].id, one.id, 'back again'));
+    const notOurs = await moveStay(probe, villaBooking, one.id, 'not ours');
+    check(
+      same instanceof BookingInputError && otherType instanceof BookingInputError && silent instanceof BookingInputError &&
+        taken instanceof BookingConflictError && taken.message === `taken on ${N1}: Twin is already confirmed for that slot` && notOurs === null,
+      "room moves: the same room, a room of another type and no note are 400s; a room confirmed on one of the nights is a 409 in words; another tenant's booking is null",
+      `same ${described(same)} · other type ${described(otherType)} · no note ${described(silent)} · taken ${described(taken)} · villa's ${notOurs}`,
+    );
+
+    // 41
+    const [pending] = await put([{ booked_date: N3, room_id: one.id, status: 'pending' }]);
+    await put([{ booked_date: N3, room_id: two.id }]);
+    const viaPackage = await thrown(() => moveStay(probe, pending.id, two.id, 'onto a confirmed room'));
+    const raw = await probe.db.from('bookings').update({ room_id: two.id }).eq('tenant_id', probe.id).eq('id', pending.id).select('id');
+    check(
+      viaPackage instanceof BookingConflictError && raw.error?.code === '23P01',
+      'room moves: a pending booking is not moved onto a room confirmed that night, through moveStay() (409) or a raw update (23P01)',
+      `package ${described(viaPackage)} · raw ${raw.error?.code ?? 'MOVED'} ${raw.error?.message ?? ''}`,
     );
   }
 

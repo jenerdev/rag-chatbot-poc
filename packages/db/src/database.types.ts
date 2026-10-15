@@ -834,7 +834,8 @@ export interface Database {
           actor_kind: 'guest' | 'staff' | 'system';
           /** the staff user's id; null for a guest or the system */
           actor_user: string | null;
-          kind: 'created' | 'status' | 'payment' | 'change';
+          /** 'room' since schema-room-move.sql (D-133): from/to are room names, note is why */
+          kind: 'created' | 'status' | 'payment' | 'change' | 'room';
           from_value: string | null;
           to_value: string | null;
           /** rows of the group the statement touched */
@@ -1223,6 +1224,11 @@ export interface Database {
       decide_change: {
         Args: { p_tenant_id: number; p_id: number; p_action: string; p_note: string | null };
         Returns: Json;
+      };
+      /** schema-room-move.sql (D-133): the stay's live rows in that booking's room → another room of the same type; rows moved, null when not this tenant's */
+      move_room: {
+        Args: { p_tenant_id: number; p_booking_id: number; p_room_id: number; p_note: string };
+        Returns: number | null;
       };
       /** schema-manage-booking.sql § 19b: every due stay of the tenant → expired, as the system; staff or service_role */
       expire_due_stays: {

@@ -321,6 +321,12 @@ export const decideRequestSchema = z.object({
 });
 
 /** Staff confirm or cancel ONE booking (D-095, D-096): PATCH /bookings/[id]. */
+/** Move a stay to another room of its type (D-133): the room, and why (required, like every decision, D-096). */
+export const roomMoveSchema = z.object({
+  roomId: z.number({ required_error: 'Choose a room.', invalid_type_error: 'roomId must be a number.' }).int().positive('Choose a room.'),
+  note: z.string({ required_error: 'Write why the booking moves.', invalid_type_error: 'The note must be text.' }).trim().min(1, 'Write why the booking moves.').max(500, 'The note is too long (500 characters at most).'),
+});
+
 export const bookingActionSchema = z.object({
   action: z.enum(['confirm', 'cancel'], {
     errorMap: () => ({ message: 'action is "confirm" or "cancel"' }),
