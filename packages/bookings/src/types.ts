@@ -455,6 +455,10 @@ export interface RequestLine {
   date: string;
   unitId: number;
   unit: string;
+  /** D-133, a stored row only (the stay's page): the row and its physical room; absent on a quote */
+  bookingId?: number;
+  roomId?: number;
+  room?: string | null;
   guests: number;
   basePrice: number;
   extraGuestPrice: number;

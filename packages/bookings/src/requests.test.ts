@@ -211,4 +211,19 @@ describe('clashes: a pending stay against the nights other stays take', () => {
     ];
     expect(clashes(own, 'me', takingRows(others, now))).toBe(false);
   });
+
+  it('counts rooms (D-133): a type of 2 rooms clashes only when the others take as many as it has left', () => {
+    const rooms = new Map([[1, 2]]);
+    const inRoom = (group: string, status: string, room: number) => ({ ...night(group, 1, status), room_id: room });
+    const one = [inRoom('other', 'confirmed', 10)];
+    const both = [inRoom('a', 'confirmed', 10), inRoom('b', 'confirmed', 11)];
+    // One pending room wanted: free with 1 of 2 taken, clashing with 2 of 2.
+    expect(clashes([night('me', 1, 'pending')], 'me', takingRows(one, now), rooms)).toBe(false);
+    expect(clashes([night('me', 1, 'pending')], 'me', takingRows(both, now), rooms)).toBe(true);
+    // Two rooms of the type wanted the same night: 1 of 2 taken is not enough.
+    expect(clashes([night('me', 1, 'pending'), night('me', 1, 'pending')], 'me', takingRows(one, now), rooms)).toBe(true);
+    // Two rows of ANOTHER stay in one room (a long stay) are one room taken.
+    const sameRoom = [inRoom('x', 'confirmed', 10), { ...inRoom('x', 'confirmed', 10), during: '["2026-10-16 07:00:00+00","2026-10-16 09:00:00+00")' }];
+    expect(clashes([night('me', 1, 'pending')], 'me', takingRows(sameRoom, now), rooms)).toBe(false);
+  });
 });

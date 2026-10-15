@@ -23,6 +23,7 @@ import type { StayPayment } from './guest.js';
 import { listPayments, stayHistory, stayPayment, type PaymentRow, type StayEvent } from './payment-review.js';
 import { clashes, parseSpan, takingRows } from './requests.js';
 import { listStayNotes, type StayNote } from './stay-notes.js';
+import { roomCounts } from './unit-rooms.js';
 import type { BookingStatus, BookingTenant, RequestLine } from './types.js';
 import { addDays, localDate } from './validate.js';
 
@@ -102,7 +103,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
 
   const { data: all, error } = await tenant.db
     .from('bookings')
-    .select('id, unit_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, created_at')
+    .select('id, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, created_at')
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
     .order('booked_date')
@@ -115,7 +116,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
   const dates = [...new Set(rows.map((r) => r.booked_date))];
   const lastNight = dates[dates.length - 1]!;
 
-  const [units, slots, promo, walkIns, calendar, payment, payments, changes, history, staffNotes, closed] = await Promise.all([
+  const [units, slots, promo, walkIns, calendar, payment, payments, changes, history, staffNotes, closed, roomRows, rooms] = await Promise.all([
     tenant.db.from('units').select('id, name').eq('tenant_id', tenant.id),
     listSlots(tenant, { retired: true }),
     first.promo_id === null
@@ -129,7 +130,11 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
     stayHistory(tenant, groupId),
     listStayNotes(tenant, groupId, userId),
     status === 'pending' ? closedDays(tenant, dates[0]!, lastNight) : Promise.resolve(new Map<string, string>()),
+    tenant.db.from('unit_rooms').select('id, name').eq('tenant_id', tenant.id).in('id', [...new Set(rows.map((r) => r.room_id))]),
+    roomCounts(tenant),
   ]);
+  if (roomRows.error) throw new Error(`Could not load the rooms: ${roomRows.error.message}`);
+  const roomName = new Map(roomRows.data.map((r) => [r.id, r.name]));
   if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
   const unitName = new Map(units.data.map((u) => [u.id, u.name]));
   const holiday = new Map((calendar.data ?? []).map((c) => [c.day, c.label]));
@@ -141,7 +146,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
   if (status === 'pending') {
     const { data: near, error: nearError } = await tenant.db
       .from('bookings')
-      .select('group_id, unit_id, during, status, held, held_until')
+      .select('group_id, unit_id, room_id, during, status, held, held_until')
       .eq('tenant_id', tenant.id)
       .in(
         'unit_id',
@@ -150,7 +155,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
       .gte('booked_date', addDays(dates[0]!, -MAX_STAY_NIGHTS))
       .lte('booked_date', lastNight);
     if (nearError) throw new Error(`Could not check the nights: ${nearError.message}`);
-    clash = clashes(rows.map((r) => ({ ...r, group_id: groupId })), groupId, takingRows(near, Date.now()));
+    clash = clashes(rows.map((r) => ({ ...r, group_id: groupId })), groupId, takingRows(near, Date.now()), rooms);
   }
 
   const unitIds = [...new Set(rows.map((r) => r.unit_id))];
@@ -183,6 +188,9 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
       date: r.booked_date,
       unitId: r.unit_id,
       unit: unitName.get(r.unit_id) ?? '(unknown unit)',
+      bookingId: r.id,
+      roomId: r.room_id,
+      room: roomName.get(r.room_id) ?? null,
       guests: r.guest_count ?? 0,
       basePrice: r.base_price ?? r.price ?? 0,
       extraGuestPrice: r.extra_guest_price ?? 0,

@@ -26,6 +26,7 @@ import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { discountLines } from './promos.js';
 import { BookingConflictError, BookingInputError, BookingsNotEnabledError, PerRoomOnlyError } from './errors.js';
 import { takenError } from './taken.js';
+import { roomCounts } from './unit-rooms.js';
 import type {
   BookingGroup,
   BookingStatus,
@@ -348,7 +349,7 @@ export async function listBookings(
   let query = tenant.db
     .from('bookings')
     .select(
-      'id, unit_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
+      'id, unit_id, room_id, slot_id, booked_date, status, guest_name, guest_phone, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, group_id, source, reference, guest_email, created_at',
     )
     .eq('tenant_id', tenant.id)
     .gte('booked_date', from)
@@ -360,11 +361,12 @@ export async function listBookings(
   // Names are joined here rather than embedded in the select. All three
   // lookups are tenant-scoped, so a name can only come from this tenant.
   // The promo names (D-097) include retired promos: a booking keeps its name.
-  const [units, slots, promos, walkIns] = await Promise.all([
+  const [units, slots, promos, walkIns, rooms] = await Promise.all([
     listUnits(tenant),
     listSlots(tenant, { retired: true }),
     tenant.db.from('promos').select('id, name').eq('tenant_id', tenant.id),
     walkInGroups(tenant, data.map((b) => b.group_id)),
+    roomCounts(tenant),
   ]);
   if (promos.error) throw new Error(`Could not load promos: ${promos.error.message}`);
   const unitName = new Map(units.map((u) => [u.id, u.name]));
@@ -378,7 +380,16 @@ export async function listBookings(
   // stops such a row being born; this names the ones that were born before
   // it, or in the one-statement window it leaves (plan Rule 4). A warning,
   // never the guard (trap 21): the server still answers at Confirm.
-  const taken = new Set(data.filter((b) => b.status === 'confirmed').map((b) => `${b.booked_date}|${b.unit_id}|${b.slot_id}`));
+  // D-133: counted in ROOMS: the night clashes when every active room of the
+  // type is confirmed for another booking.
+  const confirmedRooms = new Map<string, Set<number>>();
+  for (const b of data) {
+    if (b.status !== 'confirmed') continue;
+    const key = `${b.booked_date}|${b.unit_id}|${b.slot_id}`;
+    confirmedRooms.set(key, (confirmedRooms.get(key) ?? new Set<number>()).add(b.room_id));
+  }
+  const full = (b: { booked_date: string; unit_id: number; slot_id: number }) =>
+    (confirmedRooms.get(`${b.booked_date}|${b.unit_id}|${b.slot_id}`)?.size ?? 0) >= (rooms.get(b.unit_id) ?? 1);
   // D-100: every row has a group now, so "has a group" no longer means
   // "several rooms"; the screen asks the size instead, over the loaded rows.
   const groupSize = new Map<string, number>();
@@ -392,7 +403,7 @@ export async function listBookings(
     slotId: b.slot_id,
     slot: slotName.get(b.slot_id) ?? '(unknown slot)',
     status: b.status,
-    clash: b.status === 'pending' && taken.has(`${b.booked_date}|${b.unit_id}|${b.slot_id}`),
+    clash: b.status === 'pending' && full(b),
     guestName: b.guest_name,
     guestPhone: b.guest_phone,
     guestCount: b.guest_count,

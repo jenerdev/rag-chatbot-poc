@@ -37,6 +37,7 @@ import type {
   RequestReceipt,
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
+import { roomCounts } from './unit-rooms.js';
 import { discountLines, optionalCode, promoForStay, promoMessage } from './promos.js';
 import { addDays, lastBookingDate, localDate, pageSettings, parseRequest, paymentFlow, type ParsedRequest } from './validate.js';
 
@@ -416,6 +417,8 @@ export async function requestBooking(
 interface SpanRow {
   group_id: string | null;
   unit_id: number;
+  /** D-133: the physical room; rows without one count as one room each */
+  room_id?: number | null;
   during: string | null;
   status: string;
   held: boolean | null;
@@ -439,16 +442,27 @@ export function takingRows<T extends SpanRow>(rows: T[], now: number): T[] {
   return rows.filter((r) => r.status === 'confirmed' || (r.held === true && r.held_until !== null && Date.parse(r.held_until) > now));
 }
 
-/** Does any of a stay's rows overlap a taking row of ANOTHER stay on the same unit? Its own hold never counts. */
-export function clashes(own: SpanRow[], groupId: string, takers: SpanRow[]): boolean {
+const overlap = (a: [number, number], b: [number, number] | null) => b !== null && b[0] < a[1] && a[0] < b[1];
+
+/**
+ * Would confirming this stay be refused? For each of its rows: the rooms of
+ * that type other stays take on the span (taking rows, distinct rooms; its
+ * own hold never counts), against the type's active rooms (`rooms`, D-133)
+ * less what this stay itself needs on that span. Without `rooms` a type has
+ * one room, which is the test it was before room types: any taker clashes.
+ */
+export function clashes(own: SpanRow[], groupId: string, takers: SpanRow[], rooms: Map<number, number> = new Map()): boolean {
   return own.some((r) => {
     const mine = parseSpan(r.during);
     if (!mine) return false;
-    return takers.some((t) => {
-      if (t.group_id === groupId || t.unit_id !== r.unit_id) return false;
-      const theirs = parseSpan(t.during);
-      return theirs !== null && theirs[0] < mine[1] && mine[0] < theirs[1];
+    const taken = new Set<string>();
+    takers.forEach((t, i) => {
+      if (t.group_id === groupId || t.unit_id !== r.unit_id || !overlap(mine, parseSpan(t.during))) return;
+      taken.add(t.room_id == null ? `row ${i}` : `room ${t.room_id}`);
     });
+    if (taken.size === 0) return false;
+    const need = own.filter((o) => o.unit_id === r.unit_id && overlap(mine, parseSpan(o.during))).length;
+    return (rooms.get(r.unit_id) ?? 1) - taken.size < need;
   });
 }
 
@@ -474,7 +488,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .select('id, group_id, reference, source, unit_id, slot_id, booked_date, during, held, held_until, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
+    .select('id, group_id, reference, source, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
     .eq('tenant_id', tenant.id)
     // D-100: every source. A staff booking is a group with a reference too and
     // waits for the same decision; the row says which door it came through.
@@ -510,7 +524,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
   // overlap a listed one starts at most MAX_STAY_NIGHTS before it, which is
   // the window loaded above.
   const takers = takingRows(data, Date.now());
-  const walkIns = await walkInGroups(tenant, requests.map((g) => g.groupId));
+  const [walkIns, rooms] = await Promise.all([walkInGroups(tenant, requests.map((g) => g.groupId)), roomCounts(tenant)]);
 
   const list = requests
     .map(({ groupId, rows, checkIn }) => {
@@ -543,7 +557,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
         bookingIds: rows.map((r) => r.id),
         total: rows.every((r) => r.price !== null) ? rows.reduce((sum, r) => sum + (r.price ?? 0), 0) : null,
         // Only a pending request can clash; a confirmed one IS the taken night.
-        clash: status === 'pending' && clashes(rows, groupId, takers),
+        clash: status === 'pending' && clashes(rows, groupId, takers, rooms),
         closed: status === 'pending' && rows.some((r) => closed.has(r.booked_date)),
       };
     })

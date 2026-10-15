@@ -20,7 +20,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { StayDetail } from '@rag/bookings';
+import type { MoveOptions, StayDetail } from '@rag/bookings';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
@@ -96,7 +96,9 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
   const [refundOpen, setRefundOpen] = useState(false);
   const [refund, setRefund] = useState({ amount: '', method: '', note: '' });
   const [noteDraft, setNoteDraft] = useState('');
-  const { notice, setNotice } = useNotice(reviewing !== null || refundOpen);
+  // D-133: the Move drawer: the booking whose room moves, the type's rooms, the choice and why.
+  const [moving, setMoving] = useState<{ bookingId: number; from: string; options: MoveOptions | null; roomId: number | null; note: string } | null>(null);
+  const { notice, setNotice } = useNotice(reviewing !== null || refundOpen || moving !== null);
 
   const unauthorized = useCallback(() => {
     setAuth('out');
@@ -308,7 +310,38 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
     await write('DELETE', `/bookings/stay/${encodeURIComponent(stay.reference)}/notes/${id}`, {}, 'Note deleted.');
   }
 
+  // D-133: open the Move drawer and ask the server which rooms of the type
+  // are free for every night that would move. The PATCH is still the guard.
+  async function openMove(bookingId: number, from: string) {
+    setNotice(null);
+    setMoving({ bookingId, from, options: null, roomId: null, note: '' });
+    const response = await fetch(`${api}/bookings/${bookingId}/room`).catch(() => null);
+    if (!response?.ok) {
+      setMoving(null);
+      setNotice({ message: await describeFailure(new Error('failed'), response), kind: 'error' });
+      return;
+    }
+    const options = (await response.json()) as MoveOptions;
+    setMoving((m) => (m && m.bookingId === bookingId ? { ...m, options, roomId: options.rooms.find((r) => r.free)?.id ?? null } : m));
+  }
+
+  async function submitMove(event: React.FormEvent) {
+    event.preventDefault();
+    if (!moving || moving.roomId === null) return;
+    const to = moving.options?.rooms.find((r) => r.id === moving.roomId)?.name ?? 'the other room';
+    if (await write('PATCH', `/bookings/${moving.bookingId}/room`, { roomId: moving.roomId, note: moving.note }, `Moved from ${moving.from} to ${to}.`)) setMoving(null);
+  }
+
   const canNote = role !== null && can(role, 'bookings:write', nav.access);
+  // D-133: the rooms the stay is in, one row per physical room, with its nights.
+  const roomRows = [...new Map(stay.lines.filter((l) => l.roomId !== undefined).map((l) => [l.roomId!, l])).values()].map((l) => ({
+    roomId: l.roomId!,
+    bookingId: l.bookingId!,
+    room: l.room ?? l.unit,
+    unit: l.unit,
+    dates: stay.lines.filter((x) => x.roomId === l.roomId).map((x) => x.date),
+  }));
+  const canMove = canNote && (stay.status === 'pending' || stay.status === 'confirmed') && stay.checkOut > stay.today;
   const anyAction = actions.confirm || actions.decline || actions.cancel || actions.refund || actions.review.length > 0 || actions.decide.length > 0 || actions.confirmBlocked !== null;
   const waitingProof = stay.payments.find((p) => actions.review.includes(p.id));
   const ended = outcome(stay);
@@ -493,6 +526,30 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
               </div>
             )}
           </section>
+
+          {nav.rooms && roomRows.length > 0 && (
+            <section className="card stay-card-rooms" aria-labelledby="stay-rooms-title">
+              <h3 id="stay-rooms-title">Rooms</h3>
+              <ul className="stay-list">
+                {roomRows.map((r) => (
+                  <li key={r.roomId} className="stay-room">
+                    <span>
+                      <strong>{r.room}</strong>
+                      <span className="small muted">
+                        {r.room !== r.unit ? `${r.unit} · ` : ''}
+                        {r.dates.length === stay.nights ? (stay.nights > 1 ? `all ${stay.nights} nights` : stay.slot) : r.dates.map(dayLabel).join(', ')}
+                      </span>
+                    </span>
+                    {canMove && (
+                      <button type="button" className="sm" disabled={busy} aria-label={`Move from ${r.room}`} onClick={() => void openMove(r.bookingId, r.room)}>
+                        Move
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {stay.changes.length > 0 && (
             <section className="card stay-card-changes">
@@ -703,6 +760,47 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
             </button>
           </div>
           {notice?.kind === 'error' && (
+            <div className="notice error drawer-notice" role="alert">
+              {notice.message}
+            </div>
+          )}
+        </form>
+      </Drawer>
+
+      <Drawer open={moving !== null} title={moving ? `Move from ${moving.from}` : 'Move'} onClose={() => setMoving(null)}>
+        <form onSubmit={submitMove}>
+          {moving?.options === null ? (
+            <p className="small muted">Checking which rooms are free…</p>
+          ) : moving?.options ? (
+            <>
+              <p className="small muted">
+                Every remaining night in {moving.from} moves ({moving.options.nights.map(dayLabel).join(', ')}). The price stays as it is.
+              </p>
+              <fieldset className="move-rooms">
+                <legend>Move to</legend>
+                {moving.options.rooms.filter((r) => !r.current).length === 0 && <p className="small muted">{moving.options.unit} has no other room. Add one on the Rooms screen.</p>}
+                {moving.options.rooms
+                  .filter((r) => !r.current)
+                  .map((r) => (
+                    <label key={r.id} className="move-room">
+                      <input type="radio" name="move-room" disabled={!r.free} checked={moving.roomId === r.id} onChange={() => setMoving({ ...moving, roomId: r.id })} />
+                      <span>{r.name}</span>
+                      {!r.free && <span className="small muted">taken on one of these nights</span>}
+                    </label>
+                  ))}
+              </fieldset>
+              <div className="field">
+                <label htmlFor="move-note">Why it moves</label>
+                <input id="move-note" required maxLength={500} placeholder="Guest asked for the room by the pool" value={moving.note} onChange={(e) => setMoving({ ...moving, note: e.target.value })} />
+              </div>
+              <div className="form-footer">
+                <button type="submit" className="primary" disabled={busy || moving.roomId === null || moving.note.trim() === ''}>
+                  Move
+                </button>
+              </div>
+            </>
+          ) : null}
+          {notice?.kind === 'error' && moving !== null && (
             <div className="notice error drawer-notice" role="alert">
               {notice.message}
             </div>

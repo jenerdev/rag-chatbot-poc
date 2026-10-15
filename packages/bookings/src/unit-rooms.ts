@@ -25,6 +25,19 @@ import { positiveInt, requireText } from './validate.js';
 /** A room's name, the SQL check's own bound (unit_rooms_name_shape). */
 export const MAX_ROOM_NAME = 80;
 
+/**
+ * Active rooms per room type, for the screens' clash warnings: a pending
+ * stay clashes only when other stays take every room it would need (D-133).
+ * A type missing from the map has none active.
+ */
+export async function roomCounts(tenant: BookingTenant): Promise<Map<number, number>> {
+  const { data, error } = await tenant.db.from('unit_rooms').select('unit_id').eq('tenant_id', tenant.id).eq('active', true);
+  if (error) throw new Error(`Could not count the rooms: ${error.message}`);
+  const counts = new Map<number, number>();
+  for (const r of data) counts.set(r.unit_id, (counts.get(r.unit_id) ?? 0) + 1);
+  return counts;
+}
+
 /** The words a refused write gets: the database's own where it wrote some. */
 function writeError(error: { code?: string; message: string }, name: string): Error {
   if (error.code === '23505') return new BookingInputError(`There is already a room called "${name}" in this type.`);
