@@ -229,19 +229,32 @@ Then run the two spikes:
 - the same-statement visibility (§ 2.2), in a rolled-back transaction;
 - the trigger names (§ 2.3).
 
-### Phase 1 — SQL
-`schema-room-inventory.sql`, run by the user. verify gains these checks:
-- `unit_rooms` RLS: a token of another tenant reads 0 rows, plus its
-  positive twin;
-- `rooms:write`, with an override taking it away;
-- the backfill: every unit has exactly one room, and every booking a
-  room;
-- the constraint on `room_id`;
-- the whole-resort one-room trigger;
-- retire versus delete.
+### Phase 1 — SQL: the rooms, the constraint, the assigner
+`schema-room-inventory.sql` (the 37th file, written 2026-10-16; dry-run
+rolled back: 12 rooms backfilled, 0 units or bookings without a room).
 
-### Phase 2 — Assignment and availability
-rooms gains these checks:
+**Moved here from Phase 2:** the assigner. Once `room_id` is `not null`,
+every insert needs a room, so the basic assigner (Rule 3, steps 1–3)
+ships with the column. Nothing free means the room with the fewest
+pending overlaps, and the CONSTRAINT refuses a taking row there, with
+the same sentence as before (staff-clash § 2.5).
+
+`schema-holds.sql`'s constraint step is now guarded on
+`to_regclass('public.unit_rooms')` (§ 2.4).
+
+verify 212–218:
+- the backfill, and the new unit's own room;
+- `unit_rooms` RLS, with its positive twin;
+- the constraint per room;
+- one room per stay, in the one-statement shape;
+- a named room;
+- retire and delete;
+- the whole-resort single room.
+
+### Phase 2 — Counting reads and the re-pick at Confirm
+Availability, `request_booking()`'s check, `bookings_pending_not_taken`
+and `stay_taken()` count rooms, and Confirm re-picks a room. rooms gains
+these checks:
 - a type with 2 rooms takes two confirmed bookings on one night, and a
   third is refused `23P01`;
 - availability reads 2/2, then 1/2, then 0/2 `taken`;

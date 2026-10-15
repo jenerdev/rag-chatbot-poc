@@ -4224,6 +4224,181 @@ async function notificationChecks() {
   }
 }
 
+// --- schema-room-inventory.sql (D-133): a room type has several rooms ---------
+// On THROWAWAY tenants, deleted at the end (which is also the cascade check):
+// 212. the backfill: every unit has a room and every booking names one; a new
+//      unit gets ONE room named like it, and the room follows a rename;
+// 213. RLS: a chat token reads its tenant's rooms (2) and another tenant's
+//      none; a chat token, a staff member (no rooms:write) and another
+//      tenant's admin cannot add one (42501); an admin can, and cannot move
+//      a room to another unit (the column grant);
+// 214. the constraint is per ROOM: a type with 2 rooms takes two confirmed
+//      bookings of one slot on one date, in two rooms; the third is 23P01;
+// 215. one statement of 3 nights lands in ONE room; one statement of 2 rooms
+//      × 2 nights keeps each of its 2 rooms on both nights;
+// 216. a row may name its room: one of its unit's is kept; another unit's and
+//      a retired one are 23514 (the assigner says so first; the FK
+//      bookings_room_fk stands behind it);
+// 217. retire and delete: a room with an upcoming booking is not retired, a
+//      spare one is, the last active one is not; a booked room is not
+//      deleted (23503), an unbooked spare is;
+// 218. a whole-resort unit keeps ONE active room (23514 on a second).
+{
+  const users = [];
+  const probes = [];
+  try {
+    const tenant = async (bookingType) => {
+      const { data, error } = await supabase.from('tenants').insert({ slug: `rooms-${randomBytes(3).toString('hex')}`, business_name: 'Rooms Probe', assistant_name: 'Probe' }).select('id').single();
+      if (error) throw new Error(`tenant: ${error.message}`);
+      probes.push(data.id);
+      const app = await supabase.from('tenant_applications').insert({ tenant_id: data.id, application_key: 'bookings', config: { timezone: 'Asia/Manila', booking_type: bookingType } });
+      if (app.error) throw new Error(`app: ${app.error.message}`);
+      return data.id;
+    };
+    const member = async (tenantId, role) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `rooms-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      const m = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: tenantId, role });
+      if (m.error) throw new Error(`membership: ${m.error.message}`);
+      return asToken(staffToken(tenantId, data.user.id));
+    };
+    const one = async (q, what) => {
+      const { data, error } = await q;
+      if (error) throw new Error(`${what}: ${error.message}`);
+      return data;
+    };
+
+    const probe = await tenant('per_room');
+    const other = await tenant('per_room');
+    const resort = await tenant('whole_resort');
+    const { id: night } = await one(supabase.from('slots').insert({ tenant_id: probe, name: 'Overnight', start_time: '14:00', duration: '22 hours' }).select('id').single(), 'slot');
+    const unit = await one(supabase.from('units').insert({ tenant_id: probe, name: 'Casa', capacity: 3, sort_order: 1, active: true }).select('id').single(), 'unit');
+    const loft = await one(supabase.from('units').insert({ tenant_id: probe, name: 'Loft', capacity: 2, sort_order: 2, active: true }).select('id').single(), 'unit');
+    await one(supabase.from('unit_rates').insert([
+      { tenant_id: probe, unit_id: unit.id, slot_id: night, weekday_price: 300000, weekend_price: 400000 },
+      { tenant_id: probe, unit_id: loft.id, slot_id: night, weekday_price: 500000, weekend_price: 600000 },
+    ]), 'rates');
+    const { id: otherUnit } = await one(supabase.from('units').insert({ tenant_id: other, name: 'Elsewhere', capacity: 2, sort_order: 1, active: true }).select('id').single(), 'unit');
+    const roomsOf = (db, tenantId, unitId) => db.from('unit_rooms').select('id, name, active').eq('tenant_id', tenantId).eq('unit_id', unitId).order('sort_order').order('id');
+    const book = (db, rows) => db.from('bookings').insert(rows.map((r) => ({ tenant_id: probe, unit_id: unit.id, slot_id: night, guest_name: 'Rooms Guest', guest_count: 2, status: 'confirmed', ...r }))).select('id, room_id, booked_date');
+    const admin = await member(probe, 'admin');
+    const staff = await member(probe, 'staff');
+    const strangerAdmin = await member(other, 'admin');
+
+    // 212
+    {
+      const noRoom = await supabase.from('units').select('id, unit_rooms(id)').limit(10000);
+      const unitsWithout = (noRoom.data ?? []).filter((u) => u.unit_rooms.length === 0).length;
+      const bookingsWithout = await supabase.from('bookings').select('id', { count: 'exact', head: true }).is('room_id', null);
+      const first = await roomsOf(supabase, probe, unit.id);
+      await one(supabase.from('units').update({ name: 'Casa Uno' }).eq('id', unit.id), 'rename');
+      const renamed = await roomsOf(supabase, probe, unit.id);
+      check(
+        !noRoom.error && unitsWithout === 0 && bookingsWithout.count === 0 && first.data?.length === 1 && first.data[0].name === 'Casa' && renamed.data?.[0]?.name === 'Casa Uno',
+        'room inventory: every unit has a room, every booking names one; a new unit gets ONE room named like it, which follows a rename',
+        `units without ${unitsWithout} of ${noRoom.data?.length} · bookings without ${bookingsWithout.count} · new unit's rooms ${first.data?.map((r) => r.name).join(',')} · after rename ${renamed.data?.[0]?.name}`,
+      );
+    }
+
+    // 213
+    {
+      const byAdmin = await admin.from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'Casa Uno 2', sort_order: 1 }).select('id');
+      const chat = await asToken(chatToken(probe)).from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'from chat' });
+      const byStaff = await staff.from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'from staff' });
+      const byStranger = await strangerAdmin.from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'from next door' });
+      const chatReads = await roomsOf(asToken(chatToken(probe)), probe, unit.id);
+      const foreignReads = await asToken(chatToken(other)).from('unit_rooms').select('id').eq('tenant_id', probe);
+      const moved = await admin.from('unit_rooms').update({ unit_id: loft.id }).eq('id', byAdmin.data?.[0]?.id ?? 0);
+      check(
+        !byAdmin.error && byAdmin.data?.length === 1 && chat.error?.code === '42501' && byStaff.error?.code === '42501' && byStranger.error?.code === '42501' &&
+          chatReads.data?.length === 2 && foreignReads.data?.length === 0 && moved.error?.code === '42501',
+        "room inventory: an admin adds a room; a chat token, staff (no rooms:write) and another tenant's admin cannot (42501); a chat token reads its 2 and another's 0; a room cannot move to another unit",
+        `admin ${byAdmin.error?.message ?? 'ok'} · chat ${chat.error?.code ?? 'STORED'} · staff ${byStaff.error?.code ?? 'STORED'} · stranger ${byStranger.error?.code ?? 'STORED'} · reads ${chatReads.data?.length}/${foreignReads.data?.length} · move ${moved.error?.code ?? 'ALLOWED'}`,
+      );
+    }
+
+    // 214
+    {
+      const a = await book(admin, [{ booked_date: '2027-03-01' }]);
+      const b = await book(admin, [{ booked_date: '2027-03-01' }]);
+      const c = await book(admin, [{ booked_date: '2027-03-01' }]);
+      const rooms = [a.data?.[0]?.room_id, b.data?.[0]?.room_id];
+      check(
+        !a.error && !b.error && rooms[0] && rooms[1] && rooms[0] !== rooms[1] && c.error?.code === '23P01',
+        'room inventory: a type with 2 rooms takes 2 confirmed bookings of one slot and date, in 2 rooms; the third is refused (23P01)',
+        `first ${a.error?.message ?? rooms[0]} · second ${b.error?.message ?? rooms[1]} · third ${c.error?.code ?? 'STORED'}`,
+      );
+    }
+
+    // 215
+    {
+      const stay = await book(admin, ['2027-04-05', '2027-04-06', '2027-04-07'].map((d) => ({ booked_date: d })));
+      const pair = await book(admin, ['2027-05-10', '2027-05-10', '2027-05-11', '2027-05-11'].map((d) => ({ booked_date: d })));
+      const stayRooms = new Set((stay.data ?? []).map((r) => r.room_id));
+      const byNight = (d) => (pair.data ?? []).filter((r) => r.booked_date === d).map((r) => r.room_id).sort().join(',');
+      check(
+        !stay.error && stay.data?.length === 3 && stayRooms.size === 1 && !pair.error && pair.data?.length === 4 && new Set(byNight('2027-05-10').split(',')).size === 2 && byNight('2027-05-10') === byNight('2027-05-11'),
+        'room inventory: one statement of 3 nights lands in ONE room; 2 rooms × 2 nights keep the same 2 rooms on both nights',
+        `stay ${stay.error?.message ?? [...stayRooms].join(',')} · pair night 1 [${byNight('2027-05-10')}] night 2 [${byNight('2027-05-11')}]${pair.error ? ' ' + pair.error.message : ''}`,
+      );
+    }
+
+    const rooms = (await roomsOf(supabase, probe, unit.id)).data ?? [];
+    const loftRoom = (await roomsOf(supabase, probe, loft.id)).data?.[0];
+
+    // 216
+    {
+      const named = await book(admin, [{ booked_date: '2027-06-01', room_id: rooms[1]?.id }]);
+      const wrongUnit = await book(admin, [{ booked_date: '2027-06-02', room_id: loftRoom?.id }]);
+      const spare = await one(supabase.from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'Casa Uno 3', sort_order: 2 }).select('id').single(), 'spare');
+      await one(supabase.from('unit_rooms').update({ active: false }).eq('id', spare.id), 'retire spare');
+      const retired = await book(admin, [{ booked_date: '2027-06-03', room_id: spare.id }]);
+      await supabase.from('unit_rooms').delete().eq('id', spare.id);
+      check(
+        !named.error && named.data?.[0]?.room_id === rooms[1]?.id && wrongUnit.error?.code === '23514' && retired.error?.code === '23514',
+        "room inventory: a booking naming its unit's room keeps it; another unit's room and a retired room are refused (23514)",
+        `named ${named.error?.message ?? named.data?.[0]?.room_id + ' of ' + rooms[1]?.id} · other unit ${wrongUnit.error?.code ?? 'STORED'} · retired ${retired.error?.code ?? 'STORED'}`,
+      );
+    }
+
+    // 217
+    {
+      const busy = await admin.from('unit_rooms').update({ active: false }).eq('id', rooms[0]?.id).select('id');
+      const spare = await one(admin.from('unit_rooms').insert({ tenant_id: probe, unit_id: unit.id, name: 'Casa Uno 4', sort_order: 3 }).select('id').single(), 'spare');
+      const retireSpare = await admin.from('unit_rooms').update({ active: false }).eq('id', spare.id).select('id');
+      const lastLoft = await admin.from('unit_rooms').update({ active: false }).eq('id', loftRoom?.id).select('id');
+      const delBooked = await supabase.from('unit_rooms').delete().eq('id', rooms[0]?.id).select('id');
+      const delSpare = await admin.from('unit_rooms').delete().eq('id', spare.id).select('id');
+      check(
+        busy.error?.code === '23514' && !retireSpare.error && retireSpare.data?.length === 1 && lastLoft.error?.code === '23514' && delBooked.error?.code === '23503' && !delSpare.error && delSpare.data?.length === 1,
+        'room inventory: a room with an upcoming booking is not retired (23514), a spare is; the last active room is not (23514); a booked room is not deleted (23503), a spare is',
+        `busy ${busy.error?.code ?? 'RETIRED'} · spare ${retireSpare.error?.message ?? retireSpare.data?.length} · last ${lastLoft.error?.code ?? 'RETIRED'} · delete booked ${delBooked.error?.code ?? 'DELETED'} · delete spare ${delSpare.error?.message ?? delSpare.data?.length}`,
+      );
+    }
+
+    // 218
+    {
+      const { id: property } = await one(supabase.from('units').insert({ tenant_id: resort, name: 'The Property', capacity: 20, sort_order: 1, active: true }).select('id').single(), 'property');
+      const second = await supabase.from('unit_rooms').insert({ tenant_id: resort, unit_id: property, name: 'Annex' });
+      const count = await roomsOf(supabase, resort, property);
+      check(
+        second.error?.code === '23514' && count.data?.length === 1,
+        'room inventory: a whole-resort unit keeps ONE active room; a second is refused (23514)',
+        `second ${second.error?.code ?? 'STORED'} · rooms ${count.data?.length}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'room inventory: setup', error.message);
+  } finally {
+    for (const id of probes) {
+      const { error } = await supabase.from('tenants').delete().eq('id', id);
+      if (error) check(false, 'room inventory: a probe tenant deletes with its rooms and bookings', error.message);
+    }
+    for (const id of users) await supabase.auth.admin.deleteUser(id);
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +

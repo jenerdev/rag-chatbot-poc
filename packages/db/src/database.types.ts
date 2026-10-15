@@ -428,6 +428,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      /**
+       * sql/schema-room-inventory.sql (D-133) — the PHYSICAL rooms of a unit (a room type).
+       * How many a type has is how many active rows; every unit has at least one,
+       * named like it until staff rename it. unit_id and tenant_id never change.
+       */
+      unit_rooms: {
+        Row: {
+          id: number;
+          tenant_id: number;
+          unit_id: number;
+          name: string;
+          /** a retired room takes no new booking; a booked room is retired, never deleted */
+          active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: number;
+          id?: never;
+          unit_id: number;
+          name: string;
+          active?: boolean;
+          sort_order?: number;
+          created_at?: never;
+        };
+        Update: {
+          name?: string;
+          active?: boolean;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'unit_rooms_unit_tenant_fk';
+            columns: ['unit_id', 'tenant_id'];
+            referencedRelation: 'units';
+            referencedColumns: ['id', 'tenant_id'];
+          },
+        ];
+      };
       /** sql/schema-customer-booking.sql § 1 — holiday and peak dates, per tenant; surcharge in CENTAVOS. */
       rate_calendar: {
         Row: {
@@ -635,6 +674,8 @@ export interface Database {
           id: number;
           tenant_id: number;
           unit_id: number;
+          /** schema-room-inventory.sql (D-133): the physical room; bookings_no_overlap compares rooms */
+          room_id: number;
           slot_id: number;
           /** `date`, as "YYYY-MM-DD": the date the slot starts on */
           booked_date: string;
@@ -680,6 +721,8 @@ export interface Database {
           tenant_id: number;
           id?: never;
           unit_id: number;
+          /** left out, bookings_room_assign picks a free room of the unit (D-133) */
+          room_id?: number;
           slot_id: number;
           booked_date: string;
           /** computed by the bookings_compute_during trigger, which overwrites anything supplied */
@@ -713,6 +756,8 @@ export interface Database {
           tenant_id?: number;
           id?: never;
           unit_id?: number;
+          /** a move (D-133): another room of the SAME unit, or the FK refuses it */
+          room_id?: number;
           slot_id?: number;
           booked_date?: string;
           during?: never;

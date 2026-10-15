@@ -100,11 +100,24 @@ create trigger bookings_aa0_release_before_confirm
 -- 5. The constraint: a live hold blocks like a confirmed row. Re-created;
 --    it can fail only if two held rows already overlap, and none is held
 --    before this file runs (held defaults to false).
-alter table bookings drop constraint if exists bookings_no_overlap;
+--    GUARDED (room types, D-133): schema-room-inventory.sql re-creates this
+--    per ROOM. Once it has run, a re-run of this file must not put the
+--    per-unit version back (trap 20), so the step is skipped.
+do $guard$
+begin
+  if to_regclass('public.unit_rooms') is null then
+    execute $ddl$
+alter table bookings drop constraint if exists bookings_no_overlap
+$ddl$;
+    execute $ddl$
 alter table bookings add  constraint bookings_no_overlap exclude using gist (
   unit_id with =,
   during  with &&
-) where (status = 'confirmed' or held);
+) where (status = 'confirmed' or held)
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 6. Taking a hold: ONE function. Sets `held` on the stay's PENDING rows
 --    until p_until. A clash with a confirmed or held row is 23P01 from the

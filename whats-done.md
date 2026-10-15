@@ -9680,3 +9680,28 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **The spike (same day):** run through a throwaway `pg@8.13.1` client in the session scratchpad, on `DATABASE_URL`. The script raised its findings and rolled back, so nothing changed.
   - § 2.2: each BEFORE ROW call saw **0,1,2** earlier rows of its group in all three shapes (`values`, `generate_series`, `json_populate_recordset`). The assigner keeps a stay in one room from inside the trigger.
   - § 2.3: 19 triggers listed. The assigner is named `bookings_room_assign`, to fire after `bookings_aa_fill_group_and_reference` and `bookings_compute_during`.
+
+## 2026-10-16 · Room types, Phase 1: the rooms, the constraint, the assigner (`feat/room-types`, D-133)
+
+- **What:** `packages/db/sql/schema-room-inventory.sql`, the 37th file:
+  - `unit_rooms` (the physical rooms of a unit), with read, admin-write and D-128 `_may_`/`_can_` policies on `rooms:write`; only `name`, `active` and `sort_order` are updatable;
+  - one room per unit, backfilled, and `units_first_room` for new units (the room follows a rename);
+  - `bookings.room_id`, `not null`, FK `(room_id, unit_id, tenant_id)`;
+  - `bookings_no_overlap` on `room_id`;
+  - `bookings_room_assign`, the ONE assigner;
+  - `unit_rooms_guard` (no retiring a room with upcoming bookings or a type's last room) and `unit_rooms_whole_resort_one`.
+
+  Also: `schema-holds.sql`'s constraint step is guarded on `to_regclass('public.unit_rooms')` (trap 20); `database.types.ts` has `unit_rooms` and `room_id`; verify gained checks 212–218.
+- **Why it matters:** two Casa Uno can now be two rows under ONE type, and Postgres refuses a double booking per physical room. Every tenant behaves as before until a second room is added.
+- **Plan deviation:** the basic assigner moved from Phase 2 into Phase 1. Once `room_id` is `not null`, every insert needs a room. When nothing is free, the assigner falls through to the constraint, so a confirmed row on a full night is still the constraint's own 23P01 and sentence (staff-clash § 2.5); rooms 50/50 shows nothing changed.
+- **Observed:**
+  - dry run, rolled back: 12 rooms backfilled; 0 units and 0 bookings without a room;
+  - the user's SQL-editor run said "success", but the catalog showed nothing applied. Applied over `DATABASE_URL` with the scratch `pg` client, after which the catalog showed `unit_rooms`, `room_id`, `EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE ((status = 'confirmed') OR held)` and the trigger;
+  - verify **218/218**:
+    - 212: 0 of 19 units and 0 bookings without a room;
+    - 214: two confirmed bookings in rooms 20 and 23, the third 23P01;
+    - 215: a 3-night stay all in room 20, and 2 rooms × 2 nights as [20,23] / [20,23];
+    - 216: another unit's room is refused with **23514**, not the expected 23503, because the assigner's own check runs before the FK. The check was corrected; the FK stands behind it;
+  - rooms 50; bookings isolation 40/40 both ways; pipeline isolation 24/24 and 22/22; unit tests all pass.
+- **Trap met:** an interrupted verify run leaves its `verify-probe` and `calendar-probe` tenants behind, and the next run fails 170 checks on "duplicate key … tenants_slug_key". They were deleted by slug and id. The delete cascaded through `unit_rooms_guard`, which lets a tenant's cascade through.
+

@@ -60,7 +60,8 @@
 - [x] Phase 0 baseline (2026-10-16): verify 211, rooms 50, bookings isolation 40/40 both ways, tests all pass, typecheck 13/13, three baselines byte-identical.
 - [x] Phase 0, after the key was fixed: pipeline isolation 24/24 on tokens, 22/22 filters alone; `pnpm eval` 59/61 (antecedent, leak-2: the known set).
 - [x] Phase 0 spike (2026-10-16, run through a scratch `pg` client on DATABASE_URL): a BEFORE ROW trigger sees the earlier rows of its statement in all three insert shapes (0,1,2); the assigner is `bookings_room_assign` (after `compute_during`).
-- [ ] Phase 1: `schema-room-inventory.sql`, shaped by the spike.
+- [x] Phase 1 (2026-10-16): `schema-room-inventory.sql` (37th) APPLIED by Claude over DATABASE_URL (the editor run had not committed); catalog confirms unit_rooms, room_id, the per-room constraint, the assigner. verify **218/218**; rooms 50; bookings isolation 40/40 both ways; pipeline isolation 24 + 22; tests 13+14+5+10+132+369+174.
+- [ ] Phase 2: counting reads (availability, request_booking, pending_not_taken, stay_taken) and the re-pick at Confirm.
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**
 - [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.
