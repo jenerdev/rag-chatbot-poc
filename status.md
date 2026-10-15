@@ -56,7 +56,7 @@
 
 ## ▶ Next up (do this next)
 
-**Room types (2026-10-16, Phase 0 on `feat/room-types`):** [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type; new `unit_rooms` + `bookings.room_id`; `bookings_no_overlap` moves to the room; ONE SQL assigner, staff can move. The user chose room types, auto-assign and plan-first. § 7 answered 2026-10-16 (every recommendation taken).
+**Room types (2026-10-16, Phases 0–4 on `feat/room-types`; stopped for the night after Phase 4's code):** [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type; new `unit_rooms` + `bookings.room_id`; `bookings_no_overlap` moves to the room; ONE SQL assigner, staff can move. The user chose room types, auto-assign and plan-first. § 7 answered 2026-10-16 (every recommendation taken).
 - [x] Phase 0 baseline (2026-10-16): verify 211, rooms 50, bookings isolation 40/40 both ways, tests all pass, typecheck 13/13, three baselines byte-identical.
 - [x] Phase 0, after the key was fixed: pipeline isolation 24/24 on tokens, 22/22 filters alone; `pnpm eval` 59/61 (antecedent, leak-2: the known set).
 - [x] Phase 0 spike (2026-10-16, run through a scratch `pg` client on DATABASE_URL): a BEFORE ROW trigger sees the earlier rows of its statement in all three insert shapes (0,1,2); the assigner is `bookings_room_assign` (after `compute_during`).
@@ -64,7 +64,20 @@
 - [x] Phase 2 (2026-10-16): `schema-room-counts.sql` (38th), applied by Claude: `room_for()`, the re-pick at Confirm/hold, availability and `request_booking()` count rooms (`rooms_free`/`rooms_total`), pending check and `stay_taken()` count rooms; holds and stay-outcome guarded (tested: re-run, rolled back, every new definition kept). verify **222/222**; rooms 50; bookings isolation 40/40 both ways; pipeline isolation 24 + 22; tests pass; typecheck 13/13; three baselines identical.
 - [ ] Phase 2 owed: `pnpm eval` (stopped by the user's word mid-run to move on; no fixture rows left).
 - [x] Phase 3 (2026-10-16): `schema-room-move.sql` (39th), applied: `booking_events` kind `room`, `move_room()` (definer, checks tenant + `bookings:write`, note required, logs the event), `bookings_room_move_guard` (retired or taken room refused in words, raw updates too). `@rag/bookings` `moveOptions()`/`moveStay()`; `GET|PATCH /bookings/[id]/room`; history says "Moved from A to B: “why”". rooms **54/54** (38–41); verify 222; bookings isolation 40/40 both ways; tests (web 175); typecheck 13/13.
-- [ ] Phase 4: staff screens (S-5 Rooms list, S-15 room per night + Move, New booking stepper, calendar counts, dashboard occupancy).
+- [x] Phase 4 code (2026-10-16), five commits:
+  - (a) `4feed3b` S-5 "Rooms of this type": add, rename, retire, delete (`unit-rooms.ts`, two routes);
+  - (b) `031cf59` S-15 Rooms card and Move drawer; the clash flag counts rooms (`clashes()`, `listBookings()`, `roomCounts()`);
+  - (c) `3bdf6dd` and `a9502db` staff form "Rooms" count per type; `parseRequest()` takes a type twice; `priceStay()` counts free rooms; price lines key by position;
+  - (d)+(e) `2c6716b` `schema-room-views.sql` (40th, applied): `calendar_slots()` rooms_taken/rooms_total ("1/2"), dashboard occupancy over ROOMS and "would clash" in rooms.
+
+  Checks: verify 222; rooms **56** (42 type rooms, 43 a type twice); bookings isolation 40/40 both ways; pipeline isolation 24/22; tests 13+14+5+10+133+369+175; typecheck 13/13.
+- [ ] Phase 4 owed:
+  - a browser look at S-5, S-15 (Move), the staff form and the calendar;
+  - axe (`plan/ui-refresh-a11y.mjs`, must stay 0);
+  - a verify check for calendar_slots' counts and the dashboard's room occupancy.
+- [ ] Still owed from Phase 2: `pnpm eval` (stopped at the user's word).
+- [ ] Phase 5: the booking page's per-type count (the page's picker; the server already takes a type twice and counts) and the chat tool result's `left` ("1 of 2"); the battery.
+- [ ] Phase 6: the walls and the user's walk on alteza. Phase 7: the record (D-133, R-52, CLAUDE.md: 40 SQL files, counts).
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**
 - [x] 1 · Feature flags per tenant, set on the platform (D-127, `feat/flags-and-roles`): `tenant_features` (33rd SQL file), 8 features, pages and routes 404 when off, SQL triggers refuse the stranger's writes. verify 196, features-walk 5/5, axe 4/0, baselines identical.

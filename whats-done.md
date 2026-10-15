@@ -9750,3 +9750,28 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - verify 222; bookings isolation 40/40 both ways; web tests 175 (+1 for the words); typecheck 13/13.
 - **Trap met:** `listBookings()` needs a date range. The check reads one of villa's ids on the service client instead, to ask for it as the probe.
 
+## 2026-10-16 · Room types, Phase 4: the staff screens count rooms (`feat/room-types`, D-133)
+
+- **What:**
+  - (a) S-5 Rooms: each room type has "Rooms of this type" (add, rename, retire, delete), and the closed row says "· 2 rooms". `@rag/bookings/unit-rooms.ts` adds `addUnitRoom`, `updateUnitRoom`, `deleteUnitRoom` and `roomCounts`; Postgres' refusals come back in words. There are two routes on `rooms:write`.
+  - (b) S-15 has a Rooms card (each physical room and its nights) and a Move drawer (`GET|PATCH /bookings/[id]/room`, the free rooms selectable, a note required). `stayDetail()` lines carry `bookingId`, `roomId` and `room`.
+  - (c) The staff form has a "Rooms" count beside a type that has several, with guests per room. `parseRequest()` takes a type once per room wanted; `priceStay()` counts free rooms through `check_room_availability.rooms_free`.
+  - (d) The calendar's week cell says "1/2", and the day view says "(1 of 2 booked)".
+  - (e) The dashboard's occupancy divides by active ROOMS, and "would clash on Confirm" counts rooms (`schema-room-views.sql`, the 40th file, applied; the calendar and dashboard originals are guarded on `active_rooms()` and tested by a rolled-back re-run).
+- **Found while building:** three screens still counted a TYPE as one room after Phase 2's SQL:
+  - the clash warning (`clashes()`, `listBookings()`), which would have disabled Confirm on a half-booked type;
+  - `priceStay()`'s "No such unit or slot." for a type named twice;
+  - the price lines' React key per date and type.
+
+  All three are fixed, and `requests.test.ts` pins the room count.
+- **Observed:**
+  - rooms **56/56**:
+    - 42: listed Twin,Twin 2; a duplicate and a busy retire and a booked delete in words;
+    - 43: 2 Twin × 2 nights in rooms [268,269]/[268,269]; with 1 of 2 confirmed the quote is unavailable and the insert is "taken on …: every Twin is already confirmed for that slot"; 1 Twin is still available;
+  - verify 222; bookings isolation 40/40 both ways; pipeline isolation 24/22; bookings tests 133; web 175; typecheck 13/13.
+- **Slip, corrected:** `3bdf6dd` was committed with one failing unit test (the old "never the same twice"), because the commit was chained after the tests with `;`. `a9502db` corrects the test. Commits now run only after the tests pass.
+- **Owed:**
+  - the browser look and axe;
+  - a verify check for the new calendar and dashboard counts;
+  - `pnpm eval`;
+  - Phases 5–7.

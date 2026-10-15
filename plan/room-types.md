@@ -11,8 +11,9 @@
 > uno still available for 1 more booking. but the chatbot and booking
 > dosnt know how many casa uno are available."
 >
-> Written 2026-10-16, against `ac6179e` on `master`. **Status: Phase 0
-> done 2026-10-16 on `feat/room-types`, spike included.** § 7's four questions were
+> Written 2026-10-16, against `ac6179e` on `master`. **Status: Phases
+> 0–4 done 2026-10-16 on `feat/room-types` (Phase 4's browser look and
+> axe owed); Phases 5–7 to go.** SQL files 37–40 are applied. § 7's four questions were
 > answered 2026-10-16: every recommendation taken. The user chose three
 > things on 2026-10-16:
 > - **room types over physical rooms**, not a quantity column (the
