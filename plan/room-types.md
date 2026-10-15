@@ -12,7 +12,7 @@
 > dosnt know how many casa uno are available."
 >
 > Written 2026-10-16, against `ac6179e` on `master`. **Status: Phase 0
-> started 2026-10-16 on `feat/room-types`.** § 7's four questions were
+> done 2026-10-16 on `feat/room-types`, spike included.** § 7's four questions were
 > answered 2026-10-16: every recommendation taken. The user chose three
 > things on 2026-10-16:
 > - **room types over physical rooms**, not a quantity column (the
@@ -159,6 +159,14 @@ query see the rows inserted earlier in the same `INSERT … VALUES` /
 `createStaffStay()` pick ONE room for the whole stay first (the same
 function, called with the stay's span) and pass it on every row.
 
+**Answered by the spike, 2026-10-16: yes, in all three shapes.** Each
+BEFORE ROW call saw 0, 1, 2 earlier rows of its group, for `values`,
+`insert … select … generate_series` and `json_populate_recordset`. So the
+assigner keeps a stay in one room from inside the trigger, and no door
+picks a room itself. That holds only while every door inserts a stay
+ordered by night, which they all do (`request_booking()` and
+`decide_change()` `order by`; the staff and tool rows are built in order).
+
 ### 2.3 Trigger order is name order
 
 The assigner needs `during` (from `bookings_compute_during`) and
@@ -166,6 +174,23 @@ The assigner needs `during` (from `bookings_compute_during`) and
 triggers on `bookings` by name, and the new one is named to sort after
 both. rooms asserts on a real insert, never on a row with `during` set by
 hand (staff-clash § 2.2, trap 12).
+
+**Answered by the spike, 2026-10-16.** The BEFORE triggers in name order
+are:
+- `aa0_release_*`, `aa_fill_group_and_reference`, `ab_ensure_stay`,
+  `ac_walk_in`, `clear_hold`;
+- `compute_during`, `confirm_needs_payment_or_note`,
+  `feature_booking_page`, `not_on_closed_day`, `pending_not_taken`;
+- `slot_active`.
+
+The AFTER triggers include `zz_hold_on_request`, which sets `held`. The
+assigner is **`bookings_room_assign`**, BEFORE INSERT OR UPDATE OF
+`status`, `room_id`. It sorts after `aa_fill_group_and_reference`
+(`group_id`) and after `compute_during` (`during`), and before the AFTER
+hold, so a held row already has its room when the constraint sees it.
+`pending_not_taken` sorts before it, which is why that check counts the
+unit's rooms instead of reading `new.room_id`, except on a move, where
+the caller named the room.
 
 ### 2.4 An older file can put an old constraint back (trap 25)
 

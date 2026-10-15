@@ -9677,3 +9677,6 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - **pipeline isolation** stopped after 6 PASS, at the first embedding. OpenAI answered HTTP 401, "Incorrect API key provided": `OPENAI_API_KEY` in `.env` is rejected. That is an environment fault, not code, and it blocks `pnpm eval` too.
   - **The spike** needs the SQL editor, because the repo has no Postgres client.
 - **After the key was fixed (same day):** pipeline isolation **24/24** on tokens and **22/22** on filters alone. `pnpm eval` **59/61** as intended, `original 8/10 · tool 9/9 · lang 10/10 · date 11/11 · rooms 13/13 · book 5/5 · price 3/3`. The failures are `antecedent` (D-017) and `leak-2` (the known identical-prompt flip, trap 24); `lang-followup` passed this run.
+- **The spike (same day):** run through a throwaway `pg@8.13.1` client in the session scratchpad, on `DATABASE_URL`. The script raised its findings and rolled back, so nothing changed.
+  - § 2.2: each BEFORE ROW call saw **0,1,2** earlier rows of its group in all three shapes (`values`, `generate_series`, `json_populate_recordset`). The assigner keeps a stay in one room from inside the trigger.
+  - § 2.3: 19 triggers listed. The assigner is named `bookings_room_assign`, to fire after `bookings_aa_fill_group_and_reference` and `bookings_compute_during`.
