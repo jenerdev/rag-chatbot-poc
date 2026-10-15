@@ -58,7 +58,8 @@
 
 **Room types (2026-10-16, Phase 0 on `feat/room-types`):** [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type; new `unit_rooms` + `bookings.room_id`; `bookings_no_overlap` moves to the room; ONE SQL assigner, staff can move. The user chose room types, auto-assign and plan-first. § 7 answered 2026-10-16 (every recommendation taken).
 - [x] Phase 0 baseline (2026-10-16): verify 211, rooms 50, bookings isolation 40/40 both ways, tests all pass, typecheck 13/13, three baselines byte-identical.
-- [ ] Phase 0 owed: pipeline isolation and `pnpm eval` (OPENAI_API_KEY rejected, HTTP 401); the user runs `plan/room-types-phase0-spike.sql` in the SQL editor and pastes the result.
+- [x] Phase 0, after the key was fixed: pipeline isolation 24/24 on tokens, 22/22 filters alone; `pnpm eval` 59/61 (antecedent, leak-2: the known set).
+- [ ] Phase 0 owed: the user runs `plan/room-types-phase0-spike.sql` in the SQL editor and pastes the result.
 - [ ] Phase 1: `schema-room-inventory.sql`, shaped by the spike.
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**
