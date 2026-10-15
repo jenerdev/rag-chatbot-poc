@@ -88,11 +88,16 @@ describe('parseRequest', () => {
     expect(refused({ rooms: six, nights: 12 }, 'per_room')).toMatch(/72 room-nights/);
   });
 
-  it('whole_resort takes exactly one unit; per_room takes several, never the same twice', () => {
+  it('whole_resort takes exactly one unit; per_room takes several, a type once per room wanted (D-133)', () => {
     const two = [{ unitId: 1, guests: 2 }, { unitId: 2, guests: 2 }];
     expect(refused({ rooms: two })).toMatch(/booked as a whole/);
     expect(parse({ rooms: two }, 'per_room').rooms).toHaveLength(2);
-    expect(refused({ rooms: [{ unitId: 1, guests: 2 }, { unitId: 1, guests: 3 }] }, 'per_room')).toMatch(/twice/);
+    // Two rooms of one type: the database caps it at the type's free rooms, in words.
+    expect(parse({ rooms: [{ unitId: 1, guests: 2 }, { unitId: 1, guests: 3 }] }, 'per_room').rooms).toEqual([
+      { unitId: 1, guests: 2 },
+      { unitId: 1, guests: 3 },
+    ]);
+    expect(refused({ rooms: [{ unitId: 1, guests: 2 }, { unitId: 1, guests: 3 }] })).toMatch(/booked as a whole/);
     expect(refused({ rooms: [] }, 'per_room')).toMatch(/at least one room/);
     expect(refused({ rooms: [{ unitId: 1 }] })).toMatch(/Guests/);
   });
