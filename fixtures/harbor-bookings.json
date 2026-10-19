@@ -1,10 +1,34 @@
 {
-  "about": "A booking the eval battery seeds into tenant harbor for the rt-* cases, then hard-deletes. Dates are offsets from harbor's today (Asia/Manila), so the battery never goes stale. See plan/booking-types.md Phase 6.",
+  "about": "A booking the eval battery seeds into tenant harbor for the rt-* cases, then hard-deletes. Dates are offsets from harbor's today (Asia/Manila), so the battery never goes stale. See plan/booking-types.md Phase 6. Room types (D-133): one Garden Room on offset 30 (1 of 2 left, rt-count) and two on offset 32 (both taken, rt-count-full); the assigner picks each one's room.",
   "marker": "fixture:harbor-bookings",
   "bookings": [
     {
       "offsetDays": 12,
       "room": "Sea View Suite",
+      "slot": "Night",
+      "guestName": "Battery Harbor Guest",
+      "guestPhone": "0917-555-0277",
+      "guestCount": 2
+    },
+    {
+      "offsetDays": 30,
+      "room": "Garden Room",
+      "slot": "Night",
+      "guestName": "Battery Harbor Guest",
+      "guestPhone": "0917-555-0277",
+      "guestCount": 2
+    },
+    {
+      "offsetDays": 32,
+      "room": "Garden Room",
+      "slot": "Night",
+      "guestName": "Battery Harbor Guest",
+      "guestPhone": "0917-555-0277",
+      "guestCount": 2
+    },
+    {
+      "offsetDays": 32,
+      "room": "Garden Room",
       "slot": "Night",
       "guestName": "Battery Harbor Guest",
       "guestPhone": "0917-555-0277",

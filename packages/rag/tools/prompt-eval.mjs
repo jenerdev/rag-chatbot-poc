@@ -60,6 +60,10 @@ const BOOKED = plus(10); // the fixture: Overnight from 14:00 on this date to 12
 // H_BOOKED by fixtures/harbor-bookings.json; nothing is seeded on H_FREE.
 const H_BOOKED = plus(12);
 const H_FREE = plus(14);
+// Room types (D-133): Garden Room is two rooms (fixtures/harbor-units.json).
+// One is booked on H_COUNT, both on H_FULL; far from H_WEEKDAY's 15-18.
+const H_COUNT = plus(30);
+const H_FULL = plus(32);
 // A Monday to Thursday at least 15 days out: the weekday rate applies.
 const H_WEEKDAY = (() => {
   for (let i = 15; ; i++) {
@@ -437,6 +441,38 @@ const CASES = [
       };
     },
     note: "the seeded booking: taken, said so, and the fixture's guest name and phone appear nowhere",
+  },
+  // plan/room-types.md Phase 5: a type of two rooms, one booked, is still
+  // open, and the tool row says "1 of 2" left; with both booked it is taken.
+  {
+    id: 'rt-count',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Is the Garden Room free on ${words(H_COUNT)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_COUNT && r.unit === 'Garden Room');
+      const first = last.reply.split('|')[0];
+      const free = says(first, ['available', 'open', 'free', 'left', 'bakante']) && !says(first, ['taken', 'not available', 'unavailable', 'fully booked', 'not open']);
+      return {
+        ok: row?.status === 'open' && row?.left === '1 of 2' && free && namesDate(last.reply, H_COUNT),
+        detail: `tool: Garden Room ${row?.status ?? '(no row)'} left ${row?.left ?? '(none)'}; said free before any table: ${free}; names the date: ${namesDate(last.reply, H_COUNT)}`,
+      };
+    },
+    note: 'one of two Garden Rooms booked: still available, never "taken"',
+  },
+  {
+    id: 'rt-count-full',
+    tenant: 'harbor',
+    want: 'rooms',
+    turns: [`Is the Garden Room free on ${words(H_FULL)}?`],
+    check: (last) => {
+      const row = roomRows(last).find((r) => r.date === H_FULL && r.unit === 'Garden Room');
+      return {
+        ok: row?.status === 'taken' && row?.left === undefined && says(last.reply.split('|')[0], TAKEN_WORDS) && namesDate(last.reply, H_FULL),
+        detail: `tool: Garden Room ${row?.status ?? '(no row)'} left ${row?.left ?? '(none)'}; taken said before any table: ${says(last.reply.split('|')[0], TAKEN_WORDS)}; names the date: ${namesDate(last.reply, H_FULL)}`,
+      };
+    },
+    note: 'both Garden Rooms booked: taken, said so',
   },
   {
     id: 'rt-ask',

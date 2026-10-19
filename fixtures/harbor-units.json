@@ -1,5 +1,5 @@
 {
-  "about": "Tenant harbor's rooms and Night rates (centavos), for the eval battery's rt-* cases (plan/booking-types.md Phase 6). Loaded by plan/booking-types-phase6-harbor.mjs, which upserts by name, so it is safe to run again. Garden Room and Family Room match what the Phase 4 walk created. The Old Annex is inactive but priced, so rt-inactive proves the tool leaves it out because it is retired, not because it has no rate. Extra guests (plan/extra-guests.md): every room covers 2 guests in its rate and charges 25000 centavos (PHP 250) per guest above that, up to its own maximum, which is unchanged.",
+  "about": "Tenant harbor's rooms and Night rates (centavos), for the eval battery's rt-* cases (plan/booking-types.md Phase 6). Loaded by plan/booking-types-phase6-harbor.mjs, which upserts by name, so it is safe to run again. Garden Room and Family Room match what the Phase 4 walk created. The Old Annex is inactive but priced, so rt-inactive proves the tool leaves it out because it is retired, not because it has no rate. Extra guests (plan/extra-guests.md): every room covers 2 guests in its rate and charges 25000 centavos (PHP 250) per guest above that, up to its own maximum, which is unchanged. Room types (plan/room-types.md Phase 5, D-133): Garden Room is a type of two rooms, so rt-count and rt-count-full can book one of them and both.",
   "slot": {
     "name": "Night",
     "start_time": "14:00",
@@ -14,7 +14,11 @@
       "weekday_price": 350000,
       "weekend_price": 450000,
       "standard_capacity": 2,
-      "extra_person_rate": 25000
+      "extra_person_rate": 25000,
+      "rooms": [
+        "Garden Room 1",
+        "Garden Room 2"
+      ]
     },
     {
       "name": "Family Room",

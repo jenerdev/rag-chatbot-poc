@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 import { asOperator } from '../packages/db/dist/service.js';
-import { createAccommodation, listAccommodations, listSlots, setRates, updateAccommodation } from '../packages/bookings/dist/index.js';
+import { addUnitRoom, createAccommodation, listAccommodations, listSlots, setRates, updateAccommodation, updateUnitRoom } from '../packages/bookings/dist/index.js';
 import { ingestDocument, listDocuments, loadTenant } from '../packages/rag/dist/index.js';
 
 const read = (name) => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
@@ -69,6 +69,23 @@ for (const room of units.rooms) {
   if (rate?.weekdayPrice !== room.weekday_price || rate?.weekendPrice !== room.weekend_price) {
     current = await setRates(harbor, current.id, [{ slotId: slot.id, weekdayPrice: room.weekday_price, weekendPrice: room.weekend_price }]);
     console.log(`rate: ${room.name} ${room.weekday_price}/${room.weekend_price}`);
+  }
+  // Room types (D-133): a type with a `rooms` list has those physical rooms.
+  // A name already there is kept; the type's rooms not named are renamed in
+  // order (the backfill's one room, named after the type), then the rest added.
+  if (room.rooms) {
+    const spare = current.rooms.filter((r) => !room.rooms.includes(r.name)).sort((a, b) => a.id - b.id);
+    for (const name of room.rooms) {
+      if (current.rooms.some((r) => r.name === name)) continue;
+      const old = spare.shift();
+      if (old) {
+        await updateUnitRoom(harbor, current.id, old.id, { name });
+        console.log(`room: ${room.name}'s ${old.name} renamed ${name}`);
+      } else {
+        await addUnitRoom(harbor, current.id, name);
+        console.log(`room: ${room.name} gains ${name}`);
+      }
+    }
   }
   // Rated first, retired second: the Old Annex has a price and is still left
   // out, which is what rt-inactive needs.
