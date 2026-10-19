@@ -9850,3 +9850,16 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - `gpt-4o-mini-transcribe`: 0.8–1.4 s; "May bakante ba kayo bukas for two guests?" heard exactly in the `tts-1` run, as "kayubukas" in one earlier run.
 - **Why it mattered:** the plan's default model would have made every spoken reply wait two minutes. The defaults are now `tts-1` and a 15 s give-up, and both are env and constants, so switching back is one line when the other model recovers.
 - **Synthetic speech:** the questions were spoken by the TTS itself, so the transcripts measure the languages and the plumbing, not a guest on a phone; Phase 3's fake-microphone walk and the user's Phase 6 walk do that.
+
+## 2026-10-20 · Voice, Phases 1–5 and 7: talk to the assistant (`feat/voice`, D-134)
+
+- **What, per phase (one commit each, no check run between them, the user's word):**
+  - 1: `transcribe()` and `speak()` in `@rag/openai` by hand, each with a timeout that is a 504; `speakable()` in `apps/web/lib/`.
+  - 2: `POST voice/transcribe` (bytes sniffed, ≤ 1 MB, never answers) and `POST voice/speak` (`conversationId`, never text) through `latestReply()`; a per-IP window of 30 (`allow()` gained a per-key cap); `voice` in the feature registry, `defaultOn: false`.
+  - 3: `components/voice.tsx`: record (WebM, or MP4 on Safari; 30 s), send the words as the question, read the whole reply, fall back to an ON-DEVICE `speechSynthesis` voice or silence; Escape, Stop, New chat; "Read replies aloud"; the notice.
+  - 4: `schema-voice.sql`, the 41st file, applied by Claude and read back (`voice` in the check; `tenant_feature_on()` false with no row, true for the others); verify 196b; the privacy page names the recording for a tenant with voice on.
+  - 5: `plan/voice-phase5-walls.mjs`: `latestReply()` behind each wall alone, and its twin, in place of the pipeline isolation suite (northwind is gone).
+  - 7: D-134, R-53, CLAUDE.md, `flow.md`, `.env.example`.
+- **Moved:** the registry entry from Phase 4 to Phase 2, because the routes' `requireFeature('voice')` needs the key to compile.
+- **Not done here:** bumping a tenant's policy version (its own setting); the recording's 30 s is the browser's cap, the route checks the SIZE (a server-side duration needs a decoder).
+- **Owed:** every run (listed in status.md) and the user's phone walk.

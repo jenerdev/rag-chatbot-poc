@@ -4191,3 +4191,17 @@ either.
 **Why the assigner in SQL:** every door inserts; one trigger under a lock is the only place two concurrent requests cannot both pick the last room, and the constraint still refuses the loser.
 
 **Not done:** merging alteza's Kubo A and Kubo B into one type (the owner's call, § 7 q1); a guest choosing a room number.
+
+## D-134 · Voice: speech in and speech out around the unchanged pipeline · **Added 2026-10-20 (plan/voice.md)**
+
+**Decision:**
+- A guest may speak a question and hear the answer on the chat. A recording becomes text on the server (`POST voice/transcribe`, OpenAI transcription, `transcribe()` in `@rag/openai`), the browser sends that text to `chat/` exactly as if it had been typed, and the complete reply is read aloud (`POST voice/speak`, `speak()`). Between the two nothing changes: no prompt, tool, `language.ts` or `dates.ts` text, and a spoken question is stored as its words.
+- The speak route takes a `conversationId`, never text: an open route that spoke any text would be free text-to-speech on the tenant's key. It reads the conversation's latest reply through `latestReply()` on the chat token (both walls), the refusal marker as the tenant's words, and speaks `speakable()` of it (`apps/web/lib/speakable.ts`: no markers, emoji or addresses; a table as its first column's names and "the details are on your screen"; at most 600 characters).
+- When OpenAI's speech fails, stalls past 15 s or is refused, the browser reads the SAME `speakable()` text with a voice of its own, but only a `localService` one; with none, silence (Rule 6, added at the user's word after Phase 0). A failed transcription asks the guest to type; the question has no browser fallback (Firefox has none, Chrome's sends audio to Google).
+- No recording is kept: in memory to OpenAI and dropped. The notice under the field and the tenant's privacy page say so when voice is on.
+- A feature switch, `voice`, OFF with no row (the only one; `defaultOn: false` in `lib/features.ts`, `tenant_feature_on()` in `schema-voice.sql`, the 41st file), because it adds cost and a third party. A spoken question's answer is always read; a typed one's when the guest turns on "Read replies aloud".
+- `OPENAI_TTS_MODEL` defaults to `tts-1`: Phase 0 measured `gpt-4o-mini-tts` at 116 s of OpenAI's own processing and `tts-1` at 1.1 to 1.9 s to the first byte.
+
+**Why not speech-to-speech (Realtime):** the model would answer from the audio, past `buildPrompt()`, so the grounding, the refusal, the tools and the battery would not apply.
+
+**Why after the reply, not while it streams:** the speak route reads only what is stored (above). A spoken reply starts about 2 s after the text is complete.

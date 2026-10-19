@@ -781,6 +781,14 @@ The endpoints themselves are URLs the server POSTs to. Only known push
 services' hosts are accepted, so the server makes no requests to internal
 hosts (SSRF).
 
+## R-53 · Voice spends on an open route, and the voice goes to OpenAI · **Accepted 2026-10-20 (D-134)**
+
+**Cost:** each spoken turn is a transcription and a speech call on top of the chat call, on routes anyone can reach. Each is bounded (1 MB, 600 spoken characters, a 30-per-window IP limit), but the window is in memory and per instance (R-39), so a caller rotating addresses can still spend. The answer is the switch: voice is OFF until a super user turns it on for a tenant.
+
+**The voice itself** leaves through OpenAI to be transcribed, disclosed under the field and on the privacy page when voice is on; nothing is stored here. The browser's fallback reads replies with an ON-DEVICE voice only, so it adds no party; on a device with none it is silent.
+
+**A wrong transcript is a wrong question.** It is shown as the guest's message, so the guest sees what was heard; the answer is to that text, and the refusal still holds.
+
 ## R-52 · A room count tells anyone how full the resort is · **Accepted 2026-10-20 (D-133)**
 
 The booking page says "1 of 2 left" and the chat tool's result carries

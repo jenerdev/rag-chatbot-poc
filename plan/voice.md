@@ -1,8 +1,9 @@
 # Voice plan: talk to the assistant, and hear it answer
 
-> **Status: planned 2026-10-20; § 6 answered the same day (every
-> recommendation taken); Phase 0 done; Rule 6 (the browser's voice as the
-> fallback for replies) added at the user's word.** Branch `feat/voice`. The record
+> **Status: Phases 0–5 and 7 built 2026-10-20 (Rule 6, the browser's voice
+> as the fallback for replies, added at the user's word). Phase 6 is the
+> user's own walk. Every check, walk and audit runs AFTER Phase 7, at the
+> user's word; status.md has their results.** Branch `feat/voice`. The record
 > will be D-134 and R-53.
 
 The user: "add option to talk with the chatbot. chatbot response is also to

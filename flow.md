@@ -314,6 +314,8 @@ return 404, with no redirect.
 | `GET` | `/t/<slug>` | chat page | `app/t/[tenant]/page.tsx` → `ChatScreen` | public |
 | `GET` | `/t/<slug>/admin` | knowledge base page | `app/t/[tenant]/admin/page.tsx` → `AdminScreen` | public page, admin data |
 | `POST` | `/api/t/<slug>/chat` | ask — SSE or JSON | `answerQuestionStream` / `answerQuestion` | open |
+| `POST` | `/api/t/<slug>/voice/transcribe` | a recording (multipart `audio`, checked by its bytes, ≤ 1 MB) → `{ text }`; never answers (D-134) | `transcribe` (`@rag/openai`) | open, `voice` switch, per-IP window |
+| `POST` | `/api/t/<slug>/voice/speak` | `{ conversationId }` → the latest reply as `audio/mpeg`; never takes text; 502 → the browser's own voice | `latestReply` + `speakable` + `speak` | open, `voice` switch, per-IP window |
 | `GET` | `/t/<slug>/admin/conversations`, `…/conversations/:id` | S-16 the chats / S-16a one transcript, read-only (D-115) | `ConversationsScreen` / `TranscriptScreen` | public page, staff data |
 | `GET` | `/api/t/<slug>/admin/conversations` | one page of chats: `?days=7\|30\|90&q=&refused=1&before=&beforeId=`, from `conversation_list()`, which refuses a non-member itself | `listConversations` | admin (any member) |
 | `GET` | `/api/t/<slug>/admin/conversations/:id` | one transcript, every message named; 404 if not this tenant's. (The OPEN `/conversations/:id/messages` was removed, D-115.) | `getTranscript` | admin (any member) |
