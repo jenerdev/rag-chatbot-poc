@@ -32,6 +32,7 @@ export default async function TenantPrivacyPage({ params }: { params: Promise<{ 
     guestRetentionDays: branding.legal.guestRetentionDays,
     proofRetentionDays: PROOF_RETENTION_DAYS,
     bookings: nav.bookings,
+    voice: nav.flags.voice,
   });
   return (
     <>

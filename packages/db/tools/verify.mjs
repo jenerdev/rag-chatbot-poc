@@ -3735,6 +3735,7 @@ async function notificationChecks() {
 // 194. booking_page off: a web request is refused (23514), and on it is accepted;
 // 195. manage_booking off: a guest's proof and a change request are refused;
 // 196. notifications off: a web request queues no notice, and on it queues one.
+// 196b. voice (D-134): off with no row; only a super user switches it on.
 {
   const users = [];
   let probe = null;
@@ -3843,6 +3844,22 @@ async function notificationChecks() {
         before >= 1 && !quiet.error && afterOff === before && !loud.error && afterOn === before + 1,
         'features: with notifications off a web request queues no notice; on, it queues one (the twin)',
         `before ${before} · off ${quiet.error?.message ?? 'ok'} → ${afterOff} · on ${loud.error?.message ?? 'ok'} → ${afterOn}`,
+      );
+    }
+    // 196b. voice (schema-voice.sql, D-134): no row is OFF, unlike the other
+    //       eight; its owner cannot switch it on; a super user can, and off again.
+    {
+      const before = (await chatDb.rpc('tenant_feature_on', { p_tenant_id: probe, p_feature: 'voice' })).data;
+      const ownerOn = await ownerDb.from('tenant_features').upsert({ tenant_id: probe, feature: 'voice', enabled: true }, { onConflict: 'tenant_id,feature' }).select('feature');
+      const on = await flip('voice', true);
+      const afterOn = (await chatDb.rpc('tenant_feature_on', { p_tenant_id: probe, p_feature: 'voice' })).data;
+      await flip('voice', false);
+      const afterOff = (await chatDb.rpc('tenant_feature_on', { p_tenant_id: probe, p_feature: 'voice' })).data;
+      const other = (await chatDb.rpc('tenant_feature_on', { p_tenant_id: probe, p_feature: 'unanswered' })).data;
+      check(
+        before === false && (!!ownerOn.error || (ownerOn.data ?? []).length === 0) && !on.error && afterOn === true && afterOff === false && other === true,
+        'features: voice is OFF with no row (the other features ON); its owner cannot switch it on; a super user switches it on and off',
+        `no row ${before} · owner ${ownerOn.error?.message ?? ownerOn.data?.length} · super on ${on.error?.message ?? afterOn} · off ${afterOff} · unanswered with no row ${other}`,
       );
     }
   } catch (error) {

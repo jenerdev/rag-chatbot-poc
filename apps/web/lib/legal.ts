@@ -47,6 +47,8 @@ export interface TenantLegalFacts {
   proofRetentionDays: number;
   /** does this tenant take bookings (and so guests' contact details and receipts)? */
   bookings: boolean;
+  /** does this tenant's chat take spoken questions (D-134)? Absent: no. */
+  voice?: boolean;
 }
 
 /** "365 days (about 1 year)": the number as stored, and a rounder reading of it (half years from a year up, else months). */
@@ -80,6 +82,9 @@ export function tenantPrivacy(f: TenantLegalFacts): LegalDocument {
       heading: 'What is collected',
       paragraphs: [
         `When you chat with ${f.assistantName}, the assistant: every message you send and every answer, with the time.`,
+        ...(f.voice
+          ? ['When you speak to the assistant instead of typing: your recording is sent to OpenAI to be turned into text, and is not kept. The text is kept, as your message.']
+          : []),
         ...(f.bookings
           ? [
               'When you send a booking request: your name, mobile number and email address, the dates, rooms and number of guests, any note you add, and the price quoted.',
@@ -110,7 +115,7 @@ export function tenantPrivacy(f: TenantLegalFacts): LegalDocument {
       paragraphs: [
         `${f.businessName}'s own staff, each seeing only what their role needs.`,
         `${PLATFORM.operator}, which runs the website, as ${f.businessName}'s processor.`,
-        'OpenAI, which processes the text of your chat messages to write the assistant\'s answers. Do not type passwords, card numbers or other sensitive information into the chat.',
+        `OpenAI, which processes the text of your chat messages to write the assistant's answers${f.voice ? ', turns what you say into text and reads the answers aloud' : ''}. Do not type or say passwords, card numbers or other sensitive information in the chat.`,
         'The companies that host the website\'s database and files, under their own security obligations.',
         'Nobody else, unless the law requires it.',
       ],

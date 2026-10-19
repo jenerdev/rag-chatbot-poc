@@ -40,3 +40,16 @@ describe('legal texts (D-129)', () => {
     expect(text(platformPrivacy())).toContain('sets no cookie');
   });
 });
+
+// D-134: voice is named only where the tenant has it.
+describe('the privacy text and voice', () => {
+  it('names the recording, OpenAI and that it is not kept, only with voice on', () => {
+    const on = text(tenantPrivacy({ ...VILLA, voice: true }));
+    expect(on).toMatch(/recording is sent to OpenAI to be turned into text, and is not kept/);
+    expect(on).toMatch(/turns what you say into text/);
+    const off = text(tenantPrivacy(VILLA));
+    expect(off).not.toMatch(/recording/);
+    expect(off).not.toMatch(/what you say/);
+  });
+});
+
