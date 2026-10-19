@@ -9884,3 +9884,9 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **What:** after the first phone walk heard Tagalog as Malay, every recording carries a `prompt`: the business, and "Filipino (Tagalog), English, or a mix of both (Taglish)". The user's second walk (21:16–21:17 UTC) had no Malay ("Hello po, kamusta?") but heard "Casa Uno" as "pasauna" and garbled one line ("So buy yourself December 25."). So the hint now ends "Names they may say: …" with the tenant's active rooms and slots (`voiceVocabulary()` in `packages/rag/src/voice.ts`, at most 20, both walls).
 - **Observed:** alteza's names: Casa Uno, Casa Dos, Familia, Kubo A, Kubo B, Loft Suite, Day Use, Overnight; villa's: Whole property, Day Tour, 22-Hour Whole Day, Overnight. openai tests 20, web 188; the HTTP walk 6/6 with each version of the hint (OpenAI takes the field).
 - **Confirmed by the user's phone (21:21 UTC):** "Is Casa Uno available tomorrow?" stored word for word.
+
+## 2026-10-20 · Voice: the bundle grep, the last check (D-134)
+
+- **What:** with `pnpm dev` stopped (trap 16), `pnpm build` (7/7 tasks), then CLAUDE.md rule 2's grep of `apps/web/.next/static/`: the secret NAMES (plus `OPENAI_API_KEY`, which the voice routes use) and the secret VALUES read from `.env`, counted, never printed.
+- **Observed:** names in 0 files; OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY, DATABASE_URL, its password, TENANT_SIGNING_JWK's `d` and VAPID_PRIVATE_JWK's `d` each in 0 of 132 files.
+- **Why it mattered:** voice added two routes that call OpenAI and a Client Component that talks to them; the key stays on the server, and the browser holds only `lib/voice.ts`' limits and `speakable()`.
