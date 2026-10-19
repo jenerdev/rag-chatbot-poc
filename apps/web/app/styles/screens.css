@@ -400,12 +400,13 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .bone-small { height: 0.75em; font-size: var(--text-xs); }
 .bone-title { height: 1.15em; font-size: var(--text-lg); }
 .bone-chip { height: 1.4em; font-size: var(--text-xs); border-radius: var(--radius-full); }
-.bone-button { height: 34px; border-radius: var(--radius-md); }
+.bone-button { height: var(--control-h); border-radius: var(--radius-md); }
+.bone-button-sm { height: var(--control-h-sm); border-radius: var(--radius-md); }
 .bone-circle { border-radius: 50%; }
 .bone-pill { border-radius: var(--radius-full); }
-.bone-row-wrap { display: contents; }
-/* A skeleton's links and buttons are shapes, not controls. */
+/* A skeleton's links, buttons and clickable cells are shapes, not controls. */
 .skeleton-shape a, .skeleton-shape button { pointer-events: none; }
+.skeleton-shape, .skeleton-shape * { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .bone { animation: none; } }
 
 @media (max-width: 860px) {
@@ -813,7 +814,7 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
 
 /* Day: the summary strip, then each room and slot. */
 .cal-day-summary { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-height: 0; margin-bottom: var(--space-3); cursor: default; }
-.cal-day-summary .button { margin-left: auto; }
+.cal-day-summary .button, .cal-day-summary > .bone:last-child { margin-left: auto; }
 .cal-day-slots { margin: 0; padding: 0; list-style: none; }
 .cal-day-slots > li { padding: var(--space-3) 0; border-top: 1px solid var(--line); }
 .cal-day-slots > li:first-child { border-top: 0; }
@@ -1252,6 +1253,9 @@ dialog.proof-viewer[open] { animation: fade-in var(--dur) var(--ease); }
   .pay-row-who { grid-column: 1 / -1; grid-row: 2; }
   .pay-row > .badge { justify-self: end; }
   .pay-row > .button { grid-column: 1 / -1; justify-content: center; }
+  /* The skeleton's stand-ins for them (the bone's inline width is the desktop one). */
+  .pay-row > .bone-chip { justify-self: end; }
+  .pay-row > .bone-button, .pay-row > .bone-button-sm { grid-column: 1 / -1; width: 100% !important; }
 }
 
 /* Settings: each section what it decides (left) beside its fields (right);

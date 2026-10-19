@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PlatformPulse, TenantDetail, TenantSummary } from '@rag/pipeline';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { LoginForm, describeFailure } from '@/components/admin-login';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
@@ -222,7 +222,7 @@ export function PlatformScreen() {
               <button type="button" className="link back-link" onClick={() => setSelected(null)}>
                 <Icon name="chevron-left" size={16} /> Tenants
               </button>
-              <LoadState load={detailLoad} what="tenant" rows={4} onRetry={() => setDetailTry((n) => n + 1)} />
+              <LoadState load={detailLoad} what="tenant" onRetry={() => setDetailTry((n) => n + 1)} skeleton={<TenantFormSkeleton />} />
             </>
           )}
         </main>
@@ -272,6 +272,25 @@ export function PlatformScreen() {
           {newTenant}
         </div>
 
+        {/* While the list loads, the totals' own shape, so the list does not drop
+            by a row of tiles when they arrive (the Pulse loads with the list). */}
+        {!tenants && loadState.state === 'loading' && (
+          <div className="stat-tiles platform-totals" aria-hidden="true">
+            {boneRows(4, (i) => (
+              <div className="stat-tile static">
+                <span className="stat-tile-label">
+                  <Bone w={['44%', '52%', '58%', '54%'][i]} h="small" />
+                </span>
+                <span className="stat-tile-value">
+                  <Bone w="3ch" h="1.6rem" />
+                </span>
+                <span className="stat-tile-hint">
+                  <Bone w={['38%', '56%', '70%', '72%'][i]} h="small" />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {/* The totals over live tenants, from the Pulse (counts only, no content, no money: plan § 2.4). Left out if it failed. */}
         {tenants && pulse && (
           <div className="stat-tiles platform-totals">
@@ -325,7 +344,7 @@ export function PlatformScreen() {
           </div>
 
           {tenants === null ? (
-            <LoadState load={loadState} what="tenants" rows={4} onRetry={() => { setLoadState(LOADING); void loadTenants(); }} />
+            <LoadState load={loadState} what="tenants" onRetry={() => { setLoadState(LOADING); void loadTenants(); }} skeleton={<TenantsSkeleton />} />
           ) : tenants.length === 0 ? (
             <EmptyState icon="home" title="No tenants yet" action={newTenant}>
               A tenant is a business with its own chat, documents and staff.
@@ -343,6 +362,134 @@ export function PlatformScreen() {
           )}
         </section>
       </main>
+    </>
+  );
+}
+
+/**
+ * The tenant list while it loads, in TenantRow's own classes: the mark, the
+ * name with an application badge, the meta line, six Pulse figures, and the
+ * Open and Edit buttons. A figure is a <dl>'s caption over its count, as the
+ * real one; the buttons are bones of `button.sm`'s height.
+ */
+function TenantsSkeleton() {
+  return (
+    <ul className="tenant-list">
+      {boneRows(4, (i) => (
+        <li className="tenant-row">
+          <Bone w="40px" h="40px" />
+          <div className="tenant-who">
+            <div className="tenant-name">
+              <Bone w={['16ch', '22ch', '12ch', '19ch'][i]!} />
+              {i % 2 === 0 && <Bone w="8ch" h="chip" />}
+            </div>
+            <span className="tenant-meta">
+              <Bone w={['34ch', '40ch', '30ch', '36ch'][i]!} h="small" />
+            </span>
+          </div>
+          <dl className="tenant-figures">
+            {boneRows(6, () => (
+              <div className="tenant-figure">
+                <dt>
+                  <Bone w="7ch" h="small" />
+                </dt>
+                <dd>
+                  <Bone w="3ch" />
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <span className="list-row-actions">
+            <Bone w="8ch" h="button-sm" />
+            <Bone w="7ch" h="button-sm" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The tenant form while it loads, shaped like TenantForm's top and its first
+ * tab: the large mark, the name with its status badge, the meta line and
+ * Open chat; the tab strip; then Profile's Identity section (two name fields,
+ * the avatar, the logo and the banner). The back link is drawn outside it.
+ * The tabs are ghost <button>s so they take a control's height; the region
+ * is inert.
+ */
+function TenantFormSkeleton() {
+  const field = (label: string) => (
+    <div className="field">
+      <span className="field-label">
+        <Bone w={label} h="small" />
+      </span>
+      <Bone w="100%" h="var(--control-h)" />
+    </div>
+  );
+  const image = (preview: { w: string; round?: 'circle' }) => (
+    <div className="field brand-image-field">
+      <span className="field-label">
+        <Bone w="10ch" h="small" />
+      </span>
+      <div className="brand-image-row">
+        <Bone w={preview.w} h="72px" round={preview.round} />
+        <div className="brand-image-actions">
+          <Bone w="13ch" h="button-sm" />
+        </div>
+      </div>
+      <div className="brand-image-url">
+        <Bone w="22ch" h="small" />
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <div className="tenant-edit-head">
+        <div className="tenant-edit-title">
+          <Bone w="56px" h="56px" />
+          <div className="tenant-edit-name">
+            <div className="page-title">
+              <Bone w="18ch" h="title" /> <Bone w="5ch" h="chip" />
+            </div>
+            <p className="tenant-meta">
+              <Bone w="40ch" h="small" />
+            </p>
+          </div>
+          <Bone w="12ch" h="button" />
+        </div>
+      </div>
+      <div className="tabs">
+        {['7ch', '12ch', '8ch', '11ch', '14ch', '5ch', '7ch', '7ch'].map((w, i) => (
+          <button key={i} type="button" className="ghost">
+            <Bone w={w} h="small" />
+          </button>
+        ))}
+      </div>
+      <div className="card settings">
+        <section className="settings-section">
+          <div className="settings-about">
+            <div>
+              <Bone w="9ch" />
+            </div>
+            <p>
+              <Bone w="100%" h="small" />
+              <br />
+              <Bone w="70%" h="small" />
+            </p>
+          </div>
+          <div className="settings-fields">
+            <div className="field-row">
+              {field('13ch')}
+              {field('14ch')}
+            </div>
+            <div className="field-row">{image({ w: '72px', round: 'circle' })}</div>
+            <div className="field-row">
+              {image({ w: '72px' })}
+              {image({ w: '160px' })}
+            </div>
+          </div>
+        </section>
+      </div>
     </>
   );
 }

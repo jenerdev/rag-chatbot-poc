@@ -34,7 +34,7 @@ import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -64,6 +64,42 @@ function dayLabel(date: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/**
+ * The dates while they load: one month group of `.list-row.setup-row` rows,
+ * the real list's classes, with the date and weekday, the name and its kind
+ * badge, the surcharge, and the Edit and Remove buttons as shapes. Rows are
+ * mapped directly, not through boneRows(): its wrapper would make every row
+ * `:first-of-type` and take away the lines between them.
+ */
+function DatesSkeleton() {
+  const names = ['38%', '52%', '30%', '46%', '42%'];
+  return (
+    <div className="month-group">
+      {/* An h3 as in the list, so the first row is the first div and draws no top line. */}
+      <h3 className="month-label">
+        <Bone w="12ch" h="small" />
+      </h3>
+      {names.map((w, i) => (
+        <div key={i} className="list-row setup-row">
+          <span className="setup-row-when">
+            <Bone w="6ch" />
+            <Bone w="9ch" h="small" />
+          </span>
+          <span className="list-row-main">
+            <Bone w={w} />
+            <Bone w="8ch" h="chip" />
+          </span>
+          <span className="list-row-meta">{i % 2 === 0 && <Bone w="13ch" h="small" />}</span>
+          <span className="list-row-actions">
+            <Bone w="32px" h="var(--control-h-sm)" />
+            <Bone w="68px" h="var(--control-h-sm)" />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScreenProps) {
@@ -266,7 +302,23 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
     return (
       <>
         <StaffFrame {...frame}>
-          <LoadState load={loadState} what="setup" onRetry={() => { setLoadState(LOADING); void loadSetup(); }} />
+          <LoadState
+            load={loadState}
+            what="setup"
+            onRetry={() => { setLoadState(LOADING); void loadSetup(); }}
+            skeleton={
+              // The page's one card, so the frame does not change shape when the setup arrives.
+              <section className="card">
+                <h2>
+                  <Bone w="14em" />
+                </h2>
+                <p className="small muted">
+                  <Bone w="70%" h="small" />
+                </p>
+                <DatesSkeleton />
+              </section>
+            }
+          />
         </StaffFrame>
       </>
     );
@@ -415,7 +467,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
           <h2>The next twelve months</h2>
           <p className="small muted">Holidays and peak dates use each room's holiday rate; closed dates take no booking.</p>
           {upcoming === null ? (
-            <LoadState load={loadState} what="dates" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
+            <LoadState load={loadState} what="dates" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<DatesSkeleton />} />
           ) : upcoming.length === 0 ? (
             <EmptyState icon="flag" title="No holidays or closed dates" action={addDate}>
               Every date is open and priced as a weekday or a weekend.

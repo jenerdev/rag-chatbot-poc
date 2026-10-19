@@ -37,6 +37,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { Icon } from '@/components/icons';
 import { StayLines } from '@/components/stay-lines';
+import { Bone } from '@/components/load-state';
 import { Lightbox, useLightbox } from '@/components/lightbox';
 
 export interface BookingPageScreenProps {
@@ -139,6 +140,42 @@ function CheckTimes({ checkIn, checkOut }: { checkIn: { date: string; time: stri
 
 
 type Sent = { receipt: RequestReceipt } | null;
+
+/**
+ * The price while it is asked, shaped like the StayLines that replace it:
+ * one `.quote-night` per night and room asked for, its label left and its
+ * amount right, then the Total line. Every bone's height is given as a length
+ * because `.quote-skeleton span` (screens.css) sets a height of its own, and
+ * the night count is not `.quote .quote-night`, which the walks count. The
+ * text is `.small`, the size `.quote` gives the real lines.
+ */
+function QuoteSkeleton({ nights, rooms }: { nights: number; rooms: number }) {
+  const count = Number.isInteger(nights) && nights > 0 ? nights * rooms : rooms;
+  return (
+    <div className="stay-lines small" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="quote-night">
+          <div className="quote-line">
+            <div>
+              <Bone w={count > 1 ? (i % 2 ? '13ch' : '11ch') : '5ch'} h="0.9em" />
+            </div>
+            <div>
+              <Bone w="10ch" h="0.9em" />
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="quote-line quote-total">
+        <div>
+          <Bone w="5ch" h="0.9em" />
+        </div>
+        <div>
+          <Bone w="12ch" h="0.9em" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav, photos = {}, policyVersion }: BookingPageScreenProps) {
   const lightbox = useLightbox();
@@ -937,9 +974,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
             <div aria-live="polite">
               {quotePending ? (
                 <div className="quote-skeleton" role="status" aria-label="Getting the price">
-                  <span />
-                  <span />
-                  <span />
+                  <QuoteSkeleton nights={nightCount} rooms={Math.max(1, rooms.length)} />
                 </div>
               ) : quote.quote ? (
                 <div className={quote.quote.available ? 'quote' : 'quote error'}>

@@ -31,7 +31,7 @@ import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
 import { StayLines } from '@/components/stay-lines';
 import { ReviewProof, type ReviewDecision } from '@/components/review-proof';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { can, isRole, type Role } from '@/lib/permissions';
@@ -79,6 +79,124 @@ function outcome(stay: StayDetail): { words: string; tone: string } | null {
   const at = stay.statusAt ? ` on ${when(stay.statusAt, stay.timezone)}` : '';
   const note = stay.decisionNote ? `: “${stay.decisionNote}”` : '';
   return { words: `${what}${at}${note}`, tone: stay.status === 'expired' ? 'warn' : 'error' };
+}
+
+/**
+ * S-15 before the booking arrives: the page's own head card (badges, guest,
+ * dates strip, total) and its two columns of cards, with a Bone for each value
+ * and the fixed headings as they will read, so nothing moves when it lands.
+ */
+function StayDetailSkeleton() {
+  return (
+    <>
+      <section className="card stay-head">
+        <div className="stay-head-top">
+          <div className="stay-head-main">
+            <div className="booking-badges">
+              <Bone w="13ch" h="chip" />
+              <Bone w="11ch" h="chip" />
+            </div>
+            <h2>
+              <Bone w="18ch" />
+            </h2>
+            <p className="stay-head-sub">
+              <Bone w="26ch" h="small" />
+            </p>
+          </div>
+          <div className="stay-head-total">
+            <span className="small muted">Total</span>
+            <strong>
+              <Bone w="10ch" />
+            </strong>
+            <Bone w="9ch" h="chip" />
+          </div>
+        </div>
+        <div className="stay-dates-strip">
+          <div className="stay-date">
+            <span className="small muted">Check-in</span>
+            <strong>
+              <Bone w="14ch" />
+            </strong>
+            <Bone w="7ch" h="small" />
+          </div>
+          <div className="stay-date-span">
+            <span>
+              <Bone w="7ch" h="small" />
+            </span>
+          </div>
+          <div className="stay-date">
+            <span className="small muted">Check-out</span>
+            <strong>
+              <Bone w="14ch" />
+            </strong>
+            <Bone w="7ch" h="small" />
+          </div>
+        </div>
+      </section>
+
+      <div className="stay-layout">
+        <div className="stay-main">
+          <section className="card stay-card-price">
+            <h3>Price</h3>
+            <div className="quote stay-price">
+              {boneRows(3, (i) => (
+                <div className="quote-line">
+                  <Bone w={['22ch', '18ch', '20ch'][i]} />
+                  <Bone w="9ch" />
+                </div>
+              ))}
+              <div className="quote-line quote-total">
+                <Bone w="6ch" />
+                <Bone w="11ch" />
+              </div>
+            </div>
+          </section>
+          <section className="card stay-card-notes">
+            <h3>Staff notes</h3>
+            <Bone w="100%" h="64px" />
+          </section>
+          <section className="card stay-card-history">
+            <h3>History</h3>
+            <ol className="timeline">
+              {['55%', '40%', '48%'].map((w) => (
+                <li key={w}>
+                  <Bone w={w} />
+                  <Bone w="24ch" h="small" />
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+
+        <aside className="stay-side">
+          <section className="card stay-card-contact">
+            <h3>Contact</h3>
+            <div className="stay-contact">
+              <Bone w="80%" h="button-sm" />
+              <Bone w="90%" h="button-sm" />
+            </div>
+            <Bone w="20ch" h="small" />
+          </section>
+          <section className="card stay-card-payment">
+            <h3>Payment</h3>
+            <div className="pay-meter" />
+            <dl className="facts compact">
+              {['8ch', '14ch'].map((w) => (
+                <div key={w}>
+                  <dt>
+                    <Bone w={w} h="small" />
+                  </dt>
+                  <dd>
+                    <Bone w="9ch" />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </aside>
+      </div>
+    </>
+  );
 }
 
 export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, maxNote }: StayDetailScreenProps) {
@@ -216,7 +334,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
   if (stay === null) {
     return (
       <StaffFrame {...frame} actions={back}>
-        <LoadState load={loadState} what="booking" onRetry={() => { setLoadState(LOADING); void load(); }} />
+        <LoadState load={loadState} what="booking" skeleton={<StayDetailSkeleton />} onRetry={() => { setLoadState(LOADING); void load(); }} />
       </StaffFrame>
     );
   }

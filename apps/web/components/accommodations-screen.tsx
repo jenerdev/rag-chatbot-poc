@@ -34,7 +34,7 @@ import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice, type Notice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
@@ -643,6 +643,43 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
   );
 }
 
+/**
+ * The rooms while they load: the list's head line and closed accordion rows,
+ * on RoomCard's own classes. The toggle stays a <button> because its layout
+ * is `button.room-toggle`; LoadState makes the whole skeleton inert.
+ */
+function RoomsSkeleton() {
+  return (
+    <>
+      <div className="room-list-head">
+        <Bone w="16ch" h="small" />
+        <Bone w="10ch" h="button-sm" />
+      </div>
+      {boneRows(4, (i) => (
+        <div className="room-item">
+          <div className="room-item-heading">
+            <button type="button" className="room-toggle" tabIndex={-1}>
+              <Icon name="chevron-right" size={16} className="room-chevron" />
+              <span className="room-thumb">
+                <Bone w="100%" h="100%" />
+              </span>
+              <span className="room-title">
+                <span className="room-name">
+                  <Bone w={['34%', '46%', '28%', '40%'][i]} />
+                </span>
+                <span className="room-meta">
+                  <Bone w={['58%', '50%', '64%', '54%'][i]} h="small" />
+                </span>
+              </span>
+              <span className="room-badges">{i === 2 && <Bone w="11ch" h="chip" />}</span>
+            </button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function AccommodationsScreen({
   slug,
   businessName,
@@ -794,7 +831,7 @@ export function AccommodationsScreen({
     return (
       <>
         <StaffFrame {...frame}>
-          <LoadState load={loadState} what="rooms" onRetry={() => { setLoadState(LOADING); void load(); }} />
+          <LoadState load={loadState} what="rooms" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<RoomsSkeleton />} />
         </StaffFrame>
       </>
     );

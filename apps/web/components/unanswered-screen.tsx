@@ -29,7 +29,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ListSearch } from '@/components/list-search';
 import { notify } from '@/components/toast';
 import { PAGE_SIZE, matches } from '@/lib/search';
@@ -59,6 +59,49 @@ function askedLabel(askedAt: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** The skeleton's question widths, so the rows do not look stamped. */
+const SKELETON_QUESTIONS = ['58%', '72%', '44%', '65%', '50%'];
+
+/**
+ * The list before it arrives, in the loaded list's own order: the search
+ * field, the count, "Select all shown", then `.unanswered` rows (checkbox,
+ * the question over when it was asked, and the row's buttons: "Add answer"
+ * only where the real row has it).
+ */
+function UnansweredSkeleton({ answer, open }: { answer: boolean; open: boolean }) {
+  return (
+    <>
+      <div className="list-search">
+        <Bone w="100%" h="var(--control-h)" />
+      </div>
+      <p className="list-count">
+        <Bone w="12ch" h="small" />
+      </p>
+      <div className="unanswered-bulk">
+        <Bone w="16px" h="16px" />
+        <span>
+          <Bone w="13ch" />
+        </span>
+      </div>
+      {SKELETON_QUESTIONS.map((w, i) => (
+        <div key={i} className="unanswered">
+          <Bone w="16px" h="16px" />
+          <div className="unanswered-text">
+            <span className="unanswered-question">
+              <Bone w={w} />
+            </span>
+            <span className="unanswered-when">
+              <Bone w="38ch" h="small" />
+            </span>
+          </div>
+          {answer && open && <Bone w="7.5rem" h="button-sm" />}
+          <Bone w={open ? '8.5rem' : '4.5rem'} h="button-sm" />
+        </div>
+      ))}
+    </>
+  );
 }
 
 export function UnansweredScreen({ slug, businessName, logoUrl, nav, limit }: UnansweredScreenProps) {
@@ -247,7 +290,12 @@ export function UnansweredScreen({ slug, businessName, logoUrl, nav, limit }: Un
             <p className="small muted">Reopen a question if the assistant still cannot answer it.</p>
           )}
           {questions === null ? (
-            <LoadState load={loadState} what="questions" onRetry={() => { setLoadState(LOADING); void load(); }} />
+            <LoadState
+              load={loadState}
+              what="questions"
+              onRetry={() => { setLoadState(LOADING); void load(); }}
+              skeleton={<UnansweredSkeleton answer={canAnswer} open={tab === 'open'} />}
+            />
           ) : questions.length === 0 ? (
             <div className="empty-list">
               {tab === 'open' ? (

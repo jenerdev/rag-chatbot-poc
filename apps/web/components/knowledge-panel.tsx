@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
 
 interface DocumentRow {
@@ -21,6 +21,29 @@ interface DocumentRow {
   source: string | null;
   created_at: string;
   chunkCount: number;
+}
+
+/**
+ * The list while it loads, in the real `.kb-list`: the file icon, the title
+ * and its small meta line, the Delete button (a <button>, so `button.sm`
+ * sizes it; the region is inert).
+ */
+function KnowledgeSkeleton() {
+  return (
+    <ul className="kb-list">
+      {boneRows(4, (i) => (
+        <li>
+          <Icon name="file" size={16} />
+          <span className="kb-title">
+            <Bone w={['38%', '52%', '30%', '44%'][i]!} /> <Bone w="18ch" h="small" />
+          </span>
+          <button type="button" className="ghost sm kb-delete">
+            <Bone w="7ch" h="small" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function KnowledgePanel({
@@ -123,7 +146,7 @@ export function KnowledgePanel({
         </div>
         <div>
           {!Array.isArray(docs) ? (
-            <LoadState load={docs} onRetry={() => void load()} what="documents" />
+            <LoadState load={docs} onRetry={() => void load()} what="documents" skeleton={<KnowledgeSkeleton />} />
           ) : docs.length === 0 ? (
             <EmptyState icon="file" title="No documents yet" compact>
               Until one is added, the chat says it is still being set up.

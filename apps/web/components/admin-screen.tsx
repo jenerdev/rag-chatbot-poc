@@ -43,7 +43,7 @@ import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
 
@@ -180,7 +180,7 @@ function DocumentRow({
 
       <div className={`doc-chunks${open ? '' : ' hidden'}`}>
         {chunks === null ? (
-          <LoadState load={chunksLoad} what="chunks" rows={2} onRetry={() => { setChunksLoad(LOADING); void loadChunks(); }} />
+          <LoadState load={chunksLoad} what="chunks" onRetry={() => { setChunksLoad(LOADING); void loadChunks(); }} skeleton={<ChunksSkeleton />} />
         ) : (
           <>
             {chunks.map((chunk) => (
@@ -211,6 +211,68 @@ function DocumentRow({
   );
 }
 
+// The skeletons draw DocumentRow's own classes, so they cannot drift from it.
+// The title and the icon buttons stay <button>s: their size comes from
+// `button.doc-title` and `button.ghost.sm`, which a <span> would not take.
+// The region is inert, so none of them can be reached.
+
+const DOC_TITLE_WIDTHS = ['46%', '32%', '54%', '38%'];
+
+/** The document list while it loads: one `.doc` per row, title, meta and, for a writer, the two icon buttons. */
+function DocumentsSkeleton({ actions }: { actions: boolean }) {
+  return (
+    <div>
+      {DOC_TITLE_WIDTHS.map((w, i) => (
+        <div className="doc" key={i}>
+          <div className="doc-head">
+            <button type="button" className="doc-title">
+              <Icon name="chevron-right" size={16} className="doc-chevron" />
+              <Bone w={w} />
+            </button>
+            <span className="doc-meta">
+              <Bone w={i % 2 ? '17ch' : '19ch'} />
+            </span>
+            {actions && (
+              <>
+                <button type="button" className="ghost sm">
+                  <Bone w="16px" h="16px" />
+                </button>
+                <button type="button" className="ghost sm">
+                  <Bone w="16px" h="16px" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A document's chunks while they load: the label, then a block of text lines. */
+function ChunksSkeleton() {
+  return (
+    <>
+      {[
+        ['100%', '96%', '100%', '62%'],
+        ['98%', '100%', '44%'],
+      ].map((lines, i) => (
+        <div className="chunk" key={i}>
+          <div className="chunk-label">
+            <Bone w="22ch" h="small" />
+          </div>
+          <div className="chunk-text">
+            {lines.map((w, j) => (
+              <div key={j}>
+                <Bone w={w} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
 
 export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenProps) {
   const api = `/api/t/${slug}`;
@@ -644,7 +706,7 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
             <p className="small muted kb-intro">The assistant answers only from these. Open one to see the chunks it was split into.</p>
 
           {documents === null ? (
-            <LoadState load={loadState} what="documents" onRetry={() => { setLoadState(LOADING); void loadDocuments(); }} />
+            <LoadState load={loadState} what="documents" onRetry={() => { setLoadState(LOADING); void loadDocuments(); }} skeleton={<DocumentsSkeleton actions={canWrite} />} />
           ) : documents.length === 0 ? (
             // addDocument is undefined for staff, who may not add one: no button, the page's own courtesy.
             <EmptyState icon="file" title="No documents yet" action={addDocument}>

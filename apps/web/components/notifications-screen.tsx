@@ -21,7 +21,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon, type IconName } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { notify } from '@/components/toast';
 import { NOTIFICATIONS_CHANGED, type AttentionItem } from '@/lib/attention';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -41,6 +41,43 @@ const KIND_ICON: Readonly<Record<AttentionItem['kind'], IconName>> = { request: 
 /** "14 Oct, 02:41" in this browser's zone: an instant. */
 function whenLabel(at: string): string {
   return new Date(at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The skeleton's rows: title and body widths; the first two unread, with their button. */
+const SKELETON_ROWS = [
+  { title: '38%', body: '72%', unread: true },
+  { title: '30%', body: '58%', unread: true },
+  { title: '42%', body: '66%', unread: false },
+  { title: '34%', body: '50%', unread: false },
+];
+
+/**
+ * The feed before it arrives, in `.notification` rows: the round kind icon,
+ * the title, body and time, and "Mark read" on an unread row.
+ */
+function NotificationsSkeleton() {
+  return (
+    <ul className="notification-list">
+      {SKELETON_ROWS.map((r, i) => (
+        <li key={i} className="notification">
+          <Bone w="36px" h="36px" round="circle" />
+          <span className="notification-text">
+            {/* Each bone in its line's own span, so the row is as tall as its text. */}
+            <span className="notification-title">
+              <Bone w={r.title} />
+            </span>
+            <span className="notification-body">
+              <Bone w={r.body} />
+            </span>
+            <span className="notification-when">
+              <Bone w="12ch" h="small" />
+            </span>
+          </span>
+          {r.unread && <Bone w="9ch" h="button-sm" />}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function NotificationsScreen({ slug, businessName, logoUrl, nav }: NotificationsScreenProps) {
@@ -188,7 +225,7 @@ export function NotificationsScreen({ slug, businessName, logoUrl, nav }: Notifi
         <p className="small muted">The last 30 days. Opening one marks it read on all your devices; the request itself is still decided on its own page.</p>
 
         {items === null ? (
-          <LoadState load={loadState} onRetry={() => void load()} what="notifications" />
+          <LoadState load={loadState} onRetry={() => void load()} what="notifications" skeleton={<NotificationsSkeleton />} />
         ) : shown.length === 0 ? (
           <EmptyState icon="bell" title={show === 'unread' ? 'All read' : 'No notifications yet'}>
             {show === 'unread' ? 'Nothing new since you last looked.' : 'A guest’s booking request, proof of payment or change request will show here.'}

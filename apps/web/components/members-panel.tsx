@@ -22,9 +22,40 @@ import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
-import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { useNotice } from '@/components/toast';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/permissions';
+
+/**
+ * The member rows while they load, in the real `.member-row`: the initial's
+ * circle, the email over "Member since", the role picker and the Remove icon
+ * button (a <button>, so `button.ghost.sm` sizes it; the region is inert).
+ */
+function MembersSkeleton() {
+  return (
+    <div>
+      {boneRows(3, (i) => (
+        <div className="member-row">
+          <Bone w="36px" h="36px" round="circle" />
+          <span className="member-who">
+            <span className="member-email">
+              <Bone w={['26ch', '20ch', '30ch'][i]!} />
+            </span>
+            <span className="member-since">
+              <Bone w="20ch" h="small" />
+            </span>
+          </span>
+          <span className="list-row-actions">
+            <Bone w="11ch" h="button-sm" />
+            <button type="button" className="ghost sm danger">
+              <Bone w="16px" h="16px" />
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function MembersPanel({
   api,
@@ -104,7 +135,7 @@ export function MembersPanel({
       </p>
 
       {members === null ? (
-        <LoadState load={loadState} what="members" onRetry={() => { setLoadState(LOADING); void load(); }} />
+        <LoadState load={loadState} what="members" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<MembersSkeleton />} />
       ) : members.length === 0 ? (
         <div className="small muted">Nobody yet. Add the first owner below.</div>
       ) : (

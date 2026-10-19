@@ -22,7 +22,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { BarChart, SplitBar } from '@/components/bar-chart';
 import { Icon } from '@/components/icons';
-import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { isRole, type Role } from '@/lib/permissions';
@@ -76,6 +76,167 @@ function TodoRow({ todo }: { todo: Todo }) {
 /** A chart with nothing to draw is a sentence instead (an empty plot reads as broken). */
 function ChartOr({ bars, empty, children }: { bars: { value: number }[]; empty: string; children: React.ReactNode }) {
   return bars.some((b) => b.value > 0) ? <>{children}</> : <p className="small muted chart-empty">{empty}</p>;
+}
+
+/** A card's stat row: a big figure over its muted label. */
+function StatBones({ n, wide }: { n: number; wide?: boolean }) {
+  return (
+    <div className="stat-row">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="stat">
+          {/* Explicit heights: `.stat span` would restyle a named bone's font-size. 27px is the figure's line (xl × tight). */}
+          <strong>
+            <Bone w={wide ? '11ch' : '3ch'} h="27px" />
+          </strong>
+          <span>
+            <Bone w={['10ch', '13ch', '9ch'][i % 3]} h="small" />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Where a BarChart will be: its default height (bar-chart.tsx, 140). */
+function ChartBone() {
+  return (
+    <div className="bar-chart">
+      <Bone w="100%" h="140px" />
+    </div>
+  );
+}
+
+/**
+ * The dashboard's cards before the JSON arrives, in the same order and grid.
+ * Which cards come is known from the nav (bookings, per_room) and the role
+ * (Revenue is owners' and admins' by default), so the page does not reflow.
+ */
+function DashboardSkeleton({ bookings, rooms, money }: { bookings: boolean; rooms: boolean; money: boolean }) {
+  return (
+    <>
+      <div className="dashboard-toolbar">
+        <span className="small muted">
+          <Bone w="26ch" h="small" />
+        </span>
+        {/* The window's segmented control is one grey track: three 28px buttons in 3px padding. */}
+        <Bone w="13.5rem" h="34px" />
+      </div>
+
+      <section className="card attention">
+        <h2>
+          <Bone w="9rem" h="title" />
+        </h2>
+        <div className="todo-list">
+          {[0, 1].map((i) => (
+            <span key={i} className="todo-row">
+              <Bone w="100%" h="36px" />
+              <span className="todo-text">
+                <span className="todo-what">
+                  <Bone w={i === 0 ? '45%' : '35%'} />
+                </span>
+                <span className="small muted">
+                  <Bone w={i === 0 ? '60%' : '50%'} h="small" />
+                </span>
+              </span>
+              <Bone w="16px" h="16px" />
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {bookings && (
+        <section className="card today">
+          <div className="today-head">
+            <h2>
+              <Bone w="4rem" h="title" />
+            </h2>
+            <span className="today-counts">
+              <span>
+                <Bone w="10ch" />
+              </span>
+              <span>
+                <Bone w="11ch" />
+              </span>
+            </span>
+          </div>
+          <h3>
+            <Bone w="18rem" h="small" />
+          </h3>
+          <ul className="dashboard-list">
+            {[0, 1, 2].map((i) => (
+              <li key={i}>
+                <span className="dashboard-date">
+                  <Bone w="10ch" h="small" />
+                </span>
+                <span>
+                  <Bone w={['14ch', '18ch', '12ch'][i]} h="small" />
+                </span>
+                <span className="muted">
+                  <Bone w={['10ch', '8ch', '12ch'][i]} h="small" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="dashboard-grid">
+        <section className="card">
+          <h2>
+            <Bone w="11rem" h="title" />
+          </h2>
+          <StatBones n={3} />
+          <ChartBone />
+        </section>
+        <section className="card">
+          <h2>
+            <Bone w="9rem" h="title" />
+          </h2>
+          <StatBones n={2} />
+          <p className="small">
+            <Bone w="70%" h="small" />
+          </p>
+          <h3>
+            <Bone w="4ch" h="small" />
+          </h3>
+          <p className="small">
+            <Bone w="45%" h="small" />
+          </p>
+        </section>
+      </div>
+
+      {bookings && (
+        <div className={money ? 'dashboard-grid' : undefined}>
+          <section className="card">
+            <h2>
+              <Bone w="12rem" h="title" />
+            </h2>
+            <StatBones n={3} />
+            <ChartBone />
+          </section>
+          {money && (
+            <section className="card">
+              <h2>
+                <Bone w="12rem" h="title" />
+              </h2>
+              <StatBones n={3} wide />
+              <ChartBone />
+            </section>
+          )}
+        </div>
+      )}
+
+      {bookings && rooms && (
+        <section className="card">
+          <h2>
+            <Bone w="12rem" h="title" />
+          </h2>
+          <StatBones n={1} />
+          <ChartBone />
+        </section>
+      )}
+    </>
+  );
 }
 
 export function DashboardScreen({ slug, businessName, logoUrl, nav, currency }: DashboardScreenProps) {
@@ -152,8 +313,13 @@ export function DashboardScreen({ slug, businessName, logoUrl, nav, currency }: 
   if (!data) {
     return (
       <>
-        <StaffFrame {...frame}>
-          <LoadState load={loadState} what="dashboard" rows={4} onRetry={() => { setLoadState(LOADING); void load(); }} />
+        <StaffFrame {...frame} mainClassName="dashboard">
+          <LoadState
+            load={loadState}
+            what="dashboard"
+            onRetry={() => { setLoadState(LOADING); void load(); }}
+            skeleton={<DashboardSkeleton bookings={nav.bookings} rooms={nav.rooms} money={role === 'owner' || role === 'admin'} />}
+          />
         </StaffFrame>
       </>
     );

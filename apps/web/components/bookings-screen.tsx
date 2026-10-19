@@ -53,7 +53,7 @@ import { formatMoney } from '@/lib/money';
 import { Drawer } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { StayLines } from '@/components/stay-lines';
 import { CopyText } from '@/components/copy-button';
 import { ListSearch } from '@/components/list-search';
@@ -243,6 +243,108 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
         </span>
       </div>
       <Icon name="chevron-right" size={18} className="stay-row-chevron" />
+    </div>
+  );
+}
+
+/**
+ * The stays list while it loads: StayRow's own grid (date tile, body, end,
+ * chevron) under a group heading, a Bone where each value will be, so the
+ * list does not jump when the rows arrive.
+ */
+function StaysSkeleton() {
+  const names = ['38%', '30%', '44%', '34%', '40%'];
+  return (
+    <section className="stay-group">
+      <h3>
+        <Bone w="16ch" h="small" />
+      </h3>
+      {boneRows(5, (i) => (
+        <div className="stay-row">
+          <div className="date-tile">
+            <Bone w="3ch" h="small" />
+            <strong>
+              <Bone w="2ch" />
+            </strong>
+            <Bone w="3ch" h="small" />
+          </div>
+          <div className="stay-row-body">
+            <div className="stay-row-top">
+              <Bone w={names[i]} />
+              <Bone w="11ch" h="chip" />
+              {i % 2 === 0 && <Bone w="12ch" h="chip" />}
+            </div>
+            <div className="stay-row-meta">
+              <Bone w="22ch" h="small" />
+              <Bone w="14ch" h="small" />
+            </div>
+            <div className="stay-row-contact">
+              <Bone w="13ch" h="small" />
+              <Bone w="20ch" h="small" />
+            </div>
+          </div>
+          <div className="stay-row-end">
+            <strong className="stay-total">
+              <Bone w="10ch" />
+            </strong>
+            <span className="booking-badges">
+              <Bone w={i % 2 === 0 ? '13ch' : '9ch'} h="chip" />
+            </span>
+          </div>
+          <Icon name="chevron-right" size={18} className="stay-row-chevron" />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * The page before its setup arrives: the Stays card itself, with its header
+ * buttons, toolbar and group filter as Bones and the list skeleton under them.
+ */
+function SetupSkeleton() {
+  return (
+    <section className="card stays">
+      <div className="range-head">
+        <h2>Stays</h2>
+        <div className="range-nav">
+          <Bone w="11ch" h="button" />
+          <Bone w="13ch" h="button" />
+        </div>
+      </div>
+      <div className="stays-toolbar">
+        <div className="list-search">
+          <Bone h="button" />
+        </div>
+        <Bone w="15ch" h="button" />
+      </div>
+      <div className="segmented stays-groups">
+        {['6ch', '18ch', '14ch', '11ch', '8ch'].map((w) => (
+          <Bone key={w} w={w} h="28px" />
+        ))}
+      </div>
+      <StaysSkeleton />
+    </section>
+  );
+}
+
+/** The rooms picker while the rooms load: `.room-pick` rows, a checkbox square, a name and the meta line. */
+function RoomPicksSkeleton() {
+  return (
+    <div className="room-picks" role="status" aria-label="Loading rooms">
+      {['40%', '28%', '35%'].map((w) => (
+        <div key={w} className="room-pick" aria-hidden="true">
+          <label>
+            <Bone w="1em" h="1em" />
+            <span className="room-pick-text">
+              <span className="room-pick-name">
+                <Bone w={w} />
+              </span>
+              <Bone w="30ch" h="small" />
+            </span>
+          </label>
+        </div>
+      ))}
     </div>
   );
 }
@@ -580,7 +682,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
     return (
       <>
         <StaffFrame {...frame}>
-          <LoadState load={loadState} what="setup" onRetry={() => { setLoadState(LOADING); void loadSetup(); }} />
+          <LoadState load={loadState} what="setup" skeleton={<SetupSkeleton />} onRetry={() => { setLoadState(LOADING); void loadSetup(); }} />
         </StaffFrame>
       </>
     );
@@ -632,7 +734,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
           {from > setup.today && <p className="small muted">Stays running on or after {dayLabel(from)}.</p>}
 
           {stays === null ? (
-            <LoadState load={loadState} what="stays" rows={5} onRetry={() => { setLoadState(LOADING); void load(); }} />
+            <LoadState load={loadState} what="stays" skeleton={<StaysSkeleton />} onRetry={() => { setLoadState(LOADING); void load(); }} />
           ) : visible.length === 0 ? (
             stays.length === 0 ? (
               <EmptyState icon="calendar" title="No stays yet" action={newBooking}>
@@ -766,10 +868,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                   </span>
                   {/* null until the rooms arrive: "no rooms" is said only once it is true. */}
                   {rooms === null ? (
-                    <div className="quote-skeleton" role="status" aria-label="Loading rooms">
-                      <span />
-                      <span />
-                    </div>
+                    <RoomPicksSkeleton />
                   ) : (
                     rooms.filter((r) => r.active).length === 0 && (
                       <div className="small muted">

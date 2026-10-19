@@ -158,6 +158,9 @@ header nav a.button.primary[aria-current="page"] { box-shadow: 0 0 0 3px var(--r
 .account-link { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2); min-height: var(--control-h-sm); padding: 0 var(--space-2); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--ink); text-decoration: none; }
 .account-link:hover { background: var(--surface-2); }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-6); }
+/* A page's button ("New booking", "Add a room") arrives with its data; the row is
+   a button tall from the start, so the title does not move when it comes. */
+.staff-content > .page-head { min-height: var(--control-h); }
 .page-title { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; }
 .page-actions { display: flex; gap: var(--space-2); }
 

@@ -21,7 +21,7 @@
 // and, when the member may add one, the button that does it, instead of a
 // sentence that points at a button somewhere else on the page.
 
-import type { CSSProperties, ReactNode } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons';
 
 export type Load = { state: 'loading' } | { state: 'error'; message: string };
@@ -33,18 +33,22 @@ export const failed = (message: string): Load => ({ state: 'error', message });
  * row's own layout. `w`: its width (a %, `ch` or `px` string; text is
  * usually a %). `h`: `line` (a line of body text, the default), `small`
  * (a muted meta line), `title` (a heading), `chip` (a badge or chip),
- * `button` (a button's height), or a CSS length. `round`: an avatar or an
+ * `button` / `button-sm` (a button's / a small button's height), or a CSS length. `round`: an avatar or an
  * icon (`circle`) or a pill (`pill`).
  */
-export function Bone({ w = '100%', h = 'line', round, className }: { w?: string; h?: 'line' | 'small' | 'title' | 'chip' | 'button' | string; round?: 'circle' | 'pill'; className?: string }) {
-  const named = h === 'line' || h === 'small' || h === 'title' || h === 'chip' || h === 'button';
+export function Bone({ w = '100%', h = 'line', round, className }: { w?: string; h?: 'line' | 'small' | 'title' | 'chip' | 'button' | 'button-sm' | string; round?: 'circle' | 'pill'; className?: string }) {
+  const named = h === 'line' || h === 'small' || h === 'title' || h === 'chip' || h === 'button' || h === 'button-sm';
   const style: CSSProperties = { width: w, ...(named ? {} : { height: h }) };
   return <span className={['bone', named ? `bone-${h}` : null, round ? `bone-${round}` : null, className].filter(Boolean).join(' ')} style={style} aria-hidden="true" />;
 }
 
-/** `n` copies of a skeleton row, keyed; widths may vary by `i` so the rows do not look stamped. */
+/**
+ * `n` copies of a skeleton row, keyed; widths may vary by `i` so the rows do
+ * not look stamped. Fragments, not a wrapper: a wrapper made every row the
+ * first of its kind, and `.list-row:first-of-type` dropped every divider.
+ */
 export function boneRows(n: number, row: (i: number) => ReactNode): ReactNode[] {
-  return Array.from({ length: n }, (_, i) => <span key={i} className="bone-row-wrap">{row(i)}</span>);
+  return Array.from({ length: n }, (_, i) => <Fragment key={i}>{row(i)}</Fragment>);
 }
 
 /**

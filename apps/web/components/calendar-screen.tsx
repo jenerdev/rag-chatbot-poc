@@ -26,7 +26,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
-import { LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { STATE_WORD, buttonName, cellText, dayMarker, longDate, pendingWords } from '@/lib/calendar-labels';
 import { VIEWS, monthOptions, step, type CalendarView } from '@/lib/calendar-range';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -88,6 +88,150 @@ function query(view: CalendarView, date: string | null, unit: number | null): st
   if (date) params.set('date', date);
   if (unit !== null) params.set('unit', String(unit));
   return params.toString();
+}
+
+/** The month grid's weekday heads, as MonthGrid writes them. */
+const WEEKDAY_HEADS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * The calendar while a period loads, in the shape of the view asked for:
+ * the month's 7 × 5 table of date cells, the week's table of a column per
+ * date and a row per room and slot, or the day's summary and room cards.
+ * The real classes, a Bone for each date, word and booking, and the legend's
+ * strip under the grid, so neither the grid nor the legend moves on arrival.
+ */
+function CalendarSkeleton({ view, roomCount }: { view: CalendarView; roomCount: number }) {
+  const legend = (
+    <div className="cal-legend-wrap">
+      <ul className="cal-legend">
+        {['9ch', '13ch', '11ch', '7ch', '8ch', '10ch'].map((w, i) => (
+          <li key={i}>
+            <span className="cal-swatch" />
+            <Bone w={w} h="small" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+  const rooms = Array.from({ length: roomCount }, (_, i) => i);
+
+  if (view === 'month') {
+    return (
+      <>
+        <table className="cal-month">
+          <thead>
+            <tr>
+              {WEEKDAY_HEADS.map((d) => (
+                <th key={d}>{d}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[0, 1, 2, 3, 4].map((week) => (
+              <tr key={week}>
+                {WEEKDAY_HEADS.map((d, i) => (
+                  <td key={d}>
+                    <span className="cal-day none">
+                      <span className="cal-num">
+                        <Bone w="2ch" />
+                      </span>
+                      <Bone w={(week + i) % 3 === 0 ? '70%' : '50%'} h="small" />
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {legend}
+      </>
+    );
+  }
+
+  if (view === 'week') {
+    return (
+      <>
+        <div className="cal-week-scroll">
+          <table className="cal-week">
+            <thead>
+              <tr>
+                <th className="cal-week-corner">
+                  <Bone w="10ch" h="small" />
+                </th>
+                {WEEKDAY_HEADS.map((d) => (
+                  <th key={d}>
+                    <span className="cal-day none cal-week-day">
+                      <span className="cal-week-weekday">{d}</span>
+                      <strong className="cal-week-date">
+                        <Bone w="2ch" />
+                      </strong>
+                      <Bone w="60%" h="small" />
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {rooms.map((r) => (
+              <tbody key={r} className="cal-week-room">
+                <tr className="cal-week-room-head">
+                  <th colSpan={WEEKDAY_HEADS.length + 1}>
+                    <Bone w={r % 2 === 0 ? '16ch' : '12ch'} />
+                  </th>
+                </tr>
+                <tr>
+                  <th className="cal-week-slot">
+                    <Bone w="8ch" h="small" />
+                  </th>
+                  {WEEKDAY_HEADS.map((d) => (
+                    <td key={d}>
+                      <Bone h="32px" />
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            ))}
+          </table>
+        </div>
+        {legend}
+      </>
+    );
+  }
+
+  return (
+    <div className="cal-dayview">
+      <div className="cal-day none cal-day-summary">
+        <Bone w="9ch" />
+        <Bone w="12ch" h="small" />
+        <Bone w="16ch" h="button-sm" />
+      </div>
+      <ul className="cal-day-rooms">
+        {rooms.map((r) => (
+          <li key={r} className="cal-day-room">
+            <div className="cal-day-room-head">
+              <h3>
+                <Bone w={r % 2 === 0 ? '16ch' : '12ch'} />
+              </h3>
+              <span className="cal-day-room-slots">
+                <Bone w="12ch" h="chip" />
+              </span>
+            </div>
+            <ul className="cal-day-bookings">
+              <li className="cal-booking">
+                <div className="cal-booking-head">
+                  <Bone w={r % 2 === 0 ? '18ch' : '14ch'} />
+                  <Bone w="10ch" h="chip" />
+                  <Bone w="11ch" h="chip" />
+                </div>
+                <p className="cal-booking-line">
+                  <Bone w="26ch" h="small" />
+                </p>
+              </li>
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function CalendarScreen({ slug, businessName, logoUrl, nav, perRoom, rooms, initial }: CalendarScreenProps) {
@@ -276,7 +420,8 @@ export function CalendarScreen({ slug, businessName, logoUrl, nav, perRoom, room
           <LoadState
             load={loadState}
             what="calendar"
-            rows={5}
+            // One room when one is chosen (or the resort is one), else the rooms there are, up to four.
+            skeleton={<CalendarSkeleton view={view} roomCount={unit !== null || !perRoom ? 1 : Math.min(4, Math.max(1, rooms.length))} />}
             onRetry={() => {
               setLoadState(LOADING);
               void load();

@@ -31,7 +31,7 @@ import { useConfirmDialog } from '@/components/dialogs';
 import { ListSearch } from '@/components/list-search';
 import { matches } from '@/lib/search';
 import { Tabs } from '@/components/tabs';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, boneRows, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { centavosToInput, formatMoney, parseMoneyInput } from '@/lib/money';
 import { can, isRole, type Role } from '@/lib/permissions';
@@ -85,6 +85,50 @@ function toDraft(s: PaymentSettings | null): SettingsDraft {
     cancellation: s.cancellation.map((t) => `${t.daysBefore}:${t.refundPercent}`).join(', '),
     rescheduleUntil: s.rescheduleUntilDaysBefore === null ? '' : String(s.rescheduleUntilDaysBefore),
   };
+}
+
+/**
+ * Payment rows (and change requests, the same `.pay-row` grid) while they
+ * load: the amount and its method, the guest with the reference chip and the
+ * line under it, the status badge and the Open button, each a Bone.
+ */
+function PayRowsSkeleton({ rows, toolbar = false }: { rows: number; toolbar?: boolean }) {
+  const names = ['32%', '24%', '38%', '28%', '34%'];
+  return (
+    <>
+      {toolbar && (
+        <div className="pay-toolbar">
+          <div className="list-search">
+            <Bone h="button" />
+          </div>
+          <div className="segmented">
+            {['4ch', '8ch', '8ch', '8ch', '8ch'].map((w, i) => (
+              <Bone key={i} w={w} h="28px" />
+            ))}
+          </div>
+        </div>
+      )}
+      {boneRows(rows, (i) => (
+        <div className="pay-row">
+          <div className="pay-row-amount">
+            <strong>
+              <Bone w="10ch" />
+            </strong>
+            <Bone w="8ch" h="small" />
+          </div>
+          <div className="pay-row-who">
+            <span className="pay-row-name">
+              <Bone w={names[i % names.length]} />
+              <Bone w="11ch" h="chip" />
+            </span>
+            <Bone w={i % 2 === 0 ? '60%' : '48%'} h="small" />
+          </div>
+          <Bone w="8ch" h="chip" />
+          <Bone w="8ch" h="button-sm" />
+        </div>
+      ))}
+    </>
+  );
 }
 
 export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, timezone }: PaymentsScreenProps) {
@@ -298,7 +342,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, tim
         Open a booking to see its proof and verify or reject it there. A screenshot proves nothing by itself: check the account first.
       </p>
       {open === null ? (
-        <LoadState load={loadState} what="payments" onRetry={retry} />
+        <LoadState load={loadState} what="payments" skeleton={<PayRowsSkeleton rows={3} />} onRetry={retry} />
       ) : open.length === 0 ? (
         <EmptyState icon="check" title="Nothing to verify">
           When a guest sends a proof of payment from the Manage booking page, it waits here.
@@ -317,7 +361,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, tim
     <section className="card">
       <h2>All payments</h2>
       {all === null ? (
-        <LoadState load={loadState} what="payments" onRetry={retry} />
+        <LoadState load={loadState} what="payments" skeleton={<PayRowsSkeleton rows={5} toolbar />} onRetry={retry} />
       ) : all.length === 0 ? (
         <EmptyState icon="file" title="No payments yet">
           Proofs guests send and refunds you record are listed here.
@@ -566,7 +610,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, tim
         where a refund due is recorded too.
       </p>
       {changes === null ? (
-        <LoadState load={loadState} what="change requests" onRetry={retry} />
+        <LoadState load={loadState} what="change requests" skeleton={<PayRowsSkeleton rows={2} />} onRetry={retry} />
       ) : changes.length === 0 ? (
         <EmptyState icon="calendar" title="No change requests" />
       ) : (

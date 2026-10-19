@@ -23,7 +23,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ReplyText } from '@/components/reply-text';
 import { questionsLabel, refusalsLabel, timeLabel, whenLabel } from '@/lib/conversation-words';
 import type { NavFeatures } from '@/lib/nav-items';
@@ -56,6 +56,61 @@ function Badge({ message }: { message: TranscriptMessage }) {
     default:
       return null;
   }
+}
+
+/** The skeleton's turns: a visitor's bubble width, then the reply's line widths. */
+const SKELETON_TURNS: { ask: string; reply: string[] }[] = [
+  { ask: '14rem', reply: ['92%', '78%', '40%'] },
+  { ask: '20rem', reply: ['85%', '55%'] },
+  { ask: '11rem', reply: ['90%', '82%', '64%'] },
+];
+
+/**
+ * The transcript before it arrives, in the real card: the head (started,
+ * counts), then turns in `.transcript`'s own markup, a visitor's filled
+ * bubble on the right and the assistant's lines of text on the left, each
+ * under its name and time.
+ */
+function TranscriptSkeleton() {
+  return (
+    <section className="card">
+      <div className="transcript-head">
+        <span>
+          <Bone w="30ch" h="small" />
+        </span>
+        <span className="transcript-counts">
+          <Bone w="11ch" h="small" />
+        </span>
+      </div>
+      <ol className="transcript">
+        {SKELETON_TURNS.flatMap((t, i) => [
+          <li key={`u${i}`} className="turn user">
+            <div className="transcript-user">
+              <span className="transcript-meta">
+                <Bone w="11ch" h="small" />
+              </span>
+              {/* The bubble's own height: one line of text in 10px padding. */}
+              <Bone w={t.ask} h="42px" round="pill" />
+            </div>
+          </li>,
+          <li key={`a${i}`} className="turn assistant">
+            <div className="assistant-body">
+              <span className="transcript-meta">
+                <Bone w="14ch" h="small" />
+              </span>
+              <div className="bubble">
+                {t.reply.map((w, j) => (
+                  <div key={j}>
+                    <Bone w={w} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </li>,
+        ])}
+      </ol>
+    </section>
+  );
 }
 
 export function TranscriptScreen({ slug, id, businessName, assistantName, logoUrl, nav, backQuery, focus }: TranscriptScreenProps) {
@@ -153,7 +208,7 @@ export function TranscriptScreen({ slug, id, businessName, assistantName, logoUr
   if (transcript === null) {
     return (
       <StaffFrame {...frame} actions={back}>
-        <LoadState load={loadState} what="conversation" onRetry={() => { setLoadState(LOADING); void load(); }} />
+        <LoadState load={loadState} what="conversation" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<TranscriptSkeleton />} />
       </StaffFrame>
     );
   }

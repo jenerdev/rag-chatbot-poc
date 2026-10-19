@@ -21,7 +21,7 @@ import { LoginForm, describeFailure } from '@/components/admin-login';
 import { fetchRole } from '@/components/tenant-nav';
 import { StaffFrame } from '@/components/staff-frame';
 import { Icon } from '@/components/icons';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ListSearch } from '@/components/list-search';
 import { notify } from '@/components/toast';
 import { Tip } from '@/components/tooltip';
@@ -42,6 +42,42 @@ type Auth = 'checking' | 'out' | 'in';
 
 /** How long the search waits after the last keystroke before asking. */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** Widths of the skeleton's first questions, so the rows do not look stamped. */
+const SKELETON_QUESTIONS = ['62%', '45%', '74%', '38%', '55%'];
+
+/**
+ * The list before its first page: the count line, then rows in the real
+ * `.conversation-row` grid (question, when · questions, a refusal badge on
+ * one, the chevron).
+ */
+function ConversationsSkeleton() {
+  return (
+    <>
+      <p className="list-count">
+        <Bone w="22ch" h="small" />
+      </p>
+      <ul className="conversation-list">
+        {SKELETON_QUESTIONS.map((w, i) => (
+          <li key={i} className={i === 1 ? 'conversation-row has-refusal' : 'conversation-row'}>
+            <div className="conversation-row-body">
+              <span className="conversation-row-link">
+                <Bone w={w} />
+              </span>
+              <span className="conversation-row-meta">
+                <Bone w="12ch" h="small" />
+                <Bone w="9ch" h="small" />
+              </span>
+            </div>
+            {/* `badge` too: the phone layout places a row's badge by that class. */}
+            {i === 1 && <Bone w="10ch" h="chip" className="badge" />}
+            <Bone w="16px" h="16px" />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 export function ConversationsScreen({ slug, businessName, logoUrl, nav, initial }: ConversationsScreenProps) {
   const api = `/api/t/${slug}`;
@@ -198,7 +234,7 @@ export function ConversationsScreen({ slug, businessName, logoUrl, nav, initial 
         </div>
 
         {page === null ? (
-          <LoadState load={loadState} what="conversations" onRetry={() => void load()} />
+          <LoadState load={loadState} what="conversations" onRetry={() => void load()} skeleton={<ConversationsSkeleton />} />
         ) : page.rows.length === 0 ? (
           filtered ? (
             <EmptyState

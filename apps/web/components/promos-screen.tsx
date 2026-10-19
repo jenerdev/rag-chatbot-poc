@@ -38,7 +38,7 @@ import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { CopyText } from '@/components/copy-button';
 import { Tip } from '@/components/tooltip';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 
 export interface PromosScreenProps {
   slug: string;
@@ -69,6 +69,41 @@ const EMPTY: Draft = { id: null, name: '', kind: 'percent', value: '', validFrom
 /** "12.5 %" or "₱500.00", for the list. */
 function valueLabel(p: Promo, currency: string): string {
   return p.kind === 'percent' ? `${percentToInput(p.value)} %` : formatMoney(p.value, currency);
+}
+
+/**
+ * The promos while they load: `.list-row.setup-row` rows as `row` draws them,
+ * the amount off and its dates, the name with its status and code badges,
+ * the uses, and the Edit and Retire/Delete buttons as shapes. Mapped
+ * directly, not through boneRows(): its wrapper would make every row
+ * `:first-of-type` and take away the lines between them.
+ */
+function PromosSkeleton() {
+  const names = ['32%', '24%', '40%'];
+  return (
+    <>
+      {names.map((w, i) => (
+        <div key={i} className="list-row setup-row">
+          <span className="setup-row-when">
+            <Bone w={i === 1 ? '9ch' : '11ch'} />
+            <Bone w="15ch" h="small" />
+          </span>
+          <span className="list-row-main">
+            <Bone w={w} />
+            <Bone w="7ch" h="chip" />
+            <Bone w={i === 2 ? '10ch' : '9ch'} h="chip" />
+          </span>
+          <span className="list-row-meta">
+            <Bone w={i === 0 ? '10ch' : '6ch'} h="small" />
+          </span>
+          <span className="list-row-actions">
+            <Bone w="32px" h="var(--control-h-sm)" />
+            <Bone w={i === 0 ? '60px' : '32px'} h="var(--control-h-sm)" />
+          </span>
+        </div>
+      ))}
+    </>
+  );
 }
 
 export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: PromosScreenProps) {
@@ -486,7 +521,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
           <h2>Promos offered</h2>
           <p className="small muted">The database takes the discount off when a booking is priced. Two automatic promos on the same stay: the larger wins.</p>
           {promos === null ? (
-            <LoadState load={loadState} what="promos" onRetry={() => { setLoadState(LOADING); void load(); }} />
+            <LoadState load={loadState} what="promos" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<PromosSkeleton />} />
           ) : active.length === 0 ? (
             <EmptyState icon="tag" title="No promos" action={addPromo}>
               A promo takes a fixed amount or a percentage off the stays in its dates.

@@ -33,7 +33,7 @@ import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
-import { EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
+import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { dayWords, slotEnd } from '@/lib/slot-span';
 
 export interface SlotsScreenProps {
@@ -64,6 +64,40 @@ function lengthLabel(total: number): string {
   const m = total % 60;
   const parts = [h ? `${h} hour${h === 1 ? '' : 's'}` : '', m ? `${m} minute${m === 1 ? '' : 's'}` : ''].filter(Boolean);
   return parts.join(' ') || '0 minutes';
+}
+
+/**
+ * The slots while they load: `.list-row.setup-row` rows as below, the start
+ * and end time, the name (a Nightly badge on one), the length line, and the
+ * Edit and Retire/Delete buttons as shapes. Mapped directly, not through
+ * boneRows(): its wrapper would make every row `:first-of-type` and take
+ * away the lines between them.
+ */
+function SlotsSkeleton() {
+  const names = ['26%', '34%', '22%'];
+  return (
+    <>
+      {names.map((w, i) => (
+        <div key={i} className="list-row setup-row">
+          <span className="setup-row-when">
+            <Bone w="5ch" />
+            <Bone w="8ch" h="small" />
+          </span>
+          <span className="list-row-main">
+            <Bone w={w} />
+            {i === 1 && <Bone w="8ch" h="chip" />}
+            <span className="small muted setup-row-line">
+              <Bone w={['44%', '52%', '38%'][i]} h="small" />
+            </span>
+          </span>
+          <span className="list-row-actions">
+            <Bone w="32px" h="var(--control-h-sm)" />
+            <Bone w={i === 1 ? '60px' : '32px'} h="var(--control-h-sm)" />
+          </span>
+        </div>
+      ))}
+    </>
+  );
 }
 
 export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenProps) {
@@ -315,7 +349,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
           <h2>Slots offered</h2>
           <p className="small muted">Each room is priced per slot on the Rooms screen. A slot with no rate is not offered yet.</p>
           {slots === null ? (
-            <LoadState load={loadState} what="slots" onRetry={() => { setLoadState(LOADING); void load(); }} />
+            <LoadState load={loadState} what="slots" onRetry={() => { setLoadState(LOADING); void load(); }} skeleton={<SlotsSkeleton />} />
           ) : active.length === 0 ? (
             <EmptyState icon="clock" title="No slots offered" action={addSlot}>
               Nothing can be booked without one.
