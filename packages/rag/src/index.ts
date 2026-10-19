@@ -91,7 +91,7 @@ export type { BrandImageKind } from './brand-images.js';
 export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
 export { CONVERSATION_DAYS, CONVERSATION_PAGE_SIZE, conversationDays, getTranscript, listConversations, messageKind } from './conversations.js';
 export type { ConversationDays, ConversationPage, ConversationSummary, MessageKind, Transcript, TranscriptMessage } from './conversations.js';
-export { latestReply } from './voice.js';
+export { latestReply, voiceVocabulary } from './voice.js';
 export { DASHBOARD_DAYS, dashboardDays, platformDashboard, tenantDashboard } from './dashboard.js';
 export type { PlatformPulse, TenantDashboard } from './dashboard.js';
 export type { Member } from './members.js';

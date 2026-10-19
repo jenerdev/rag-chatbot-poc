@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { transcribe } from '@rag/openai';
+import { voiceVocabulary } from '@rag/pipeline';
 import { requireFeature } from '@/lib/feature-flags';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
@@ -40,7 +41,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   const mime = sniffAudio(bytes);
   if (!mime) return badRequest('That is not a recording.');
 
-  const text = await transcribe(bytes, mime, { prompt: transcriptionHint(tenant.businessName) });
+  const text = await transcribe(bytes, mime, { prompt: transcriptionHint(tenant.businessName, await voiceVocabulary(tenant)) });
   if (text === '') return NextResponse.json({ error: "I couldn't hear that. Please try again or type your question." }, { status: 422 });
   return NextResponse.json({ text });
 });

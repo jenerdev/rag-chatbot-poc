@@ -52,3 +52,23 @@ export async function latestReply(
   console.log(`[voice] ${tenant.slug} latest reply of ${conversationId}: ${reply.content.length} chars, ${language}`);
   return { text: displayReply(reply.content, refusalText(tenant, language)), language };
 }
+
+/** At most this many names go into the transcription hint: the hint is short, and the first rooms matter most. */
+const MAX_VOCABULARY = 20;
+
+/**
+ * The tenant's own words for the transcriber: its active rooms (units) and
+ * slots, by their order. The user's second walk heard "Casa Uno" as
+ * "pasauna"; a name the model has been shown is a name it can spell. Read on
+ * the chat token, filtered on the tenant (both walls); a tenant without
+ * bookings has none, and the hint names only its languages.
+ */
+export async function voiceVocabulary(tenant: TenantContext): Promise<string[]> {
+  const [units, slots] = await Promise.all([
+    tenant.db.from('units').select('name').eq('tenant_id', tenant.id).eq('active', true).order('sort_order').order('name'),
+    tenant.db.from('slots').select('name').eq('tenant_id', tenant.id).eq('active', true).order('start_time'),
+  ]);
+  if (units.error) throw new Error(`Could not load rooms: ${units.error.message}`);
+  if (slots.error) throw new Error(`Could not load slots: ${slots.error.message}`);
+  return [...new Set([...units.data, ...slots.data].map((row) => row.name.trim()).filter(Boolean))].slice(0, MAX_VOCABULARY);
+}

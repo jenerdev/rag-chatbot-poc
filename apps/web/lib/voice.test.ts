@@ -27,4 +27,9 @@ describe('transcriptionHint', () => {
     expect(hint).toContain('Alteza Hillside Resort');
     expect(hint).toMatch(/Filipino \(Tagalog\), English, or a mix of both \(Taglish\)/);
   });
+
+  it('spells the names of the rooms and slots when it has them, and says nothing of names when it has none', () => {
+    expect(transcriptionHint('Alteza Hillside Resort', ['Casa Uno', 'Loft Suite', 'Overnight'])).toMatch(/Names they may say: Casa Uno, Loft Suite, Overnight\.$/);
+    expect(transcriptionHint('Northwind')).not.toMatch(/Names/);
+  });
 });

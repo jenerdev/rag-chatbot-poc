@@ -18,10 +18,13 @@ export const VOICE_REQUESTS_PER_WINDOW = 30;
  * (Phase 6) heard short Tagalog as MALAY ("Kenapa perlu sama ada") with no
  * hint. Naming the languages biases the transcriber toward them without
  * forcing one, as `language` would, so a Taglish question stays possible.
- * The business's name helps it spell the place's own words.
+ * The business's name, and its rooms' and slots' names, help it spell the
+ * place's own words.
  */
-export function transcriptionHint(businessName: string): string {
-  return `A guest is asking ${businessName}, a business in the Philippines, a question. They speak Filipino (Tagalog), English, or a mix of both (Taglish).`;
+export function transcriptionHint(businessName: string, names: readonly string[] = []): string {
+  const base = `A guest is asking ${businessName}, a business in the Philippines, a question. They speak Filipino (Tagalog), English, or a mix of both (Taglish).`;
+  // The second walk heard "Casa Uno" as "pasauna": the place's own names, spelled once.
+  return names.length > 0 ? `${base} Names they may say: ${names.join(', ')}.` : base;
 }
 
 /**
