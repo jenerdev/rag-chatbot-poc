@@ -41,6 +41,11 @@ export const createDocumentSchema = z.object({
     ),
 });
 
+/** POST voice/speak (D-134): a conversation, never text (plan/voice.md Rule 2). */
+export const voiceSpeakSchema = z.object({
+  conversationId: z.string({ required_error: 'A conversation is required', invalid_type_error: 'A conversation is required' }).uuid('That is not a conversation'),
+});
+
 export const chatSchema = z.object({
   // A uuid from a previous reply, or absent on the first message of a session.
   // Anything else is a client bug worth surfacing rather than ignoring.

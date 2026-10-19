@@ -30,8 +30,8 @@ export function clientIp(request: Request): string {
   return forwarded?.split(',')[0]?.trim() || 'local';
 }
 
-/** true if this call is inside the limit (and counts it), false if it is over. */
-export function allow(key: string, now: number = Date.now()): boolean {
+/** true if this call is inside the limit (and counts it), false if it is over. `max` is per key's own policy (voice allows more, D-134). */
+export function allow(key: string, now: number = Date.now(), max: number = MAX_REQUESTS_PER_WINDOW): boolean {
   if (windows.size > 10_000) {
     for (const [k, w] of windows) if (now - w.start >= WINDOW_MS) windows.delete(k);
   }
@@ -40,7 +40,7 @@ export function allow(key: string, now: number = Date.now()): boolean {
     windows.set(key, { start: now, count: 1 });
     return true;
   }
-  if (current.count >= MAX_REQUESTS_PER_WINDOW) return false;
+  if (current.count >= max) return false;
   current.count++;
   return true;
 }
