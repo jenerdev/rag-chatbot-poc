@@ -9883,4 +9883,4 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 
 - **What:** after the first phone walk heard Tagalog as Malay, every recording carries a `prompt`: the business, and "Filipino (Tagalog), English, or a mix of both (Taglish)". The user's second walk (21:16–21:17 UTC) had no Malay ("Hello po, kamusta?") but heard "Casa Uno" as "pasauna" and garbled one line ("So buy yourself December 25."). So the hint now ends "Names they may say: …" with the tenant's active rooms and slots (`voiceVocabulary()` in `packages/rag/src/voice.ts`, at most 20, both walls).
 - **Observed:** alteza's names: Casa Uno, Casa Dos, Familia, Kubo A, Kubo B, Loft Suite, Day Use, Overnight; villa's: Whole property, Day Tour, 22-Hour Whole Day, Overnight. openai tests 20, web 188; the HTTP walk 6/6 with each version of the hint (OpenAI takes the field).
-- **Owed:** the user's phone, again: whether "Casa Uno" is now heard as "Casa Uno".
+- **Confirmed by the user's phone (21:21 UTC):** "Is Casa Uno available tomorrow?" stored word for word.
