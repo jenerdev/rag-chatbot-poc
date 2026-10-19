@@ -9872,3 +9872,9 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - `addScriptToEvaluateOnNewDocument` scripts pile up and the first one's `speechSynthesis` won, so the "online voices only" step still had a local one; the walk now removes its previous spy;
   - the cleanup embedded `messages` in `conversations`, which PostgREST refuses (two relationships); it reads `messages` now. Eight test chats from this session were left on villa and are removed.
 - **The doubled transcript** ("…two cars? Do you have parking for two cars?") is Chrome's fake microphone looping a 2 s file through a 3.5 s recording, not the app.
+
+## 2026-10-20 · Voice, Phase 6: the user's walk on alteza (`feat/voice`, D-134)
+
+- **What:** the user switched voice on for alteza (21:06 UTC) and spoke to the chat on a phone, then said "done".
+- **Observed, from the stored questions (21:07–21:09 UTC):** "Hello.", "Ano po yung mga available options ninyo?" and "What are the rooms available?" heard right; "Bora San." and "Kenapa perlu sama ada" not. The second is Malay (Indonesian) grammar, so the transcriber, given no language, heard short Tagalog as a neighbouring language. Phase 0's synthetic Tagalog was heard right because it was clear, full sentences.
+- **Why it matters:** a wrong transcript is a wrong question (R-53); the guest sees it, but a Malay question gets an answer to a question nobody asked. The fix is a hint on the transcription request (a `prompt` saying the speaker uses Filipino and English, which keeps Taglish possible, rather than `language`, which forces one).
