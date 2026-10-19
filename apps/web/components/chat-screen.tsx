@@ -35,6 +35,7 @@ import { SourcesPanel } from '@/components/sources-panel';
 import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { Icon } from '@/components/icons';
+import { MicButton, ReadAloudToggle, useVoice, VoiceStatus } from '@/components/voice';
 import type { NavFeatures } from '@/lib/nav-items';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
@@ -136,6 +137,9 @@ export function ChatScreen({
   // looks broken if you do not know why. Better to say so up front. The count
   // comes from the server, so there is no request to wait for.
   const emptyKb = documentCount === 0;
+  // Voice (plan/voice.md, D-134): drawn only where a super user switched it on.
+  const voiceOn = nav.flags.voice;
+  const voice = useVoice(api);
 
   const messagesRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -181,9 +185,11 @@ export function ChatScreen({
   }, [scrollToBottom]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, spoken = false) => {
       setBusy(true);
       stick.current = true;
+      // A new question silences the last answer.
+      voice.stopSpeaking();
 
       const userId = nextId++;
       const replyId = nextId++;
@@ -280,6 +286,11 @@ export function ChatScreen({
 
         if (streamError) throw new Error(streamError);
         if (!sawDone) throw new Error('The connection closed before the answer finished.');
+        // Read aloud once the reply is whole and stored (Rule 2): always after
+        // a spoken question, after a typed one when the guest asked for it.
+        if (voiceOn && (spoken || voice.readAloud) && conversationId.current && answered !== '') {
+          void voice.speak(conversationId.current, answered);
+        }
       } catch (caught) {
         const message = await describeFailure(caught as Error, response);
         // If the answer had already started, keep what arrived and put the
@@ -302,7 +313,7 @@ export function ChatScreen({
         inputRef.current?.focus();
       }
     },
-    [api],
+    [api, voice, voiceOn],
   );
 
   /**
@@ -337,10 +348,20 @@ export function ChatScreen({
     // Clearing the id is all it takes: the server creates a new conversation
     // row on the next message. The old conversation stays in the database.
     conversationId.current = null;
+    voice.cancel();
+    voice.stopSpeaking();
     setTurns([]);
     setUnseen(false);
     inputRef.current?.focus();
-  }, []);
+  }, [voice]);
+
+  // The microphone: the first press records, the second sends what was
+  // heard, as the question, exactly as if it had been typed (§ 6 q1).
+  const startListening = useCallback(async () => {
+    const heard = await voice.listen();
+    if (heard) void send(heard, true);
+    else inputRef.current?.focus();
+  }, [send, voice]);
 
   return (
     <div className="chat-layout">
@@ -487,6 +508,7 @@ export function ChatScreen({
             <Icon name="chevron-down" size={16} /> New messages
           </button>
         )}
+        {voiceOn && <VoiceStatus state={voice.state} seconds={voice.seconds} message={voice.message} onStop={voice.stopSpeaking} />}
         <form
           className="composer-inner"
           onSubmit={(event) => {
@@ -523,6 +545,15 @@ export function ChatScreen({
               }
             }}
           />
+          {voiceOn && (
+            <MicButton
+              state={voice.state}
+              seconds={voice.seconds}
+              disabled={busy}
+              onStart={() => void startListening()}
+              onFinish={voice.finish}
+            />
+          )}
           <button className="primary composer-send" type="submit" aria-label="Send" disabled={busy || input.trim() === ''}>
             <Icon name="arrow-up" size={18} />
           </button>
@@ -533,14 +564,17 @@ export function ChatScreen({
           {/* D-129: what happens to what is typed here, at the moment it is typed. Page text, not prompt text. */}
           <p className="composer-notice">
             {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by
-            OpenAI. Don&apos;t share passwords or card numbers.{' '}
+            OpenAI{voiceOn ? '; what you say is sent to OpenAI to be turned into text, and the recording is not kept' : ''}. Don&apos;t share passwords or card numbers.{' '}
             <span className="composer-links">
               <Link href={`/t/${slug}/privacy`}>Privacy</Link> · <Link href={`/t/${slug}/terms`}>Terms</Link>
             </span>
           </p>
-          <p className="composer-hint">
-            <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
-          </p>
+          <div className="composer-side">
+            <p className="composer-hint">
+              <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
+            </p>
+            {voiceOn && <ReadAloudToggle on={voice.readAloud} onChange={voice.setReadAloud} />}
+          </div>
         </div>
       </section>
     </div>

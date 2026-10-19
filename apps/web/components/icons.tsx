@@ -137,6 +137,17 @@ const PATHS = {
   star: <path d="M10 3l2.1 4.4 4.8.6-3.5 3.3.9 4.7L10 13.7 5.7 16l.9-4.7L3.1 8l4.8-.6z" />,
   flame: <path d="M10 17c-3 0-5-2-5-4.8 0-3.2 3-4.7 3-8.2 2.8 1.6 4 3.9 3.6 6.1.9-.4 1.5-1.2 1.7-2.3 1.7 1.4 1.7 3.1 1.7 4.4C15 15 13 17 10 17z" />,
   logout: <path d="M8 3.5H5A1.5 1.5 0 003.5 5v10A1.5 1.5 0 005 16.5h3M12.5 6.5L16 10l-3.5 3.5M16 10H8" />,
+  // Voice (plan/voice.md, D-134): the microphone, a recording's stop, and
+  // the speaker that reads replies aloud, on and off.
+  mic: (
+    <>
+      <rect x="7.5" y="2.5" width="5" height="9" rx="2.5" />
+      <path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5" />
+    </>
+  ),
+  stop: <rect x="5.5" y="5.5" width="9" height="9" rx="1.5" />,
+  speaker: <path d="M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10" />,
+  'speaker-off': <path d="M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 8l4 4M17.5 8l-4 4" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;
