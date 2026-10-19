@@ -54,7 +54,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
   const config = await requireConfig(tenant);
-  const [app, units, rates, slots] = await Promise.all([
+  const [app, units, rates, slots, rooms] = await Promise.all([
     tenant.db.from('tenant_applications').select('config').eq('tenant_id', tenant.id).eq('application_key', 'bookings').single(),
     tenant.db
       .from('units')
@@ -65,10 +65,14 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
       .order('name'),
     tenant.db.from('unit_rates').select('unit_id, slot_id, weekday_price, weekend_price, holiday_price').eq('tenant_id', tenant.id),
     listSlots(tenant),
+    // D-133: how many rooms each type has, the most a guest may ask for; the
+    // quote then says how many of them are free for the stay.
+    tenant.db.from('unit_rooms').select('unit_id').eq('tenant_id', tenant.id).eq('active', true),
   ]);
   if (app.error) throw new Error(`Could not load the booking page settings: ${app.error.message}`);
   if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
   if (rates.error) throw new Error(`Could not load rates: ${rates.error.message}`);
+  if (rooms.error) throw new Error(`Could not load rooms: ${rooms.error.message}`);
 
   const slotName = new Map(slots.map((s) => [s.id, s.name]));
   const slotOrder = new Map(slots.map((s, i) => [s.id, i]));
@@ -80,6 +84,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
       capacity: u.capacity,
       standardCapacity: u.standard_capacity,
       extraPersonRate: u.extra_person_rate,
+      rooms: rooms.data.filter((r) => r.unit_id === u.id).length,
       rates: rates.data
         .filter((r) => r.unit_id === u.id && slotName.has(r.slot_id))
         .sort((a, b) => (slotOrder.get(a.slot_id) ?? 0) - (slotOrder.get(b.slot_id) ?? 0))
@@ -179,6 +184,8 @@ export interface PricedStay {
   lines: RequestLine[];
   lastNight: string;
   available: boolean;
+  /** D-133: each requested type's fewest free rooms over the stay's nights */
+  free: { unitId: number; rooms: number }[];
 }
 
 /**
@@ -264,7 +271,8 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
       });
     }
   }
-  return { slot: slot.data.name, lines, lastNight, available };
+  const fewest = [...unitById.values()].map((u) => ({ unitId: u.id, rooms: Math.min(...dates.map((d) => free.get(`${d}|${u.name}`) ?? 0)) }));
+  return { slot: slot.data.name, lines, lastNight, available, free: fewest };
 }
 
 /**
@@ -296,6 +304,7 @@ export async function withDiscount(
     total: lines.reduce((sum, l) => sum + l.price, 0),
     currency,
     available: stay.available,
+    free: stay.free,
     promo: promo ? { id: promo.id, name: promo.name, kind: promo.kind, value: promo.value } : null,
     discount: discounts.reduce((sum, d) => sum + d, 0),
     promoMessage: message,

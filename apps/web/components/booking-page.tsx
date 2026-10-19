@@ -150,9 +150,10 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
   const slot = page.slots.find((s) => s.id === slotId)!;
   const [checkIn, setCheckIn] = useState('');
   const [nights, setNights] = useState('1');
-  // whole_resort: one unit, one guest count. per_room: ticked rooms, each with its own.
+  // whole_resort: one unit, one guest count. per_room: ticked room types,
+  // each with one guest count per room wanted (D-133: "Casa Uno ×2").
   const [guests, setGuests] = useState('');
-  const [chosen, setChosen] = useState<Record<number, string>>({});
+  const [chosen, setChosen] = useState<Record<number, string[]>>({});
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -191,7 +192,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
     }
     return Object.entries(chosen)
       .filter(([id]) => units.some((u) => u.id === Number(id)))
-      .map(([id, g]) => ({ unitId: Number(id), guests: g === '' ? NaN : Number(g) }));
+      .flatMap(([id, list]) => list.map((g) => ({ unitId: Number(id), guests: g === '' ? NaN : Number(g) })));
   }, [chosen, guests, perRoom, units]);
   const roomsComplete = rooms.length > 0 && rooms.every((r) => Number.isInteger(r.guests) && r.guests > 0);
   const nightsValid = Number.isInteger(nightCount) && nightCount >= 1 && nightCount <= page.maxNights;
@@ -416,8 +417,8 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                 checkOut={{ date: instantDate(r.endsAt, page.timezone), time: instantTime(r.endsAt, page.timezone) }}
               />
               <ul className="confirm-rooms">
-                {roomsBooked.map((l) => (
-                  <li key={l.unitId}>
+                {roomsBooked.map((l, i) => (
+                  <li key={i}>
                     <Icon name="bed" size={16} />
                     <span className="grow">{l.unit}</span>
                     <span className="small muted">
@@ -678,7 +679,13 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   {page.guestHint && <p className="small muted step-hint">{page.guestHint}</p>}
                   <div className="room-picks" role="group" aria-label="Rooms">
                     {units.map((u) => {
-                      const picked = chosen[u.id] !== undefined;
+                      const wanted = chosen[u.id];
+                      const picked = wanted !== undefined;
+                      // D-133: up to the type's rooms, and, once the quote has
+                      // counted them for these nights, up to the free ones. The
+                      // server refuses more anyway (request_booking()).
+                      const free = quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
+                      const cap = Math.max(1, free === null ? u.rooms : Math.min(u.rooms, free));
                       return (
                         <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
                           {/* The room's photo, OUTSIDE the label: a tap looks, it does not choose. */}
@@ -704,7 +711,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                               onChange={(e) =>
                                 setChosen((current) => {
                                   const next = { ...current };
-                                  if (e.target.checked) next[u.id] = '';
+                                  if (e.target.checked) next[u.id] = [''];
                                   else delete next[u.id];
                                   return next;
                                 })
@@ -721,20 +728,65 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                                   </>
                                 ) : null}
                               </span>
+                              {u.rooms > 1 && free !== null && (
+                                <span className="room-pick-meta">{free === 0 ? `None of ${u.rooms} left` : `${free} of ${u.rooms} left`}</span>
+                              )}
                               {u.description && <span className="room-description">{u.description}</span>}
                             </span>
                           </label>
                           {picked && (
-                            <input
-                              type="number"
-                              min={1}
-                              max={u.capacity ?? undefined}
-                              step={1}
-                              placeholder="Guests"
-                              aria-label={`Guests in ${u.name}`}
-                              value={chosen[u.id]}
-                              onChange={(e) => setChosen((current) => ({ ...current, [u.id]: e.target.value }))}
-                            />
+                            <div className="room-pick-controls">
+                              {u.rooms > 1 && (
+                                <label className="room-pick-guests">
+                                  <span className="small muted">Rooms</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={cap}
+                                    step={1}
+                                    aria-label={`How many ${u.name} rooms, of ${cap}`}
+                                    value={wanted.length}
+                                    onChange={(e) => {
+                                      const n = Math.max(1, Math.min(cap, Math.floor(Number(e.target.value) || 1)));
+                                      setChosen((current) => {
+                                        const list = [...(current[u.id] ?? [''])].slice(0, n);
+                                        while (list.length < n) list.push('');
+                                        return { ...current, [u.id]: list };
+                                      });
+                                    }}
+                                  />
+                                </label>
+                              )}
+                              {wanted.map((g, i) => {
+                                const box = (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={u.capacity ?? undefined}
+                                    step={1}
+                                    placeholder="Guests"
+                                    aria-label={wanted.length > 1 ? `Guests in ${u.name}, room ${i + 1}` : `Guests in ${u.name}`}
+                                    value={g}
+                                    onChange={(e) =>
+                                      setChosen((current) => {
+                                        const list = [...(current[u.id] ?? [])];
+                                        list[i] = e.target.value;
+                                        return { ...current, [u.id]: list };
+                                      })
+                                    }
+                                  />
+                                );
+                                // Several rooms: each box says which room it is, filled or not.
+                                return wanted.length > 1 ? (
+                                  <label key={i} className="room-pick-guests">
+                                    <span className="small muted">Guests, room {i + 1}</span>
+                                    {box}
+                                  </label>
+                                ) : (
+                                  <span key={i}>{box}</span>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
                       );
@@ -805,8 +857,8 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
                   <div className="review-label">{perRoom ? 'Rooms' : 'Guests'}</div>
                   <div className="review-value">
                     {perRoom ? (
-                      rooms.map((r) => (
-                        <span key={r.unitId}>
+                      rooms.map((r, i) => (
+                        <span key={i}>
                           {units.find((u) => u.id === r.unitId)?.name} · {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
                         </span>
                       ))
