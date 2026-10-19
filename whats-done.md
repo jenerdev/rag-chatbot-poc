@@ -9890,3 +9890,8 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **What:** with `pnpm dev` stopped (trap 16), `pnpm build` (7/7 tasks), then CLAUDE.md rule 2's grep of `apps/web/.next/static/`: the secret NAMES (plus `OPENAI_API_KEY`, which the voice routes use) and the secret VALUES read from `.env`, counted, never printed.
 - **Observed:** names in 0 files; OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY, DATABASE_URL, its password, TENANT_SIGNING_JWK's `d` and VAPID_PRIVATE_JWK's `d` each in 0 of 132 files.
 - **Why it mattered:** voice added two routes that call OpenAI and a Client Component that talks to them; the key stays on the server, and the browser holds only `lib/voice.ts`' limits and `speakable()`.
+
+## 2026-10-20 · Room types: the user's walk on alteza (D-133)
+
+- **Observed, from the rows:** "Casa Uno B" added on S-5 (17:54 UTC) beside "Casa Uno A"; two web requests for Casa Uno on 9 November, confirmed, `ALT-MFBKMW` in room 13 and `ALT-7KGV26` in room 325, so the assigner put the second stay in the free room; the chat answered "available" between them (19:24) and "not available, as it is taken" after both (19:28).
+- **Not shown:** a move on S-15. `booking_events` has no `room` event for alteza: with both rooms taken on the 9th there was nowhere to move to, which the drawer says ("taken on one of these nights"). The move itself was walked on harbor in Phase 4 (`plan/room-types-walk.mjs`, 4b–4d).
