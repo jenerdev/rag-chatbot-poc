@@ -129,9 +129,11 @@
 
 /* Derived. Declared wherever the base colours can change (see the top). */
 :root, .tenant-root, [data-scheme] {
-  /* 68%, measured (Phase 10's audit): at 60% muted text on villa's cream
-     background was 4.36:1, under WCAG AA's 4.5:1. */
-  --muted: color-mix(in srgb, var(--ink) 68%, var(--panel));
+  /* 78%, measured. Phase 10's audit set 68% (at 60% muted text on villa's
+     cream was 4.36:1); 2026-10-20 alteza, whose ink is #333 and whose page is
+     #e1e4da, read 3.63:1 on its page and 4.36:1 on --surface-2 at 68%
+     (the Payments and Unanswered tabs). 78% is 4.9:1 and 5.9:1 there. */
+  --muted: color-mix(in srgb, var(--ink) 78%, var(--panel));
   /* Muted text on a grey surface (--surface-3: the segmented control). --muted
      is tuned against --panel; on --surface-3 northwind's measured 4.48:1. */
   --muted-on-surface: color-mix(in srgb, var(--ink) 78%, var(--panel));
