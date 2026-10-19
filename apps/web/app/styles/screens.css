@@ -392,6 +392,22 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .quote-skeleton span:nth-child(3) { width: 45%; height: 20px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+/* A skeleton shaped like its rows (components/load-state.tsx): the screen's own
+   row classes, with a Bone where the text, chip, avatar or button will be.
+   Heights follow the type scale, so a bone sits where its line will. */
+.bone { display: inline-block; flex: none; max-width: 100%; vertical-align: middle; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.bone-line { height: 0.9em; }
+.bone-small { height: 0.75em; font-size: var(--text-xs); }
+.bone-title { height: 1.15em; font-size: var(--text-lg); }
+.bone-chip { height: 1.4em; font-size: var(--text-xs); border-radius: var(--radius-full); }
+.bone-button { height: 34px; border-radius: var(--radius-md); }
+.bone-circle { border-radius: 50%; }
+.bone-pill { border-radius: var(--radius-full); }
+.bone-row-wrap { display: contents; }
+/* A skeleton's links and buttons are shapes, not controls. */
+.skeleton-shape a, .skeleton-shape button { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .bone { animation: none; } }
+
 @media (max-width: 860px) {
   .book-layout { grid-template-columns: minmax(0, 1fr); }
   .book-summary { position: static; }
