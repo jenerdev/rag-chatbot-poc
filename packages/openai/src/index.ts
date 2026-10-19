@@ -578,17 +578,19 @@ function timedOut(what: string, ms: number): OpenAIError {
  *
  * `mime` is the type the ROUTE checked by the bytes, never the browser's word
  * (the plan's Rule 5). The model is `OPENAI_TRANSCRIBE_MODEL`, read per call
- * like the chat model. No `language` is sent: the model hears English,
- * Tagalog and Taglish on its own (Phase 0: all three word for word), and the
- * reply language is decided later, in code, from the text (D-043).
+ * like the chat model. No `language` is sent: it would force one, and a
+ * guest may speak Taglish. `prompt` is a hint the caller writes instead: the
+ * user's walk (Phase 6) heard short Tagalog as Malay with none. The reply
+ * language is still decided later, in code, from the text (D-043).
  */
-export async function transcribe(audio: Uint8Array, mime: string, options: { timeoutMs?: number } = {}): Promise<string> {
-  const { timeoutMs = 30_000 } = options;
+export async function transcribe(audio: Uint8Array, mime: string, options: { timeoutMs?: number; prompt?: string } = {}): Promise<string> {
+  const { timeoutMs = 30_000, prompt } = options;
   const form = new FormData();
   form.append('model', process.env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-4o-mini-transcribe');
   // The file name's extension is how the service learns the container.
   const extension = mime.includes('mp4') ? 'mp4' : mime.includes('wav') ? 'wav' : mime.includes('mpeg') ? 'mp3' : 'webm';
   form.append('file', new Blob([audio], { type: mime }), `question.${extension}`);
+  if (prompt) form.append('prompt', prompt);
 
   const started = Date.now();
   let res: Response;

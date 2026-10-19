@@ -309,6 +309,14 @@ describe('voice: transcribe() and speak()', () => {
     expect((failure as OpenAIError).message).toContain('Invalid file format.');
   });
 
+  it('transcribe sends the hint it is given as `prompt`, and no `language`', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ text: 'Ano po ang mga kwarto ninyo?' }), { status: 200 }));
+    await transcribe(new Uint8Array([1]), 'audio/webm', { prompt: 'Filipino and English.' });
+    const form = fetchMock.mock.calls[0]![1].body as FormData;
+    expect(form.get('prompt')).toBe('Filipino and English.');
+    expect(form.get('language')).toBeNull();
+  });
+
   it('transcribe past its timeout is a 504 that says so', async () => {
     fetchMock.mockRejectedValue(timeout());
     const failure = await transcribe(new Uint8Array([1]), 'audio/webm', { timeoutMs: 5 }).catch((e: unknown) => e);

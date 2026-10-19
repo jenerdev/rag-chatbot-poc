@@ -4,7 +4,7 @@ import { requireFeature } from '@/lib/feature-flags';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { withTenantRoute } from '@/lib/tenant';
-import { MAX_AUDIO_BYTES, sniffAudio, VOICE_REQUESTS_PER_WINDOW } from '@/lib/voice';
+import { MAX_AUDIO_BYTES, sniffAudio, transcriptionHint, VOICE_REQUESTS_PER_WINDOW } from '@/lib/voice';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,7 +40,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   const mime = sniffAudio(bytes);
   if (!mime) return badRequest('That is not a recording.');
 
-  const text = await transcribe(bytes, mime);
+  const text = await transcribe(bytes, mime, { prompt: transcriptionHint(tenant.businessName) });
   if (text === '') return NextResponse.json({ error: "I couldn't hear that. Please try again or type your question." }, { status: 422 });
   return NextResponse.json({ text });
 });

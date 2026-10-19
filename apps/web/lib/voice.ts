@@ -14,6 +14,17 @@ export const SPEAK_TIMEOUT_MS = 15_000;
 export const VOICE_REQUESTS_PER_WINDOW = 30;
 
 /**
+ * The hint sent with every recording (`prompt`). The user's phone walk
+ * (Phase 6) heard short Tagalog as MALAY ("Kenapa perlu sama ada") with no
+ * hint. Naming the languages biases the transcriber toward them without
+ * forcing one, as `language` would, so a Taglish question stays possible.
+ * The business's name helps it spell the place's own words.
+ */
+export function transcriptionHint(businessName: string): string {
+  return `A guest is asking ${businessName}, a business in the Philippines, a question. They speak Filipino (Tagalog), English, or a mix of both (Taglish).`;
+}
+
+/**
  * The audio container, from the file's first bytes, never from the browser's
  * word or the file name (Rule 5; payments.ts does the same for proofs).
  * null: not a recording this feature takes.
