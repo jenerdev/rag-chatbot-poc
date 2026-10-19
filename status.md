@@ -71,12 +71,17 @@
   - (d)+(e) `2c6716b` `schema-room-views.sql` (40th, applied): `calendar_slots()` rooms_taken/rooms_total ("1/2"), dashboard occupancy over ROOMS and "would clash" in rooms.
 
   Checks: verify 222; rooms **56** (42 type rooms, 43 a type twice); bookings isolation 40/40 both ways; pipeline isolation 24/22; tests 13+14+5+10+133+369+175; typecheck 13/13.
+- [x] Phase 4 browser look (2026-10-20, `157b5e1`): `plan/room-types-walk.mjs`, 11/11 on harbor with a throwaway Garden Room 2 (S-5 add, staff form "of 2", week calendar "1/2", S-15 Move and every night stored on the new room, 375 px no sideways scroll); screenshots in `plan/room-types/walk/`.
 - [ ] Phase 4 owed:
-  - a browser look at S-5, S-15 (Move), the staff form and the calendar;
-  - axe (`plan/ui-refresh-a11y.mjs`, must stay 0);
+  - axe (`plan/ui-refresh-a11y.mjs`, must stay 0): started 2026-10-20, result not yet recorded;
   - a verify check for calendar_slots' counts and the dashboard's room occupancy.
-- [ ] Still owed from Phase 2: `pnpm eval` (stopped at the user's word).
-- [ ] Phase 5: the booking page's per-type count (the page's picker; the server already takes a type twice and counts) and the chat tool result's `left` ("1 of 2"); the battery.
+- [ ] Still owed from Phase 2: `pnpm eval` (stopped at the user's word, again 2026-10-20; its 2 fixture rows deleted by hand, 0 left).
+- [x] Phase 5 code (2026-10-20, three commits):
+  - `b04ad6b`: the tool row carries `left: "1 of 2"` (open, several rooms only); pipeline tests 370; northwind, villa and harbor baselines byte-identical;
+  - `d83d49b`: the booking page takes a type up to its rooms, capped by the quote's new `free` (fewest free over the stay), "N of M left", guests per room; `plan/room-types-page-walk.mjs` 13/13 incl. axe on two states, no console warning;
+  - `3993d03`: harbor's Garden Room = Garden Room 1 + 2 (loader idempotent, applied); fixture books one on day 30, both on day 32; `rt-count`, `rt-count-full` (battery now 63 cases).
+  - Typecheck 13/13, tests 13+14+10+370+133+175+5.
+- [ ] Phase 5 owed: `pnpm eval` (the two new cases; expect the known set otherwise); rooms, bookings isolation both ways and verify after harbor's second room (stopped at the user's word).
 - [ ] Phase 6: the walls and the user's walk on alteza. Phase 7: the record (D-133, R-52, CLAUDE.md: 40 SQL files, counts).
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**
