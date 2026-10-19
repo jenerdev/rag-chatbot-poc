@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**Voice (2026-10-20, planned, nothing built):** [`plan/voice.md`](./plan/voice.md). Talk to the assistant and hear it answer: transcription in, text-to-speech out, around the UNCHANGED pipeline; the speak route speaks only the conversation's stored reply. Waiting on the user's answers to § 6 (six questions, each with a recommendation) before Phase 0.
+
 **Room types (2026-10-16, Phases 0–4 on `feat/room-types`; stopped for the night after Phase 4's code):** [`plan/room-types.md`](./plan/room-types.md). A per_room type can have several physical rooms (alteza: 2 Casa Uno, 3 Loft Suite). `units` stays the type; new `unit_rooms` + `bookings.room_id`; `bookings_no_overlap` moves to the room; ONE SQL assigner, staff can move. The user chose room types, auto-assign and plan-first. § 7 answered 2026-10-16 (every recommendation taken).
 - [x] Phase 0 baseline (2026-10-16): verify 211, rooms 50, bookings isolation 40/40 both ways, tests all pass, typecheck 13/13, three baselines byte-identical.
 - [x] Phase 0, after the key was fixed: pipeline isolation 24/24 on tokens, 22/22 filters alone; `pnpm eval` 59/61 (antecedent, leak-2: the known set).
