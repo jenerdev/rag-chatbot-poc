@@ -13,7 +13,9 @@ import {
   assistantToolCallMessage,
   chat,
   chatStream,
+  speak,
   toolResultMessage,
+  transcribe,
   type ChatMessage,
   type ToolDefinition,
 } from './index.js';
@@ -277,5 +279,60 @@ describe('the messages that carry a tool round trip', () => {
       tool_call_id: 'call_q',
       content: '[{"status":"open"}]',
     });
+  });
+});
+
+// plan/voice.md Phase 1: the two voice requests, by their wire shape.
+describe('voice: transcribe() and speak()', () => {
+  const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  const aborted = () => Object.assign(new Error('This operation was aborted'), { name: 'AbortError' });
+
+  it('transcribe sends one multipart file with the model, and returns the text trimmed', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ text: ' May bakante ba kayo bukas? ' }), { status: 200 }));
+    const text = await transcribe(new Uint8Array([1, 2, 3]), 'audio/webm');
+    expect(text).toBe('May bakante ba kayo bukas?');
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('https://api.openai.com/v1/audio/transcriptions');
+    const form = init.body as FormData;
+    expect(form.get('model')).toBe(process.env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-4o-mini-transcribe');
+    expect((form.get('file') as File).name).toBe('question.webm');
+    // fetch writes the multipart boundary; a Content-Type of ours would break it.
+    expect(init.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('transcribe names a Safari recording .mp4, and a refusal is an OpenAIError in words', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Invalid file format.' } }), { status: 400 }));
+    const failure = await transcribe(new Uint8Array([1]), 'audio/mp4').catch((e: unknown) => e);
+    expect(((fetchMock.mock.calls[0]![1].body as FormData).get('file') as File).name).toBe('question.mp4');
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).status).toBe(400);
+    expect((failure as OpenAIError).message).toContain('Invalid file format.');
+  });
+
+  it('transcribe past its timeout is a 504 that says so', async () => {
+    fetchMock.mockRejectedValue(timeout());
+    const failure = await transcribe(new Uint8Array([1]), 'audio/webm', { timeoutMs: 5 }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(OpenAIError);
+    expect((failure as OpenAIError).status).toBe(504);
+  });
+
+  it('speak asks for mp3 from tts-1 by default and hands back the body unread', async () => {
+    const audio = new Response(new Uint8Array([9, 9, 9]), { status: 200, headers: { 'content-type': 'audio/mpeg' } });
+    fetchMock.mockResolvedValue(audio);
+    const spoken = await speak('Open on the 18th.', { voice: 'alloy' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('https://api.openai.com/v1/audio/speech');
+    expect(JSON.parse(init.body as string)).toEqual({ model: process.env.OPENAI_TTS_MODEL ?? 'tts-1', voice: 'alloy', input: 'Open on the 18th.', response_format: 'mp3' });
+    expect(spoken.contentType).toBe('audio/mpeg');
+    expect(new Uint8Array(await new Response(spoken.body).arrayBuffer())).toEqual(new Uint8Array([9, 9, 9]));
+  });
+
+  it('speak past its timeout is a 504; with nothing to say it does not call out', async () => {
+    fetchMock.mockRejectedValue(aborted());
+    const failure = await speak('Hello.', { voice: 'alloy', timeoutMs: 5 }).catch((e: unknown) => e);
+    expect((failure as OpenAIError).status).toBe(504);
+    fetchMock.mockClear();
+    await expect(speak('  ', { voice: 'alloy' })).rejects.toThrow('nothing to say');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

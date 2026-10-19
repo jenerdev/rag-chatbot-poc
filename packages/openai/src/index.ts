@@ -17,6 +17,8 @@
 
 const EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 const CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+const TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
+const SPEECH_URL = 'https://api.openai.com/v1/audio/speech';
 
 /**
  * The four roles this project sends.
@@ -558,4 +560,94 @@ export async function chatStream(
     }
   }
   return { content: answer === '' ? null : answer, toolCalls };
+}
+
+// --- voice (plan/voice.md, D-134) ---------------------------------------------
+//
+// Two more requests, by hand like the others (D-001). Voice is a way in and a
+// way out of the pipeline, never a second pipeline (the plan's Rule 1): these
+// turn audio into text and text into audio, and nothing here answers.
+
+/** A timeout is an error with a status of its own, so the route can tell "too slow" from "refused". */
+function timedOut(what: string, ms: number): OpenAIError {
+  return new OpenAIError(`OpenAI ${what} took longer than ${Math.round(ms / 1000)} s`, 504);
+}
+
+/**
+ * Audio in, text out: `/v1/audio/transcriptions`, multipart, one file.
+ *
+ * `mime` is the type the ROUTE checked by the bytes, never the browser's word
+ * (the plan's Rule 5). The model is `OPENAI_TRANSCRIBE_MODEL`, read per call
+ * like the chat model. No `language` is sent: the model hears English,
+ * Tagalog and Taglish on its own (Phase 0: all three word for word), and the
+ * reply language is decided later, in code, from the text (D-043).
+ */
+export async function transcribe(audio: Uint8Array, mime: string, options: { timeoutMs?: number } = {}): Promise<string> {
+  const { timeoutMs = 30_000 } = options;
+  const form = new FormData();
+  form.append('model', process.env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-4o-mini-transcribe');
+  // The file name's extension is how the service learns the container.
+  const extension = mime.includes('mp4') ? 'mp4' : mime.includes('wav') ? 'wav' : mime.includes('mpeg') ? 'mp3' : 'webm';
+  form.append('file', new Blob([audio], { type: mime }), `question.${extension}`);
+
+  const started = Date.now();
+  let res: Response;
+  try {
+    // No Content-Type of our own: fetch writes the multipart boundary.
+    res = await fetch(TRANSCRIBE_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') throw timedOut('transcription', timeoutMs);
+    throw error;
+  }
+  if (!res.ok) throw await toError(res);
+  const body = (await res.json()) as { text?: unknown; usage?: { input_tokens?: number; output_tokens?: number } };
+  if (typeof body.text !== 'string') throw new OpenAIError('OpenAI returned a transcription with no text', 502);
+  console.log(
+    `[openai] transcribe: ${audio.length} bytes → ${body.text.length} chars in ${Date.now() - started} ms` +
+      (body.usage ? ` (${body.usage.input_tokens ?? '?'} in + ${body.usage.output_tokens ?? '?'} out)` : ''),
+  );
+  return body.text.trim();
+}
+
+/**
+ * Text in, audio out: `/v1/audio/speech`. Returns the response body as it
+ * arrives, so the route can stream it to the browser without holding it.
+ *
+ * `OPENAI_TTS_MODEL` defaults to `tts-1`: Phase 0 measured `gpt-4o-mini-tts`
+ * at 116 s of OpenAI's own processing time and `tts-1` at 1.1 to 1.9 s to the
+ * first byte. The timeout covers the wait for the HEADERS; a body that
+ * started is not cut off.
+ */
+export async function speak(
+  text: string,
+  options: { voice: string; timeoutMs?: number },
+): Promise<{ body: ReadableStream<Uint8Array>; contentType: string }> {
+  const { voice, timeoutMs = 15_000 } = options;
+  if (text.trim() === '') throw new Error('speak: nothing to say');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+  let res: Response;
+  try {
+    res = await fetch(SPEECH_URL, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ model: process.env.OPENAI_TTS_MODEL ?? 'tts-1', voice, input: text, response_format: 'mp3' }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw timedOut('speech', timeoutMs);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) throw await toError(res);
+  if (!res.body) throw new OpenAIError('OpenAI returned speech with no body', 502);
+  console.log(`[openai] speak: ${text.length} chars, first byte in ${Date.now() - started} ms`);
+  return { body: res.body, contentType: res.headers.get('content-type') ?? 'audio/mpeg' };
 }
