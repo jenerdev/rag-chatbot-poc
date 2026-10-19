@@ -9840,3 +9840,13 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **The page's h1** is the business name, visually hidden, so a screen reader still has one; it and the button sit inside `<main>`, because axe's `region` rule failed them outside it (10 states, the first run).
 - **Observed:** axe over 8 welcome states (villa, alteza × 1280, 375 × light, dark) and 2 conversation states: 0 violations, no `<header>`, no sideways scroll; New chat absent on the welcome, not over the first question, and it resets to the welcome with the field focused. Web tests 175.
 - **Seen, not changed:** after a greeting, the sources line under the reply says "No matching chunks above the similarity threshold." to a guest.
+
+## 2026-10-20 · Voice, Phase 0: the plan answered, the baseline, the speech measurements (`feat/voice`)
+
+- **What:** `plan/voice.md` (talk to the assistant and hear it, around the unchanged pipeline); § 6 answered with every recommendation. Baseline green (tests, typecheck, verify, rooms; villa's tool text byte-identical). `plan/voice-phase0-spike.mjs`: three replies spoken, three questions spoken and transcribed back.
+- **Observed:**
+  - `gpt-4o-mini-tts`: 76–135 s to the first byte on every reply of the first run; a later probe 1 s; then `openai-processing-ms` 115596 and 117449 on two of three calls, and 10 of 12 calls past a 30 s timeout. The time is OpenAI's processing, so no client change fixes it;
+  - `tts-1`: first byte 1.1–1.9 s on six calls of six;
+  - `gpt-4o-mini-transcribe`: 0.8–1.4 s; "May bakante ba kayo bukas for two guests?" heard exactly in the `tts-1` run, as "kayubukas" in one earlier run.
+- **Why it mattered:** the plan's default model would have made every spoken reply wait two minutes. The defaults are now `tts-1` and a 15 s give-up, and both are env and constants, so switching back is one line when the other model recovers.
+- **Synthetic speech:** the questions were spoken by the TTS itself, so the transcripts measure the languages and the plumbing, not a guest on a phone; Phase 3's fake-microphone walk and the user's Phase 6 walk do that.

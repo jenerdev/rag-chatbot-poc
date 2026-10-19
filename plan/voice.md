@@ -1,8 +1,8 @@
 # Voice plan: talk to the assistant, and hear it answer
 
-> **Status: planned 2026-10-20, nothing built.** Branch `feat/voice` when
-> started. The record will be D-134 and R-53. § 6 holds the questions, each
-> with a recommendation; Phase 0 waits for the answers.
+> **Status: planned 2026-10-20; § 6 answered the same day (every
+> recommendation taken); Phase 0 started.** Branch `feat/voice`. The record
+> will be D-134 and R-53.
 
 The user: "add option to talk with the chatbot. chatbot response is also to
 talk." A guest on `/t/<slug>` presses a microphone, speaks, and the assistant
@@ -127,6 +127,28 @@ speaker toggle, which is a gesture too.
   - whether "₱3,500.00" and Tagalog words are read acceptably, judged by
     the user from the saved files.
 
+**Done 2026-10-20.** Baseline: tests 13+14+10+5+133+370+175, typecheck,
+verify OK, rooms OK, villa's tool text byte-identical to
+`villa-tools-post-villa-prices.txt`. The spike
+(`plan/baseline/voice-phase0-spike-tts1.txt`, audio in `plan/voice/phase0/`):
+- **`gpt-4o-mini-tts` is not usable today.** Its first byte took 76–135 s
+  on the first run, and OpenAI's own `openai-processing-ms` said 116 s on
+  two of three later calls (the third, 3 s): the wait is theirs, not the
+  network's. Two later runs timed out at 30 s on 10 of 12 calls.
+- **`tts-1` is:** first byte 1.1–1.9 s, the whole reply 1.9–2.8 s, for
+  5.5–8.5 s of audio, on every call (six, three of them a probe).
+- **Transcription** (`gpt-4o-mini-transcribe`): 0.8–1.4 s for 2–4.7 s of
+  speech; English, Tagalog and Taglish heard word for word in the last run.
+  One earlier run heard "kayubukas" for "kayo bukas": a join, which the
+  field shows the guest (R-53's third point).
+- **So:** `OPENAI_TTS_MODEL` defaults to `tts-1`; every speech call gives up
+  after `SPEAK_TIMEOUT_MS` (15 s), silently (the text is on the screen);
+  the speak route asks for `mp3` (about a third of `wav`'s bytes).
+- **Owed to the user:** listen to `plan/voice/phase0/reply-*.wav` (written
+  by `gpt-4o-mini-tts` in the first run) and the `tts-1` ones the last run
+  overwrote them with, and say whether "₱20,000.00" and the Taglish read
+  acceptably.
+
 ### Phase 1 — `@rag/openai` and `speakable()`
 `transcribe()`, `speak()`, unit tests on a fake `fetch` (the request shape,
 the errors in words). `speakable()` with tests for every shape in Rule 3,
@@ -202,7 +224,7 @@ from the question (D-043).
 
 ---
 
-## 6. Questions (recommendations first)
+## 6. Questions, answered 2026-10-20 (every recommendation taken)
 
 1. **After speaking, send at once or wait?** Recommendation: **send at
    once**, with the transcript shown as the question. It is what "talk to

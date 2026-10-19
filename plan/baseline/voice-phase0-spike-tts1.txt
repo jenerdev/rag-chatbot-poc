@@ -1,0 +1,16 @@
+tts tts-1 (alloy) · transcribe gpt-4o-mini-transcribe
+
+1. replies spoken
+   reply-en-price: first byte 1189 ms · whole 2062 ms · 8.5 s of audio · 99 chars
+   reply-taglish: first byte 1090 ms · whole 1881 ms · 8.4 s of audio · 116 chars
+   reply-refusal: first byte 1925 ms · whole 2832 ms · 5.5 s of audio · 95 chars
+
+2. questions spoken, then transcribed back
+   ask-en: said   "Do you have parking for two cars?"
+           heard  "Do you have parking for two cars?"  (808 ms for 2 s · usage {"type":"tokens","total_tokens":30,"input_tokens":20,"input_token_details":{"text_tokens":0,"audio_tokens":20},"output_tokens":10})
+   ask-tagalog: said   "May paradahan po ba kayo para sa dalawang sasakyan?"
+                heard  "May paradahan po ba kayo para sa dalawang sasakyan?"  (870 ms for 3.2 s · usage {"type":"tokens","total_tokens":47,"input_tokens":31,"input_token_details":{"text_tokens":0,"audio_tokens":31},"output_tokens":16})
+   ask-taglish: said   "May bakante ba kayo bukas for two guests?"
+                heard  "May bakante ba kayo bukas for two guests?"  (796 ms for 2.5 s · usage {"type":"tokens","total_tokens":38,"input_tokens":25,"input_token_details":{"text_tokens":0,"audio_tokens":25},"output_tokens":13})
+
+audio in C:\Users\65813\Desktop\Projects\implementations\rag-chatbot-poc\plan\voice\phase0
