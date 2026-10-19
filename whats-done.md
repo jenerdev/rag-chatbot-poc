@@ -9829,3 +9829,14 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - on a phone: a shorter cover, a smaller mark, and the suggested questions as wrapping chips instead of 52 px cards.
 - **Observed:** axe over 16 states (villa, alteza × 1280, 375 × light, dark × top, scrolled): 0 violations, no sideways scroll. New chat hidden on the welcome, shown after "hello", and resets to the welcome with the field focused. Web tests 175. No prompt, tool or server code changed.
 - **Not changed:** the composer's footer: it already drops the keyboard hint below 560 px.
+
+## 2026-10-20 · The chat page has no header (`feat/chat-layout`)
+
+- **Asked:** after the lighter header above, "please remove the header totally". Done, on the chat only; the booking page, Manage booking and the staff screens keep theirs.
+- **Where its three jobs went:**
+  - New chat floats in the top-right corner (a round button, "New chat" beside the icon from 560 px up), only once there is a conversation; the conversation's first row starts below it;
+  - the brand: the welcome carries it (cover, assistant, "<business>'s assistant"); during a conversation nothing names the business but the tab title and the notice under the field;
+  - staff's link to their screens is gone from the chat; they go to `/t/<slug>/admin`.
+- **The page's h1** is the business name, visually hidden, so a screen reader still has one; it and the button sit inside `<main>`, because axe's `region` rule failed them outside it (10 states, the first run).
+- **Observed:** axe over 8 welcome states (villa, alteza × 1280, 375 × light, dark) and 2 conversation states: 0 violations, no `<header>`, no sideways scroll; New chat absent on the welcome, not over the first question, and it resets to the welcome with the field focused. Web tests 175.
+- **Seen, not changed:** after a greeting, the sources line under the reply says "No matching chunks above the similarity threshold." to a guest.

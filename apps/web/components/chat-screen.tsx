@@ -35,8 +35,6 @@ import { SourcesPanel } from '@/components/sources-panel';
 import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { Icon } from '@/components/icons';
-import { BrandHeader } from '@/components/brand-header';
-import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
@@ -51,7 +49,7 @@ export interface ChatScreenProps {
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
   /**
-   * What the tenant has, for the header's links (lib/nav.ts). `book` is the
+   * What the tenant has (lib/nav.ts); the chat reads only `book`, the
    * customer booking page (plan/customer-booking.md § 8 q5): a button, not a
    * link in the model's reply: the chat renders no links, and the model never
    * books (D-037).
@@ -169,15 +167,11 @@ export function ChatScreen({
     else setUnseen(true);
   }, [turns, scrollToBottom]);
 
-  // The header is drawn on the page itself and gains its divider only once
-  // something has scrolled under it.
-  const [scrolled, setScrolled] = useState(false);
   const onScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (stick.current) setUnseen(false);
-    setScrolled(el.scrollTop > 4);
   }, []);
 
   const jumpDown = useCallback(() => {
@@ -349,21 +343,23 @@ export function ChatScreen({
   }, []);
 
   return (
-    <div className={scrolled ? 'chat-layout scrolled' : 'chat-layout'}>
-      {/* The banner is the welcome's cover here, not a strip over the header. */}
-      <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={null}>
-        {/* Only once there is something to leave: on the welcome it would do nothing. */}
+    <div className="chat-layout">
+
+      {/* <main>: the page's main landmark (Phase 10's audit found none on the chat). */}
+      <main id="messages" ref={messagesRef} onScroll={onScroll}>
+        {/* No header (the user's call, 2026-10-20): the welcome carries the
+            brand, and the page's one h1 is the business, for screen readers.
+            Both sit inside <main> (axe's region rule); the button is
+            positioned on .chat-layout, so it does not scroll. */}
+        <h1 className="visually-hidden">{businessName}</h1>
+        {/* New chat floats over the conversation's corner, only once there is
+            one: on the welcome it would do nothing. */}
         {turns.length > 0 && (
-          <button className="ghost" type="button" onClick={newChat}>
+          <button className="chat-new" type="button" onClick={newChat}>
             <Icon name="plus" size={16} />
             <span className="narrow-hidden">New chat</span>
           </button>
         )}
-        <TenantNav slug={slug} features={nav} current="chat" />
-      </BrandHeader>
-
-      {/* <main>: the page's main landmark (Phase 10's audit found none on the chat). */}
-      <main id="messages" ref={messagesRef} onScroll={onScroll}>
         <div className="messages-inner">
           {/* The welcome (plan/public-brand.md): the tenant's banner, or a
               gradient of its accent, as a cover; its mark; the assistant
