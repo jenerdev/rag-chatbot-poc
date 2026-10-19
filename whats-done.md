@@ -9863,3 +9863,12 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Moved:** the registry entry from Phase 4 to Phase 2, because the routes' `requireFeature('voice')` needs the key to compile.
 - **Not done here:** bumping a tenant's policy version (its own setting); the recording's 30 s is the browser's cap, the route checks the SIZE (a server-side duration needs a decoder).
 - **Owed:** every run (listed in status.md) and the user's phone walk.
+
+## 2026-10-20 · Voice: the runs after Phase 7 (`feat/voice`, D-134)
+
+- **Observed:** tests 13+19+10+5+133+370+186 (openai +5, web +11); typecheck 13/13; verify 224/224; rooms OK; the walls 3/3 (`null · 0 rows`, `null`, and alteza's refusal as "Sorry, I don't have that information yet. Please message Alteza on Viber or SMS…"); the HTTP walk 6/6 (a WAV heard as "Do you have parking for two cars?", 83712 bytes of `audio/mpeg` for villa's own reply, alteza's conversation the same 404 as a made-up one, the 31st call a 429); the browser walk 11/11 (the fake microphone's words as the question, the reply played, Stop, Escape, the LOCAL voice on a 503 and silence with only online voices, the sentence on a failed transcription, New chat), axe over 6 voice states clean.
+- **What the first runs found, all in the checks, none in the app:**
+  - the rate-limit check met the dev server reloading `lib/` after a package build (its in-memory window emptied); re-run, and a probe (30 × 400, then 429), pass;
+  - `addScriptToEvaluateOnNewDocument` scripts pile up and the first one's `speechSynthesis` won, so the "online voices only" step still had a local one; the walk now removes its previous spy;
+  - the cleanup embedded `messages` in `conversations`, which PostgREST refuses (two relationships); it reads `messages` now. Eight test chats from this session were left on villa and are removed.
+- **The doubled transcript** ("…two cars? Do you have parking for two cars?") is Chrome's fake microphone looping a 2 s file through a 3.5 s recording, not the app.

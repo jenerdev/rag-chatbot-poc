@@ -12,8 +12,8 @@
 //
 //   (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/voice-phase5-walls.mjs)
 
-import { mintTenantToken, scopedClient } from '@rag/db';
-import { supabase as service } from '@rag/db/service';
+import { mintTenantToken, scopedClient } from '../packages/db/dist/index.js';
+import { supabase as service } from '../packages/db/dist/service.js';
 import { latestReply, loadTenant, NO_ANSWER } from '../packages/rag/dist/index.js';
 
 let failures = 0;

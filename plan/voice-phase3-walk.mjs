@@ -66,9 +66,13 @@ let browser;
 const mic = `document.querySelector('.composer-mic')`;
 const status = `(document.querySelector('.voice-status')?.textContent ?? '')`;
 
+// One spy script at a time: added scripts pile up, and the FIRST one's
+// speechSynthesis won (a "local voice" spy answered the online-only step).
+let spyScript = null;
 async function open(page, voices, width = 1280) {
   await page.viewport(width);
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPIES(voices) });
+  if (spyScript) await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: spyScript });
+  spyScript = (await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPIES(voices) })).result?.identifier ?? null;
   await page.goto(`${BASE}/t/villa`);
   await page.until(`!!${mic}`, 30000).catch(() => null);
 }
@@ -130,7 +134,7 @@ try {
   await page.type('#input', 'hello');
   await page.eval(`document.querySelector('.composer-inner').requestSubmit()`);
   await sleep(6000);
-  check((await page.eval(`window.__spoken.length`)) === 0, '4b. with only online voices, the fallback stays silent');
+  check((await page.eval(`window.__spoken.length`)) === 0, '4b. with only online voices, the fallback stays silent', await page.eval(`JSON.stringify({ spoken: window.__spoken, voices: speechSynthesis.getVoices() })`));
   await page.send('Fetch.disable');
 
   // 5. Transcription fails: the sentence, and the field ready to type.
@@ -159,6 +163,7 @@ try {
   for (const scheme of ['light', 'dark']) {
     browser = await openBrowser({ scheme, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
     page = browser.page;
+    spyScript = null;
     for (const width of [1280, 375]) {
       await open(page, LOCAL, width);
       states.push([`idle ${width} ${scheme}`, await axe(page)]);
@@ -174,8 +179,9 @@ try {
   if (before) await supabase.from('tenant_features').upsert({ tenant_id: villa.id, feature: 'voice', enabled: before.enabled });
   else await supabase.from('tenant_features').delete().eq('tenant_id', villa.id).eq('feature', 'voice');
   // The walk's own chats: villa's, since it started, whose first question is the walk's.
-  const { data: made } = await supabase.from('conversations').select('id, messages(content, role)').eq('tenant_id', villa.id).gte('created_at', startedAt);
-  const ours = (made ?? []).filter((c) => c.messages.some((m) => m.role === 'user' && /^(hello|do you have parking)/i.test(m.content))).map((c) => c.id);
+  // (Not an embed: conversations and messages are joined twice, and PostgREST refuses to guess.)
+  const { data: asked } = await supabase.from('messages').select('conversation_id, content').eq('tenant_id', villa.id).eq('role', 'user').gte('created_at', startedAt);
+  const ours = [...new Set((asked ?? []).filter((m) => /^(hello|do you have parking)/i.test(m.content)).map((m) => m.conversation_id))];
   if (ours.length) await supabase.from('conversations').delete().in('id', ours);
   console.log(`cleanup: ${ours.length} walk conversation(s) removed`);
 }
