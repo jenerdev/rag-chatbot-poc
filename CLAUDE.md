@@ -294,6 +294,34 @@
 > - **Retention:** `retention` removes chats and guest details past each
 >   tenant's period.
 > - **Chatbot:** the chat's notice is page text; no prompt changed.
+>
+> **A room is a TYPE with physical rooms** since 2026-10-20 (D-133,
+> [`plan/room-types.md`](./plan/room-types.md), Phases 0–5 and 7; Phase 6's
+> runs and the user's alteza walk owed).
+> - `units` is the type (name, capacity, rates, photos, promos: no price
+>   changed); `unit_rooms` holds its rooms, and the count is always active
+>   ROWS, never a number typed beside them. Every unit was backfilled with
+>   one room named like it.
+> - `bookings.room_id` is required and `bookings_no_overlap` is per room.
+>   ONE trigger, `bookings_room_assign`, picks a free room under a lock at
+>   every door, and Confirm re-picks if the room was taken meanwhile.
+> - Staff add, rename and retire rooms on S-5 and move a stay on S-15
+>   (`move_room()`, a note, an event row; the price never moves). The
+>   calendar says "1 of 2" and the dashboard counts rooms.
+> - Guests see a count, never a room number: the booking page caps a
+>   type's count by the quote's `free` ("1 of 2 left"), and the tool row
+>   carries `left` for an open type of several rooms, in the RESULT only.
+>   No prompt or tool text changed (R-52).
+> - SQL files 37–40: `schema-room-inventory`, `-room-counts`, `-room-move`,
+>   `-room-views`.
+>
+> **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
+> the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
+> remain. `pnpm eval`, both isolation suites, the rooms checks that read
+> harbor and every harbor walk need them, so they cannot run as written
+> until test tenants are rebuilt from `fixtures/` (northwind.json,
+> harbor.json, harbor-units.json, harbor-bookings.json). Ask before
+> rebuilding them.
 
 ## What this is
 
@@ -392,11 +420,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (36 files; the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (40 files; the 37th–40th, schema-room-inventory.sql, schema-room-counts.sql, schema-room-move.sql and schema-room-views.sql (room types, D-133); the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     211 checks (207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     222 checks (212–222 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, D-133; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -407,8 +435,10 @@ packages/
     src/requests.ts        the booking page's reads and its one write (chat token); staff list/confirm/decline; priceStay(), the ONE stay quote
     src/staff-stay.ts      D-111: a staff stay on the page's rules (quoteStaffStay, createStaffStay), Walk in
     src/calendar.ts        the holiday calendar: list (any token), set/remove/copy (staff)
+    src/unit-rooms.ts      D-133: a type's physical rooms (add, rename, retire, delete a never-booked one); roomCounts()
+    src/room-move.ts       D-133: moveOptions() and moveStay() over move_room(), the one way a stay changes room
     src/closed.ts          closed dates (D-080): the reads that say 'closed', the words a refused write gets
-    tools/isolation.mjs    40 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 30 manage booking, 31a–g push notifications, the Notifications feed, all my devices)
+    tools/isolation.mjs    42 cross-tenant checks, no API key (16b room photos, 16c promos, 16d the calendar, 16e a type's rooms and a move, D-133, 30 manage booking, 31a–g push notifications, the Notifications feed, all my devices)
     src/slots.ts           slots (D-090): list for staff, create, edit, retire, delete; every refusal in words
     src/promos.ts          promos (D-097): list with uses, create, edit, retire, delete-unused; the quotes' two reads of the ONE discount function
     src/taken.ts           D-099: the trigger's "taken on <date>: <unit>…" passes through as the 409 (and, D-106, "is held for another guest"); the constraint's own 23P01 keeps the sentence
@@ -420,7 +450,7 @@ packages/
     src/notify.ts          D-116: the drain (notify_claim → sendPush → notify_done) and pushMessage(), the ONE wording of a notification
     src/notifications.ts   D-116 § 8: the member's feed and read marks (notification_feed, notification_read)
     src/push-devices.ts    D-116: this member's devices: one, or all (R-51)
-    tools/rooms.mjs        50 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b) and references on staff stays (4f, 4g)
+    tools/rooms.mjs        56 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b), references on staff stays (4f, 4g), moving a stay between rooms (38–41) and a type's rooms on S-5 and the staff form (42, 43)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
@@ -428,7 +458,7 @@ packages/
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
     src/tables.ts          pipeTable(): the ONE writer of a table into a reply (D-091); the browser's parser draws exactly this shape
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
-    tools/prompt-eval.mjs  the battery, 61 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 13 rt-* + 5 book-* + 3 price-*), three tenants; seeds its own bookings
+    tools/prompt-eval.mjs  the battery, 63 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 15 rt-* + 5 book-* + 3 price-*; rt-count and rt-count-full, D-133, never run yet), three tenants; seeds its own bookings
     src/conversations.ts   listConversations (over conversation_list()) and getTranscript, for staff: every message named question, answer, refusal, failed or interrupted (D-115)
     src/unanswered.ts      listUnanswered / resolve / reopen, one or many (the S-4 checkboxes): the questions answered with NO_ANSWER, for staff (D-045)
     src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
@@ -458,16 +488,16 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 211 checks, no API key needed
+pnpm --filter @rag/db verify    # 222 checks, no API key needed
 pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period; a dry run unless --remove, counted
-pnpm eval                       # the prompt battery, 61 cases  ⚠ see below
+pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
 pnpm --filter @rag/pipeline isolation -- --filters-only   # 22 of them, code filters alone (RLS bypassed)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
-pnpm --filter @rag/bookings isolation   # 40 cross-tenant booking checks, on operator staff tokens, no API key
+pnpm --filter @rag/bookings isolation   # 42 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 40, code filters alone
-pnpm --filter @rag/bookings rooms       # 50 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
+pnpm --filter @rag/bookings rooms       # 56 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
 pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/manage-booking-phase2-walk.mjs)   # (and phase3, phase4, phase6) the Manage booking and Payments routes over HTTP, needs pnpm dev
@@ -777,6 +807,11 @@ All are expanded in `risks.md`.
 
     Re-run an older file only to test today's guard, then re-apply
     everything after it (legal Phase 1).
+26. **A walk that cleans up BY NAME deletes the real row once one exists.**
+    `plan/room-types-walk.mjs` added a throwaway "Garden Room 2" and
+    deleted it by name. Phase 5's loader then gave harbor a real Garden
+    Room 2, and the next run of the walk deleted it (room types, 2026-10-20).
+    Clean up by the ids the run itself created, never by a name.
 ## Conventions
 
 - ES modules, `async`/`await`, named exports, one responsibility per module.

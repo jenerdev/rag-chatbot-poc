@@ -81,7 +81,10 @@
   - `d83d49b`: the booking page takes a type up to its rooms, capped by the quote's new `free` (fewest free over the stay), "N of M left", guests per room; `plan/room-types-page-walk.mjs` 13/13 incl. axe on two states, no console warning;
   - `3993d03`: harbor's Garden Room = Garden Room 1 + 2 (loader idempotent, applied); fixture books one on day 30, both on day 32; `rt-count`, `rt-count-full` (battery now 63 cases).
   - Typecheck 13/13, tests 13+14+10+370+133+175+5.
-- [ ] Phase 5 owed: `pnpm eval` (the two new cases; expect the known set otherwise); rooms, bookings isolation both ways and verify after harbor's second room (stopped at the user's word).
+- [ ] Phase 5 owed: `pnpm eval` (the two new cases; expect the known set otherwise).
+- [x] Phase 6, written (2026-10-20, `6a19671`): bookings isolation 16e, a type's rooms and a move across tenants; 42/42 filters alone, tokens all passing; axe's one violation (the week cell's "1/2") fixed as "1 of 2"; rooms' key list updated.
+- [x] Phase 7 (2026-10-20): D-133 (amends D-034, D-070), R-52, CLAUDE.md (header, SQL 37–40, counts, trap 26), flow.md, whats-done.md.
+- [ ] **Blocked: the user hard-deleted `harbor` and `northwind` on 2026-10-20.** Every remaining run needs test tenants rebuilt from `fixtures/` first (ask the user): `pnpm eval` (63), pipeline isolation both ways, rooms (56), verify (222), the build grep, both harbor walks, the axe re-audit. Also owed: the Phase 4 verify check (calendar and dashboard room counts) and the user's alteza walk (plan § Phase 6).
 - [ ] Phase 6: the walls and the user's walk on alteza. Phase 7: the record (D-133, R-52, CLAUDE.md: 40 SQL files, counts).
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**

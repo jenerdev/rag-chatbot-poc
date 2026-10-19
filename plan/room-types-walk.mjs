@@ -32,6 +32,10 @@ const check = (ok, label, detail = '') => {
 
 const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', SLUG).single();
 const { data: unit } = await supabase.from('units').select('id').eq('tenant_id', tenant.id).eq('name', TYPE).single();
+// Trap 26: the cleanup deletes EXTRA by name, so a real room of that name
+// would go with it. Refuse to start rather than risk it.
+const { count: clash } = await supabase.from('unit_rooms').select('id', { count: 'exact', head: true }).eq('unit_id', unit.id).eq('name', EXTRA);
+if (clash) throw new Error(`${TYPE} already has a room named "${EXTRA}": rename it or EXTRA before walking`);
 const users = [];
 const groups = [];
 let browser;

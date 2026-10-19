@@ -781,6 +781,21 @@ The endpoints themselves are URLs the server POSTs to. Only known push
 services' hosts are accepted, so the server makes no requests to internal
 hosts (SSRF).
 
+## R-52 · A room count tells anyone how full the resort is · **Accepted 2026-10-20 (D-133)**
+
+The booking page says "1 of 2 left" and the chat tool's result carries
+`left: "1 of 2"`, both open to anyone, so a competitor or a curious guest
+can read occupancy per type and night.
+
+**What limits it:** the page and the chat already said `taken` per night
+before D-133, so the count adds degree, not a new kind of fact. It is shown
+only for a type of several rooms, and only when it is open: a taken row has
+no `left`. No guest name, room number or booking reaches either.
+
+**What remains:** a scripted reader can still sample a year of nights. If
+that matters to a tenant, the answer is to drop `left` from the result and
+the count from the page, not to rate-limit the reads.
+
 ---
 
 ## Explicitly still missing after tenancy

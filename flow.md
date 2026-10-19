@@ -242,6 +242,9 @@ sequenceDiagram
     how many guests the price includes and the fee per extra guest; with a
     guest count, it carries that party's extra charge and total, from
     `unit_quote()`, the one function that makes a price (plan/extra-guests.md).
+    **A type of several rooms** (D-133) is open while one of its rooms is
+    free, and its open rows add `left: "1 of 2"`, mapped field by field from
+    `rooms_free` and `rooms_total`. The tool's text is unchanged.
     **Villa gets the same columns since D-074:** a whole-resort tenant whose
     unit has a rate is priced from the same function
     (`checkPricedAvailability`), its tool takes `guests`, and its documents
@@ -331,6 +334,9 @@ return 404, with no redirect.
 | `GET` / `POST` | `/api/t/<slug>/accommodations` | rooms with rates and photos / add a room (per_room; 404 otherwise) | `listAccommodations` / `createAccommodation` | admin |
 | `GET` / `PATCH` | `/api/t/<slug>/accommodations/:id` | one room / change or retire it | `getAccommodation` / `updateAccommodation` | admin |
 | `PUT` | `/api/t/<slug>/accommodations/:id/rates` | set rates, in centavos | `setRates` | admin |
+| `POST` | `/api/t/<slug>/accommodations/:id/rooms` | add a physical room to a type (D-133) | `addUnitRoom` | rooms:write |
+| `PATCH` / `DELETE` | `/api/t/<slug>/accommodations/:id/rooms/:roomId` | rename or retire / delete a never-booked room | `updateUnitRoom` / `deleteUnitRoom` | rooms:write |
+| `GET` / `PATCH` | `/api/t/<slug>/bookings/:id/room` | the rooms the stay could move to / move it, with a note (`move_room()`) | `moveOptions` / `moveStay` | bookings:write |
 | `GET` / `POST` | `/api/t/<slug>/accommodations/:id/images` | photos / upload one (multipart) | `listImages` / `addImage` | admin |
 | `PATCH` / `DELETE` | `/api/t/<slug>/accommodations/:id/images/:imageId` | reorder / remove (row, then object) | `setImageOrder` / `removeImage` | admin |
 | `GET` | `/t/<slug>/book` | the customer booking page (404 without the application or a priced unit) | `app/t/[tenant]/book/page.tsx` → `BookingPageScreen` | public |
@@ -380,6 +386,10 @@ sends `book/request` once. That route is `withTenantRoute()` with no
 function that can only insert `pending` rows (D-071). A request holds
 nothing (D-070): staff see it in the Requests section of S-3 and confirm or
 decline the whole group; `bookings_no_overlap` decides a clash at confirm.
+Since D-133 a type may be asked for more than once ("Garden Room ×2"), up to
+the quote's `free` for it, and Postgres gives every row its room
+(`bookings_room_assign`): no request names a room, and the constraint is
+per room.
 
 "Admin" means `tenant = await requireAdmin(request, tenant, permission)`.
 - The request must carry this tenant's signed session cookie, and its user

@@ -1196,6 +1196,12 @@ constraint still holds per unit.
 
 ---
 
+**Amended 2026-10-20 by D-133 (room types):** the constraint is per
+PHYSICAL room, `exclude (room_id with =, during with &&) where (status =
+'confirmed' or held)`. A unit is now a room TYPE with any number of
+`unit_rooms`; two confirmed bookings of one type may share a night when
+they are in different rooms. The guarantee is the same one level down.
+
 ## D-035 · Zero chunks: accept the model's reply only if it called a tool this turn · **Added 2026-09-24 (bookings Phase 6). Amends D-008**
 
 **Decision:** for a tenant with tools, the model is called even when retrieval
@@ -2106,6 +2112,13 @@ lands, the confirm is 23P01 and both nights stay pending); rooms 25–26; the
 HTTP walk's 409; the user's walk on harbor.
 
 ---
+
+**Amended 2026-10-20 by D-133 (room types):** unchanged in substance. A
+pending row still holds nothing; what changes is the unit of "taken". A
+pending row is refused, and a Confirm is a 409, only when EVERY active room
+of the type is taken on the span. Confirming a row whose assigned room was
+confirmed for someone else first re-picks a free room of the type
+(`bookings_room_assign`, BEFORE UPDATE) before it gives up.
 
 ## D-071 · `request_booking()`, the one public write, a fourth `security definer` function · **Added 2026-09-28 (customer-booking Phase 1). Amends D-042 and D-054**
 
@@ -4161,3 +4174,20 @@ either.
 
 **Why not reuse `bookings.notes`:** that is one text per ROW, written on the booking form and repeated on every night; a log of many dated, attributed entries is a table.
 
+## D-133 · A room is a TYPE with physical rooms; every count is rows, and Postgres assigns the room · **Added 2026-10-20 (plan/room-types.md). Amends D-034 and D-070**
+
+**Decision:**
+- `units` stays the room TYPE: its name, capacity, rates, photos and promos, so no price changes (`unit_price()`, `unit_quote()`, `promo_discount()` untouched). Under it, `unit_rooms` (`sql/schema-room-inventory.sql`, the 37th file) holds the physical rooms: `id, tenant_id, unit_id, name, active, sort_order`, unique `(unit_id, name)`, a composite foreign key to its unit's tenant. Every unit was backfilled with one room named like it, so every tenant behaved as before until staff added a second.
+- `bookings.room_id` is `not null`, and `bookings_no_overlap` is per room (D-034 amended).
+- ONE assigner, `bookings_room_assign`, a BEFORE INSERT trigger after `compute_during`, picks the room under an advisory lock on (tenant, unit) when an insert names none: the room the same group used the night before, then the first free by `sort_order`, preferring one with no pending row. It is every door's: the booking page, staff, `decide_change()`'s reschedule, the tools. Confirm re-picks (BEFORE UPDATE) when the room was taken meanwhile (`schema-room-counts.sql`, the 38th).
+- The count is ALWAYS active rows, never a quantity column. Availability (`check_availability`, `check_room_availability`) carries `rooms_free` and `rooms_total`; `taken` means 0 free. `request_booking()` takes a type several times up to its free rooms, signature unchanged.
+- Staff move a stay between rooms of its type: `move_room()` (definer, `bookings:write`, a note required, a `booking_events` row of kind `room`), and `bookings_room_move_guard` refuses a retired or taken room in words, raw updates too (`schema-room-move.sql`, the 39th). The price never moves.
+- The calendar counts rooms ("1 of 2") and the dashboard's occupancy is over rooms (`schema-room-views.sql`, the 40th).
+- A whole-resort unit keeps one active room (a trigger). A room ever booked is retired, never deleted (the D-090 pattern).
+- Guests see a count, never a room number: the booking page says "1 of 2 left" and caps its count by the quote's `free`; the tool row carries `left: "1 of 2"` for an open type of several rooms only, in the RESULT, never the tool text (the three baselines byte-identical; `closedNote()`'s precedent, D-080). Manage booking shows the type (§ 7 q4).
+
+**Why rows and not a `quantity`:** a number typed beside the rows can disagree with them; a booking needs a room to sit in for the constraint to refuse a loser (trap 8), and staff need a room to move.
+
+**Why the assigner in SQL:** every door inserts; one trigger under a lock is the only place two concurrent requests cannot both pick the last room, and the constraint still refuses the loser.
+
+**Not done:** merging alteza's Kubo A and Kubo B into one type (the owner's call, § 7 q1); a guest choosing a room number.

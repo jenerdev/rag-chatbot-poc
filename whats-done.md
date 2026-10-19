@@ -9775,3 +9775,34 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - a verify check for the new calendar and dashboard counts;
   - `pnpm eval`;
   - Phases 5–7.
+
+## 2026-10-20 · Room types, Phase 4's browser look and axe (`feat/room-types`, D-133)
+
+- **What:** `plan/room-types-walk.mjs` (`157b5e1`), on harbor with a throwaway Garden Room 2: S-5 adds it, the staff form asks "how many, of 2", the week calendar says the count, S-15's Move drawer offers the free room and moves every night of the stay.
+- **Observed:** 11/11. Screenshots in `plan/room-types/walk/`. The full audit (`plan/ui-refresh-a11y.mjs`): **208 states, 1 violation**, `label-content-name-mismatch` on 14 week cells at 375 px: the cell showed "1/2" while its name said "1 of 2 rooms booked". Fixed by showing "1 of 2", the name's own words (`6a19671`). Not re-audited: harbor was deleted before the re-run.
+- **Why it mattered:** the count is Phase 4's own text; axe found it only once a type had two rooms on a live tenant, which no earlier audit had.
+
+## 2026-10-20 · Room types, Phase 5: the booking page and the chatbot count rooms (`feat/room-types`, D-133)
+
+- **What:**
+  - `b04ad6b`: `RoomAvailability` carries `roomsFree`/`roomsTotal`; the tool row adds `left: "1 of 2"` for an OPEN type of several rooms only, field by field (Rule 7). The tool text is unchanged.
+  - `d83d49b`: `bookingPage()` gives each type its active room count; the quote (`priceStay()` → `RequestQuote.free`) gives each picked type's FEWEST free rooms over the stay. The page shows "N of M left", a Rooms count capped by it, and a labelled guest box per room. `plan/room-types-page-walk.mjs`.
+  - `3993d03`: harbor's Garden Room = Garden Room 1 + 2 (the loader renames the backfilled room and adds the second; a second run changes nothing); the fixture books one Garden Room on day 30 and both on day 32; `rt-count` and `rt-count-full`. The battery is 63 cases.
+- **Observed:**
+  - pipeline tests 370 (+1: `left` on an open type of 2, none on a taken one or a one-room type); typecheck 13/13;
+  - northwind's prompt, villa's and harbor's tool definitions **byte-identical** to their baselines;
+  - the page walk **13/13**: "2 of 2 left", a count of up to 2 (3 stays 2), two rooms priced; with one confirmed, "1 of 2 left" and a cap of 1; no sideways scroll at 375; axe clean on both states; no console error or warning.
+- **Found while building:** the first layout put three unlabelled number boxes in a row, unreadable once filled; they are a column now, each labelled. `npx prettier` reformatted the whole file with its defaults (the repo's config was not found); the file was restored and the edit re-applied by hand.
+- **Not run:** `pnpm eval`. The user stopped it, then harbor and northwind were deleted, so the two new cases have never run.
+
+## 2026-10-20 · Room types, Phase 6 (partly) and Phase 7: the walls and the record (`feat/room-types`, D-133)
+
+- **What:**
+  - bookings isolation 16e (`6a19671`): A cannot read B's rooms (RLS: 0 rows unfiltered), add one to B's type, rename, retire or delete one, or move B's booking, each `null`/`false` like a missing room; B's rooms and booking are unchanged. The twin: B adds a room, moves its booking there and back, and retires it. On filters alone the move is skipped, because `move_room()` is a definer that only a staff token may call.
+  - `rooms.mjs`' key list gains `roomsFree,roomsTotal`, which Phase 5 added to every availability row.
+  - The record: D-133 (amending D-034 and D-070), R-52, CLAUDE.md (the header, SQL 37–40, the counts, trap 26), `flow.md` (the tool's `left`, three routes, the booking page).
+- **Observed:** bookings isolation **42/42 filters alone**; on tokens every check passed (before the tenant deletion), count not printed. rooms 55/56 before the key-list fix, not re-run since.
+- **Two things happened to the data:**
+  - **Trap 26.** The Phase 4 walk cleans up "Garden Room 2" by NAME. After Phase 5's loader gave harbor a real Garden Room 2 (no bookings), the next run deleted it. The walk now refuses to start when that name exists.
+  - **The user archived, then hard-deleted, `harbor` and `northwind`** (`tenant:remove --yes`, run by the user after two dry runs). harbor: 1 document, 97 chats, 5 rooms, 2 photos (swept), no bookings. northwind: 1 document, 103 chats. The sweep also removed one orphaned proof file of alteza's (no payment row, over an hour old).
+- **Owed, and blocked until test tenants exist again:** `pnpm eval` (63 cases), pipeline isolation both ways, rooms, verify, the build grep, both harbor walks, the re-audit; the Phase 4 verify check for calendar and dashboard room counts; the user's alteza walk.
