@@ -144,10 +144,9 @@ verify OK, rooms OK, villa's tool text byte-identical to
 - **So:** `OPENAI_TTS_MODEL` defaults to `tts-1`; every speech call gives up
   after `SPEAK_TIMEOUT_MS` (15 s), silently (the text is on the screen);
   the speak route asks for `mp3` (about a third of `wav`'s bytes).
-- **Owed to the user:** listen to `plan/voice/phase0/reply-*.wav` (written
-  by `gpt-4o-mini-tts` in the first run) and the `tts-1` ones the last run
-  overwrote them with, and say whether "₱20,000.00" and the Taglish read
-  acceptably.
+- **Owed to the user:** listen to `plan/voice/phase0/reply-*.wav` (all six
+  files are `tts-1`'s, the last run's) and say whether "₱20,000.00" and the
+  Taglish read acceptably.
 
 ### Phase 1 — `@rag/openai` and `speakable()`
 `transcribe()`, `speak()`, unit tests on a fake `fetch` (the request shape,
