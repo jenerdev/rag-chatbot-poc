@@ -166,19 +166,21 @@ async function bookingChecks(probeId) {
     if (bad) return;
   }
 
-  // 16. The seed: villa has bookings in Asia/Manila, northwind has nothing.
-  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
+  // 16. The seed: villa has bookings in Asia/Manila; the probe has none yet
+  //     (the checks from 17 on give it the application). It was northwind
+  //     until the user deleted northwind on 2026-10-20.
+  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa']);
   const idOf = Object.fromEntries((tenants ?? []).map((t) => [t.slug, t.id]));
   const { data: apps } = await supabase
     .from('tenant_applications')
     .select('tenant_id, application_key, config')
-    .in('tenant_id', [idOf.villa ?? -1, idOf.northwind ?? -1]);
+    .in('tenant_id', [idOf.villa ?? -1, probeId]);
   const villaApp = apps?.find((a) => a.tenant_id === idOf.villa);
-  const northwindApps = apps?.filter((a) => a.tenant_id === idOf.northwind) ?? [];
+  const probeApps = apps?.filter((a) => a.tenant_id === probeId) ?? [];
   check(
-    villaApp?.config?.timezone === 'Asia/Manila' && northwindApps.length === 0,
-    'villa has bookings, northwind has none',
-    `villa ${JSON.stringify(villaApp?.config ?? null)} · northwind ${northwindApps.length} rows`,
+    villaApp?.config?.timezone === 'Asia/Manila' && probeApps.length === 0,
+    'villa has bookings, the probe has none',
+    `villa ${JSON.stringify(villaApp?.config ?? null)} · probe ${probeApps.length} rows`,
   );
 
   // 17. An unknown timezone is refused on write (22023), not on the first
@@ -342,16 +344,21 @@ async function bookingChecks(probeId) {
   }
 
   // 26. The same function, asked as another tenant, returns nothing: the
-  //     leakage check of 14, for bookings.
+  //     leakage check of 14, for bookings. The other tenant is a throwaway
+  //     with no units (it was northwind, deleted 2026-10-20), removed after.
   {
-    const { data, error } = await supabase.rpc('check_availability', {
-      p_tenant_id: idOf.northwind ?? -1,
-      p_from: '2026-10-01',
-      p_to: '2026-10-02',
-    });
+    const { data: other, error: made } = await supabase
+      .from('tenants')
+      .insert({ slug: `verify-empty-${Date.now()}`, business_name: 'verify.mjs empty tenant', assistant_name: 'Probe' })
+      .select('id')
+      .single();
+    const { data, error } = made
+      ? { data: null, error: made }
+      : await supabase.rpc('check_availability', { p_tenant_id: other.id, p_from: '2026-10-01', p_to: '2026-10-02' });
+    if (other) await supabase.from('tenants').delete().eq('id', other.id);
     check(
       !error && data.length === 0,
-      'check_availability(northwind) returns zero rows',
+      'check_availability(a tenant with no units) returns zero rows',
       error ? error.message : `${data.length} rows`,
     );
   }
@@ -418,7 +425,7 @@ const staffToken = (tenantId, userId) => mintTenantToken({ tenantId, userId, adm
 const platformToken = (userId) => mintPlatformToken({ userId }); // no tenant_id (tenant management Rule 1)
 
 async function authChecks(probeId, anyChunk) {
-  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa', 'northwind']);
+  const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', ['villa']);
   const idOf = Object.fromEntries((tenants ?? []).map((t) => [t.slug, t.id]));
   const villa = idOf.villa;
   if (!villa) {
@@ -1759,7 +1766,8 @@ async function rolesChecks() {
       const { count: allDocuments } = await supabase.from('documents').select('id', { count: 'exact', head: true });
       check(
         !chatRows.error && chatRows.data.length === 0 && !staffRows.error && staffRows.data.length === 0
-          && !all.error && all.data.length === count && count >= 5
+          // At least villa, alteza and this probe (it was 5 before northwind and harbor were deleted, 2026-10-20).
+          && !all.error && all.data.length === count && count >= 3
           && documents.data?.length === allDocuments && allDocuments > 0 && (chunks.data?.length ?? 0) > 0
           && bookings.data?.length === 0 && messages.data?.length === 0 && payments.data?.length === 0,
         'roles: tenants read by the platform only; the platform reads the knowledge base (D-128) and no bookings, messages or payments',
@@ -4415,6 +4423,11 @@ async function notificationChecks() {
 //      23P01 and writes nothing;
 // 222. Confirm re-picks: a pending row whose room was confirmed for someone
 //      else since moves to the free room; with none free, Confirm is 23P01.
+// 223. the staff views count ROOMS (schema-room-views.sql, Phase 4): on a
+//      type of 2 rooms with 1 confirmed, calendar_slots() is open 1 of 2;
+//      tenant_dashboard()'s occupancy divides by the 2 rooms, not the 1 type,
+//      and "would clash" counts two pending stays on 2 rooms as none, and
+//      both once a third stay is confirmed there.
 {
   const users = [];
   let probe = null;
@@ -4513,6 +4526,34 @@ async function notificationChecks() {
         p1.room_id !== p2.room_id && !first.error && first.data?.[0]?.status === 'confirmed' && first.data[0].room_id === p2.room_id && second.error?.code === '23P01',
         "room counts: Confirm moves a pending row whose room was confirmed for someone else to the free room; with none free, Confirm is 23P01",
         `p1 room ${p1.room_id}, p2 room ${p2.room_id} · p1 confirmed ${first.error?.message ?? `in room ${first.data?.[0]?.room_id}`} · p2 ${second.error?.code ?? 'CONFIRMED'}`,
+      );
+    }
+
+    // 223. Dates from the dashboard's own today (the tenant's zone), so the
+    //      rows fall inside its 30-day window and its "upcoming" test.
+    {
+      const dash = async () => one(admin.rpc('tenant_dashboard', { p_tenant_id: probe, p_days: 30 }), 'dashboard');
+      const { today } = await dash();
+      const plus = (n) => { const d = new Date(`${today}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+      await one(insert([{ booked_date: plus(3) }]), 'one of two');
+      const cells = await one(admin.rpc('calendar_slots', { p_tenant_id: probe, p_from: plus(3), p_to: plus(3), p_unit_id: casa }), 'calendar');
+      const cell = cells.find((c) => c.slot_id === night);
+      const before = await dash();
+      // 220–222 leave clashing pending stays of their own (2027, still
+      // upcoming), so the count is read as a change from here.
+      const base = before.bookings?.attention?.clashing;
+      await one(insert([{ booked_date: plus(5), status: 'pending' }]), 'pending a');
+      await one(insert([{ booked_date: plus(5), status: 'pending' }]), 'pending b');
+      const twoPending = (await dash()).bookings?.attention?.clashing;
+      await one(insert([{ booked_date: plus(5) }]), 'confirmed beside them');
+      const after = await dash();
+      const occ = before.bookings?.occupancy;
+      check(
+        cell?.state === 'open' && cell.rooms_taken === 1 && cell.rooms_total === 2
+          && occ?.activeUnits === 2 && occ.roomNights === 1 && occ.percent === 1.7
+          && typeof base === 'number' && twoPending === base && after.bookings?.attention?.clashing === base + 2,
+        'room counts: the calendar says open 1 of 2; the dashboard divides by 2 rooms (1 room-night = 1.7%), and counts two pending on 2 rooms as no clash, then both once one is confirmed',
+        `cell ${cell ? `${cell.state} ${cell.rooms_taken}/${cell.rooms_total}` : '(none)'} · occupancy ${occ ? `${occ.roomNights} of ${occ.activeUnits} rooms = ${occ.percent}%` : '(none)'} · clashing ${base} → ${twoPending} with two pending → ${after.bookings?.attention?.clashing} with one confirmed`,
       );
     }
   } catch (error) {

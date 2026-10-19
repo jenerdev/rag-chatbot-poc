@@ -84,7 +84,8 @@
 - [ ] Phase 5 owed: `pnpm eval` (the two new cases; expect the known set otherwise).
 - [x] Phase 6, written (2026-10-20, `6a19671`): bookings isolation 16e, a type's rooms and a move across tenants; 42/42 filters alone, tokens all passing; axe's one violation (the week cell's "1/2") fixed as "1 of 2"; rooms' key list updated.
 - [x] Phase 7 (2026-10-20): D-133 (amends D-034, D-070), R-52, CLAUDE.md (header, SQL 37–40, counts, trap 26), flow.md, whats-done.md.
-- [ ] **Blocked: the user hard-deleted `harbor` and `northwind` on 2026-10-20.** Every remaining run needs test tenants rebuilt from `fixtures/` first (ask the user): `pnpm eval` (63), pipeline isolation both ways, rooms (56), verify (222), the build grep, both harbor walks, the axe re-audit. Also owed: the Phase 4 verify check (calendar and dashboard room counts) and the user's alteza walk (plan § Phase 6).
+- [x] Without the deleted tenants (2026-10-20): rooms **56/56**; verify **223/223**: checks 16, 26 and 99 no longer need northwind (the probe, a throwaway empty tenant, a floor of 3 tenants), and 223 is the Phase 4 check owed: `calendar_slots()` open 1 of 2, the dashboard's occupancy over 2 rooms (1 room-night = 1.7%), "would clash" in rooms (+0 for two pending on 2 rooms, +2 once one is confirmed).
+- [ ] **Not runnable: the user hard-deleted `harbor` and `northwind` on 2026-10-20 and declined rebuilding them.** `pnpm eval` (63), both isolation suites on tokens, the build grep, both harbor walks, the axe re-audit. Still owed: the user's alteza walk (plan § Phase 6), then the merge.
 - [ ] Phase 6: the walls and the user's walk on alteza. Phase 7: the record (D-133, R-52, CLAUDE.md: 40 SQL files, counts).
 
 **Three items (2026-10-14, asked to run unattended; one commit each).**

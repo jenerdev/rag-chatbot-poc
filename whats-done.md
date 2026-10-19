@@ -9806,3 +9806,13 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
   - **Trap 26.** The Phase 4 walk cleans up "Garden Room 2" by NAME. After Phase 5's loader gave harbor a real Garden Room 2 (no bookings), the next run deleted it. The walk now refuses to start when that name exists.
   - **The user archived, then hard-deleted, `harbor` and `northwind`** (`tenant:remove --yes`, run by the user after two dry runs). harbor: 1 document, 97 chats, 5 rooms, 2 photos (swept), no bookings. northwind: 1 document, 103 chats. The sweep also removed one orphaned proof file of alteza's (no payment row, over an hour old).
 - **Owed, and blocked until test tenants exist again:** `pnpm eval` (63 cases), pipeline isolation both ways, rooms, verify, the build grep, both harbor walks, the re-audit; the Phase 4 verify check for calendar and dashboard room counts; the user's alteza walk.
+
+## 2026-10-20 · Room types: the checks that still run without northwind and harbor (`feat/room-types`, D-133)
+
+- **What:** the user declined rebuilding the deleted test tenants. `rooms` creates its own tenants, so it ran as is. `verify` read northwind in three places, rewritten to need neither deleted tenant:
+  - 16: "villa has bookings, the probe has none" (the probe, before the checks that give it the application);
+  - 26: `check_availability` for another tenant returns nothing, asked of a throwaway tenant with no units, deleted after;
+  - 99: the platform reads every tenant, with a floor of 3 (it was 5: four real tenants and the probe).
+- **And the Phase 4 check owed, 223:** on a type of 2 rooms, `calendar_slots()` says open 1 of 2; `tenant_dashboard()`'s occupancy has `activeUnits` 2, so 1 room-night is 1.7% (the type count would say 3.3%); two pending stays on 2 rooms add 0 to "would clash", and confirming a third stay there makes both clash (+2).
+- **Observed:** rooms **56/56**; verify **223/223** (`cell open 1/2 · occupancy 1 of 2 rooms = 1.7% · clashing 2 → 2 with two pending → 4 with one confirmed`).
+- **Found while writing 223:** the dashboard's clash count already read 2 before the check's rows: 220–222 leave clashing pending stays on 2027 dates, which are still "upcoming". The check reads the change from a baseline instead of an absolute.
