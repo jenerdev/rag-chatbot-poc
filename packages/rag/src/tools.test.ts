@@ -143,8 +143,8 @@ describe('per_room: check_availability checks rooms', () => {
   const config = vi.mocked(bookingsConfig);
   const HARBOR = { ...TENANT, id: 67, slug: 'harbor' } as unknown as TenantContext;
   const ROOMS = [
-    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, rateKind: 'weekday', dayPrice: 350000, extraGuestPrice: 0, total: 350000 },
-    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, rateKind: 'weekday', dayPrice: 600000, extraGuestPrice: 25000, total: 625000 },
+    { date: '2026-09-28', unit: 'Garden Room', capacity: 2, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'open', price: 350000, rateKind: 'weekday', dayPrice: 350000, extraGuestPrice: 0, total: 350000, roomsFree: 1, roomsTotal: 1 },
+    { date: '2026-09-28', unit: 'Family Room', capacity: 6, standardCapacity: 2, extraPersonRate: 25000, slot: 'Night', status: 'taken', price: 600000, rateKind: 'weekday', dayPrice: 600000, extraGuestPrice: 25000, total: 625000, roomsFree: 0, roomsTotal: 1 },
   ];
 
   beforeEach(() => {
@@ -181,6 +181,18 @@ describe('per_room: check_availability checks rooms', () => {
     // No total without a guest count: there is no party to price.
     expect(rows.every((r) => Object.keys(r).sort().join(',') === 'capacity,date,extra_guest_fee,included_guests,price,rate,slot,status,unit')).toBe(true);
     expect(content).not.toContain('350000');
+  });
+
+  // D-133: a type of several rooms says how many are free, open rows only.
+  it('an open type of several rooms carries left, "1 of 2"; a taken one and a one-room type do not', async () => {
+    rooms.mockResolvedValueOnce([
+      { ...ROOMS[0], roomsFree: 1, roomsTotal: 2 },
+      { ...ROOMS[0], status: 'taken', roomsFree: 0, roomsTotal: 2 },
+      ROOMS[0],
+    ] as never);
+    const { record } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28"}' });
+    const rows = (record.result as { slots: { left?: string }[] }).slots;
+    expect(rows.map((r) => r.left)).toEqual(['1 of 2', undefined, undefined]);
   });
 
   it("with a guest count, each row carries that party's extra charge and total, from the database", async () => {

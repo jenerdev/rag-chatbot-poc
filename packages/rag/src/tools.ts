@@ -613,6 +613,11 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
             extra_guest_fee: r.extraPersonRate === null ? null : money(r.extraPersonRate, config.currency),
             slot: r.slot,
             status: r.status,
+            // D-133, Rule 5 of plan/room-types.md: how many of a type are
+            // still free, in the RESULT, never in the tool text. Only for a
+            // type of several rooms that is open, so a one-room tenant's
+            // rows, and a taken row, are what they were.
+            ...(r.status === 'open' && r.roomsTotal > 1 ? { left: `${r.roomsFree} of ${r.roomsTotal}` } : {}),
             // D-083: the DAY price, surcharge in: unit_quote()'s own price
             // with no guest count. The base rate alone quoted villa's 24
             // December at ₱20,000.00, where the page and the stored row say

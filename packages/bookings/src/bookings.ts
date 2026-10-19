@@ -234,6 +234,8 @@ async function pricedAvailability(
     dayPrice: r.day_price,
     extraGuestPrice: r.extra_guest_price,
     total: r.total,
+    roomsFree: r.rooms_free,
+    roomsTotal: r.rooms_total,
   }));
 }
 

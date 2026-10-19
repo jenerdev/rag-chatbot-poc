@@ -297,6 +297,9 @@ export interface RoomAvailability {
   /** for the guests asked about (0 when none were): the fee, and base + fee + that day's surcharge */
   extraGuestPrice: number;
   total: number;
+  /** D-133: the type's active rooms free that date and slot (0 when taken), of its active rooms */
+  roomsFree: number;
+  roomsTotal: number;
 }
 
 /** A booking group as createBookings returns it. */
@@ -434,6 +437,8 @@ export interface BookingPage {
     capacity: number | null;
     standardCapacity: number | null;
     extraPersonRate: number | null;
+    /** D-133: the type's active rooms, the most one request may take */
+    rooms: number;
     /** only the slots this unit has a price for */
     rates: RateSummary[];
   }[];
@@ -486,6 +491,8 @@ export interface RequestQuote {
   currency: string;
   /** false when a night is already CONFIRMED for one of the units; a request would be refused */
   available: boolean;
+  /** D-133: each requested type's fewest free rooms over the stay, the page's cap */
+  free: { unitId: number; rooms: number }[];
   /** the promo applied (D-097): a typed code that applies, or the automatic one; null otherwise */
   promo: { id: number; name: string; kind: PromoKind; value: number } | null;
   /** centavos, the sum of the lines' discounts; 0 without a promo */
