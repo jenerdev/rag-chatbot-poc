@@ -396,7 +396,7 @@ try {
   check(
     rooms.map((r) => `${r.unit} ${r.status}`).join(', ') === 'Garden Room taken, Family Room taken'
       && forSix.map((r) => r.unit).join(',') === 'Family Room'
-      && keys === 'capacity,date,dayPrice,extraGuestPrice,extraPersonRate,price,rateKind,slot,standardCapacity,status,total,unit',
+      && keys === 'capacity,date,dayPrice,extraGuestPrice,extraPersonRate,price,rateKind,roomsFree,roomsTotal,slot,standardCapacity,status,total,unit',
     'room availability: priced active rooms, capacity filter, no guest data',
     `${rooms.map((r) => `${r.unit} ${r.status} ${r.price}`).join(', ')} · 6 guests: ${forSix.map((r) => r.unit).join(',')} · keys ${keys}`,
   );

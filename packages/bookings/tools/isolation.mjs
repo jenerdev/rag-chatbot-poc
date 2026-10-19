@@ -31,6 +31,11 @@ import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
 import { asOperator, operatorEmail, supabase, userIdByEmail } from '@rag/db/service';
 import {
   addImage,
+  addUnitRoom,
+  deleteUnitRoom,
+  moveOptions,
+  moveStay,
+  updateUnitRoom,
   BookingConflictError,
   BookingInputError,
   BookingsNotEnabledError,
@@ -435,6 +440,51 @@ try {
         && bGuests.includes('B Guest') && !aGuests.includes('B Guest') && aOnBGuests.length === 0,
       "calendar A: B's confirmed night, pending request and guest are on B's calendar and not A's; A naming B's room reads nothing",
       `B ${counts(bDays)} · A ${counts(aDays)} · A on B's room ${aOnB.length} slots, ${aOnBDays.map((d) => d.state).join(',')} · guests B [${bGuests}] A [${aGuests}] A on B ${aOnBGuests.length}`,
+    );
+  }
+
+  // 16e. Room types (plan/room-types.md Phase 6, D-133): A cannot read B's
+  //      physical rooms, add one to B's type, rename, retire or delete one,
+  //      or move B's booking, each refused like a room that is not there.
+  //      The positive twin: B adds a room and moves its own booking to it,
+  //      then moves it back and retires the room, so later checks see one.
+  {
+    const { data: bRooms } = await supabase.from('unit_rooms').select('id, name, active').eq('unit_id', bRoom.id);
+    const bRoomId = bRooms[0].id;
+    const bBookingId = bBooked.bookings[0].id;
+    const seen = (await listAccommodations(a)).flatMap((r) => r.rooms.map((x) => x.name));
+    // Wall 2 alone: an unfiltered read of the table under A's token. On the
+    // service client (filters only) the same read would bypass RLS, so it is
+    // RLS's check and is skipped there.
+    const raw = filtersOnly ? null : (await a.db.from('unit_rooms').select('id')).data?.filter((r) => bRooms.some((x) => x.id === r.id)).length;
+    const added = await addUnitRoom(a, bRoom.id, 'Hijack 2');
+    const renamed = await updateUnitRoom(a, bRoom.id, bRoomId, { name: 'Hijacked' });
+    const retired = await updateUnitRoom(a, bRoom.id, bRoomId, { active: false });
+    const deleted = await deleteUnitRoom(a, bRoom.id, bRoomId);
+    const options = await moveOptions(a, bBookingId);
+    // move_room() is a definer that asks for a staff token of the tenant
+    // itself; the service client is no one's staff, so on filters alone the
+    // move is not callable at all and is skipped (null = skipped there).
+    const moved = filtersOnly ? null : await moveStay(a, bBookingId, bRoomId, 'iso: not yours');
+    const { data: after } = await supabase.from('unit_rooms').select('id, name, active').eq('unit_id', bRoom.id);
+    const { data: row } = await supabase.from('bookings').select('room_id').eq('id', bBookingId).single();
+    check(
+      !seen.includes(bRooms[0].name) && (raw === null || raw === 0) && added === null && renamed === false && retired === false
+        && deleted === false && options === null && moved === null && JSON.stringify(after) === JSON.stringify(bRooms) && row.room_id === bRoomId,
+      "room types A: cannot read, add, rename, retire, delete or move B's rooms (null/false); B's rooms and booking unchanged",
+      `A sees ${seen.join(',')} · raw ${raw ?? 'skipped'} · add ${added} · rename ${renamed} · retire ${retired} · delete ${deleted} · options ${options} · move ${moved} · B rooms ${after.length}`,
+    );
+
+    const second = await addUnitRoom(b, bRoom.id, 'B Room 2');
+    const offered = (await moveOptions(b, bBookingId))?.rooms.find((r) => r.id === second);
+    const there = filtersOnly ? 1 : await moveStay(b, bBookingId, second, 'iso: the positive twin');
+    const { data: moved2 } = await supabase.from('bookings').select('room_id').eq('id', bBookingId).single();
+    const back = filtersOnly ? 1 : await moveStay(b, bBookingId, bRoomId, 'iso: back again');
+    const off = await updateUnitRoom(b, bRoom.id, second, { active: false });
+    check(
+      second !== null && offered?.free === true && there === 1 && (filtersOnly || moved2.room_id === second) && back === 1 && off === true,
+      `room types B: adds its own room${filtersOnly ? '' : ', moves its booking there and back'}, retires it`,
+      `added #${second} · offered free ${offered?.free} · ${filtersOnly ? 'moves skipped (a definer, staff tokens only)' : `moved ${there} (row on #${moved2.room_id}) · back ${back}`} · retired ${off}`,
     );
   }
 

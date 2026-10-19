@@ -1,12 +1,13 @@
 // Room types Phase 4 (D-133) in a browser, against pnpm dev: S-5 adds a
 // second room to a type, the New booking form asks how many of that type,
-// the calendar says "1/2", and S-15's Rooms card moves a stay between the
+// the calendar says "1 of 2" (axe-clean at 375 px), and S-15's Rooms card moves a stay between the
 // two rooms through the Move drawer. On harbor, with a throwaway
 // "Garden Room 2" and one stay, both removed at the end.
 //
 //   (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/room-types-walk.mjs)
 
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { supabase } from '../packages/db/dist/service.js';
@@ -17,6 +18,11 @@ const SLUG = 'harbor';
 const TYPE = 'Garden Room';
 const EXTRA = 'Garden Room 2';
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'room-types', 'walk');
+const AXE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui-refresh', 'axe', 'axe.min.js'), 'utf8');
+const axe = async (page) => {
+  await page.eval(AXE);
+  return JSON.parse(await page.eval(`axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] }).then(r => JSON.stringify(r.violations.map(v => v.id + ' (' + v.nodes.length + ')')))`));
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -75,7 +81,7 @@ try {
   } else check(false, '2. the staff form lists Garden Room', 'no room picks appeared');
   await page.shot(join(OUT, 'staff-form-1280.png'));
 
-  // 3. Seed one confirmed Garden Room stay; the calendar says 1/2.
+  // 3. Seed one confirmed Garden Room stay; the calendar says 1 of 2.
   const setup = await (await call('/bookings/setup')).json();
   const night = setup.slots.find((x) => x.nightly);
   const day = (n) => { const d = new Date(`${setup.today}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -91,8 +97,17 @@ try {
   const cellSel = `[...document.querySelectorAll('button.wk-cell')].find(b => b.getAttribute('aria-label').startsWith(${JSON.stringify(`${TYPE}, ${night.name}`)}) && b.getAttribute('aria-label').includes('1 of 2 rooms booked'))`;
   const counted = await page.until(`!!${cellSel}`, 20000).then(() => true, () => false);
   check(counted, '3. the week calendar says Garden Room is 1 of 2 booked');
-  if (counted) check((await page.eval(`${cellSel}.textContent`)).includes('1/2'), '3b. the cell shows "1/2"');
+  if (counted) check((await page.eval(`${cellSel}.textContent`)).includes('1 of 2'), '3b. the cell shows "1 of 2"');
   await page.shot(join(OUT, 'calendar-week-1280.png'));
+  // The full audit's one violation (2026-10-20): the cell showed "1/2" while
+  // its name said "1 of 2 rooms booked" (label-content-name-mismatch at 375).
+  await page.viewport(375);
+  await page.goto(`${BASE}/t/${SLUG}/admin/calendar?view=week&date=${checkIn}`);
+  await page.until(`!!${cellSel}`, 20000).catch(() => null);
+  const weekAxe = await axe(page);
+  check(weekAxe.length === 0, '3c. axe: the week calendar at 375 px has no violation', weekAxe.join(', '));
+  await page.shot(join(OUT, 'calendar-week-375.png'));
+  await page.viewport(1280);
 
   // 4. S-15: the Rooms card, Move to Garden Room 2.
   await page.goto(`${BASE}/t/${SLUG}/admin/bookings/${ref}`);

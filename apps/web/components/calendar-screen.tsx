@@ -381,7 +381,7 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
                           {/* D-133: a type of several rooms says how many are booked. */}
                           {cell.roomsTotal > 1 && cell.state !== 'closed' && (
                             <span className="small" aria-hidden="true">
-                              {cell.roomsTaken}/{cell.roomsTotal}
+                              {cell.roomsTaken} of {cell.roomsTotal}
                             </span>
                           )}
                           {cell.pending > 0 && (
