@@ -9816,3 +9816,16 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **And the Phase 4 check owed, 223:** on a type of 2 rooms, `calendar_slots()` says open 1 of 2; `tenant_dashboard()`'s occupancy has `activeUnits` 2, so 1 room-night is 1.7% (the type count would say 3.3%); two pending stays on 2 rooms add 0 to "would clash", and confirming a third stay there makes both clash (+2).
 - **Observed:** rooms **56/56**; verify **223/223** (`cell open 1/2 · occupancy 1 of 2 rooms = 1.7% · clashing 2 → 2 with two pending → 4 with one confirmed`).
 - **Found while writing 223:** the dashboard's clash count already read 2 before the check's rows: 220–222 leave clashing pending stays on 2027 dates, which are still "upcoming". The check reads the change from a baseline instead of an absolute.
+
+## 2026-10-20 · The chat page: a lighter header, a welcome that fits a phone (`feat/chat-layout`)
+
+- **Asked:** improve the chat page's layout; can the header go? **Kept, made lighter:** it is the only New chat, the only brand once the welcome gives way, and staff's links. The page is a guest's whole site, not a widget.
+- **What:**
+  - the header is drawn on the page (no accent stripe, fill or divider) and gets its frosted bar and line back once the conversation scrolls under it (`.chat-layout.scrolled`); scoped to the chat, the booking page's and Manage booking's headers are unchanged;
+  - New chat only once there is a conversation;
+  - the welcome says the business's name twice, not four times: "Ask me anything. I answer from our own information, and show where each answer came from.";
+  - before the first message the welcome is centred in the page;
+  - **the bug:** on mount the scroller jumped to the bottom even with no conversation, so a phone opened on the welcome's bottom with its cover and the assistant's face scrolled away. Nothing scrolls now until there is a turn;
+  - on a phone: a shorter cover, a smaller mark, and the suggested questions as wrapping chips instead of 52 px cards.
+- **Observed:** axe over 16 states (villa, alteza × 1280, 375 × light, dark × top, scrolled): 0 violations, no sideways scroll. New chat hidden on the welcome, shown after "hello", and resets to the welcome with the field focused. Web tests 175. No prompt, tool or server code changed.
+- **Not changed:** the composer's footer: it already drops the keyboard hint below 560 px.

@@ -11,9 +11,18 @@
    a phone's browser bars; vh is the fallback. */
 .chat-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
 /* A <main>, so the base `main` width and margin are undone: this is the scroller, full width. */
+/* The header (BrandHeader) is drawn on the page, not as a bar: no stripe, no
+   fill, no divider, until the conversation scrolls under it; then the usual
+   frosted bar and its line come back (.scrolled, set by the scroll handler). */
+.chat-layout > .public-header { border-top: 0; border-bottom-color: transparent; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.chat-layout.scrolled > .public-header { border-bottom-color: var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); }
 #messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); max-width: none; margin: 0; width: 100%; }
 /* A reading width: a reply line longer than ~70 characters is hard to follow. */
 .messages-inner { max-width: 760px; margin: 0 auto; }
+/* Before the first message the welcome sits in the middle of the page, not
+   under the header with the empty half below it. */
+.messages-inner:has(> .welcome) { min-height: 100%; display: flex; flex-direction: column; justify-content: center; }
+.messages-inner:has(> .welcome) > .welcome { width: 100%; }
 
 /* The welcome (plan/ui-refresh.md Phase 3): the assistant's mark, one
    sentence, one muted line, and the suggested questions (D-089) as quiet
@@ -417,8 +426,13 @@
 .welcome-book { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--space-3); width: 100%; margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); font-size: var(--text-sm); color: var(--muted); }
 @media (max-width: 560px) {
   .welcome { margin-top: var(--space-2); }
-  .welcome-cover { height: 88px; }
-  .welcome-cover.has-image { height: 128px; }
+  .welcome-cover { height: 72px; }
+  .welcome-cover.has-image { height: 104px; }
   .welcome-body { padding: 0 var(--space-4) var(--space-5); }
-  .welcome .suggestions { margin-top: var(--space-4); }
+  .welcome .assistant-mark { width: 56px; height: 56px; margin-top: -28px; font-size: var(--text-lg); }
+  /* On a phone the suggestions are chips that wrap, not a column of cards:
+     five cards pushed the cover off the first screen. */
+  .welcome .suggestions { display: flex; flex-wrap: wrap; justify-content: center; margin-top: var(--space-4); }
+  .welcome .suggestions button { flex: none; min-height: 40px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-full); text-align: center; }
+  .welcome .suggestions button .icon { display: none; }
 }

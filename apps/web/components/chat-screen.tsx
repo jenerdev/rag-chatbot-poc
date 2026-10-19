@@ -160,16 +160,24 @@ export function ChatScreen({
 
   // useLayoutEffect, not useEffect: scrolling after the browser has painted the
   // new text produces a visible jump on every delta.
+  // The welcome is read from its top (its cover, the assistant's face), so
+  // nothing scrolls until there is a conversation: on a phone the welcome is
+  // taller than the screen, and scrolling it to the bottom hid the cover.
   useLayoutEffect(() => {
+    if (turns.length === 0) return;
     if (stick.current) scrollToBottom();
-    else if (turns.length > 0) setUnseen(true);
+    else setUnseen(true);
   }, [turns, scrollToBottom]);
 
+  // The header is drawn on the page itself and gains its divider only once
+  // something has scrolled under it.
+  const [scrolled, setScrolled] = useState(false);
   const onScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (stick.current) setUnseen(false);
+    setScrolled(el.scrollTop > 4);
   }, []);
 
   const jumpDown = useCallback(() => {
@@ -341,13 +349,16 @@ export function ChatScreen({
   }, []);
 
   return (
-    <div className="chat-layout">
+    <div className={scrolled ? 'chat-layout scrolled' : 'chat-layout'}>
       {/* The banner is the welcome's cover here, not a strip over the header. */}
       <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={null}>
-        <button className="ghost" type="button" onClick={newChat}>
-          <Icon name="plus" size={16} />
-          <span className="narrow-hidden">New chat</span>
-        </button>
+        {/* Only once there is something to leave: on the welcome it would do nothing. */}
+        {turns.length > 0 && (
+          <button className="ghost" type="button" onClick={newChat}>
+            <Icon name="plus" size={16} />
+            <span className="narrow-hidden">New chat</span>
+          </button>
+        )}
         <TenantNav slug={slug} features={nav} current="chat" />
       </BrandHeader>
 
@@ -374,7 +385,7 @@ export function ChatScreen({
                 <p className="welcome-text">
                   {emptyKb
                     ? 'I am still being set up, so I cannot answer questions yet. Please check back soon.'
-                    : `Ask me anything about ${businessName}. I answer from ${businessName}'s own information, and show where each answer came from.`}
+                    : 'Ask me anything. I answer from our own information, and show where each answer came from.'}
                 </p>
                 {!emptyKb && suggestedQuestions.length > 0 && (
                   <div className="suggestions" role="group" aria-label="Suggested questions">
