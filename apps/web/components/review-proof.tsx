@@ -21,7 +21,9 @@ import type { StayDetail } from '@rag/bookings';
 import { ProofThumb, proofKind } from '@/components/proof-viewer';
 import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
+import { QuickNotes } from '@/components/quick-notes';
 import { centavosToInput, formatMoney } from '@/lib/money';
+import { quickNotes } from '@/lib/quick-notes';
 import { when } from '@/lib/stay-words';
 
 type PaymentRow = StayDetail['payments'][number];
@@ -33,14 +35,6 @@ export interface ReviewDecision {
   note: string | null;
   confirm: boolean;
 }
-
-/** Reasons staff give most; one click fills the reason, which stays editable. */
-const QUICK_REASONS = [
-  'The money is not in the account.',
-  'The amount received is different from the amount sent.',
-  'The photo is unreadable. Please send a clearer one.',
-  'This receipt is for another booking.',
-];
 
 /** "Mon 12 Oct 2026" for a YYYY-MM-DD date. */
 function dateLabel(date: string): string {
@@ -236,6 +230,7 @@ export function ReviewProof({
             <label htmlFor="review-note">
               Note <span className="muted">(required)</span>
             </label>
+            <QuickNotes options={quickNotes('verify-proof')} value={note} onPick={setNote} />
             <input id="review-note" required maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
@@ -243,13 +238,7 @@ export function ReviewProof({
         <div className="review-fields">
           <div className="field">
             <label htmlFor="reject-reason">Reason, shown to the guest</label>
-            <div className="chip-picks" role="group" aria-label="Common reasons">
-              {QUICK_REASONS.map((r) => (
-                <button key={r} type="button" className={`chip${reason === r ? ' picked' : ''}`} aria-pressed={reason === r} onClick={() => setReason(r)}>
-                  {r}
-                </button>
-              ))}
-            </div>
+            <QuickNotes options={quickNotes('reject-proof')} value={reason} onPick={setReason} danger label="Common reasons" />
             <textarea id="reject-reason" required rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
         </div>

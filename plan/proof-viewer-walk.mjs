@@ -149,7 +149,7 @@ try {
   await realClick(page, '.review-option.danger input');
   await sleep(200);
   const before = await page.eval("({ hint: document.querySelector('.drawer-footer-total').innerText.trim(), disabled: [...document.querySelectorAll('.drawer-footer button')].find(b => b.textContent.trim() === 'Reject proof')?.disabled })");
-  await realClick(page, '.chip-picks .chip');
+  await realClick(page, '.review-proof .chip-picks .chip');
   await sleep(200);
   const reason = await page.eval("document.querySelector('#reject-reason').value");
   const enabled = await page.eval("[...document.querySelectorAll('.drawer-footer button')].find(b => b.textContent.trim() === 'Reject proof')?.disabled === false");

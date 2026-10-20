@@ -315,6 +315,15 @@
 > - SQL files 37–40: `schema-room-inventory`, `-room-counts`, `-room-move`,
 >   `-room-views`.
 >
+> **Every note on the booking page offers quick notes** since 2026-10-20
+> (D-135): three to five sentences per step (Confirm paid or unpaid,
+> Decline, Cancel, a change request's decision, a proof's, a refund, a
+> move, a staff note) in ONE table, `apps/web/lib/quick-notes.ts`, drawn
+> by ONE component as chips above the field. A click fills the field; the
+> text stays editable; a refusal's chips are the danger tone. The server
+> still requires every note it did (D-096); nothing moved there. A new
+> note field on S-15 gets a step in that table.
+>
 > **Guests can talk to the assistant** since 2026-10-20 (D-134,
 > [`plan/voice.md`](./plan/voice.md); the user's phone walk and the runs
 > after Phase 7 are recorded in status.md). A mic in the composer: the
@@ -374,7 +383,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/page.tsx  redirects to admin/dashboard (D-098 amended); 404 on an unknown tenant
   app/t/[tenant]/admin/documents/page.tsx  S-2 knowledge base — same
   app/t/[tenant]/admin/bookings/page.tsx  S-3 bookings — 404 unless the tenant has the application
-  app/t/[tenant]/admin/bookings/[reference]/page.tsx  S-15 one booking (D-114): EVERY action on a stay is here; lists link to it; its Staff notes card (D-132)
+  app/t/[tenant]/admin/bookings/[reference]/page.tsx  S-15 one booking (D-114): EVERY action on a stay is here; lists link to it; its Staff notes card (D-132); every note field offers quick notes for its step (D-135, lib/quick-notes.ts the ONE table, components/quick-notes.tsx)
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/conversations/page.tsx  S-16 conversations (D-115) — every member (conversations:read), every tenant; filters in the URL
   app/t/[tenant]/admin/conversations/[id]/page.tsx  S-16a one transcript, read-only; ?m= scrolls to a message; the route is /api/t/[tenant]/admin/conversations/[id]

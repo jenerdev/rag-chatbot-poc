@@ -4206,3 +4206,16 @@ either.
 **Why not speech-to-speech (Realtime):** the model would answer from the audio, past `buildPrompt()`, so the grounding, the refusal, the tools and the battery would not apply.
 
 **Why after the reply, not while it streams:** the speak route reads only what is stored (above). A spoken reply starts about 2 s after the text is complete.
+
+## D-135 · Quick notes: every note on the booking page offers the sentences staff write most · **Added 2026-10-20**
+
+**Decision:**
+- Every note field on S-15 has a row of chips above it, three to five sentences for THAT step: Confirm (two lists: a payment verified, or nothing verified, where the note must say how the stay is paid), Decline, Cancel stay, Approve and Reject a change request (cancel and reschedule apart), Verify and Reject a proof, Record a refund, Move, and a staff note.
+- A click puts the sentence in the field. The field stays editable, the chip whose sentence is the field's text reads pressed (`aria-pressed`), and an edited note presses none.
+- The words are in ONE table, `apps/web/lib/quick-notes.ts` (pure, tested): a note the guest reads is written to the guest, in full sentences; a note for staff is the fact, short. The reject-proof list that lived in `review-proof.tsx` moved there unchanged.
+- ONE component draws them, `components/quick-notes.tsx`; `useConfirmDialog()`'s question takes `quickNotes`. A refusal's chips (decline, cancel, reject) are the danger tone, `.chip-picks.danger`; the rest the accent.
+- Nothing moved on the server: every note is still required where it was (D-096), by the route or the SQL function, and the chips are a courtesy over the same field.
+
+**Why:** every decision takes a note, most of them required, and staff were typing the same five sentences. A pick is one click, and a guest reads a complete sentence instead of "ok".
+
+**Why not a free-text history of what this tenant typed:** it would carry guest names and amounts into a suggestion list, and the list would differ by tenant and by day; fixed words are predictable and hold nothing.

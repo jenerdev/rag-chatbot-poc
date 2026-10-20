@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
+import { QuickNotes } from './quick-notes';
 
 export interface Question {
   title: string;
@@ -22,6 +23,8 @@ export interface Question {
   noteLabel?: string;
   /** The action waits until a note is written (the booking page asks one for every decision). */
   noteRequired?: boolean;
+  /** Quick notes (D-135): sentences a click puts in the note field, from lib/quick-notes.ts. */
+  quickNotes?: readonly string[];
   actionLabel: string;
   /** The way out; "Back" unless the question reads better otherwise ("Keep it"). */
   backLabel?: string;
@@ -48,7 +51,7 @@ export function useConfirmDialog() {
   return { ask, dialog };
 }
 
-function ConfirmDialog({ title, body, noteLabel, noteRequired, actionLabel, backLabel = 'Back', danger, onDone }: Question & { onDone: (answer: string | null) => void }) {
+function ConfirmDialog({ title, body, noteLabel, noteRequired, quickNotes, actionLabel, backLabel = 'Back', danger, onDone }: Question & { onDone: (answer: string | null) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [note, setNote] = useState('');
   const titleId = useId();
@@ -92,6 +95,7 @@ function ConfirmDialog({ title, body, noteLabel, noteRequired, actionLabel, back
             <label htmlFor={noteId}>
               {noteLabel} <span className="muted">{noteRequired ? '(required)' : '(optional)'}</span>
             </label>
+            {quickNotes && <QuickNotes options={quickNotes} value={note} onPick={setNote} danger={danger} />}
             <textarea id={noteId} rows={3} autoFocus required={noteRequired} value={note} onChange={(event) => setNote(event.target.value)} />
           </div>
         )}

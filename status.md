@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**Quick notes (2026-10-20, D-135, done):** every note field on S-15 offers chips for its step (`lib/quick-notes.ts`, `components/quick-notes.tsx`); web tests 192, `plan/quick-notes-walk.mjs` 7/7, the proof-viewer walk 12/12. Nothing owed.
+
 **Voice (2026-10-20, planned, nothing built):** [`plan/voice.md`](./plan/voice.md). Talk to the assistant and hear it answer: transcription in, text-to-speech out, around the UNCHANGED pipeline; the speak route speaks only the conversation's stored reply. § 6 answered 2026-10-20 (every recommendation). **Phase 0 done:** baseline green; `gpt-4o-mini-tts` stalls (116 s processing, timeouts), `tts-1` answers in 1.1–1.9 s, transcription 0.8–1.4 s, Tagalog and Taglish heard right. Owed: the user listens to `plan/voice/phase0/` and judges the peso amount and the Taglish. Rule 6 added at the user's word: the browser's own voice reads the reply when OpenAI's speech fails (a local voice only, else silence); a failed transcription falls back to typing. Next: Phase 1 (`transcribe()`, `speak()`, `speakable()` in `apps/web/lib/`).
 - [x] Phases 1–5 and 7 built 2026-10-20, one commit each (`a6fc865`, `81deb46`, `3f078a1`, `00e63ed`, `4072899`, and Phase 7's): `transcribe()`/`speak()`, `speakable()`; the two routes and `latestReply()`; the composer's mic, read-aloud and the on-device fallback; `schema-voice.sql` (41st, APPLIED: the constraint has `voice`, `tenant_feature_on(villa, voice)` = false with no row) and the privacy text; the walls script; D-134, R-53. **No suite, walk or audit ran between phases (the user's word);** they run now, after Phase 7.
 - [x] The runs, after Phase 7 (2026-10-20): tests 13+19+10+5+133+370+186; typecheck 13/13; verify **224/224**; rooms OK; `voice-phase5-walls` **3/3**; `voice-phase2-walk` **6/6** (the first run's 429 check met the dev server reloading after a package build; re-run, and a 34-call probe: 30 × 400 then 429); `voice-phase3-walk` **11/11** with axe over 6 voice states clean (its first runs: a spy script piling up, and a cleanup query PostgREST refused, both the walk's own, fixed); no prompt-side file changed on the branch, villa's tool text byte-identical. Eight test chats this session left on villa removed.
@@ -1854,6 +1856,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-20 — quick notes on the booking page (D-135)
+- **Asked:** "on booking detail page. on every notes request/required. add quick note options. related to the steps."
+- **Did:** one table of sentences per step (`apps/web/lib/quick-notes.ts`, tested), one chip component, `quickNotes` on the confirm dialog's question, and every note on S-15 wired: Confirm (paid / unpaid lists), Decline, Cancel stay, Approve and Reject a change, Verify and Reject a proof, the refund, the move, a staff note. The reject-proof list moved into the table; the server's rules are untouched.
+- **Observed:** web tests 192 (4 new), typecheck 13/13, `plan/quick-notes-walk.mjs` 7/7 on villa (shots in `plan/quick-notes/walk/`), `plan/proof-viewer-walk.mjs` 12/12 with its chip selector scoped to the drawer.
 
 ### 2026-10-15 — staff notes on a booking (`feat/stay-notes`, D-132)
 - **Asked:** "on booking details page, add a section for notes; can add multiple notes."

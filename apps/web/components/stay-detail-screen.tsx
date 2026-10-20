@@ -14,6 +14,10 @@
 // Staff notes (D-132): any number per stay, newest first, for staff only.
 // Anyone with bookings:write adds one; only its author deletes it.
 //
+// Quick notes (D-135): every note field here offers chips for its step, the
+// sentences in lib/quick-notes.ts; a click fills the field, which stays
+// editable. The server still requires every note it did.
+//
 // No money is computed here: every figure is a stored row's or
 // stay_payment()'s. Amounts typed by staff are pesos, parsed by string on
 // the server (lib/money.ts).
@@ -31,10 +35,12 @@ import { Icon } from '@/components/icons';
 import { Tip } from '@/components/tooltip';
 import { StayLines } from '@/components/stay-lines';
 import { ReviewProof, type ReviewDecision } from '@/components/review-proof';
+import { QuickNotes } from '@/components/quick-notes';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { can, isRole, type Role } from '@/lib/permissions';
+import { confirmQuickNotes, quickNotes } from '@/lib/quick-notes';
 import { stayActions } from '@/lib/stay-actions';
 import { STAY_PAYMENT, eventWords, pendingState, when } from '@/lib/stay-words';
 
@@ -352,13 +358,14 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
         ? {
             title: `Confirm ${s.reference}?`,
             body: `${s.guestName}: ${stayWhen}. Confirming books the dates.`,
-            noteLabel: actions.confirmNeedsNote ? 'Note: no payment is verified yet, e.g. "Paid cash at the desk"' : 'Note',
+            noteLabel: actions.confirmNeedsNote ? 'Note: no payment is verified yet, so say how the stay is paid' : 'Note',
             noteRequired: true,
+            quickNotes: confirmQuickNotes(actions.confirmNeedsNote),
             actionLabel: 'Confirm',
           }
         : action === 'cancel'
-          ? { title: `Cancel ${s.reference}?`, body: `${s.guestName}: ${stayWhen}. Every night is freed.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
-          : { title: `Decline ${s.reference}?`, body: `${s.guestName}: ${stayWhen}.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Decline', danger: true },
+          ? { title: `Cancel ${s.reference}?`, body: `${s.guestName}: ${stayWhen}. Every night is freed.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, quickNotes: quickNotes('cancel'), actionLabel: 'Cancel stay', backLabel: 'Keep it', danger: true }
+          : { title: `Decline ${s.reference}?`, body: `${s.guestName}: ${stayWhen}.`, noteLabel: 'Reason, shown to the guest', noteRequired: true, quickNotes: quickNotes('decline'), actionLabel: 'Decline', danger: true },
     );
     if (answer === null) return;
     const done =
@@ -376,8 +383,8 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
     const what = kind === 'cancel' ? 'cancel this stay' : `move this stay to ${newCheckIn ? dayLabel(newCheckIn) : 'another date'}`;
     const answer = await ask(
       action === 'approve'
-        ? { title: `Approve the request to ${what}?`, body: kind === 'cancel' ? 'The stay is cancelled. Pay any refund due, then record it here.' : 'The stay moves to the new dates.', noteLabel: 'Note, shown to the guest', noteRequired: true, actionLabel: 'Approve' }
-        : { title: `Reject the request to ${what}?`, body: 'The stay stays as it is.', noteLabel: 'Reason, shown to the guest', noteRequired: true, actionLabel: 'Reject', danger: true },
+        ? { title: `Approve the request to ${what}?`, body: kind === 'cancel' ? 'The stay is cancelled. Pay any refund due, then record it here.' : 'The stay moves to the new dates.', noteLabel: 'Note, shown to the guest', noteRequired: true, quickNotes: quickNotes(kind === 'cancel' ? 'approve-cancel' : 'approve-reschedule'), actionLabel: 'Approve' }
+        : { title: `Reject the request to ${what}?`, body: 'The stay stays as it is.', noteLabel: 'Reason, shown to the guest', noteRequired: true, quickNotes: quickNotes('reject-change'), actionLabel: 'Reject', danger: true },
     );
     if (answer === null) return;
     await write(
@@ -697,6 +704,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
                 <label htmlFor="stay-note-body" className="visually-hidden">
                   New note
                 </label>
+                <QuickNotes options={quickNotes('staff-note')} value={noteDraft} onPick={setNoteDraft} />
                 <textarea
                   id="stay-note-body"
                   rows={2}
@@ -870,6 +878,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
           </div>
           <div className="field">
             <label htmlFor="refund-note">Note</label>
+            <QuickNotes options={quickNotes('refund')} value={refund.note} onPick={(note) => setRefund({ ...refund, note })} />
             <input id="refund-note" required maxLength={500} value={refund.note} onChange={(e) => setRefund({ ...refund, note: e.target.value })} />
           </div>
           <div className="form-footer">
@@ -909,6 +918,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
               </fieldset>
               <div className="field">
                 <label htmlFor="move-note">Why it moves</label>
+                <QuickNotes options={quickNotes('move')} value={moving.note} onPick={(note) => setMoving({ ...moving, note })} />
                 <input id="move-note" required maxLength={500} placeholder="Guest asked for the room by the pool" value={moving.note} onChange={(e) => setMoving({ ...moving, note: e.target.value })} />
               </div>
               <div className="form-footer">
