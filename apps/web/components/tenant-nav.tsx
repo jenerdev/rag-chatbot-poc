@@ -19,7 +19,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from './icons';
-import { navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
+import { chatLinkLabel, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 
 export type SessionState = 'checking' | 'out' | 'in';
@@ -38,11 +38,14 @@ export function TenantNav({
   slug,
   features,
   current,
+  assistantName,
   session,
 }: {
   slug: string;
   features: NavFeatures;
   current: NavPage;
+  /** The assistant's name: on a guest page the chat link reads "Need help? Ask <name>" (D-136 amended). */
+  assistantName?: string;
   session?: { auth: SessionState; role: Role | null; onLogout: () => void };
 }) {
   const api = `/api/t/${slug}`;
@@ -81,7 +84,8 @@ export function TenantNav({
           href={item.href}
           aria-current={item.page === current ? 'page' : undefined}
         >
-          {item.label}
+          {publicPage && item.page === 'chat' && <Icon name="chat" size={16} />}
+          {publicPage && item.page === 'chat' ? chatLinkLabel(assistantName) : item.label}
         </Link>
       ))}
       {staffHome && (

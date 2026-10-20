@@ -42,6 +42,7 @@ export default async function TenantManagePage({
     <ManageBookingScreen
       slug={tenant.slug}
       businessName={branding.businessName}
+      assistantName={branding.assistantName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
       nav={nav}

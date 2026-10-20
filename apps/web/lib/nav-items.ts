@@ -42,6 +42,17 @@ export interface NavItem {
 }
 
 /**
+ * The chat link as a GUEST reads it on the booking page and Manage booking
+ * (D-136 amended, the user's word): an invitation by the assistant's name,
+ * "Need help? Ask Lia", not "Chat". With no name, "Need help? Ask us".
+ * navItems() keeps "Chat" for the staff account menu and the tests.
+ */
+export function chatLinkLabel(assistantName: string | null | undefined): string {
+  const name = assistantName?.trim();
+  return `Need help? Ask ${name ? name : 'us'}`;
+}
+
+/**
  * The header's links, in order: the public pages first, then every staff
  * page this role may open. `role` null means "not logged in" (or not yet
  * known): the public pages only.

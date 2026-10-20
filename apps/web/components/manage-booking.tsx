@@ -36,6 +36,8 @@ import type { NavFeatures } from '@/lib/nav-items';
 export interface ManageBookingScreenProps {
   slug: string;
   businessName: string;
+  /** the assistant's name, for the header's chat link (D-136) */
+  assistantName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
   nav: NavFeatures;
@@ -161,7 +163,7 @@ function timeLabel(iso: string, timezone: string): string {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
 }
 
-export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
+export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
   const [reference, setReference] = useState(initialReference);
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
@@ -199,7 +201,7 @@ export function ManageBookingScreen({ slug, businessName, logoUrl, bannerUrl, na
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} hero="Manage booking">
-      <TenantNav slug={slug} features={nav} current="manage" />
+      <TenantNav slug={slug} features={nav} current="manage" assistantName={assistantName} />
     </BrandHeader>
   );
 

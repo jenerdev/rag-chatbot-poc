@@ -35,7 +35,7 @@ export default async function TenantTermsPage({ params }: { params: Promise<{ te
   return (
     <>
       <BrandHeader businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={null} subtitle="Terms">
-        <TenantNav slug={tenant.slug} features={nav} current="legal" />
+        <TenantNav slug={tenant.slug} features={nav} current="legal" assistantName={branding.assistantName} />
       </BrandHeader>
       <main className="legal-main">
         <LegalBody doc={doc} />

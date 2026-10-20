@@ -52,7 +52,7 @@ try {
   const manageHead = await page.eval(links('.public-header nav a'));
   const manageFoot = await page.eval(links('.public-footer a'));
   const manageWords = await page.eval("[...document.querySelectorAll('.public-header nav a')].map(a => a.textContent.trim())");
-  check(manageHead.join() === `${CHAT},${BOOK}` && manageFoot.includes(BOOK) && manageWords.join() === 'Chat,Book a stay', '3. Manage booking links to the chat and the booking page in its header, not to itself', `${manageWords.join(' · ')} · ${manageFoot.join(' ')}`);
+  check(manageHead.join() === `${CHAT},${BOOK}` && manageFoot.includes(BOOK) && /^Need help\? Ask \S+,Book a stay$/.test(manageWords.join()), '3. Manage booking links to the chat and the booking page in its header, not to itself', `${manageWords.join(' · ')} · ${manageFoot.join(' ')}`);
   await page.shot(join(OUT, 'manage-1280.png'));
 
   // 4. On a phone every header link is still there and nothing scrolls sideways.

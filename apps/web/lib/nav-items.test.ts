@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_ON } from './features';
-import { groupNavItems, groupOf, navItems, type NavFeatures } from './nav-items';
+import { chatLinkLabel, groupNavItems, groupOf, navItems, type NavFeatures } from './nav-items';
 
 // The header offers exactly the pages a role may open, and only the pages the
 // tenant has (so a button never leads to a 404).
@@ -9,6 +9,16 @@ const labels = (features: NavFeatures, role: Parameters<typeof navItems>[2]) => 
 const NORTHWIND: NavFeatures = { bookings: false, rooms: false, book: false, manage: false, flags: ALL_ON, access: {} };
 const VILLA: NavFeatures = { bookings: true, rooms: false, book: true, manage: true, flags: ALL_ON, access: {} };
 const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true, manage: true, flags: ALL_ON, access: {} };
+
+describe('chatLinkLabel', () => {
+  it('invites the guest by the assistant\'s name, or "us" without one', () => {
+    expect(chatLinkLabel('Lia')).toBe('Need help? Ask Lia');
+    expect(chatLinkLabel('  Brava ')).toBe('Need help? Ask Brava');
+    expect(chatLinkLabel('')).toBe('Need help? Ask us');
+    expect(chatLinkLabel(null)).toBe('Need help? Ask us');
+    expect(chatLinkLabel(undefined)).toBe('Need help? Ask us');
+  });
+});
 
 describe('navItems', () => {
   it('shows a visitor the public pages only', () => {

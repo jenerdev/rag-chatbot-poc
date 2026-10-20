@@ -39,6 +39,7 @@ export default async function TenantBookPage({ params }: { params: Promise<{ ten
     <BookingPageScreen
       slug={tenant.slug}
       businessName={branding.businessName}
+      assistantName={branding.assistantName}
       logoUrl={branding.logoUrl}
       bannerUrl={branding.bannerUrl}
       nav={nav}

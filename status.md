@@ -56,7 +56,9 @@
 
 ## ▶ Next up (do this next)
 
-**Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; web tests 192, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
+**Shared rate limit (2026-10-20, planned, nothing built):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window leaves `lib/rate-limit.ts`'s in-memory `Map` for ONE Postgres table and ONE definer function, `rate_allow()` (`schema-rate-limit.sql`, the 42nd file), so every instance shares one count (R-39 closed); the chat route gets the limit it never had; a per-tenant ceiling across addresses on the OpenAI routes is § 7 q2. No prompt text, no tool text. § 7's five questions wait for the user. It is one of the four things owed before a public URL (with guest email, custom SMTP and an audit log).
+
+**Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; the chat link on a guest page reads "Need help? Ask <assistant>" (`chatLinkLabel()`); web tests 193, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
 
 **Quick notes (2026-10-20, D-135, done):** every note field on S-15 offers chips for its step (`lib/quick-notes.ts`, `components/quick-notes.tsx`); web tests 192, `plan/quick-notes-walk.mjs` 7/7, the proof-viewer walk 12/12. Nothing owed.
 
@@ -1863,6 +1865,7 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 - **Asked:** "on 3 public pages chatbot, manage booking, and booking page. should have link to each other".
 - **Did:** `navItems()` lists the three guest pages (Chat, Book a stay, Manage booking); a guest page's header shows the other two; the chat's welcome offers "Book your stay" and "Manage your booking", and the links under the field carry both; the staff account menu names Manage booking too.
 - **Observed:** web tests 192, typecheck 13/13, `plan/guest-links-walk.mjs` 6/6 on villa at 1280 and 390 (shots in `plan/guest-links/walk/`).
+- **Then, the user's reword:** the chat link on a guest page is "Need help? Ask Lia" (`chatLinkLabel(assistantName)`, "Ask us" with no name); tests 193, the walk 6/6 again.
 
 ### 2026-10-20 — quick notes on the booking page (D-135)
 - **Asked:** "on booking detail page. on every notes request/required. add quick note options. related to the steps."

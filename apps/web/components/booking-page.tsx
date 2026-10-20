@@ -43,6 +43,8 @@ import { Lightbox, useLightbox } from '@/components/lightbox';
 export interface BookingPageScreenProps {
   slug: string;
   businessName: string;
+  /** the assistant's name, for the header's chat link (D-136) */
+  assistantName: string;
   logoUrl: string | null;
   bannerUrl: string | null;
   page: BookingPage;
@@ -177,7 +179,7 @@ function QuoteSkeleton({ nights, rooms }: { nights: number; rooms: number }) {
   );
 }
 
-export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page, nav, photos = {}, policyVersion }: BookingPageScreenProps) {
+export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, bannerUrl, page, nav, photos = {}, policyVersion }: BookingPageScreenProps) {
   const lightbox = useLightbox();
   const api = `/api/t/${slug}`;
   const perRoom = page.bookingType === 'per_room';
@@ -331,7 +333,7 @@ export function BookingPageScreen({ slug, businessName, logoUrl, bannerUrl, page
 
   const header = (
     <BrandHeader businessName={businessName} logoUrl={logoUrl} bannerUrl={bannerUrl} hero="Online booking">
-      <TenantNav slug={slug} features={nav} current="book" />
+      <TenantNav slug={slug} features={nav} current="book" assistantName={assistantName} />
     </BrandHeader>
   );
 

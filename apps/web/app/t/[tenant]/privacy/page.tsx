@@ -37,7 +37,7 @@ export default async function TenantPrivacyPage({ params }: { params: Promise<{ 
   return (
     <>
       <BrandHeader businessName={branding.businessName} logoUrl={branding.logoUrl} bannerUrl={null} subtitle="Privacy">
-        <TenantNav slug={tenant.slug} features={nav} current="legal" />
+        <TenantNav slug={tenant.slug} features={nav} current="legal" assistantName={branding.assistantName} />
       </BrandHeader>
       <main className="legal-main">
         <LegalBody doc={doc} />

@@ -4231,3 +4231,5 @@ either.
 - Each link is drawn only when the page exists (`nav.book`, `nav.manage`, the same checks the pages 404 on), so a tenant without the booking page or with Manage booking switched off (D-127) shows no dead link.
 
 **Why:** a guest who arrived on one page was often one of the other two away from what they wanted, with no way there but the address bar: the chat had no link to Manage booking at all, and the booking page's header had only Chat.
+
+**Amended 2026-10-20, the same day (the user: reword "Chat"):** on a guest page the chat link reads **"Need help? Ask Lia"**, the tenant's assistant by name, with a chat icon; with no name, "Need help? Ask us". ONE function, `chatLinkLabel()` in `lib/nav-items.ts`, tested; `TenantNav` takes `assistantName` and every guest page passes it (the booking page, Manage booking, privacy, terms, reset). `navItems()` keeps "Chat": the staff account menu says "Chat page", and a signed-out staff page keeps the plain link. An invitation, because a guest does not know what "Chat" is for; the name, because the welcome already introduces the assistant by it.

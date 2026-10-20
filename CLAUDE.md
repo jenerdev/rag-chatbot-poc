@@ -317,7 +317,9 @@
 >
 > **The three guest pages link to each other** since 2026-10-20 (D-136):
 > `navItems()` lists Chat, Book a stay and Manage booking (each only when
-> the page exists); a guest page's header shows the other two, the chat's
+> the page exists); on a guest page the chat link reads "Need help? Ask
+> <assistant>" (`chatLinkLabel()`, the ONE wording; `TenantNav` takes
+> `assistantName`); a guest page's header shows the other two, the chat's
 > welcome and the links under its field carry both, and the staff account
 > menu names all three. A new guest page gets a `NavPage` and a line there.
 >
