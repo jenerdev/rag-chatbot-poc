@@ -56,7 +56,7 @@
 
 ## ▶ Next up (do this next)
 
-**Shared rate limit (2026-10-20, D-137, done, walk included):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window is ONE count in Postgres (`rate_windows` + `rate_allow()`, `schema-rate-limit.sql`, the 42nd file, applied), shared by every instance (R-39 closed); the chat route is limited for the first time; the chat and voice routes meet a per-tenant ceiling across addresses (R-53). verify **229/229**, `plan/rate-limit-walk.mjs` 8/8, voice walk 6/6, web tests 202, typecheck 13/13, rooms 56; villa's tool text byte-identical. On `feat/rate-limit`, unmerged. Nothing owed. Still owed before a public URL: guest email (manage-booking Phase 7), custom SMTP (R-21), an audit log (R-13).
+**Shared rate limit (2026-10-20, D-137, done, walk included):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window is ONE count in Postgres (`rate_windows` + `rate_allow()`, `schema-rate-limit.sql`, the 42nd file, applied), shared by every instance (R-39 closed); the chat route is limited for the first time; the chat and voice routes meet a per-tenant ceiling across addresses (R-53). verify **229/229**, `plan/rate-limit-walk.mjs` 8/8, voice walk 6/6, web tests 202, typecheck 13/13, rooms 56; villa's tool text byte-identical. **Merged** into `master` 2026-10-20 (fast-forward, `3dc96c3`), by the user's word. Nothing owed. Still owed before a public URL: guest email (manage-booking Phase 7), custom SMTP (R-21), an audit log (R-13).
 
 **Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; the chat link on a guest page reads "Need help? Ask <assistant>" (`chatLinkLabel()`); web tests 193, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
 
