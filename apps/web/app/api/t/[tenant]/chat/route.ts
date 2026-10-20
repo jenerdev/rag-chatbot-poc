@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta, ToolCallRecord } from '@rag/pipeline';
+import { allowSpend, CHAT_REQUESTS_PER_WINDOW, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -28,6 +29,15 @@ const encoder = new TextEncoder();
 export const POST = withTenantRoute(async (request, { tenant }) => {
   const parsed = chatSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+
+  // The limit, BEFORE anything is spent and before the Accept header is read
+  // (plan/rate-limit.md Rule 5): a refused turn is one JSON 429 in both
+  // deliveries, and no embedding, retrieval or model call happens. A
+  // greeting answered in code counts too, so a stranger cannot learn which
+  // messages are cheap. The screen shows these words in the turn.
+  if (!(await allowSpend(tenant, 'chat', clientIp(request), CHAT_REQUESTS_PER_WINDOW))) {
+    return NextResponse.json({ error: 'Too many questions from here. Please wait a few minutes and ask again.' }, { status: 429 });
+  }
 
   const args = {
     tenant,
