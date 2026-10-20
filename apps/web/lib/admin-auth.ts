@@ -169,6 +169,20 @@ export async function checkStaffLogin(tenant: TenantContext, email: string, pass
   return (await staffClient(tenant.id, userId)) ? userId : null;
 }
 
+/**
+ * D-138: a login or logout row in the audit log, written by audit_note() on
+ * a STAFF token for this user, so the row names them; Postgres refuses a
+ * token with no user. Called after a login succeeded and before a logout.
+ * A failed login is NOT noted (plan § 2b.4): at that moment there is no
+ * staff token, and Supabase records failed sign-ins itself.
+ */
+export async function noteSession(tenant: TenantContext, userId: string, action: 'login' | 'logout'): Promise<void> {
+  const staff = await staffClient(tenant.id, userId);
+  if (!staff) return; // no longer a member: nothing to note, and nothing to refuse
+  const { error } = await staff.db.rpc('audit_note', { p_tenant_id: tenant.id, p_action: action });
+  if (error) throw new Error(`Could not record the ${action}: ${error.message}`);
+}
+
 /** Attach the session cookie, scoped to this tenant's API path. */
 export function setSessionCookie(response: NextResponse, tenant: TenantContext, userId: string): NextResponse {
   const expiresAt = Date.now() + SESSION_MS;

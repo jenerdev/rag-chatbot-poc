@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { LOGIN_FAILED, checkStaffLogin, clearSessionCookie, requireAdmin, setSessionCookie } from '@/lib/admin-auth';
+import { LOGIN_FAILED, checkStaffLogin, clearSessionCookie, noteSession, readSession, requireAdmin, setSessionCookie } from '@/lib/admin-auth';
 import { badRequest } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -23,6 +23,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 
   const userId = await checkStaffLogin(tenant, parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: LOGIN_FAILED }, { status: 401 });
+  await noteSession(tenant, userId, 'login'); // D-138
   return setSessionCookie(NextResponse.json({ admin: true, tenant: tenant.slug }), tenant, userId);
 });
 
@@ -47,7 +48,9 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
   }
 });
 
-/** Log out. It always succeeds, because clearing a cookie that is not there is not an error. */
-export const DELETE = withTenantRoute(async (_request, { tenant }) => {
+/** Log out. It always succeeds, because clearing a cookie that is not there is not an error. A genuine session is noted first (D-138). */
+export const DELETE = withTenantRoute(async (request, { tenant }) => {
+  const userId = readSession(request, tenant);
+  if (userId) await noteSession(tenant, userId, 'logout');
   return clearSessionCookie(NextResponse.json({ admin: false }), tenant);
 });

@@ -77,6 +77,14 @@ export async function checkPlatformLogin(email: string, password: string): Promi
   return (await platformClient(userId)) ? userId : null;
 }
 
+/** D-138: a super user's login or logout, as a platform-wide audit row (no tenant), on the platform token so the row names them. */
+export async function notePlatformSession(userId: string, action: 'login' | 'logout'): Promise<void> {
+  const db = await platformClient(userId);
+  if (!db) return;
+  const { error } = await db.rpc('audit_note', { p_tenant_id: null, p_action: action });
+  if (error) throw new Error(`Could not record the ${action}: ${error.message}`);
+}
+
 export function setPlatformCookie(response: NextResponse, userId: string): NextResponse {
   const expiresAt = Date.now() + SESSION_MS;
   const payload = `platform.${userId}.${expiresAt}`;

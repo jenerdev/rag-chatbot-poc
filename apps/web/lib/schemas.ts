@@ -471,6 +471,7 @@ export const updateTenantSchema = z
     policyVersion: z.string().trim().regex(/^[A-Za-z0-9._-]{1,20}$/, 'The version is 1–20 letters, digits, dots, dashes or underscores').optional(),
     chatRetentionDays: z.number().int().min(30, 'Chats are kept at least 30 days').max(1825, 'Chats are kept at most 1,825 days').optional(),
     guestRetentionDays: z.number().int().min(180, 'Guest details are kept at least 180 days').max(3650, 'Guest details are kept at most 3,650 days').optional(),
+    auditRetentionDays: z.number().int().min(90, 'Activity is kept at least 90 days').max(3650, 'Activity is kept at most 3,650 days').optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');

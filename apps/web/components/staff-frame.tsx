@@ -54,6 +54,7 @@ const ICON_OF: Readonly<Record<NavPage, IconName>> = {
   slots: 'clock',
   promos: 'tag',
   members: 'users',
+  activity: 'eye',
   reset: 'user',
   legal: 'file',
 };

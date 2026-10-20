@@ -16,9 +16,11 @@ export interface LegalFields {
   policyVersion: string;
   chatRetentionDays: number;
   guestRetentionDays: number;
+  /** D-138: days an activity row is kept */
+  auditRetentionDays: number;
 }
 
-type Draft = { name: string; email: string; dpa: string; version: string; chatDays: string; guestDays: string };
+type Draft = { name: string; email: string; dpa: string; version: string; chatDays: string; guestDays: string; auditDays: string };
 
 const draftOf = (l: LegalFields): Draft => ({
   name: l.privacyContactName ?? '',
@@ -27,6 +29,7 @@ const draftOf = (l: LegalFields): Draft => ({
   version: l.policyVersion,
   chatDays: String(l.chatRetentionDays),
   guestDays: String(l.guestRetentionDays),
+  auditDays: String(l.auditRetentionDays),
 });
 
 /** The PATCH body: every field, empty text as null. Numbers as numbers; a bad one is the route's 400. */
@@ -37,6 +40,7 @@ const bodyOf = (d: Draft) => ({
   policyVersion: d.version.trim(),
   chatRetentionDays: Number(d.chatDays),
   guestRetentionDays: Number(d.guestDays),
+  auditRetentionDays: Number(d.auditDays),
 });
 
 export function LegalPanel({ legal, slug, busy, onSave }: { legal: LegalFields; slug: string; busy: boolean; onSave: (body: ReturnType<typeof bodyOf>) => void }) {
@@ -121,6 +125,11 @@ export function LegalPanel({ legal, slug, busy, onSave }: { legal: LegalFields; 
               <label htmlFor="legal-guest-days">Guest details, days after check-out</label>
               <input id="legal-guest-days" type="number" min={180} max={3650} value={d.guestDays} onChange={set('guestDays')} required />
               <p className="hint">180 to 3,650. Dates, amounts and references stay.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="legal-audit-days">Activity log, days</label>
+              <input id="legal-audit-days" type="number" min={90} max={3650} value={d.auditDays} onChange={set('auditDays')} required />
+              <p className="hint">90 to 3,650. Who did what, on the Activity screen.</p>
             </div>
           </div>
         </div>

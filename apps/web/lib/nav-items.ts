@@ -30,7 +30,7 @@ export interface NavFeatures {
   access: RoleOverrides;
 }
 
-export type NavPage = 'chat' | 'book' | 'manage' | 'legal' | 'payments' | 'dashboard' | 'notifications' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'reset';
+export type NavPage = 'chat' | 'book' | 'manage' | 'legal' | 'payments' | 'dashboard' | 'notifications' | 'documents' | 'unanswered' | 'conversations' | 'bookings' | 'calendar' | 'rooms' | 'holidays' | 'slots' | 'promos' | 'members' | 'activity' | 'reset';
 
 export interface NavItem {
   page: NavPage;
@@ -88,6 +88,8 @@ export function navItems(slug: string, features: NavFeatures, role: Role | null,
     ['holidays', 'Holidays', '/admin/holidays', features.bookings && can(role, 'holidays:read', features.access)],
     ['promos', 'Promos', '/admin/promos', features.bookings && can(role, 'promos:read', features.access)],
     ['members', 'Members', '/admin/members', can(role, 'members:manage', features.access)],
+    // S-18 (plan/audit-log.md, D-138): who did what; owners by default, grantable to admins.
+    ['activity', 'Activity', '/admin/activity', can(role, 'activity:read', features.access)],
   ];
   // What this member has not read, on Notifications alone; a zero is no badge.
   for (const [page, label, path, allowed] of staff) {
@@ -122,6 +124,7 @@ const GROUP_OF: Readonly<Partial<Record<NavPage, NavGroup>>> = {
   holidays: 'Setup',
   promos: 'Setup',
   members: 'Setup',
+  activity: 'Setup',
 };
 const GROUP_ORDER: readonly NavGroup[] = ['Overview', 'Front desk', 'Assistant', 'Setup'];
 

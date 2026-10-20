@@ -37,12 +37,12 @@ describe('navItems', () => {
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos', 'Members', 'Activity']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Slots', 'Holidays', 'Promos', 'Members']);
-    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Conversations', 'Unanswered', 'Knowledge base', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Slots', 'Holidays', 'Promos', 'Members', 'Activity']);
+    expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Conversations', 'Unanswered', 'Knowledge base', 'Members', 'Activity']);
   });
 
   it('links each page under the tenant', () => {
@@ -63,6 +63,7 @@ describe('navItems', () => {
       '/t/harbor/admin/holidays',
       '/t/harbor/admin/promos',
       '/t/harbor/admin/members',
+      '/t/harbor/admin/activity',
     ]);
   });
 });
@@ -75,7 +76,7 @@ describe('groupNavItems', () => {
 
   it("sections an owner's harbor links by the work: the daily work first, then the assistant, then setup", () => {
     expect(sections(HARBOR, 'owner')).toEqual({
-      groups: ['Overview: Dashboard', 'Front desk: Bookings, Calendar, Payments', 'Assistant: Conversations, Unanswered, Knowledge base', 'Setup: Rooms, Slots, Holidays, Promos, Members'],
+      groups: ['Overview: Dashboard', 'Front desk: Bookings, Calendar, Payments', 'Assistant: Conversations, Unanswered, Knowledge base', 'Setup: Rooms, Slots, Holidays, Promos, Members, Activity'],
       publicItems: ['Chat', 'Book a stay', 'Manage booking'],
     });
   });

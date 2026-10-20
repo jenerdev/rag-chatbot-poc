@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PLATFORM_LOGIN_FAILED, checkPlatformLogin, clearPlatformCookie, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
+import { PLATFORM_LOGIN_FAILED, checkPlatformLogin, clearPlatformCookie, notePlatformSession, readPlatformSession, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
 import { badRequest, withRoute } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
 
@@ -23,6 +23,7 @@ export const POST = withRoute(async (request: Request) => {
 
   const userId = await checkPlatformLogin(parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: PLATFORM_LOGIN_FAILED }, { status: 401 });
+  await notePlatformSession(userId, 'login'); // D-138
   return setPlatformCookie(NextResponse.json({ platform: true }), userId);
 });
 
@@ -39,5 +40,9 @@ export const GET = withRoute(async (request: Request) => {
   }
 });
 
-/** Log out. Always succeeds. */
-export const DELETE = withRoute(async () => clearPlatformCookie(NextResponse.json({ platform: false })));
+/** Log out. Always succeeds. A genuine session is noted first (D-138). */
+export const DELETE = withRoute(async (request: Request) => {
+  const userId = readPlatformSession(request);
+  if (userId) await notePlatformSession(userId, 'logout');
+  return clearPlatformCookie(NextResponse.json({ platform: false }));
+});

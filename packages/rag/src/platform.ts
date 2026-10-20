@@ -81,7 +81,7 @@ export function fromPostgrest(error: { code?: string; message: string }, what: s
 }
 
 /** The tenants columns a platform read selects. EXPLICIT, never `*` (CLAUDE.md § Conventions). */
-const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at, privacy_contact_name, privacy_contact_email, dpa_signed_on, policy_version, chat_retention_days, guest_retention_days';
+const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at, privacy_contact_name, privacy_contact_email, dpa_signed_on, policy_version, chat_retention_days, guest_retention_days, audit_retention_days';
 
 /** One row of the platform's tenant list. */
 export interface TenantSummary {
@@ -108,6 +108,8 @@ export interface TenantSummary {
     policyVersion: string;
     chatRetentionDays: number;
     guestRetentionDays: number;
+    /** D-138: days an activity row is kept */
+    auditRetentionDays: number;
   };
   /** The application keys switched on. */
   applications: ApplicationKey[];
@@ -143,6 +145,7 @@ type TenantRow = {
   policy_version: string;
   chat_retention_days: number;
   guest_retention_days: number;
+  audit_retention_days: number;
 };
 
 const isApplicationKey = (key: string): key is ApplicationKey => Object.hasOwn(APPLICATIONS, key);
@@ -168,6 +171,7 @@ function summary(row: TenantRow, applications: ApplicationKey[], members: number
       policyVersion: row.policy_version,
       chatRetentionDays: row.chat_retention_days,
       guestRetentionDays: row.guest_retention_days,
+      auditRetentionDays: row.audit_retention_days,
     },
     applications,
     members,
@@ -262,6 +266,7 @@ export interface TenantPatch {
   policyVersion?: string;
   chatRetentionDays?: number;
   guestRetentionDays?: number;
+  auditRetentionDays?: number;
 }
 
 export async function updateTenant(platform: PlatformContext, tenantId: number, patch: TenantPatch): Promise<TenantDetail> {
@@ -281,6 +286,7 @@ export async function updateTenant(platform: PlatformContext, tenantId: number, 
   if (patch.policyVersion !== undefined) row.policy_version = patch.policyVersion;
   if (patch.chatRetentionDays !== undefined) row.chat_retention_days = patch.chatRetentionDays;
   if (patch.guestRetentionDays !== undefined) row.guest_retention_days = patch.guestRetentionDays;
+  if (patch.auditRetentionDays !== undefined) row.audit_retention_days = patch.auditRetentionDays;
   if (Object.keys(row).length === 0) throw new PlatformInputError('Nothing to change.');
 
   const { data, error } = await platform.db.from('tenants').update(row).eq('id', tenantId).select('id');
