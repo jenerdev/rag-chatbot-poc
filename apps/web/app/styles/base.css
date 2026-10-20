@@ -277,7 +277,7 @@ button[aria-busy="true"]::before {
 
 /* --- form controls ------------------------------------------------------ */
 
-label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--ink); margin-bottom: var(--space-1); }
+label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--ink); margin-bottom: var(--space-3) }
 
 /* input:not([type]) too: an input with no type IS a text field, and the
    tenant form writes several that way (the Phase 9 walk found them unstyled). */
@@ -436,7 +436,7 @@ dialog.drawer[open] { animation: drawer-in var(--dur) var(--ease); }
    the bridge to the trigger: the pointer crosses it without leaving the tip
    (WCAG 1.4.13, hoverable). Shown on hover and on keyboard focus; Escape
    adds .dismissed. */
-.tip { position: relative; display: inline-flex; }
+.tip { position: relative; display: inline-flex; margin-bottom: var(--space-3);}
 .tip-text {
   position: absolute;
   bottom: 100%;
