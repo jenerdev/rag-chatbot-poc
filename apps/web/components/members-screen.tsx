@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 // S-8, the tenant's Members screen (plan/tenant-management.md § 4.3): for
 // OWNERS. The page holds nothing; the browser proves its session first, and
 // the route behind every action asks `members:manage` again.
@@ -87,6 +88,12 @@ export function MembersScreen({
     <>
       <StaffFrame {...frame}>
         <MembersPanel api={`${api}/members`} onUnauthorized={unauthorized} />
+        {/* D-138: what members did is a filter away. */}
+        {can(role, 'activity:read', nav.access) && (
+          <p className="small muted members-activity-link">
+            <Link href={`/t/${slug}/admin/activity?area=members`}>See what members did</Link>
+          </p>
+        )}
       </StaffFrame>
     </>
   );

@@ -18,6 +18,7 @@ import { TenantMark } from '@/components/tenant-mark';
 import { Drawer } from '@/components/dialogs';
 import { Toaster } from '@/components/toast';
 import { AccountMenu } from '@/components/account-menu';
+import { ActivityList } from '@/components/activity-list';
 
 type Auth = 'checking' | 'out' | 'in';
 const API = '/api/platform';
@@ -360,6 +361,12 @@ export function PlatformScreen() {
               ))}
             </ul>
           )}
+        </section>
+
+        {/* D-138: the platform's own log: super users added and removed, workspaces created and removed, sign-ins. */}
+        <section className="card platform-activity" aria-labelledby="platform-activity-title">
+          <h2 id="platform-activity-title">Platform activity</h2>
+          <ActivityList api={`${API}/activity`} slug={null} platformView initial={{ days: 30, area: '', actor: '', q: '' }} onUnauthorized={unauthorized} retentionDays={730} />
         </section>
       </main>
     </>

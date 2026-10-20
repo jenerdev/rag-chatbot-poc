@@ -29,6 +29,7 @@ import { LegalPanel } from '@/components/legal-panel';
 import { PermissionsPanel } from '@/components/permissions-panel';
 import { SaveBar } from '@/components/save-bar';
 import { MembersPanel } from '@/components/members-panel';
+import { ActivityList } from '@/components/activity-list';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
 import { useConfirmDialog } from '@/components/dialogs';
@@ -775,6 +776,16 @@ export function TenantForm({
             ),
           },
           { id: 'members', label: 'Members', panel: <MembersPanel api={`${api}/tenants/${id}/members`} selfUserId={selfUserId} onUnauthorized={onUnauthorized} /> },
+          // D-138: the tenant's log as the platform reads it; a super user's own actions say "Super user".
+          {
+            id: 'activity',
+            label: 'Activity',
+            panel: (
+              <section className="card">
+                <ActivityList api={`${api}/tenants/${id}/activity`} slug={tenant.slug} platformView initial={{ days: 30, area: '', actor: '', q: '' }} onUnauthorized={onUnauthorized} retentionDays={tenant.legal.auditRetentionDays} />
+              </section>
+            ),
+          },
           { id: 'archive', label: tenant.archivedAt ? 'Archived' : 'Archive', panel: archive },
         ]}
       />
