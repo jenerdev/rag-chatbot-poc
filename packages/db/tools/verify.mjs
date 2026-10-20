@@ -4584,6 +4584,103 @@ async function notificationChecks() {
   }
 }
 
+// 225–229. The shared rate limit (schema-rate-limit.sql, plan/rate-limit.md
+//          Phase 1, D-137): rate_allow() bumps and judges ONE count in
+//          Postgres, on a chat token, under two walls, and sweeps itself.
+{
+  let probe = null;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const { data: t, error: tError } = await supabase.from('tenants').insert({ slug: `rate-${randomBytes(3).toString('hex')}`, business_name: 'Rate Probe', assistant_name: 'Probe' }).select('id').single();
+    if (tError) throw new Error(`tenant: ${tError.message}`);
+    probe = t.id;
+    const chat = asToken(chatToken(probe));
+    const WINDOW = 600;
+    const allow = (key, max = 10, db = chat, tenantId = probe) =>
+      db.rpc('rate_allow', { p_tenant_id: tenantId, p_key: key, p_max: max, p_window_seconds: WINDOW });
+    const rows = (key) => supabase.from('rate_windows').select('key, window_start, count').eq('tenant_id', probe).eq('key', key);
+
+    // 225. Ten calls are inside, the eleventh is not, and the table holds ONE
+    //      row for the key with count 11 (the refusal is counted too; trap 12's
+    //      positive twin: the count is in Postgres, not in a process).
+    {
+      const key = 'chat|probe|10.0.0.1';
+      const results = [];
+      for (let i = 0; i < 11; i++) results.push(await allow(key));
+      const errors = results.filter((r) => r.error).map((r) => r.error.message);
+      const verdicts = results.map((r) => r.data);
+      const { data: stored } = await rows(key);
+      check(
+        errors.length === 0 && verdicts.slice(0, 10).every((v) => v === true) && verdicts[10] === false
+          && stored?.length === 1 && stored[0].count === 11,
+        'rate limit: a chat token is inside for 10 calls and refused on the 11th; the table holds one row for the key, count 11',
+        errors[0] ?? `verdicts ${verdicts.map((v) => (v ? 'y' : 'n')).join('')} · rows ${stored?.length} · count ${stored?.[0]?.count}`,
+      );
+    }
+
+    // 226. Wall 2: the probe's token calling with villa's id is refused in SQL,
+    //      and villa gets no row from it.
+    {
+      const key = 'chat|probe|wall2';
+      const { data, error } = await allow(key, 10, chat, villaRow.id);
+      const { data: villaRows } = await supabase.from('rate_windows').select('key').eq('tenant_id', villaRow.id).eq('key', key);
+      check(
+        error?.code === '42501' && data == null && (villaRows ?? []).length === 0,
+        "rate limit: another tenant's id on this tenant's token is insufficient_privilege, and that tenant gets no row",
+        `${error?.code ?? `data ${data}`} · villa rows ${villaRows?.length}`,
+      );
+    }
+
+    // 227. No token reads the table: the chat token's select is refused or
+    //      empty while the service client sees the rows 225 made.
+    {
+      const mine = await chat.from('rate_windows').select('key, count').eq('tenant_id', probe);
+      const { data: all } = await supabase.from('rate_windows').select('key').eq('tenant_id', probe);
+      check(
+        (!!mine.error || (mine.data ?? []).length === 0) && (all ?? []).length >= 1,
+        'rate limit: a chat token reads nothing from rate_windows (refused or empty) while the service client sees the rows',
+        `token ${mine.error?.code ?? `${mine.data?.length} rows`} · service ${all?.length} rows`,
+      );
+    }
+
+    // 228. The sweep: a row aged three windows on a key is gone after the next
+    //      call on that key, and that call starts a fresh count (true).
+    {
+      const key = 'manage|probe|old';
+      const old = new Date(Date.now() - 3 * WINDOW * 1000).toISOString();
+      const seeded = await supabase.from('rate_windows').insert({ tenant_id: probe, key, window_start: old, count: 99 });
+      if (seeded.error) throw new Error(`seed: ${seeded.error.message}`);
+      const { data: verdict, error } = await allow(key);
+      const { data: after } = await rows(key);
+      check(
+        !error && verdict === true && after?.length === 1 && after[0].count === 1 && after[0].window_start !== old,
+        'rate limit: a window aged three windows is swept by the next call on its key, which starts a fresh count',
+        error?.message ?? `verdict ${verdict} · rows ${after?.length} · count ${after?.[0]?.count}`,
+      );
+    }
+
+    // 229. Keys do not share a count: a second address on the same tenant is
+    //      fresh after the first was refused, and a smaller max is its own.
+    {
+      const a = await allow('chat|probe|10.0.0.2');
+      const b1 = await allow('voice-in|probe|10.0.0.2', 1);
+      const b2 = await allow('voice-in|probe|10.0.0.2', 1);
+      check(
+        a.data === true && b1.data === true && b2.data === false,
+        'rate limit: a second address is fresh after the first was refused; a key with max 1 refuses its second call alone',
+        `${a.error?.message ?? a.data} · ${b1.error?.message ?? b1.data} · ${b2.error?.message ?? b2.data}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'rate limit: setup', error.message);
+  } finally {
+    if (probe) {
+      const { error } = await supabase.from('tenants').delete().eq('id', probe);
+      if (error) check(false, 'rate limit: the probe tenant deletes', error.message);
+    }
+  }
+}
+
 console.log();
 console.log(
   `documents ${counts.documents} · chunks ${counts.chunks} · ` +
