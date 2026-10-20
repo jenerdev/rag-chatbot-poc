@@ -4,7 +4,7 @@
 // and THIS device, out of the sidebar, which is now navigation only.
 //
 //   - who is signed in, as what role;
-//   - the public pages (Chat, Book): where guests go, opened from here;
+//   - the public pages (Chat, Book, Manage booking): where guests go, opened from here;
 //   - this device: the Sound toggle and push (components/attention.tsx,
 //     push-control.tsx), which are settings, not places;
 //   - Log out.

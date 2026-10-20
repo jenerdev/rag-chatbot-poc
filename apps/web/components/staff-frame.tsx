@@ -157,7 +157,7 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
   const bell = topItems.find((item) => item.page === 'notifications');
   const section = groupOf(current);
   const here = groups.flatMap((g) => g.items).find((item) => item.page === current)?.label ?? title;
-  const guestPages = publicItems.map((item) => ({ label: item.page === 'book' ? 'Booking page' : 'Chat page', href: item.href, icon: ICON_OF[item.page] }));
+  const guestPages = publicItems.map((item) => ({ label: item.page === 'book' ? 'Booking page' : item.page === 'manage' ? 'Manage booking' : 'Chat page', href: item.href, icon: ICON_OF[item.page] }));
   const link = (item: { page: NavPage; label: string; href: string; badge?: number }) => (
     <Link
       key={item.page}

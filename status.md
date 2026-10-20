@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; web tests 192, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
+
 **Quick notes (2026-10-20, D-135, done):** every note field on S-15 offers chips for its step (`lib/quick-notes.ts`, `components/quick-notes.tsx`); web tests 192, `plan/quick-notes-walk.mjs` 7/7, the proof-viewer walk 12/12. Nothing owed.
 
 **Voice (2026-10-20, planned, nothing built):** [`plan/voice.md`](./plan/voice.md). Talk to the assistant and hear it answer: transcription in, text-to-speech out, around the UNCHANGED pipeline; the speak route speaks only the conversation's stored reply. § 6 answered 2026-10-20 (every recommendation). **Phase 0 done:** baseline green; `gpt-4o-mini-tts` stalls (116 s processing, timeouts), `tts-1` answers in 1.1–1.9 s, transcription 0.8–1.4 s, Tagalog and Taglish heard right. Owed: the user listens to `plan/voice/phase0/` and judges the peso amount and the Taglish. Rule 6 added at the user's word: the browser's own voice reads the reply when OpenAI's speech fails (a local voice only, else silence); a failed transcription falls back to typing. Next: Phase 1 (`transcribe()`, `speak()`, `speakable()` in `apps/web/lib/`).
@@ -1856,6 +1858,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-20 — the three guest pages link to each other (D-136)
+- **Asked:** "on 3 public pages chatbot, manage booking, and booking page. should have link to each other".
+- **Did:** `navItems()` lists the three guest pages (Chat, Book a stay, Manage booking); a guest page's header shows the other two; the chat's welcome offers "Book your stay" and "Manage your booking", and the links under the field carry both; the staff account menu names Manage booking too.
+- **Observed:** web tests 192, typecheck 13/13, `plan/guest-links-walk.mjs` 6/6 on villa at 1280 and 390 (shots in `plan/guest-links/walk/`).
 
 ### 2026-10-20 — quick notes on the booking page (D-135)
 - **Asked:** "on booking detail page. on every notes request/required. add quick note options. related to the steps."

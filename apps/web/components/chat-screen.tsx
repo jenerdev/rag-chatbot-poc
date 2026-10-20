@@ -50,10 +50,11 @@ export interface ChatScreenProps {
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
   /**
-   * What the tenant has (lib/nav.ts); the chat reads only `book`, the
-   * customer booking page (plan/customer-booking.md § 8 q5): a button, not a
-   * link in the model's reply: the chat renders no links, and the model never
-   * books (D-037).
+   * What the tenant has (lib/nav.ts); the chat reads `book`, the customer
+   * booking page (plan/customer-booking.md § 8 q5), and `manage` (D-136):
+   * buttons on the welcome and links under the field, never a link in the
+   * model's reply: the chat renders no links, and the model never books
+   * (D-037).
    */
   nav: NavFeatures;
   /**
@@ -414,15 +415,28 @@ export function ChatScreen({
                     ))}
                   </div>
                 )}
-                {nav.book && (
+                {(nav.book || nav.manage) && (
                   <div className="welcome-book">
-                    <span>Know your dates?</span>
-                    {/* "Book your stay" (D-125): an invitation, not "Book now" or "Reserve now",
-                        which promise an instant confirmation the page does not give: a
-                        request waits for staff (D-070), as the booking page says. */}
-                    <Link className="button primary" href={`/t/${slug}/book`}>
-                      <Icon name="calendar" size={16} /> Book your stay
-                    </Link>
+                    {nav.book && (
+                      <span className="welcome-go">
+                        <span>Know your dates?</span>
+                        {/* "Book your stay" (D-125): an invitation, not "Book now" or "Reserve now",
+                            which promise an instant confirmation the page does not give: a
+                            request waits for staff (D-070), as the booking page says. */}
+                        <Link className="button primary" href={`/t/${slug}/book`}>
+                          <Icon name="calendar" size={16} /> Book your stay
+                        </Link>
+                      </span>
+                    )}
+                    {/* D-136: the chat links to Manage booking too, so every guest page reaches the other two. */}
+                    {nav.manage && (
+                      <span className="welcome-go">
+                        <span>Already booked?</span>
+                        <Link className="button" href={`/t/${slug}/manage`}>
+                          <Icon name="search" size={16} /> Manage your booking
+                        </Link>
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -566,6 +580,17 @@ export function ChatScreen({
             {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by
             OpenAI{voiceOn ? '; what you say is sent to OpenAI to be turned into text, and the recording is not kept' : ''}. Don&apos;t share passwords or card numbers.{' '}
             <span className="composer-links">
+              {/* D-136: the other guest pages stay one click away once the welcome has gone. */}
+              {nav.book && (
+                <>
+                  <Link href={`/t/${slug}/book`}>Book a stay</Link> ·{' '}
+                </>
+              )}
+              {nav.manage && (
+                <>
+                  <Link href={`/t/${slug}/manage`}>Manage booking</Link> ·{' '}
+                </>
+              )}
               <Link href={`/t/${slug}/privacy`}>Privacy</Link> · <Link href={`/t/${slug}/terms`}>Terms</Link>
             </span>
           </p>

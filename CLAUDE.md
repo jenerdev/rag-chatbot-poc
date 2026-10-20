@@ -315,6 +315,12 @@
 > - SQL files 37–40: `schema-room-inventory`, `-room-counts`, `-room-move`,
 >   `-room-views`.
 >
+> **The three guest pages link to each other** since 2026-10-20 (D-136):
+> `navItems()` lists Chat, Book a stay and Manage booking (each only when
+> the page exists); a guest page's header shows the other two, the chat's
+> welcome and the links under its field carry both, and the staff account
+> menu names all three. A new guest page gets a `NavPage` and a line there.
+>
 > **Every note on the booking page offers quick notes** since 2026-10-20
 > (D-135): three to five sentences per step (Confirm paid or unpaid,
 > Decline, Cancel, a change request's decision, a proof's, a refund, a
@@ -406,7 +412,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/not-found.tsx   "No such workspace"
   app/api/t/[tenant]/**/route.ts the endpoints + admin/session, password-reset, password; chat/ does JSON and SSE
                                  book/quote and book/request are OPEN (no requireAdmin), like chat/
-  components/                    tenant-nav (every tenant page's header links, by role and feature), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos, D-094; short cells fact chips, sentences text, a sideways row on a phone, D-120), lightbox (the photo viewer: the room and count in a bar, thumbnails, Tab kept inside, D-120), admin-screen, bookings-screen (the list of stays, D-112), accommodations-screen, unanswered-screen, conversations-screen and transcript-screen (S-16, D-115), booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
+  components/                    tenant-nav (every tenant page's header links, by role and feature; a guest page shows the other guest pages, D-136), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos, D-094; short cells fact chips, sentences text, a sideways row on a phone, D-120), lightbox (the photo viewer: the room and count in a bar, thumbnails, Tab kept inside, D-120), admin-screen, bookings-screen (the list of stays, D-112), accommodations-screen, unanswered-screen, conversations-screen and transcript-screen (S-16, D-115), booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
   lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)

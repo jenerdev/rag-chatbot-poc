@@ -80,7 +80,7 @@ try {
   await page.click('.account-button');
   const panel = await page.eval("({ open: !document.querySelector('.account-panel').hidden, expanded: document.querySelector('.account-button').getAttribute('aria-expanded'), role: document.querySelector('.account-panel .badge')?.textContent, links: [...document.querySelectorAll('.account-panel a')].map(a => a.textContent + ' ' + a.getAttribute('href')), sound: !!document.querySelector('.account-panel .sound-toggle'), logout: [...document.querySelectorAll('.account-panel button')].some(b => b.textContent === 'Log out') })");
   check(
-    panel.open && panel.expanded === 'true' && panel.role === 'Owner' && panel.links.join(',') === 'Chat page /t/harbor,Booking page /t/harbor/book' && panel.sound && panel.logout,
+    panel.open && panel.expanded === 'true' && panel.role === 'Owner' && panel.links.join(',') === 'Chat page /t/harbor,Booking page /t/harbor/book,Manage booking /t/harbor/manage' && panel.sound && panel.logout,
     '2b. open: the role, the guest pages, this device, Log out',
     JSON.stringify(panel),
   );

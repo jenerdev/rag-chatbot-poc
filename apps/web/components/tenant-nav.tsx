@@ -64,11 +64,12 @@ export function TenantNav({
   const publicPage = current === 'chat' || current === 'book' || current === 'manage' || current === 'reset' || current === 'legal';
 
   const all = navItems(slug, features, role);
-  const isPublic = (page: NavPage) => page === 'chat' || page === 'book';
-  // No "Book" button in the header (the user, 2026-10-14: redundant). The
-  // chat's welcome card offers "Book your stay", the booking page is
-  // itself, and Manage booking's footer has "Book a stay".
-  const shown = (publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all).filter((item) => item.page !== 'book');
+  const isPublic = (page: NavPage) => page === 'chat' || page === 'book' || page === 'manage';
+  // D-136: the three guest pages link to each other. A guest page's header
+  // shows the OTHER guest pages (its own link is left out); a signed-out
+  // staff page's header shows Chat alone, as before (the user, 2026-10-14:
+  // a Book button there was redundant).
+  const shown = publicPage ? all.filter((item) => isPublic(item.page) && item.page !== current) : all.filter((item) => item.page !== 'book' && item.page !== 'manage');
   const staffHome = publicPage ? all.find((item) => !isPublic(item.page)) : undefined;
 
   return (

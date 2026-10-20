@@ -4219,3 +4219,15 @@ either.
 **Why:** every decision takes a note, most of them required, and staff were typing the same five sentences. A pick is one click, and a guest reads a complete sentence instead of "ok".
 
 **Why not a free-text history of what this tenant typed:** it would carry guest names and amounts into a suggestion list, and the list would differ by tenant and by day; fixed words are predictable and hold nothing.
+
+## D-136 · The three guest pages link to each other · **Added 2026-10-20. Amends D-125's header note**
+
+**Decision:**
+- The chat, the booking page and Manage booking each link to the other two, and never to themselves.
+  - **The chat** (no header, the user's call of 2026-10-20): the welcome card's row has "Know your dates? Book your stay" and "Already booked? Manage your booking"; under the field, beside Privacy and Terms, "Book a stay · Manage booking" stay once the welcome has given way to the conversation.
+  - **The booking page and Manage booking**: the header's `TenantNav` shows the other guest pages (Chat, and Book a stay or Manage booking; the page's own link is left out), and the footer keeps what it had.
+- `navItems()` is the ONE list: the public items are `chat`, `book` ("Book a stay", when the tenant has the page) and `manage` ("Manage booking", when the feature is on). The staff account menu's guest pages come from the same list, so it gained Manage booking.
+- A signed-out STAFF page's header still shows Chat alone: the 2026-10-14 call that a Book button there was redundant stands for those pages.
+- Each link is drawn only when the page exists (`nav.book`, `nav.manage`, the same checks the pages 404 on), so a tenant without the booking page or with Manage booking switched off (D-127) shows no dead link.
+
+**Why:** a guest who arrived on one page was often one of the other two away from what they wanted, with no way there but the address bar: the chat had no link to Manage booking at all, and the booking page's header had only Chat.

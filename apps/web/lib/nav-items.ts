@@ -48,8 +48,11 @@ export interface NavItem {
  */
 export function navItems(slug: string, features: NavFeatures, role: Role | null, attention?: Attention | null): NavItem[] {
   const base = `/t/${slug}`;
+  // The three guest pages (D-136): each links to the other two, so a guest
+  // on any of them can reach the chat, the booking page and Manage booking.
   const items: NavItem[] = [{ page: 'chat', label: 'Chat', href: base }];
-  if (features.book) items.push({ page: 'book', label: 'Book', href: `${base}/book`, primary: true });
+  if (features.book) items.push({ page: 'book', label: 'Book a stay', href: `${base}/book`, primary: true });
+  if (features.manage) items.push({ page: 'manage', label: 'Manage booking', href: `${base}/manage` });
   if (role === null) return items;
 
   // Each staff page with the permission its screen's first read needs, in

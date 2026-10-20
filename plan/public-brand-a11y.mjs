@@ -34,10 +34,11 @@ const BANNER = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1
 let probeId = null;
 let browser;
 try {
-  const { data: harbor } = await supabase.from('tenants').select('suggested_questions').eq('slug', 'harbor').single();
+  // villa's questions, not harbor's: harbor was deleted 2026-10-20, and an empty list fails tenants_suggested_questions_shape.
+  const { data: harbor } = await supabase.from('tenants').select('suggested_questions').eq('slug', 'villa').single();
   const { data: probe, error } = await supabase
     .from('tenants')
-    .insert({ slug: 'brand-probe', business_name: 'Casa Brava Beach Resort', assistant_name: 'Brava', logo_url: LOGO, banner_url: BANNER, theme: { accent: '#c2410c' }, suggested_questions: harbor?.suggested_questions ?? [] })
+    .insert({ slug: 'brand-probe', business_name: 'Casa Brava Beach Resort', assistant_name: 'Brava', logo_url: LOGO, banner_url: BANNER, theme: { accent: '#c2410c' }, suggested_questions: harbor?.suggested_questions ?? null })
     .select('id')
     .single();
   if (error) throw new Error(error.message);

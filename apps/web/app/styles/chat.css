@@ -438,7 +438,9 @@
 .welcome-role { margin: 2px 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
 .welcome-text { max-width: 46ch; margin: var(--space-3) 0 0; color: var(--muted); text-wrap: pretty; }
 .welcome .suggestions { margin-top: var(--space-5); max-width: none; }
-.welcome-book { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--space-3); width: 100%; margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); font-size: var(--text-sm); color: var(--muted); }
+.welcome-book { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--space-3) var(--space-6); width: 100%; margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); font-size: var(--text-sm); color: var(--muted); }
+/* D-136: one group per guest page ("Know your dates? Book your stay", "Already booked? Manage your booking"); side by side, wrapping on a phone. */
+.welcome-go { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: var(--space-3); }
 @media (max-width: 560px) {
   .welcome { margin-top: var(--space-2); }
   .welcome-cover { height: 72px; }

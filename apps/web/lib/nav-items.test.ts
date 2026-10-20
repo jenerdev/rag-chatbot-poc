@@ -13,23 +13,25 @@ const HARBOR: NavFeatures = { bookings: true, rooms: true, book: true, manage: t
 describe('navItems', () => {
   it('shows a visitor the public pages only', () => {
     expect(labels(NORTHWIND, null)).toEqual(['Chat']);
-    expect(labels(HARBOR, null)).toEqual(['Chat', 'Book']);
+    expect(labels(HARBOR, null)).toEqual(['Chat', 'Book a stay', 'Manage booking']);
+    expect(labels({ ...HARBOR, manage: false }, null)).toEqual(['Chat', 'Book a stay']);
+    expect(labels({ ...HARBOR, book: false }, null)).toEqual(['Chat', 'Manage booking']);
   });
 
   it('shows staff the daily work, and no admin-only page', () => {
-    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base']);
+    expect(labels(HARBOR, 'staff')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base']);
   });
 
   it('adds rooms and holidays for an admin, but not members', () => {
-    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos']);
+    expect(labels(HARBOR, 'admin')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos']);
   });
 
   it('adds members for an owner', () => {
-    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos', 'Members']);
+    expect(labels(HARBOR, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Rooms', 'Slots', 'Holidays', 'Promos', 'Members']);
   });
 
   it('leaves out what the tenant does not have', () => {
-    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Slots', 'Holidays', 'Promos', 'Members']);
+    expect(labels(VILLA, 'owner')).toEqual(['Chat', 'Book a stay', 'Manage booking', 'Dashboard', 'Notifications', 'Bookings', 'Calendar', 'Payments', 'Conversations', 'Unanswered', 'Knowledge base', 'Slots', 'Holidays', 'Promos', 'Members']);
     expect(labels(NORTHWIND, 'owner')).toEqual(['Chat', 'Dashboard', 'Conversations', 'Unanswered', 'Knowledge base', 'Members']);
   });
 
@@ -37,6 +39,7 @@ describe('navItems', () => {
     expect(navItems('harbor', HARBOR, 'owner').map((i) => i.href)).toEqual([
       '/t/harbor',
       '/t/harbor/book',
+      '/t/harbor/manage',
       '/t/harbor/admin/dashboard',
       '/t/harbor/admin/notifications',
       '/t/harbor/admin/bookings',
@@ -63,7 +66,7 @@ describe('groupNavItems', () => {
   it("sections an owner's harbor links by the work: the daily work first, then the assistant, then setup", () => {
     expect(sections(HARBOR, 'owner')).toEqual({
       groups: ['Overview: Dashboard', 'Front desk: Bookings, Calendar, Payments', 'Assistant: Conversations, Unanswered, Knowledge base', 'Setup: Rooms, Slots, Holidays, Promos, Members'],
-      publicItems: ['Chat', 'Book'],
+      publicItems: ['Chat', 'Book a stay', 'Manage booking'],
     });
   });
 
