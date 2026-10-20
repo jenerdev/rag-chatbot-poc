@@ -342,6 +342,21 @@
 > stays silent. Nothing is recorded or kept. The `voice` feature is the one
 > that is OFF with no row (`schema-voice.sql`, the 41st file).
 >
+> **The per-IP limit is ONE count in Postgres, and the chat has one,** since
+> 2026-10-20 (D-137, [`plan/rate-limit.md`](./plan/rate-limit.md), Phases 0–5,
+> all done, walk included). `rate_windows` + `rate_allow()`
+> (`sql/schema-rate-limit.sql`, the 42nd file; the thirteenth callable
+> definer): one statement bumps a (tenant, key, window) row and judges it,
+> so every instance shares the count (R-39 closed). `allow(tenant, key,
+> max?)` in `lib/rate-limit.ts` is async over it, throws when Postgres does
+> not answer (never fail-open), and no token reads the table. The chat
+> route is limited for the first time (30 turns per address per 10 min,
+> before the Accept header is read: one JSON 429 in both deliveries, nothing
+> spent); the chat and voice routes also meet `allowSpend()`'s per-tenant
+> ceiling across addresses (600 per 10 min, R-53). Every number is policy, in
+> one constant. A walk that probes a limit sends a FRESH `X-Forwarded-For`
+> per run: the count outlives the process now. The chatbot is untouched.
+>
 > **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
 > the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
 > remain. `pnpm eval`, both isolation suites and every harbor walk need
@@ -417,7 +432,7 @@ apps/web/              Next.js 15, App Router
   components/                    tenant-nav (every tenant page's header links, by role and feature; a guest page shows the other guest pages, D-136), chat-screen, reply-text (the reply as text + tables, D-091), room-cards (a room-list reply as one card per room with its photos, D-094; short cells fact chips, sentences text, a sideways row on a phone, D-120), lightbox (the photo viewer: the room and count in a bar, thumbnails, Tab kept inside, D-120), admin-screen, bookings-screen (the list of stays, D-112), accommodations-screen, unanswered-screen, conversations-screen and transcript-screen (S-16, D-115), booking-page, holidays-screen, slots-screen, promos-screen, dashboard-screen (draws tenant_dashboard()'s JSON, D-098), bar-chart (inline SVG, no library), admin-login, reset-password (Client), brand-header, sources-panel,
                                  platform-screen, tenant-form (the theme preview is the page's own mechanism), members-panel (one panel, two callers), members-screen
   lib/route.ts           withRoute(): validation + the ONE error→status map
-  lib/rate-limit.ts      the per-IP window on book/request — in memory, per instance, the WEAK limit (R-39)
+  lib/rate-limit.ts      the per-IP window on every open route (chat, book/request, manage/*, voice/*): ONE count in Postgres through rate_allow(), async, throws when the database is down (D-137); allowSpend() adds the per-tenant ceiling on the OpenAI routes; the numbers are policy, one constant each
   lib/tenant.ts          getTenant() + withTenantRoute(): slug → a CHAT TenantContext, 404 on a miss
   lib/admin-auth.ts      the staff session cookie; requireAdmin(request, tenant, permission) re-checks the membership and the ROLE → a STAFF context, or 401 / 403
   lib/platform-auth.ts   the platform session cookie (rag_platform, /api/platform); requirePlatform() → { db, userId }; withPlatformRoute()
@@ -450,11 +465,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (41 files; the 41st, schema-voice.sql (the voice switch, off with no row, D-134); the 37th–40th, schema-room-inventory.sql, schema-room-counts.sql, schema-room-move.sql and schema-room-views.sql (room types, D-133); the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (42 files; the 42nd, schema-rate-limit.sql (rate_windows and rate_allow(), the shared per-IP count, D-137); the 41st, schema-voice.sql (the voice switch, off with no row, D-134); the 37th–40th, schema-room-inventory.sql, schema-room-counts.sql, schema-room-move.sql and schema-room-views.sql (room types, D-133); the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     224 checks (196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     229 checks (225–229 the shared rate limit: ten in and the eleventh out with one row at 11, wall 2, no token reads the table, the sweep, keys apart, D-137; 196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -541,6 +556,7 @@ node --conditions=react-server --env-file=../../.env tools/staff-cases.mjs   # (
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/public-brand-a11y.mjs)   # axe over the chat, the booking page and Manage booking for 4 tenants (one with a logo and banner, made and removed), 48 states (D-118); public-brand-shots.mjs <label> photographs them
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/nav-layout-walk.mjs)   # 19 checks of the staff frame (D-117): sections by role, the top bar, the account menu by keyboard and pointer, the phone drawer; nav-layout-a11y.mjs is axe over 10 states; nav-layout-shots.mjs <label> photographs it
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/notifications-inbox-walk.mjs)   # 12 checks in a browser: a HIDDEN tab chimes, the ONE badge, read on open, Mark all read; also notifications-sound-walk.mjs (5), notifications-devices-walk.mjs (4, HTTP), notifications-phase5-walk.mjs (real pushes, two Chrome profiles), notifications-a11y.mjs (8 states); needs pnpm dev with VAPID_* set
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/rate-limit-walk.mjs)   # 8 HTTP checks of the shared per-IP limit (D-137): the chat 30 then 429, the ceiling, a streamed 429, book/request and manage, the table's counts; needs pnpm dev; a fresh address per run
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/unanswered-bulk-walk.mjs)   # 11 HTTP checks of resolving several unanswered questions at once, needs pnpm dev; unanswered-bulk-browser-walk.mjs the same 12 in a browser
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/tenant-management-phase4-walk.mjs)   # the platform and members routes over HTTP, needs pnpm dev
 pnpm --filter @rag/db tenant:add -- <slug> "<business>" "<assistant>"   # then member:add for its first admin
@@ -703,7 +719,9 @@ pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 
    admins, each asking `app_is_admin()`), `expire_due_stays` (staff or
    service_role); since D-116 two more, `notify_claim` and `notify_done`
    (any token of the tenant, each checking the token's tenant; a claimed
-   row is consumed, so the claim cannot list devices twice); and
+   row is consumed, so the claim cannot list devices twice); since D-137
+   `rate_allow` (any token of the tenant, checking the token's tenant; the
+   ONE way to `rate_windows`, which no token reads); and
    trigger-only definers that no token can call (the stay row, the event
    log, the terms, the holds, `booking_events_notify`) (`booking_reference` also admits a direct session, `session_user
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
@@ -873,8 +891,10 @@ All are expanded in `risks.md`.
   route stays open, and so do `book/quote` and `book/request`: they run on
   the chat token, read only what any token of the tenant may read, and write
   only through `request_booking()`. Their limits are, weakest first, a
-  honeypot field, the in-memory per-IP window, and the per-contact limit in
-  SQL, which is the one that holds.
+  honeypot field, the per-IP window (ONE count in Postgres since D-137,
+  `rate_allow()`; the chat, the Manage doors and the voice routes share it,
+  and the OpenAI routes add a per-tenant ceiling), and the per-contact
+  limit in SQL. A probe of a limit sends a fresh `X-Forwarded-For` per run.
 - Money is bigint **centavos**, and every price is `unit_quote()`'s: a
   quote before, the stored rows after. A screen never adds up a total; a
   receipt's total is the sum of what was STORED (customer-booking Rule 3).

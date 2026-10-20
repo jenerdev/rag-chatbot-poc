@@ -56,7 +56,7 @@
 
 ## ▶ Next up (do this next)
 
-**Shared rate limit (2026-10-20, planned, nothing built):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window leaves `lib/rate-limit.ts`'s in-memory `Map` for ONE Postgres table and ONE definer function, `rate_allow()` (`schema-rate-limit.sql`, the 42nd file), so every instance shares one count (R-39 closed); the chat route gets the limit it never had; a per-tenant ceiling across addresses on the OpenAI routes is § 7 q2. No prompt text, no tool text. § 7's five questions wait for the user. It is one of the four things owed before a public URL (with guest email, custom SMTP and an audit log).
+**Shared rate limit (2026-10-20, D-137, done, walk included):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window is ONE count in Postgres (`rate_windows` + `rate_allow()`, `schema-rate-limit.sql`, the 42nd file, applied), shared by every instance (R-39 closed); the chat route is limited for the first time; the chat and voice routes meet a per-tenant ceiling across addresses (R-53). verify **229/229**, `plan/rate-limit-walk.mjs` 8/8, voice walk 6/6, web tests 202, typecheck 13/13, rooms 56; villa's tool text byte-identical. On `feat/rate-limit`, unmerged. Nothing owed. Still owed before a public URL: guest email (manage-booking Phase 7), custom SMTP (R-21), an audit log (R-13).
 
 **Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; the chat link on a guest page reads "Need help? Ask <assistant>" (`chatLinkLabel()`); web tests 193, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
 
@@ -1860,6 +1860,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-20 — the shared rate limit, the chat included (D-137)
+- **Asked:** "do you think this code is production ready?" → no, four things owed; then "create a plan for this" (the shared limit) and "proceed with your recomendations".
+- **Did:** `schema-rate-limit.sql` (the 42nd file, applied by the scratch pg client, dry-run first): `rate_windows`, no policy for any token, and `rate_allow()`, a definer that bumps and judges one (tenant, key, window) row in one statement and sweeps the tenant's stale windows. `allow(tenant, key, max?)` is async over it; the seven callers await it; `allowSpend()` adds the per-tenant ceiling (600) on the chat and voice routes; the chat route gets 30 turns per address per 10 minutes, before the Accept header. The `Map` is gone. `server-only` left off `rate-limit.ts` so vitest loads it.
+- **Observed:** verify 229/229 (225–229 new); `plan/rate-limit-walk.mjs` 8/8 against `pnpm dev` (the table at 31 after 31 chats, the ceiling row at 30; the seeded ceiling refuses a new address with no conversation made; a streamed request past the limit is one JSON 429; book/request ten 400s then 429; manage ten 404s then 429); `voice-phase2-walk` 6/6; web tests 202 (9 new); every package green; typecheck 13/13; rooms 56; no file under `packages/rag` changed and villa's tool definitions byte-identical.
+- **Learned:** the first sweep was per KEY, so a visitor who never returned kept their row forever; now per tenant on `rate_windows_sweep_idx`. The chat screen needed nothing: `describeFailure()` already shows a 429's words. Phases committed one by one; the suites ran once, at the end.
 
 ### 2026-10-20 — the three guest pages link to each other (D-136)
 - **Asked:** "on 3 public pages chatbot, manage booking, and booking page. should have link to each other".

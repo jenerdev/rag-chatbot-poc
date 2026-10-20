@@ -322,6 +322,13 @@ and there is still no audit log.
 - Still missing: a rate limit on our own endpoints (the open chat, the reset
   request, which Supabase's email cap throttles hard, R-21) and an audit
   log.
+
+**Amended 2026-10-20 (D-137):** the open chat, the booking request, the
+Manage booking doors and the voice routes share ONE per-IP window in
+Postgres (30 chat turns, 10 requests or lookups, 30 voice calls, per address
+per tenant per 10 minutes), and the OpenAI routes a per-tenant ceiling of
+600. Still missing: a limit on the reset request (Supabase's cap holds it),
+and the audit log.
 ---
 
 ## R-14 · The model states availability without calling the tool · **Re-opened by every tools-block edit**
@@ -634,14 +641,22 @@ formats are checked, and "+63 917…" and "0917…" count as one contact.
 
 ---
 
-## R-39 · The per-IP limit is per server instance · **Weak by design**
+## R-39 · The per-IP limit is per server instance · **Closed 2026-10-20 (D-137): the count is Postgres's**
 
-`lib/rate-limit.ts` keeps its windows in memory, so on Vercel each instance
-has its own count and a sender spread across instances gets several
-allowances. It only slows a script hammering one process before any
-database work (the HTTP walk: ten 400s then 429). The limit that holds is
-R-38's, in SQL. A shared limiter (a table, or the platform's firewall) when
-abuse is actually seen.
+`lib/rate-limit.ts` kept its windows in memory, so on Vercel each instance
+had its own count and a sender spread across instances got several
+allowances. It only slowed a script hammering one process before any
+database work (the HTTP walk: ten 400s then 429). The limit that held was
+R-38's, in SQL.
+
+**Closed 2026-10-20 (D-137):** the count is ONE row per (tenant, key,
+window) in `rate_windows`, bumped and judged by `rate_allow()` in one
+statement, so every instance sees the same count. `plan/rate-limit-walk.mjs`
+reads the row the HTTP calls made (31 after 31 calls). The database down
+means the route fails, never that the limit opens. What remains: the per-IP
+key is only as good as the address Vercel reports (`clientIp()`), and a
+caller rotating addresses meets the per-tenant ceiling, not a per-IP one
+(R-53).
 
 ---
 
@@ -785,6 +800,8 @@ hosts (SSRF).
 
 **Cost:** each spoken turn is a transcription and a speech call on top of the chat call, on routes anyone can reach. Each is bounded (1 MB, 600 spoken characters, a 30-per-window IP limit), but the window is in memory and per instance (R-39), so a caller rotating addresses can still spend. The answer is the switch: voice is OFF until a super user turns it on for a tenant.
 
+**Amended 2026-10-20 (D-137):** the window is Postgres's now, one count for every instance (R-39 closed), and each voice route also has the tenant's ceiling across addresses, 600 per 10 minutes, so rotating addresses buys at most that. The switch still stands in front of both.
+
 **The voice itself** leaves through OpenAI to be transcribed, disclosed under the field and on the privacy page when voice is on; nothing is stored here. The browser's fallback reads replies with an ON-DEVICE voice only, so it adds no party; on a device with none it is silent.
 
 **A wrong transcript is a wrong question.** It is shown as the guest's message, so the guest sees what was heard; the answer is to that text, and the refusal still holds.
@@ -803,6 +820,147 @@ no `left`. No guest name, room number or booking reaches either.
 **What remains:** a scripted reader can still sample a year of nights. If
 that matters to a tenant, the answer is to drop `left` from the result and
 the count from the page, not to rate-limit the reads.
+
+---
+
+<!-- R-54 is reserved by plan/audit-log.md (the log is as safe as the service key). -->
+
+## R-55 · No security headers on any response · **Found 2026-10-20, pre-deployment review; open**
+
+**The risk:** there is no `middleware.ts` and `next.config.mjs` sets no
+`headers()`, so no response carries a Content-Security-Policy, a
+Strict-Transport-Security, a `frame-ancestors` (or X-Frame-Options) or a
+Referrer-Policy. The staff screens and `/platform` can be framed by any
+site, and nothing restricts where a script may load from.
+
+**Why it has not mattered:** everything has run on localhost. React escapes
+every child and the one parser (`lib/tables.ts`) renders elements, never
+HTML, so there is no known injection to exploit; a CSP is the wall behind
+that one, and today it is absent.
+
+**What to do before a public URL:** one `headers()` block in next.config:
+`frame-ancestors 'none'` (or `SAMEORIGIN`), HSTS, `Referrer-Policy:
+strict-origin-when-cross-origin`, and a CSP that allows `'self'`, the
+Supabase project host (Storage photos, signed proof URLs) and the theme's
+`style` prop (it is an inline style attribute, not a `<style>` tag, so
+`style-src 'unsafe-inline'` is NOT needed unless something else adds one).
+Measure it in a browser against every screen; a CSP that is too tight
+breaks a page the way a tight policy breaks a query (R-22): silently.
+
+---
+
+## R-56 · CSRF rests on `sameSite: lax` alone · **Found 2026-10-20; open**
+
+**The risk:** both session cookies are `httpOnly`, `sameSite: 'lax'` and
+`secure` outside development (`admin-auth.ts`, `platform-auth.ts`), and
+that is the whole defence. No route checks the `Origin` or `Sec-Fetch-Site`
+header. Lax stops a cross-site form POST in every current browser, so the
+staff and platform writes are safe today, by one wall.
+
+**What would make it two walls:** one check in `withRoute()`, before the
+handler: a request with a session cookie and a method other than GET must
+carry an `Origin` equal to the request's own origin, or it is a 403. One
+place, every admin and platform route at once, and the open routes (chat,
+book, manage, voice) carry no cookie, so nothing changes for them.
+
+---
+
+## R-57 · The client IP is the first `X-Forwarded-For` entry, trusted blindly · **Found 2026-10-20; correct on Vercel only**
+
+**The risk:** `clientIp()` (`lib/rate-limit.ts`) takes the first entry of
+`X-Forwarded-For` and `local` with none. On Vercel the platform overwrites
+that header, so it is the caller's address. Behind any other host (a bare
+Node server, a container with no proxy in front, a proxy that appends
+rather than replaces) a caller sets the header itself and gets a fresh
+rate-limit window per request, per address of their choosing. The limits
+that hold regardless are the SQL ones: `request_booking()`'s per-contact
+cap, `guest_stay()`'s lockout, and the per-tenant ceiling of D-137, which
+counts across addresses.
+
+**What to do:** on Vercel, nothing. Anywhere else, read the proxy's own
+header (`CF-Connecting-IP`, `True-Client-IP`, or the LAST entry a trusted
+proxy appends) and say which host the deployment assumes, in `env.ts`.
+
+---
+
+## R-58 · Open dependency advisories · **Found 2026-10-20 by `pnpm audit --prod`; re-run before every build**
+
+Eight advisories, four high, all in packages the web app ships or builds
+with, none in a pipeline step (the pipeline has no dependencies to audit,
+D-001):
+
+| Package | Severity | Patched in | What it is |
+|---|---|---|---|
+| `next` | moderate ×2 | 15.5.27 | cache poisoning of SSG/ISR pages, cross-user content and persistent DoS (GHSA-mcj8-r9mp-w47p) |
+| `postcss` | high ×2, moderate ×2 | 8.5.23 | path traversal and file read through `sourceMappingURL`; XSS through an unescaped `</style>` |
+| `source-map-js` | high | 1.2.2 | event-loop DoS through an indexed source map |
+| `sharp` | high | 0.35.5 | a librsvg CVE in a dependency |
+
+`postcss`, `source-map-js` and `sharp` are build-time and image-time
+(`next/image`) only, so an attacker needs to hand the build a stylesheet or
+the server an SVG; the Next advisories are the ones that reach a request.
+`next` is `^15` in `apps/web/package.json`, so `pnpm update next` lands
+the fix without a major. Re-run the audit on the commit that is deployed,
+not the one that was reviewed.
+
+---
+
+## R-59 · The sweeps have no scheduler · **Found 2026-10-20; open until deployment**
+
+Three things are promised by the record and run by hand only:
+- `retention -- --remove` (D-131): chats and guest details past each
+  tenant's stated period. The privacy page states the period; nothing
+  enforces it.
+- `storage-orphans -- --expired` (R-48): proof files 180 days after the
+  stay.
+- `expire_due_stays()` (D-105) runs before every staff list, so the
+  stored `expired` and its event row appear only when staff look. The
+  guest is not misled: S-13 derives "expired" from the deadline at read
+  time (`stay_is_due()`), and a lapsed hold blocks nothing. What waits is
+  the record, and any notification that hangs off the event.
+
+There is no `vercel.json` and no cron anywhere in the repo. Deployment
+means a schedule for each (a Vercel cron hitting one protected route, or
+a GitHub Action running the tools on `service_role`), daily, and a line in
+`whats-done.md` with the first run's counts.
+
+---
+
+## R-60 · The legal texts are placeholders · **Found 2026-10-20; blocks real guests, not the deploy**
+
+`lib/legal.ts` says in its first line that every word is a draft for a
+lawyer, and the pages say so to the visitor. The DPA gate (D-130) means no
+tenant's bookings switch on without `dpa_signed_on`, so a tenant cannot
+take a request under the draft by accident; it can still chat under it. A
+lawyer's text, each tenant's privacy contact and periods, and each
+tenant's signed date come before its first real guest.
+
+---
+
+## R-61 · Deploy-time secrets and dashboard settings · **Found 2026-10-20; a checklist, not a defect**
+
+What the host gets, and what it must not:
+- `OPENAI_API_KEY` (with the spend cap of R-1 set), `OPENAI_*_MODEL`,
+  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `TENANT_SIGNING_JWK`,
+  `ADMIN_COOKIE_SECRET`, and the VAPID pair if push is wanted.
+- **Never `SUPABASE_SERVICE_ROLE_KEY`** (rule 2). `next build` passes
+  without it, measured.
+- Rotate `TENANT_SIGNING_JWK` by R-19's five steps and `ADMIN_COOKIE_SECRET`
+  if either was ever pasted outside `.env` (a chat, a ticket, `scratch/`).
+  Rotating the cookie secret logs every member and super user out (R-44).
+
+In the Supabase dashboard, before the URL is public: custom SMTP (R-21),
+leaked-password protection and the auth rate limits on, and MFA for every
+super-user account, since a super account is a master account (R-43).
+Confirm the buckets as they are meant to be: `unit-images` and
+`brand-images` PUBLIC (room and brand photos, by design), `payment-proofs`
+PRIVATE (R-48).
+
+**And the suites must be able to run.** `pnpm eval` and the pipeline
+isolation suite need northwind and harbor, hard-deleted 2026-10-20. Until
+test tenants are rebuilt from `fixtures/`, the `leak-*` cases, the only
+test that one tenant's facts cannot be answered as another's, cannot run.
+Deploying without them is deploying R-11 untested.
 
 ---
 
