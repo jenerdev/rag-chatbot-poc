@@ -105,7 +105,7 @@ try {
   {
     await page.goto(`${BASE}/t/${slug}`);
     await page.until("!!document.querySelector('.composer-notice')", 45000);
-    const notice = await page.eval("({ text: document.querySelector('.composer-notice').textContent, links: [...document.querySelectorAll('.composer-notice a')].map(a => a.getAttribute('href')) })");
+    const notice = await page.eval("({ text: document.querySelector('.composer-notice').textContent, links: [...document.querySelectorAll('.composer-links a')].map(a => a.getAttribute('href')) })");
     const codes = await Promise.all(notice.links.map((h) => status(h)));
     check(
       /AI assistant/.test(notice.text) && /saved/.test(notice.text) && /staff/.test(notice.text) && /OpenAI/.test(notice.text) && notice.links.join() === `/t/${slug}/privacy,/t/${slug}/terms` && codes.every((c) => c === 200),

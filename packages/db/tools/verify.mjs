@@ -574,7 +574,7 @@ async function authChecks(probeId, anyChunk) {
     const pub = await asToken(null).rpc('tenant_public', { p_slug: 'villa' });
     const keys = pub.data?.[0] ? Object.keys(pub.data[0]).sort().join(',') : '';
     check(
-      !pub.error && keys === 'assistant_avatar_url,assistant_name,banner_url,business_name,chat_retention_days,fallback_messages,guest_retention_days,id,logo_url,policy_version,privacy_contact_email,privacy_contact_name,slug,suggested_questions,theme' /* D-124 added the avatar; D-129 the privacy contact, the policy version and the retention periods, which the public privacy page states. Never the DPA date. */,
+      !pub.error && keys === 'assistant_avatar_url,assistant_name,banner_url,business_name,chat_retention_days,fallback_messages,guest_retention_days,id,logo_url,policy_version,privacy_contact_email,privacy_contact_name,slug,suggested_questions,theme,welcome_text' /* D-124 added the avatar; D-129 the privacy contact, the policy version and the retention periods, which the public privacy page states; D-139 the welcome line. Never the DPA date. */,
       "auth: tenant_public('villa') has only public columns",
       pub.error ? pub.error.message : `keys: ${keys}`,
     );
@@ -1896,6 +1896,31 @@ async function rolesChecks() {
         bad.length === 0 && set.data?.length === 1 && JSON.stringify(seen) === '["What rooms do you have?","Do you allow pets?"]' && cleared.data?.suggested_questions === null,
         'roles: suggested questions set by the platform, read by anon in order, bad shapes refused, null clears',
         bad.length ? bad.join(' · ') : `6 refused · public ${JSON.stringify(seen)} · cleared ${cleared.error ? cleared.error.message : cleared.data.suggested_questions}`,
+      );
+    }
+
+    // 102c. The welcome line (D-139): the platform writes it, anon reads it
+    //       back through tenant_public(); blank and over-long are refused by
+    //       tenants_welcome_text_length (23514); null clears to the default.
+    {
+      const superClient = asToken(platformToken(ids.super));
+      const bad = [];
+      for (const [label, value] of [
+        ['an empty string', ''],
+        ['spaces only', '   '],
+        ['201 characters', 'x'.repeat(201)],
+      ]) {
+        const { error } = await superClient.from('tenants').update({ welcome_text: value }).eq('id', probe.id);
+        if (error?.code !== '23514') bad.push(`${label}: ${error ? error.code : 'ACCEPTED'}`);
+      }
+      const line = 'Ask about our rooms, rates and how to book.';
+      const set = await superClient.from('tenants').update({ welcome_text: line }).eq('id', probe.id).select('id');
+      const seen = (await asToken(null).rpc('tenant_public', { p_slug: 'roles-probe' })).data?.[0]?.welcome_text;
+      const cleared = await superClient.from('tenants').update({ welcome_text: null }).eq('id', probe.id).select('welcome_text').single();
+      check(
+        bad.length === 0 && set.data?.length === 1 && seen === line && cleared.data?.welcome_text === null,
+        'roles: the welcome line set by the platform, read by anon, blank and over-long refused, null clears',
+        bad.length ? bad.join(' · ') : `3 refused · public ${JSON.stringify(seen)} · cleared ${cleared.error ? cleared.error.message : cleared.data.welcome_text}`,
       );
     }
 

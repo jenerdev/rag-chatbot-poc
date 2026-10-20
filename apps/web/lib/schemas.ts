@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_WELCOME_TEXT_LENGTH } from './welcome-text';
 import { MAX_CONTENT_LENGTH, MAX_MESSAGE_LENGTH } from './limits';
 
 // Validation at the route boundary (CLAUDE.md § Conventions): validate here,
@@ -454,6 +455,14 @@ export const createTenantSchema = z.object({
   assistantName: z.string({ required_error: 'An assistant name is required' }).trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters'),
 });
 
+/** D-139: the same bound as tenants_welcome_text_length, said first in the form's words. */
+const welcomeTextSchema = z
+  .string()
+  .trim()
+  .min(1, 'Send null for the default welcome line')
+  .max(MAX_WELCOME_TEXT_LENGTH, `The welcome line is at most ${MAX_WELCOME_TEXT_LENGTH} characters`)
+  .nullable();
+
 export const updateTenantSchema = z
   .object({
     businessName: z.string().trim().min(1, 'A business name is required').max(100, 'A business name is at most 100 characters').optional(),
@@ -464,6 +473,7 @@ export const updateTenantSchema = z
     theme: themeSchema.optional(),
     fallbackMessages: fallbackMessagesSchema.optional(),
     suggestedQuestions: suggestedQuestionsSchema.optional(),
+    welcomeText: welcomeTextSchema.optional(),
     // D-129–D-131, the Legal tab. The shapes are checked again by Postgres.
     privacyContactName: z.string().trim().min(1, 'The contact name is empty').max(100, 'The contact name is at most 100 characters').nullable().optional(),
     privacyContactEmail: z.string().trim().email('The privacy contact is an email address').max(254).nullable().optional(),

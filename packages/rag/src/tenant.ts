@@ -42,6 +42,7 @@ export async function loadTenant(slug: string): Promise<TenantContext | null> {
     assistantName: row.assistant_name,
     fallbackMessages: fallbackMessagesOf(row.fallback_messages),
     suggestedQuestions: suggestedQuestionsOf(row.suggested_questions),
+    welcomeText: typeof row.welcome_text === 'string' && row.welcome_text.trim() !== '' ? row.welcome_text.trim() : null,
     db: scopedClient(mintTenantToken({ tenantId: row.id })),
   };
 }

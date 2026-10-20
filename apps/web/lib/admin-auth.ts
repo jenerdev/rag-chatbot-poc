@@ -160,6 +160,22 @@ export async function requireAdmin(request: Request, tenant: TenantContext, perm
 }
 
 /**
+ * May this request's member do that? The NON-THROWING twin of requireAdmin()
+ * for a route that stays OPEN to guests (the chat, D-140): false with no
+ * session, a stale membership or a role without the permission; the same
+ * three questions, from the same membership row. A database error still
+ * throws. It hands back no context: the route keeps running as the chat
+ * token, and only decides what the reply carries.
+ */
+export async function sessionCan(request: Request, tenant: TenantContext, permission: Permission): Promise<boolean> {
+  const userId = readSession(request, tenant);
+  if (!userId) return false;
+  const staff = await staffClient(tenant.id, userId);
+  if (!staff) return false;
+  return can(staff.role, permission, await loadRoleOverrides(tenant));
+}
+
+/**
  * Email + password, then the membership. The user id on success, or null,
  * which the route turns into LOGIN_FAILED whatever the reason was.
  */

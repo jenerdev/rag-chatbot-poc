@@ -37,6 +37,7 @@ import { describeFailure, readEventStream } from '@/lib/chat-stream';
 import { Icon } from '@/components/icons';
 import { MicButton, ReadAloudToggle, useVoice, VoiceStatus } from '@/components/voice';
 import type { NavFeatures } from '@/lib/nav-items';
+import { welcomeTextOf } from '@/lib/welcome-text';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
 export interface ChatScreenProps {
@@ -47,6 +48,8 @@ export interface ChatScreenProps {
   bannerUrl: string | null;
   /** The assistant's own picture (D-124), set on the platform page; null: the logo, else its initial. */
   assistantAvatarUrl?: string | null;
+  /** The welcome card's line under the assistant's name (D-139); null = the default words (lib/welcome-text.ts). */
+  welcomeText?: string | null;
   /** Counted on the server: the document list itself is admin-only (Phase 6). */
   documentCount: number;
   /**
@@ -75,7 +78,8 @@ type Turn =
       id: number;
       kind: 'answer';
       text: string;
-      sources: Source[];
+      /** The chunks, for a member who may see them (D-140); null when the route left them out: nothing is drawn, not even "no sources". */
+      sources: Source[] | null;
       /** Filled in by `tool` events, one per call, before the answer that uses them (plan/bookings.md Phase 7). */
       toolCalls: ToolCallRecord[];
       /** From `meta` at a per_room tenant (D-094): the rooms' photos, drawn as cards or as a Photo column on the reply's table. */
@@ -124,6 +128,7 @@ export function ChatScreen({
   logoUrl,
   bannerUrl,
   assistantAvatarUrl = null,
+  welcomeText = null,
   documentCount,
   nav,
   suggestedQuestions,
@@ -244,11 +249,12 @@ export function ChatScreen({
                       id: replyId,
                       kind: 'answer',
                       text: '',
-                      sources: data.sources,
+                      // Absent for a guest (D-140): the route removed the keys, so a missing list means "not shown", never "none".
+                      sources: Array.isArray(data.sources) ? data.sources : null,
                       toolCalls: [],
                       roomCards: data.roomCards,
                       roomCardsView: data.roomCardsView,
-                      searchQuery: data.searchQuery,
+                      searchQuery: typeof data.searchQuery === 'string' ? data.searchQuery : '',
                       question: text,
                     }
                   : turn,
@@ -403,7 +409,7 @@ export function ChatScreen({
                 <p className="welcome-text">
                   {emptyKb
                     ? 'I am still being set up, so I cannot answer questions yet. Please check back soon.'
-                    : 'Ask me anything. I answer from our own information, and show where each answer came from.'}
+                    : welcomeTextOf(welcomeText)}
                 </p>
                 {!emptyKb && suggestedQuestions.length > 0 && (
                   <div className="suggestions" role="group" aria-label="Suggested questions">
@@ -572,28 +578,27 @@ export function ChatScreen({
             <Icon name="arrow-up" size={18} />
           </button>
         </form>
-        {/* One row under the field, its edges on the field's text: the notice
-            on the left, the keys on the right (the keys go on a phone). */}
+        {/* The fine print under the field, its edges on the field's text: the
+            notice, the links to the other pages, and (on a desktop) the keys
+            and the Read aloud toggle. One grid (chat.css): on a desktop the
+            notice and the links stack on the left with the keys on the right;
+            on a phone the notice takes the whole width and the links share
+            the last row with the toggle, so the notice is never squeezed into
+            a narrow column beside it (the 2026-10-21 phone shot: eight lines). */}
         <div className="composer-foot">
           {/* D-129: what happens to what is typed here, at the moment it is typed. Page text, not prompt text. */}
           <p className="composer-notice">
             {assistantName} is an AI assistant. Chats are saved, read by {businessName}&apos;s staff and processed by
-            OpenAI{voiceOn ? '; what you say is sent to OpenAI to be turned into text, and the recording is not kept' : ''}. Don&apos;t share passwords or card numbers.{' '}
-            <span className="composer-links">
-              {/* D-136: the other guest pages stay one click away once the welcome has gone. */}
-              {nav.book && (
-                <>
-                  <Link href={`/t/${slug}/book`}>Book a stay</Link> ·{' '}
-                </>
-              )}
-              {nav.manage && (
-                <>
-                  <Link href={`/t/${slug}/manage`}>Manage booking</Link> ·{' '}
-                </>
-              )}
-              <Link href={`/t/${slug}/privacy`}>Privacy</Link> · <Link href={`/t/${slug}/terms`}>Terms</Link>
-            </span>
+            OpenAI{voiceOn ? '; what you say is sent to OpenAI to be turned into text, and the recording is not kept' : ''}. Don&apos;t share passwords or card numbers.
           </p>
+          {/* D-136: the other guest pages stay one click away once the welcome has gone;
+              D-129: Privacy and Terms. The separators are CSS, so the links can wrap as a row. */}
+          <nav className="composer-links" aria-label="More">
+            {nav.book && <Link href={`/t/${slug}/book`}>Book a stay</Link>}
+            {nav.manage && <Link href={`/t/${slug}/manage`}>Manage booking</Link>}
+            <Link href={`/t/${slug}/privacy`}>Privacy</Link>
+            <Link href={`/t/${slug}/terms`}>Terms</Link>
+          </nav>
           <div className="composer-side">
             <p className="composer-hint">
               <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line

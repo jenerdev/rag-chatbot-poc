@@ -85,6 +85,8 @@ export interface Database {
           fallback_messages: Json | null;
           /** up to six questions a visitor can click on a new chat (D-089); null = none. Shape checked in SQL */
           suggested_questions: Json | null;
+          /** the welcome card's one line, saying what to ask (D-139); null = the default words (apps/web/lib/welcome-text.ts). 1-200 characters, checked in SQL */
+          welcome_text: string | null;
           /** set by the platform (tenant management Phase 1): tenant_public() no longer returns the row, so the whole app answers 404 for it */
           archived_at: string | null;
           created_at: string;
@@ -107,6 +109,7 @@ export interface Database {
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
+          welcome_text?: string | null;
           archived_at?: string | null;
           created_at?: string;
         };
@@ -128,6 +131,7 @@ export interface Database {
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
+          welcome_text?: string | null;
           archived_at?: string | null;
           created_at?: string;
         };
@@ -1350,6 +1354,8 @@ export interface Database {
           fallback_messages: Json | null;
           /** sql/schema-suggested-questions.sql (D-089) */
           suggested_questions: Json | null;
+          /** sql/schema-welcome-text.sql (D-139) */
+          welcome_text: string | null;
         }[];
       };
       /** plan/auth-phase0-spike.sql — TEMPORARY: returns auth.jwt(). Dropped after auth-rls Phase 2. */

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta, ToolCallRecord } from '@rag/pipeline';
+import { sessionCan } from '@/lib/admin-auth';
 import { allowSpend, CHAT_REQUESTS_PER_WINDOW, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
@@ -17,6 +18,20 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const encoder = new TextEncoder();
+
+/**
+ * A reply for someone who may not see what it was built from (D-140): the
+ * same answer without the chunks and the search query. The keys are
+ * REMOVED, not emptied, so the screen can tell "nothing matched" (an empty
+ * list, drawn as such for staff) from "not yours to see" (no list at all).
+ * The tool calls stay: the availability evidence is the guest's too (rule 7).
+ */
+function withoutSources<T extends { sources: unknown; searchQuery: unknown }>(value: T): Omit<T, 'sources' | 'searchQuery'> {
+  const copy: Partial<T> = { ...value };
+  delete copy.sources;
+  delete copy.searchQuery;
+  return copy as Omit<T, 'sources' | 'searchQuery'>;
+}
 
 /**
  * Ask a question. Returns the answer plus the exact chunks it was built from.
@@ -45,6 +60,13 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
     message: parsed.data.message.trim(),
   };
 
+  // D-140: the chunks a reply was built from reach a signed-in member with
+  // sources:read (owners and admins by default, grantable to staff) and
+  // nobody else. The route is the guard; the screen draws only what arrives.
+  // Decided before the answer, from the membership row, and never from
+  // anything the request claims. The pipeline itself is untouched.
+  const showSources = await sessionCan(request, tenant, 'sources:read');
+
   // An EXPLICIT header check, not `request.accepts()`-style negotiation.
   //
   // This is the bug the POC hit and documented: curl and most HTTP clients send
@@ -53,7 +75,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   // for and cannot parse. Only a client that names the type gets one.
   const wantsStream = (request.headers.get('accept') ?? '').includes('text/event-stream');
   if (!wantsStream) {
-    return NextResponse.json(await answerQuestion(args));
+    const answer = await answerQuestion(args);
+    return NextResponse.json(showSources ? answer : withoutSources(answer));
   }
 
   const stream = new ReadableStream<Uint8Array>({
@@ -80,7 +103,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
       try {
         await answerQuestionStream({
           ...args,
-          onMeta: (meta: StreamMeta) => send('meta', meta),
+          onMeta: (meta: StreamMeta) => send('meta', showSources ? meta : withoutSources(meta)),
           onDelta: (text: string) => send('delta', { text }),
           // One event per tool call, as it completes and before the answer
           // built from it (plan/bookings.md Phase 6). A client that does not

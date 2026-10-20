@@ -163,6 +163,11 @@ function ToolCallBox({ call }: { call: ToolCallRecord }) {
  * tell "the bot read my document" from "the model happened to know this" —
  * without it, a wrong answer is a mystery instead of something you can
  * diagnose in two seconds.
+ *
+ * Since D-140 it is STAFF's: the chat route sends the chunks only to a
+ * signed-in member with sources:read (owners and admins by default), and
+ * `sources` is null when it did not. Then nothing of the chunks is drawn,
+ * not even "no matching chunks"; the tool evidence still is (rule 7).
  */
 export function SourcesPanel({
   sources,
@@ -170,7 +175,7 @@ export function SourcesPanel({
   searchQuery,
   question,
 }: {
-  sources: Source[];
+  sources: Source[] | null;
   toolCalls: ToolCallRecord[];
   searchQuery: string;
   question: string;
@@ -187,6 +192,9 @@ export function SourcesPanel({
         ))}
       </div>
     ) : null;
+
+  // A guest: the route sent no list (D-140). The evidence of a tool call, if any, and nothing else.
+  if (sources === null) return checked;
 
   if (sources.length === 0) {
     // Not an error. This is the system correctly declining to answer, or, with

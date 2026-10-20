@@ -49,7 +49,7 @@ alter table public.role_permissions add  constraint role_permissions_configurabl
   'dashboard:read', 'documents:read', 'documents:write', 'bookings:read', 'bookings:write',
   'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write',
   'promos:read', 'promos:write', 'payments:read', 'unanswered:read', 'unanswered:write',
-  'conversations:read', 'members:manage', 'activity:read'
+  'conversations:read', 'members:manage', 'activity:read', 'sources:read'
 ));
 
 create or replace function public.app_default_can(p_role text, p_permission text) returns boolean
@@ -68,12 +68,14 @@ as $$
       ('admin', 'conversations:read'), ('admin', 'documents:write'), ('admin', 'rooms:read'), ('admin', 'rooms:write'),
       ('admin', 'holidays:read'), ('admin', 'holidays:write'), ('admin', 'slots:read'), ('admin', 'slots:write'),
       ('admin', 'promos:read'), ('admin', 'promos:write'), ('admin', 'payments:write'), ('admin', 'payments:settings'),
+      ('admin', 'sources:read'),
       -- owner: admin's, the members, and the activity log (D-138)
       ('owner', 'session'), ('owner', 'dashboard:read'), ('owner', 'documents:read'), ('owner', 'bookings:read'),
       ('owner', 'bookings:write'), ('owner', 'payments:read'), ('owner', 'unanswered:read'), ('owner', 'unanswered:write'),
       ('owner', 'conversations:read'), ('owner', 'documents:write'), ('owner', 'rooms:read'), ('owner', 'rooms:write'),
       ('owner', 'holidays:read'), ('owner', 'holidays:write'), ('owner', 'slots:read'), ('owner', 'slots:write'),
       ('owner', 'promos:read'), ('owner', 'promos:write'), ('owner', 'payments:write'), ('owner', 'payments:settings'),
+      ('owner', 'sources:read'),
       ('owner', 'members:manage'), ('owner', 'activity:read')
     ) d (role, permission)
     where d.role = p_role and d.permission = p_permission
@@ -86,7 +88,7 @@ set search_path = ''
 as $$
   select p_permission in (
     'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write',
-    'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read'
+    'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read', 'sources:read'
   )
 $$;
 
@@ -213,7 +215,8 @@ begin
       v_area := 'tenant'; v_subject := v_row ->> 'slug'; v_label := v_row ->> 'business_name';
       v_keep := array['slug', 'business_name', 'assistant_name', 'logo_url', 'banner_url', 'assistant_avatar_url', 'theme',
                       'archived_at', 'dpa_signed_on', 'privacy_contact_name', 'privacy_contact_email', 'policy_version',
-                      'chat_retention_days', 'guest_retention_days', 'audit_retention_days', 'fallback_messages', 'suggested_questions'];
+                      'chat_retention_days', 'guest_retention_days', 'audit_retention_days', 'fallback_messages', 'suggested_questions',
+                      'welcome_text'];
     when 'unanswered_resolutions' then
       v_area := 'unanswered'; v_subject := v_row ->> 'message_id';
       v_keep := array['message_id'];

@@ -34,6 +34,7 @@ const POSTGRES: Record<Permission, Role[]> = {
   'conversations:read': ANY_MEMBER, // conversation_list() refuses unless app_is_staff() (schema-conversations.sql)
   'members:manage': OWNER_ONLY, // memberships_owner_insert/update/delete
   'activity:read': OWNER_ONLY, // audit_log_read → app_can('activity:read'); activity_list() asks it again (schema-audit-log.sql)
+  'sources:read': ADMIN_ONLY, // no policy: app_default_can() alone; the chat route strips the chunks for anyone else (D-140)
 };
 
 describe('permissions: the code view matches the Postgres view', () => {

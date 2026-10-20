@@ -31,6 +31,7 @@ import { SaveBar } from '@/components/save-bar';
 import { MembersPanel } from '@/components/members-panel';
 import { ActivityList } from '@/components/activity-list';
 import { MAX_SUGGESTED_QUESTION_LENGTH, MAX_SUGGESTED_QUESTIONS } from '@/lib/schemas';
+import { DEFAULT_WELCOME_TEXT, MAX_WELCOME_TEXT_LENGTH } from '@/lib/welcome-text';
 import { COLOUR, THEME_KEY_LIST, THEME_LABELS, contrastProblems, pinsLightScheme, themeVars, type Theme, type ThemeKey } from '@/lib/theme';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
@@ -143,6 +144,8 @@ interface ProfileFields {
   logoUrl: string;
   bannerUrl: string;
   avatarUrl: string;
+  /** D-139: the welcome card's line; '' = the default words. */
+  welcomeText: string;
   theme: Theme;
   fallbacks: Record<Languages, string>;
   suggestions: string[];
@@ -155,13 +158,14 @@ function profileFieldsOf(tenant: TenantDetail): ProfileFields {
     logoUrl: tenant.logoUrl ?? '',
     bannerUrl: tenant.bannerUrl ?? '',
     avatarUrl: tenant.assistantAvatarUrl ?? '',
+    welcomeText: tenant.welcomeText ?? '',
     theme: themeOf(tenant.theme),
     fallbacks: fallbacksOf(tenant.fallbackMessages),
     suggestions: suggestionsOf(tenant.suggestedQuestions),
   };
 }
 
-/** The PATCH body: the same eight keys every time. Also what "unsaved" compares. */
+/** The PATCH body: the same nine keys every time. Also what "unsaved" compares. */
 function profileBodyOf(f: ProfileFields) {
   const theme: Theme = {};
   for (const k of THEME_KEY_LIST) if (f.theme[k]) theme[k] = f.theme[k];
@@ -174,6 +178,7 @@ function profileBodyOf(f: ProfileFields) {
     logoUrl: f.logoUrl.trim() || null,
     bannerUrl: f.bannerUrl.trim() || null,
     assistantAvatarUrl: f.avatarUrl.trim() || null,
+    welcomeText: f.welcomeText.trim() || null,
     theme,
     fallbackMessages: Object.keys(fb).length ? fb : null,
     suggestedQuestions: questions.length ? questions : null,
@@ -211,6 +216,7 @@ export function TenantForm({
   const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl ?? '');
   const [bannerUrl, setBannerUrl] = useState(tenant?.bannerUrl ?? '');
   const [avatarUrl, setAvatarUrl] = useState(tenant?.assistantAvatarUrl ?? '');
+  const [welcomeText, setWelcomeText] = useState(tenant?.welcomeText ?? '');
   const [theme, setTheme] = useState<Theme>(themeOf(tenant?.theme));
   const [fallbacks, setFallbacks] = useState(fallbacksOf(tenant?.fallbackMessages));
   const [suggestions, setSuggestions] = useState<string[]>(suggestionsOf(tenant?.suggestedQuestions));
@@ -221,7 +227,7 @@ export function TenantForm({
   const preview = useMemo(() => themeVars(theme), [theme]);
   const contrast = useMemo(() => contrastProblems(theme), [theme]);
   const { ask, dialog } = useConfirmDialog();
-  const profileFields: ProfileFields = { businessName, assistantName, logoUrl, bannerUrl, avatarUrl, theme, fallbacks, suggestions };
+  const profileFields: ProfileFields = { businessName, assistantName, logoUrl, bannerUrl, avatarUrl, welcomeText, theme, fallbacks, suggestions };
 
   /** One request; the tenant the route hands back becomes the form's tenant. */
   async function send(method: string, path: string, body: object | undefined, done: string) {
@@ -311,6 +317,7 @@ export function TenantForm({
     setLogoUrl(saved.logoUrl);
     setBannerUrl(saved.bannerUrl);
     setAvatarUrl(saved.avatarUrl);
+    setWelcomeText(saved.welcomeText);
     setTheme(saved.theme);
     setFallbacks(saved.fallbacks);
     setSuggestions(saved.suggestions);
@@ -344,6 +351,22 @@ export function TenantForm({
               <label htmlFor="tenant-assistant">Assistant name</label>
               <input id="tenant-assistant" value={assistantName} onChange={(e) => setAssistantName(e.target.value)} maxLength={50} required />
             </div>
+          </div>
+          {/* D-139: the welcome card's one line under the assistant's name. Empty = the default words, shown as the placeholder. */}
+          <div className="field">
+            <label htmlFor="tenant-welcome">Welcome line</label>
+            <textarea
+              id="tenant-welcome"
+              rows={2}
+              maxLength={MAX_WELCOME_TEXT_LENGTH}
+              value={welcomeText}
+              placeholder={DEFAULT_WELCOME_TEXT}
+              onChange={(e) => setWelcomeText(e.target.value)}
+            />
+            <p className="hint">
+              Under &ldquo;Hi, I&rsquo;m {assistantName.trim() || 'the assistant'}&rdquo; on a new chat, saying what to ask. Empty uses the words shown. At most{' '}
+              {MAX_WELCOME_TEXT_LENGTH} characters.
+            </p>
           </div>
           {/* The assistant's own picture (D-124): beside every reply, and on the chat's welcome. */}
           <div className="field-row">

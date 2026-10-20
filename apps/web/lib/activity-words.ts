@@ -143,6 +143,7 @@ const COLUMN_WORDS: Readonly<Record<string, string>> = {
   audit_retention_days: 'activity retention (days)',
   fallback_messages: 'fallback messages',
   suggested_questions: 'suggested questions',
+  welcome_text: 'welcome line',
   config: 'settings',
 };
 

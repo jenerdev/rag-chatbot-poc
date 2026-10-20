@@ -42,6 +42,11 @@
 -- lists below as well, identically, so either file run last gives the same
 -- functions (trap 25); permissions.test.ts reads THIS file.
 --
+-- sources:read (D-140, 2026-10-21) is in the three lists too, in both files
+-- alike: an admin's by default, grantable to staff; its only guard is the
+-- chat route (sessionCan(), lib/admin-auth.ts), which strips the chunks
+-- from a reply for anyone else. No table policy asks it.
+--
 -- Idempotent. Run after schema-features.sql (and so after every earlier file).
 
 -- 1. The overrides. Absent = the default.
@@ -59,7 +64,7 @@ alter table public.role_permissions add  constraint role_permissions_configurabl
   'dashboard:read', 'documents:read', 'documents:write', 'bookings:read', 'bookings:write',
   'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write',
   'promos:read', 'promos:write', 'payments:read', 'unanswered:read', 'unanswered:write',
-  'conversations:read', 'members:manage', 'activity:read'
+  'conversations:read', 'members:manage', 'activity:read', 'sources:read'
 ));
 
 alter table public.role_permissions enable row level security;
@@ -91,12 +96,14 @@ as $$
       ('admin', 'conversations:read'), ('admin', 'documents:write'), ('admin', 'rooms:read'), ('admin', 'rooms:write'),
       ('admin', 'holidays:read'), ('admin', 'holidays:write'), ('admin', 'slots:read'), ('admin', 'slots:write'),
       ('admin', 'promos:read'), ('admin', 'promos:write'), ('admin', 'payments:write'), ('admin', 'payments:settings'),
+      ('admin', 'sources:read'),
       -- owner: admin's, and the members
       ('owner', 'session'), ('owner', 'dashboard:read'), ('owner', 'documents:read'), ('owner', 'bookings:read'),
       ('owner', 'bookings:write'), ('owner', 'payments:read'), ('owner', 'unanswered:read'), ('owner', 'unanswered:write'),
       ('owner', 'conversations:read'), ('owner', 'documents:write'), ('owner', 'rooms:read'), ('owner', 'rooms:write'),
       ('owner', 'holidays:read'), ('owner', 'holidays:write'), ('owner', 'slots:read'), ('owner', 'slots:write'),
       ('owner', 'promos:read'), ('owner', 'promos:write'), ('owner', 'payments:write'), ('owner', 'payments:settings'),
+      ('owner', 'sources:read'),
       ('owner', 'members:manage'), ('owner', 'activity:read')
     ) d (role, permission)
     where d.role = p_role and d.permission = p_permission
@@ -110,7 +117,7 @@ set search_path = ''
 as $$
   select p_permission in (
     'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write',
-    'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read'
+    'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read', 'sources:read'
   )
 $$;
 

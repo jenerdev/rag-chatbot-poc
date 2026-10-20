@@ -81,7 +81,7 @@ export function fromPostgrest(error: { code?: string; message: string }, what: s
 }
 
 /** The tenants columns a platform read selects. EXPLICIT, never `*` (CLAUDE.md § Conventions). */
-const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, archived_at, created_at, privacy_contact_name, privacy_contact_email, dpa_signed_on, policy_version, chat_retention_days, guest_retention_days, audit_retention_days';
+const TENANT_COLUMNS = 'id, slug, business_name, assistant_name, logo_url, banner_url, assistant_avatar_url, theme, fallback_messages, suggested_questions, welcome_text, archived_at, created_at, privacy_contact_name, privacy_contact_email, dpa_signed_on, policy_version, chat_retention_days, guest_retention_days, audit_retention_days';
 
 /** One row of the platform's tenant list. */
 export interface TenantSummary {
@@ -97,6 +97,8 @@ export interface TenantSummary {
   fallbackMessages: Json | null;
   /** D-089: the questions a new chat offers as buttons, or null. */
   suggestedQuestions: Json | null;
+  /** D-139: the welcome card's line under the assistant's name, or null for the default words. */
+  welcomeText: string | null;
   /** ISO timestamp, or null while live. An archived tenant is a 404 everywhere but here. */
   archivedAt: string | null;
   createdAt: string;
@@ -137,6 +139,7 @@ type TenantRow = {
   theme: Json;
   fallback_messages: Json | null;
   suggested_questions: Json | null;
+  welcome_text: string | null;
   archived_at: string | null;
   created_at: string;
   privacy_contact_name: string | null;
@@ -162,6 +165,7 @@ function summary(row: TenantRow, applications: ApplicationKey[], members: number
     theme: row.theme,
     fallbackMessages: row.fallback_messages,
     suggestedQuestions: row.suggested_questions,
+    welcomeText: row.welcome_text,
     archivedAt: row.archived_at,
     createdAt: row.created_at,
     legal: {
@@ -259,6 +263,8 @@ export interface TenantPatch {
   theme?: Json;
   fallbackMessages?: Json | null;
   suggestedQuestions?: Json | null;
+  /** D-139: null = the default welcome line */
+  welcomeText?: string | null;
   /** D-129–D-131: the Legal tab's fields; each is Postgres's to check (tenants_privacy_contact, _policy_version, _retention) */
   privacyContactName?: string | null;
   privacyContactEmail?: string | null;
@@ -280,6 +286,7 @@ export async function updateTenant(platform: PlatformContext, tenantId: number, 
   if (patch.theme !== undefined) row.theme = patch.theme;
   if (patch.fallbackMessages !== undefined) row.fallback_messages = patch.fallbackMessages;
   if (patch.suggestedQuestions !== undefined) row.suggested_questions = patch.suggestedQuestions;
+  if (patch.welcomeText !== undefined) row.welcome_text = patch.welcomeText;
   if (patch.privacyContactName !== undefined) row.privacy_contact_name = patch.privacyContactName;
   if (patch.privacyContactEmail !== undefined) row.privacy_contact_email = patch.privacyContactEmail;
   if (patch.dpaSignedOn !== undefined) row.dpa_signed_on = patch.dpaSignedOn;
@@ -373,6 +380,7 @@ export async function platformTenantContext(platform: PlatformContext, tenantId:
     assistantName: detail.assistantName,
     fallbackMessages: {},
     suggestedQuestions: [],
+    welcomeText: null,
     db: platform.db,
   };
 }

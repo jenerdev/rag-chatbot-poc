@@ -263,6 +263,9 @@ people, and seeing the cap in your own code is how it stops surprising you.
 ---
 
 ## D-012 · Sources shown in the UI as a product feature · **Settled**
+## D-012 · Sources shown in the UI as a product feature · **Settled**
+
+> **Amended by D-140 (2026-10-21):** still a product feature, but STAFF's: the chat route sends the chunks to a signed-in member with `sources:read` (owners and admins by default) and to nobody else.
 
 **Decision:** Every answer displays the chunks that were retrieved, with their
 similarity scores. Not behind a debug flag.
@@ -4270,3 +4273,124 @@ either.
 **Why the platform's view of a tenant has no stay log:** the platform token has no policy on `booking_events` (D-076: no booking, message or payment), and the invoker function reads under it. The tenant's owner sees both; the super user sees the audit rows alone. Kept, not worked around.
 
 **What the test suites do to the live log:** every write a probe makes on villa or the platform on service_role is a `system` row ("System deleted the promo villa ten", a super user added and removed). verify and both walks now sweep their own system rows at the end, counted; the 49 that the first runs left were removed by hand.
+
+## D-139 · The welcome line is per tenant, set by a super user; the chat's foot is one grid · **Added 2026-10-21 (schema-welcome-text.sql)**
+
+**Decision:**
+- The sentence under the assistant's name on a new chat ("Discover more
+  about our resort, accommodations, amenities, and booking options.", the
+  user's words, replacing "Ask me anything. I answer from our own
+  information, and show where each answer came from.") is
+  `tenants.welcome_text` (the 44th SQL file): null = the default in ONE
+  file, `apps/web/lib/welcome-text.ts`, which the chat draws and the
+  platform form shows as the field's placeholder. 1–200 characters once
+  trimmed (`tenants_welcome_text_length`; `lib/schemas.ts` says the same
+  first), null clears, '' is refused.
+- It reaches guests through `tenant_public()`, re-created with the column;
+  schema-legal.sql's drop-and-create is now guarded on it (trap 20). A
+  super user sets it on the platform tenant form, Profile → Identity, under
+  the assistant's name; the PATCH is the ordinary tenant route. The audit
+  log keeps its before and after (`audit_row()`'s tenants allowlist, the
+  43rd file re-run).
+- An EMPTY knowledge base still says "I am still being set up" instead,
+  as before.
+- **The chat's foot (the same day, the user: "the layout is not looking
+  good specially the footer on mobile view"):** the fine print under the
+  field is ONE grid. The links (Book a stay, Manage booking, Privacy,
+  Terms) left the notice paragraph for their own `<nav>` with CSS dots
+  between them; on a desktop they sit in the right column under the keys
+  hint, so the foot is as tall as the notice; on a phone the notice takes
+  the whole width and the links share the last row with the Read aloud
+  toggle. The composer's bottom padding adds `env(safe-area-inset-bottom)`.
+  `plan/legal-walk.mjs` reads the links from `.composer-links a` now.
+
+**Why:** the sentence is the first thing a guest reads and it is the
+resort's, not the platform's; the same mechanism as the suggested
+questions (D-089) and the fallback messages (D-048), so a super user
+changes it without a deploy. The foot: at 375 px the notice was squeezed
+into a 187 px column beside the toggle and ran eight lines, 144 px of
+fine print under a 51 px field, and the links overflowed the column.
+
+**Measured (2026-10-21):**
+- verify **242/242** (102c: the platform sets the line, anon reads it
+  back through `tenant_public()`, '' and 201 characters refused with
+  23514, null clears; 42's column list has `welcome_text`).
+- `plan/welcome-text-walk.mjs` **4/4** on a throwaway tenant and super
+  user over HTTP and in a browser at 375: the default line on a new
+  tenant; PATCH '' → 400 "Send null for the default welcome line", 201
+  characters → 400, a padded line → 200 trimmed, `tenant_public()` and
+  the welcome card carry it; the audit row (super, update, changed
+  `["welcome_text"]`, before null, after the line); null → the default
+  again. Screenshot `plan/welcome-text/welcome-375.png`.
+- The foot at 375 on alteza, voice off: the notice 335 × 54 (three
+  lines, was 187 × 144), the foot 80 px (was 144), the composer 159 px
+  (was 223); voice on: the notice 72, the links wrapped to two lines
+  beside the toggle, the foot 118. At 1280 the foot is 41 px (was 54).
+  `plan/guest-links-walk.mjs` 6/6 (the chat's field links at 1280 and
+  390, no sideways scroll). Web tests **215** (welcome-text 5 new),
+  typecheck 13/13.
+- The chatbot is untouched: no prompt text, no tool text; the sentence
+  is page text.
+
+**What would change it:** a tenant wanting the line per language, as the
+fallback messages are (D-048): then `welcome_text` becomes a jsonb of the
+three keys and `welcomeTextOf()` takes the reply language.
+
+## D-140 · The sources behind a reply are staff's: `sources:read`, owners and admins by default · **Added 2026-10-21. Amends D-012**
+
+**Decision:**
+- The chunks a reply was built from (the "N sources" line, its cards and
+  the "searched for" note) reach a SIGNED-IN member whose role has
+  `sources:read`, and nobody else. By default that is an owner or an
+  admin; it is configurable per tenant (D-128) and grantable to staff, on
+  the platform form's Permissions tab under Assistant, "See the sources
+  behind a reply in the chat".
+- The route is the guard, not the screen. `POST /chat` asks
+  `sessionCan(request, tenant, 'sources:read')` (`lib/admin-auth.ts`, the
+  non-throwing twin of `requireAdmin()`: the same cookie, the same
+  membership row, the same overrides) BEFORE the answer and, for anyone
+  else, REMOVES `sources` and `searchQuery` from the JSON body and from the
+  stream's `meta` event. Removed, not emptied: the screen tells "nothing
+  matched" (an empty list, drawn for staff) from "not shown" (no list) and
+  draws nothing of the chunks in the second case, not even "no matching
+  chunks". The route still runs as the chat token: `sessionCan()` hands
+  back no context, only an answer.
+- The tool evidence ("Checked availability") stays for everyone: rule 7,
+  D-037, it is the guest's answer's basis, and it carries no guest data.
+- No table policy asks the permission, because no table needs to: the
+  chunks reach the route through the search RPC on the chat token as
+  before, and the pipeline is untouched (`pnpm eval` and the isolation
+  suites call it directly). `app_default_can()`, the configurable
+  constraint and the grantable list carry `sources:read` in BOTH files
+  that hold them (the 34th and the 43rd, identically, trap 25), and
+  `permissions.test.ts` pins the code's lists to the SQL.
+
+**Why:** the user's word ("show the sources documents only for owner and
+admin. when logged in"). D-012 made the panel a product feature so a wrong
+answer could be diagnosed in seconds; that is still true, and it is staff's
+diagnosis to make. A guest reading the resort's chunks verbatim, scores and
+all, is the knowledge base shown to someone who may not list it (S-2 is
+staff's). Hiding it in the browser alone would have left the chunks in
+every guest's network tab: a wall nobody tests (rule 6's lesson).
+
+**Measured (2026-10-21):**
+- `plan/sources-access-walk.mjs` **4/4** on a throwaway tenant with an
+  owner, an admin and a member of staff, every question "hello" (answered
+  in code, nothing spent): a guest's JSON body has `conversationId,
+  refused, reply, toolCalls` and no `sources`; a guest's `meta` event has
+  `conversationId` alone, then `done`; staff the same; admin and owner get
+  `sources` (an array) and `searchQuery` in both deliveries; a
+  `role_permissions` row grants staff the list and another takes it from
+  the owner, the admin unchanged; the rows removed, the defaults are back.
+- Web tests **216** (`sources:read` pinned ADMIN_ONLY against
+  `app_default_can()`, the constraint and the grantable list); typecheck
+  13/13; the 34th and 43rd files dry-run then applied, the catalog read
+  back: owner true, admin true, staff false, grantable true, the
+  constraint names the key.
+- No prompt text and no tool text changed; the pipeline's types are as
+  they were (the route's wire shape is the route's).
+
+**What would change it:** a tenant wanting guests to see the sources
+again: a row on the Permissions tab cannot give a GUEST anything (there is
+no role), so that would be a feature flag (D-127) read by the same line in
+the route.

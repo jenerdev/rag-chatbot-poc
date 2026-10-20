@@ -43,6 +43,19 @@ alter table public.tenants add  constraint tenants_retention check (
 --    version, the periods. Not the DPA date: that is between the platform
 --    and the resort. Dropped and re-created (the return type changes);
 --    still definer, search_path '', no archived tenant; grants re-applied.
+-- GUARDED (D-139, 2026-10-21): schema-welcome-text.sql replaces this with a
+-- welcome_text column. Re-run after it, this drop and create would quietly
+-- take the column away again (CLAUDE.md trap 20), so it is skipped once
+-- tenant_public() returns that column.
+do $guard$
+begin
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'tenant_public'
+       and 'welcome_text' = any(p.proargnames)
+  ) then
+    return;
+  end if;
 drop function if exists public.tenant_public(text);
 create function public.tenant_public(p_slug text)
 returns table (
@@ -74,6 +87,8 @@ as $$
 $$;
 revoke all on function public.tenant_public(text) from public, anon, authenticated;
 grant execute on function public.tenant_public(text) to anon, authenticated, service_role;
+end;
+$guard$;
 
 -- 3. Consent on the stay (D-129).
 alter table public.stays add column if not exists consent_version text;

@@ -365,27 +365,34 @@
 .voice-status.error { color: var(--danger); }
 .read-aloud { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--muted); }
 .read-aloud[aria-pressed="true"] { color: var(--ink); }
-/* The fine print under the field: one row, inset to the field's text so
-   both edges line up with what is typed. */
+/* The fine print under the field, inset to the field's text so both edges
+   line up with what is typed. ONE grid: the notice on the left, and on the
+   right the keys, the Read aloud toggle and the links to the other pages,
+   so the foot is as tall as the notice and no taller. */
 .composer-foot {
   max-width: 760px;
   margin: var(--space-2) auto 0;
   padding: 0 var(--space-4);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-6);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "notice side" "notice links";
+  column-gap: var(--space-6);
+  row-gap: var(--space-1);
+  align-items: start;
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--muted);
 }
 /* D-129: the chat's notice of what happens to a message. */
-.composer-notice { flex: 1; min-width: 0; margin: 0; text-wrap: pretty; }
-.composer-notice a { color: inherit; text-underline-offset: 2px; }
-.composer-notice a:hover { color: var(--ink); }
-/* The links never break apart from each other. */
-.composer-links { white-space: nowrap; }
-.composer-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+.composer-notice { grid-area: notice; min-width: 0; margin: 0; text-wrap: pretty; }
+/* D-136, D-129: the other guest pages, Privacy and Terms, as one row that
+   wraps. The dots between them are drawn here, not typed, so a wrapped row
+   never starts with one. */
+.composer-links { grid-area: links; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 2px 0; min-width: 0; }
+.composer-links a { color: inherit; text-underline-offset: 2px; }
+.composer-links a:hover { color: var(--ink); }
+.composer-links a + a::before { content: "·"; margin: 0 6px; color: var(--faint); text-decoration: none; display: inline-block; }
+.composer-side { grid-area: side; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 .composer-hint { margin: 0; white-space: nowrap; }
 .composer-hint kbd {
   display: inline-block;
@@ -399,11 +406,18 @@
   text-align: center;
   color: var(--ink);
 }
+.read-aloud { white-space: nowrap; }
 /* Scrolled up while an answer arrived: the way back down. */
 .jump-down { position: absolute; left: 50%; top: calc(-1 * var(--space-10)); transform: translateX(-50%); border-radius: var(--radius-full); box-shadow: var(--shadow-2); }
 @media (max-width: 560px) {
-  .composer { padding: var(--space-2) var(--space-3) var(--space-3); }
-  .composer-foot { padding: 0 var(--space-2); }
+  /* The field edge to edge but for a gutter, and room for a phone's home bar under it. */
+  .composer { padding: var(--space-2) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+  /* The notice takes the whole width (beside the toggle it ran eight lines);
+     the links and the Read aloud toggle share the last row, the toggle at
+     the right edge. The keys hint goes: there is no Enter key to speak of. */
+  .composer-foot { padding: 0 var(--space-2); grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "notice notice" "links side"; column-gap: var(--space-4); row-gap: var(--space-2); }
+  .composer-links { justify-content: flex-start; }
+  .composer-side { align-self: end; }
   .composer-hint { display: none; }
 }
 @media (pointer: coarse) {

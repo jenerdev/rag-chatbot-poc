@@ -36,6 +36,12 @@ export interface TenantContext {
    */
   suggestedQuestions: string[];
   /**
+   * The welcome card's one line under the assistant's name, saying what to
+   * ask (D-139), or null for the default words (apps/web/lib/welcome-text.ts).
+   * Set on the platform tenant form.
+   */
+  welcomeText: string | null;
+  /**
    * The database, AS this tenant: a client holding a token minted for it
    * (auth-rls Phase 3, D-039). Postgres's RLS policies compare every row
    * against that token, so this is the second wall behind every
