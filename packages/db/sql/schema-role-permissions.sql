@@ -38,6 +38,10 @@
 --    who adds them. Still no bookings, guests, messages or payments: D-076's
 --    line moves for the knowledge base alone (D-128).
 --
+-- activity:read (D-138, schema-audit-log.sql, the 43rd file) is in the three
+-- lists below as well, identically, so either file run last gives the same
+-- functions (trap 25); permissions.test.ts reads THIS file.
+--
 -- Idempotent. Run after schema-features.sql (and so after every earlier file).
 
 -- 1. The overrides. Absent = the default.
@@ -55,7 +59,7 @@ alter table public.role_permissions add  constraint role_permissions_configurabl
   'dashboard:read', 'documents:read', 'documents:write', 'bookings:read', 'bookings:write',
   'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write',
   'promos:read', 'promos:write', 'payments:read', 'unanswered:read', 'unanswered:write',
-  'conversations:read', 'members:manage'
+  'conversations:read', 'members:manage', 'activity:read'
 ));
 
 alter table public.role_permissions enable row level security;
@@ -93,7 +97,7 @@ as $$
       ('owner', 'conversations:read'), ('owner', 'documents:write'), ('owner', 'rooms:read'), ('owner', 'rooms:write'),
       ('owner', 'holidays:read'), ('owner', 'holidays:write'), ('owner', 'slots:read'), ('owner', 'slots:write'),
       ('owner', 'promos:read'), ('owner', 'promos:write'), ('owner', 'payments:write'), ('owner', 'payments:settings'),
-      ('owner', 'members:manage')
+      ('owner', 'members:manage'), ('owner', 'activity:read')
     ) d (role, permission)
     where d.role = p_role and d.permission = p_permission
   )
@@ -106,7 +110,7 @@ set search_path = ''
 as $$
   select p_permission in (
     'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write',
-    'slots:read', 'slots:write', 'promos:read', 'promos:write'
+    'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read'
   )
 $$;
 

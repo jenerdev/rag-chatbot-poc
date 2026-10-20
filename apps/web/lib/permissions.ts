@@ -55,12 +55,14 @@ export const PERMISSIONS = [
   'conversations:read',
   /** the Members screen: list, add an existing account, change a role, remove */
   'members:manage',
+  /** S-18 Activity (D-138): who did what; owners by default, grantable to admins; activity_list() and the audit_log policy ask app_can() again */
+  'activity:read',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const STAFF: readonly Permission[] = ['session', 'dashboard:read', 'documents:read', 'bookings:read', 'bookings:write', 'payments:read', 'unanswered:read', 'unanswered:write', 'conversations:read'];
 const ADMIN: readonly Permission[] = [...STAFF, 'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write', 'payments:write', 'payments:settings'];
-const OWNER: readonly Permission[] = [...ADMIN, 'members:manage'];
+const OWNER: readonly Permission[] = [...ADMIN, 'members:manage', 'activity:read'];
 
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   staff: STAFF,
@@ -86,10 +88,10 @@ export const CONFIGURABLE_PERMISSIONS: readonly Permission[] = [
   'dashboard:read', 'documents:read', 'documents:write', 'bookings:read', 'bookings:write',
   'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write',
   'promos:read', 'promos:write', 'payments:read', 'unanswered:read', 'unanswered:write',
-  'conversations:read', 'members:manage',
+  'conversations:read', 'members:manage', 'activity:read',
 ];
 export const GRANTABLE_PERMISSIONS: readonly Permission[] = [
-  'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write',
+  'documents:write', 'rooms:read', 'rooms:write', 'holidays:read', 'holidays:write', 'slots:read', 'slots:write', 'promos:read', 'promos:write', 'activity:read',
 ];
 
 /** A tenant's rows: role → permission → allowed. Absent = the default. */
@@ -147,6 +149,7 @@ export const PERMISSION_LABELS: Readonly<Record<Permission, { area: string; labe
   'unanswered:write': { area: 'Assistant', label: 'Resolve and reopen them' },
   'conversations:read': { area: 'Assistant', label: 'Read conversations' },
   'members:manage': { area: 'Members', label: 'Add, change and remove members' },
+  'activity:read': { area: 'Members', label: 'See the activity log' },
 };
 
 /**
