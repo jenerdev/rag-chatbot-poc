@@ -154,7 +154,7 @@ if (command === 'fallback') {
   // The counts first, so the person sees what --yes will take with it.
   const TABLES = [
     'documents', 'chunks', 'conversations', 'messages', 'memberships', 'tenant_applications',
-    'units', 'slots', 'unit_rates', 'unit_images', 'rate_calendar', 'bookings', 'unanswered_resolutions',
+    'units', 'slots', 'unit_rates', 'unit_images', 'rate_calendar', 'bookings', 'unanswered_resolutions', 'audit_log',
   ];
   const { data: tenant, error: tenantError } = await supabase.from('tenants').select('id, slug, archived_at').eq('slug', slug ?? '').maybeSingle();
   if (!slug) {
@@ -177,6 +177,11 @@ if (command === 'fallback') {
       else if (data.length !== 1) fail(`expected to delete 1 tenant, deleted ${data.length}`);
       else {
         console.log(`Deleted tenant "${slug}" and everything above by cascade. Sweeping the photo bucket (R-30)…`);
+        // D-138: the tenant's own audit rows went with it; ONE platform row says
+        // it existed and was removed. The one insert outside the trigger and
+        // audit_note(), on service_role, which the policies do not bind.
+        const noted = await supabase.from('audit_log').insert({ tenant_id: null, actor_kind: 'system', area: 'platform', action: 'tenant_removed', subject: String(tenant.id), label: slug });
+        if (noted.error) console.log(`  (the platform's activity row was not written: ${noted.error.message})`);
         // The objects do not cascade. The sweeper counts what Storage says it
         // removed against what was asked (CLAUDE.md trap 17) and exits 1 on a gap.
         execSync('pnpm --silent --filter @rag/bookings storage-orphans -- --remove', { cwd: new URL('../../..', import.meta.url), stdio: 'inherit' });

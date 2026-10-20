@@ -20,6 +20,7 @@
 // own probe user in Supabase Auth.
 //
 // 173–183 are notifications Phase 2 (schema-notifications.sql, D-116).
+// 230–241 are the audit log (schema-audit-log.sql, D-138).
 //
 // Run:  pnpm --filter @rag/db verify
 
@@ -4678,6 +4679,277 @@ async function notificationChecks() {
       const { error } = await supabase.from('tenants').delete().eq('id', probe);
       if (error) check(false, 'rate limit: the probe tenant deletes', error.message);
     }
+  }
+}
+
+// 230–241. The audit log (schema-audit-log.sql, plan/audit-log.md Phase 2,
+//          D-138): Postgres writes it, no token writes it, each wall holds
+//          alone, and the read function refuses the wrong caller itself.
+{
+  const users = [];
+  const probes = [];
+  try {
+    const tenant = async (slug) => {
+      const { data, error } = await supabase.from('tenants').insert({ slug, business_name: 'Audit Probe', assistant_name: 'Probe' }).select('id, slug').single();
+      if (error) throw new Error(`tenant: ${error.message}`);
+      probes.push(data.id);
+      return data;
+    };
+    const member = async (tenantId, role) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `audit-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(error.message);
+      users.push(data.user.id);
+      const m = await supabase.from('memberships').insert({ user_id: data.user.id, tenant_id: tenantId, role });
+      if (m.error) throw new Error(`membership: ${m.error.message}`);
+      return { id: data.user.id, db: asToken(staffToken(tenantId, data.user.id)) };
+    };
+    const probe = await tenant(`audit-${randomBytes(3).toString('hex')}`);
+    const other = await tenant(`audit-${randomBytes(3).toString('hex')}`);
+    const app = await supabase.from('tenant_applications').insert({ tenant_id: probe.id, application_key: 'bookings', config: { timezone: 'Asia/Manila' } });
+    if (app.error) throw new Error(`app: ${app.error.message}`);
+    const { data: unit, error: unitError } = await supabase.from('units').insert({ tenant_id: probe.id, name: 'Garden', capacity: 2, sort_order: 1, active: true }).select('id').single();
+    if (unitError) throw new Error(`unit: ${unitError.message}`);
+    const owner = await member(probe.id, 'owner');
+    const admin = await member(probe.id, 'admin');
+    const stranger = await member(other.id, 'owner');
+    const chat = asToken(chatToken(probe.id));
+    const logOf = (where = {}) => supabase.from('audit_log').select('id, tenant_id, actor_kind, actor_user, area, action, subject, label, changed, before, after').eq('tenant_id', probe.id).match(where).order('id');
+    const list = (db, tenantId = probe.id, extra = {}) => db.rpc('activity_list', { p_tenant_id: tenantId, p_days: 30, ...extra });
+
+    // 230. The rows the setup wrote ON SERVICE_ROLE are 'system': the tenant,
+    //      the application, the unit AND its one room (D-133's trigger), the
+    //      probe's two memberships (the stranger is the other tenant's): the
+    //      positive twin of every check below, the trigger fires and names
+    //      the right table.
+    {
+      const { data: rows, error } = await logOf();
+      const areas = (rows ?? []).map((r) => `${r.area}:${r.action}`).sort().join(',');
+      check(
+        !error && rows?.length === 6 && rows.every((r) => r.actor_kind === 'system' && r.actor_user === null) && areas === 'applications:insert,members:insert,members:insert,rooms:insert,rooms:insert,tenant:insert',
+        'audit: the setup on service_role wrote 6 system rows: the tenant, the application, the unit and its room, two members',
+        error?.message ?? `${rows?.length} rows: ${areas}`,
+      );
+    }
+
+    // 231. A staff update through a staff token is ONE row with the member's
+    //      id, actor 'staff', changed = {name}, before/after the name; a
+    //      no-op save (the same values) writes NOTHING (§ 2b.3).
+    {
+      const before = (await logOf()).data?.length ?? 0;
+      const rename = await admin.db.from('units').update({ name: 'Garden Room' }).eq('tenant_id', probe.id).eq('id', unit.id).select('id');
+      const noop = await admin.db.from('units').update({ name: 'Garden Room', capacity: 2 }).eq('tenant_id', probe.id).eq('id', unit.id).select('id');
+      // The unit's own row; its one room is renamed with it (D-133), a second rooms:update row.
+      const { data: rows } = await logOf({ area: 'rooms', action: 'update', subject: String(unit.id), label: 'Garden Room' });
+      const row = rows?.[0];
+      const after = (await logOf()).data?.length ?? 0;
+      check(
+        !rename.error && rename.data?.length === 1 && !noop.error && noop.data?.length === 1
+          && rows?.length === 1 && row.actor_kind === 'staff' && row.actor_user === admin.id && row.label === 'Garden Room'
+          && JSON.stringify(row.changed) === '["name"]' && row.before?.name === 'Garden' && row.after?.name === 'Garden Room' && after === before + 2,
+        "audit: an admin's rename is ONE staff row for the unit with their id, changed = [name], before Garden → after Garden Room (its room's rename is the other); the same save again writes nothing",
+        `${rename.error?.message ?? 'renamed'} · rows ${rows?.length} · actor ${row?.actor_kind}/${row?.actor_user === admin.id} · changed ${JSON.stringify(row?.changed)} · ${before} → ${after}`,
+      );
+    }
+
+    // 232. No token writes the table: a staff insert, update and delete and a
+    //      chat token's insert are refused (42501), and the row count holds.
+    {
+      const before = (await logOf()).data?.length ?? 0;
+      const ins = await owner.db.from('audit_log').insert({ tenant_id: probe.id, actor_kind: 'staff', area: 'documents', action: 'delete' });
+      const upd = await owner.db.from('audit_log').update({ label: 'forged' }).eq('tenant_id', probe.id).select('id');
+      const del = await owner.db.from('audit_log').delete().eq('tenant_id', probe.id).select('id');
+      const chatIns = await chat.from('audit_log').insert({ tenant_id: probe.id, actor_kind: 'staff', area: 'documents', action: 'delete' });
+      const after = (await logOf()).data?.length ?? 0;
+      check(
+        ins.error?.code === '42501' && (upd.error?.code === '42501' || upd.data?.length === 0) && (del.error?.code === '42501' || del.data?.length === 0) && chatIns.error?.code === '42501' && after === before,
+        "audit: no token inserts, updates or deletes a row: the owner's three writes and a chat token's insert are refused; the count holds",
+        `insert ${ins.error?.code ?? 'STORED'} · update ${upd.error?.code ?? `${upd.data?.length} rows`} · delete ${del.error?.code ?? `${del.data?.length} rows`} · chat ${chatIns.error?.code ?? 'STORED'} · ${before} → ${after}`,
+      );
+    }
+
+    // 233. Wall 2 alone: the other tenant's owner reads 0 rows of the probe's
+    //      with NO filter, a chat token reads 0, the probe's owner reads them
+    //      all (the count matches service_role's), and an admin (no
+    //      activity:read by default) reads 0.
+    {
+      const { count: truth } = await supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      const mine = await owner.db.from('audit_log').select('id', { count: 'exact', head: true });
+      const theirs = await stranger.db.from('audit_log').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      const { count: ownTruth } = await supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('tenant_id', other.id);
+      const own = await stranger.db.from('audit_log').select('id', { count: 'exact', head: true });
+      const chatRead = await chat.from('audit_log').select('id', { count: 'exact', head: true });
+      const adminRead = await admin.db.from('audit_log').select('id', { count: 'exact', head: true });
+      check(
+        typeof truth === 'number' && truth > 0 && mine.count === truth && theirs.count === 0 && own.count === ownTruth && (ownTruth ?? 0) > 0 && chatRead.count === 0 && adminRead.count === 0,
+        "audit: RLS alone: the owner's unfiltered read equals service_role's count; the other tenant's owner reads 0 of the probe's and all of its own; a chat token and an admin read 0",
+        `truth ${truth} · owner ${mine.count} · stranger ${theirs.count} of probe's, ${own.count}/${ownTruth} of its own · chat ${chatRead.count} · admin ${adminRead.count}`,
+      );
+    }
+
+    // 234. activity_list(): the owner gets a page whose total is the count;
+    //      an admin and a chat token get insufficient_privilege, not an
+    //      empty page; the other tenant's owner naming the probe's id too.
+    {
+      const ok = await list(owner.db);
+      const adminTry = await list(admin.db);
+      const chatTry = await list(chat);
+      const strangerTry = await list(stranger.db);
+      const { count: truth } = await supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('tenant_id', probe.id);
+      check(
+        !ok.error && ok.data?.total === truth && Array.isArray(ok.data?.rows) && ok.data.rows.length === truth
+          && adminTry.error?.code === '42501' && chatTry.error?.code === '42501' && strangerTry.error?.code === '42501',
+        'audit: activity_list() lists every row for the owner (total = the count); an admin, a chat token and another tenant\'s owner are refused (42501)',
+        `owner ${ok.error?.message ?? `${ok.data?.rows?.length} of ${ok.data?.total}`} · admin ${adminTry.error?.code ?? 'LISTED'} · chat ${chatTry.error?.code ?? 'LISTED'} · stranger ${strangerTry.error?.code ?? 'LISTED'}`,
+      );
+    }
+
+    // 235. A grant (D-128): a role_permissions row giving admin activity:read
+    //      lets the admin read the rows and the list; the row itself was
+    //      logged (permissions:insert, system). Then the row goes, and the
+    //      admin reads 0 again.
+    {
+      const grant = await supabase.from('role_permissions').insert({ tenant_id: probe.id, role: 'admin', permission: 'activity:read', allowed: true });
+      const withGrant = await admin.db.from('audit_log').select('id', { count: 'exact', head: true });
+      const listed = await list(admin.db);
+      const { data: logged } = await logOf({ area: 'permissions', action: 'insert' });
+      await supabase.from('role_permissions').delete().eq('tenant_id', probe.id);
+      const without = await admin.db.from('audit_log').select('id', { count: 'exact', head: true });
+      check(
+        !grant.error && withGrant.count > 0 && !listed.error && listed.data?.total === withGrant.count && logged?.length === 1 && logged[0].after?.permission === 'activity:read' && without.count === 0,
+        'audit: a tenant row granting admin activity:read lets the admin read and list (the grant itself logged under permissions); removed, the admin reads 0 again',
+        `grant ${grant.error?.message ?? 'ok'} · with ${withGrant.count} · list ${listed.error?.code ?? listed.data?.total} · logged ${logged?.length} · without ${without.count}`,
+      );
+    }
+
+    // 236. A super user's write on the tenant is a 'super' row with their id
+    //      (a feature switched), readable by the tenant's owner and listed by
+    //      the super user through activity_list() for that tenant.
+    {
+      const { data: su, error: suError } = await supabase.auth.admin.createUser({ email: `audit-super-${randomUUID()}@example.com`, password: randomBytes(24).toString('base64url'), email_confirm: true });
+      if (suError) throw new Error(suError.message);
+      users.push(su.user.id);
+      const pa = await supabase.from('platform_admins').insert({ user_id: su.user.id });
+      if (pa.error) throw new Error(`platform_admins: ${pa.error.message}`);
+      const platform = asToken(platformToken(su.user.id));
+      const flip = await platform.from('tenant_features').upsert({ tenant_id: probe.id, feature: 'voice', enabled: true }, { onConflict: 'tenant_id,feature' });
+      const { data: rows } = await logOf({ area: 'features' });
+      const row = rows?.[0];
+      const ownerSees = await owner.db.from('audit_log').select('id').eq('area', 'features');
+      const superList = await list(platform);
+      const superPlatform = await list(platform, null);
+      const ownerPlatform = await list(owner.db, null);
+      await supabase.from('platform_admins').delete().eq('user_id', su.user.id);
+      check(
+        !flip.error && rows?.length === 1 && row.actor_kind === 'super' && row.actor_user === su.user.id && row.subject === 'voice' && row.after?.enabled === true
+          && ownerSees.data?.length === 1 && !superList.error && superList.data?.rows?.some((r) => r.area === 'features' && r.actorKind === 'super')
+          && !superPlatform.error && ownerPlatform.error?.code === '42501',
+        "audit: a super user's feature switch is a 'super' row with their id; the owner reads it; the super user lists the tenant's log and the platform's; an owner asking for the platform's is refused",
+        `flip ${flip.error?.message ?? 'ok'} · row ${row?.actor_kind}/${row?.actor_user === su.user.id}/${row?.subject} · owner ${ownerSees.data?.length} · super list ${superList.error?.code ?? superList.data?.total} · platform ${superPlatform.error?.code ?? superPlatform.data?.total} · owner→platform ${ownerPlatform.error?.code ?? 'LISTED'}`,
+      );
+    }
+
+    // 237. audit_note(): login and logout rows for a member; a chat token
+    //      (no sub) is refused; an unknown action is refused; a member naming
+    //      the OTHER tenant is refused; proof_opened needs a subject.
+    {
+      const login = await owner.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'login' });
+      const logout = await owner.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'logout' });
+      const chatTry = await chat.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'login' });
+      const unknown = await owner.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'deleted_everything' });
+      const foreign = await stranger.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'login' });
+      const noSubject = await owner.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'proof_opened' });
+      const proof = await owner.db.rpc('audit_note', { p_tenant_id: probe.id, p_action: 'proof_opened', p_subject: '17' });
+      const { data: rows } = await logOf({ actor_user: owner.id });
+      const kinds = (rows ?? []).map((r) => `${r.area}:${r.action}`).sort().join(',');
+      check(
+        !login.error && !logout.error && !proof.error && chatTry.error?.code === '42501' && unknown.error?.code === '23514' && foreign.error?.code === '42501' && noSubject.error?.code === '23514'
+          && kinds === 'proof:proof_opened,session:login,session:logout' && rows.every((r) => r.actor_kind === 'staff'),
+        'audit: audit_note() writes login, logout and proof_opened for the member; refuses a chat token (42501), an unknown action (23514), another tenant (42501) and a proof with no subject (23514)',
+        `login ${login.error?.message ?? login.data} · chat ${chatTry.error?.code ?? 'WROTE'} · unknown ${unknown.error?.code ?? 'WROTE'} · foreign ${foreign.error?.code ?? 'WROTE'} · no subject ${noSubject.error?.code ?? 'WROTE'} · ${kinds}`,
+      );
+    }
+
+    // 238. A write through a DEFINER carries the member's id (§ 2b.2): a
+    //      member removed by the owner through the memberships policy is a
+    //      'members:delete' row naming the owner; and a promotion is an
+    //      update with role before → after.
+    {
+      const victim = await member(probe.id, 'staff');
+      const promote = await owner.db.from('memberships').update({ role: 'admin' }).eq('tenant_id', probe.id).eq('user_id', victim.id).select('user_id');
+      const remove = await owner.db.from('memberships').delete().eq('tenant_id', probe.id).eq('user_id', victim.id).select('user_id');
+      const { data: rows } = await logOf({ area: 'members', subject: victim.id });
+      const up = rows?.find((r) => r.action === 'update');
+      const gone = rows?.find((r) => r.action === 'delete');
+      check(
+        !promote.error && promote.data?.length === 1 && !remove.error && remove.data?.length === 1
+          && up?.actor_user === owner.id && up.before?.role === 'staff' && up.after?.role === 'admin' && gone?.actor_user === owner.id && gone.actor_kind === 'staff',
+        "audit: the owner's promotion (role staff → admin) and removal of a member are two rows naming the owner",
+        `promote ${promote.error?.message ?? promote.data?.length} · remove ${remove.error?.message ?? remove.data?.length} · update ${up ? `${up.before?.role}→${up.after?.role} by owner ${up.actor_user === owner.id}` : 'none'} · delete ${gone ? `by owner ${gone.actor_user === owner.id}` : 'none'}`,
+      );
+    }
+
+    // 239. A stay's log is NOT copied (rule 2): a booking inserted and
+    //      confirmed writes booking_events rows and 0 audit rows; and
+    //      activity_list() shows it as a 'bookings' row WITHOUT the note.
+    {
+      const { data: slot } = await supabase.from('slots').insert({ tenant_id: probe.id, name: 'Day', start_time: '08:00', duration: '8 hours' }).select('id').single();
+      const auditBefore = (await logOf()).data?.length ?? 0;
+      const stay = await supabase.from('bookings').insert({ tenant_id: probe.id, unit_id: unit.id, slot_id: slot.id, booked_date: '2026-01-10', guest_name: 'Audit Guest', status: 'pending' }).select('id, group_id').single();
+      if (stay.error) throw new Error(`booking: ${stay.error.message}`);
+      const confirm = await supabase.from('bookings').update({ status: 'confirmed', decision_note: 'audit secret note' }).eq('tenant_id', probe.id).eq('id', stay.data.id);
+      const auditAfter = (await logOf()).data?.length ?? 0;
+      const { data: events } = await supabase.from('booking_events').select('kind').eq('tenant_id', probe.id).eq('group_id', stay.data.group_id);
+      const listed = await list(owner.db, probe.id, { p_area: 'bookings' });
+      const bookingRows = listed.data?.rows ?? [];
+      const leaked = JSON.stringify(bookingRows).includes('audit secret note') || JSON.stringify(bookingRows).includes('Audit Guest');
+      check(
+        !confirm.error && auditAfter === auditBefore && events?.length === 2 && bookingRows.length === 2 && bookingRows.every((r) => r.source === 'bookings' && r.area === 'bookings') && !leaked,
+        'audit: a stay born and confirmed writes 2 booking_events and 0 audit rows; activity_list() lists both as bookings rows with no note and no guest name',
+        `confirm ${confirm.error?.message ?? 'ok'} · audit ${auditBefore} → ${auditAfter} · events ${events?.length} · listed ${bookingRows.length} · leaked ${leaked}`,
+      );
+    }
+
+    // 240. The list's filters and keyset: p_area narrows, p_actor narrows,
+    //      p_limit 2 pages with `more` and the second page continues after
+    //      the first's last key with no repeat.
+    {
+      const all = await list(owner.db);
+      const byActor = await list(owner.db, probe.id, { p_actor: owner.id });
+      const first = await list(owner.db, probe.id, { p_limit: 2 });
+      const last = first.data?.rows?.at(-1);
+      const second = await list(owner.db, probe.id, { p_limit: 2, p_before_at: last?.at, p_before_key: last?.key });
+      const firstKeys = new Set((first.data?.rows ?? []).map((r) => r.key));
+      check(
+        !all.error && byActor.data?.rows?.length > 0 && byActor.data.rows.every((r) => r.actorUser === owner.id) && byActor.data.total < all.data.total
+          && first.data?.rows?.length === 2 && first.data.more === true && second.data?.rows?.length === 2 && second.data.rows.every((r) => !firstKeys.has(r.key)),
+        'audit: p_actor lists only that member; a page of 2 says more, and the next page continues after its last key with no repeat',
+        `all ${all.data?.total} · by actor ${byActor.data?.total} · page1 ${first.data?.rows?.length} more ${first.data?.more} · page2 ${second.data?.rows?.length} fresh ${second.data?.rows?.every((r) => !firstKeys.has(r.key))}`,
+      );
+    }
+
+    // 241. Retention: audit_retention_days has its default and bound, and a
+    //      row aged past it is what the tool deletes (a counted delete on
+    //      service_role; a token's delete is 232's).
+    {
+      const { data: t } = await supabase.from('tenants').select('audit_retention_days').eq('id', probe.id).single();
+      const bad = await supabase.from('tenants').update({ audit_retention_days: 10 }).eq('id', probe.id);
+      const old = new Date(Date.now() - 800 * 86_400_000).toISOString();
+      const { data: aged } = await supabase.from('audit_log').select('id').eq('tenant_id', probe.id).order('id').limit(1).single();
+      // Age one row by hand (service_role bypasses RLS; the column has no policy to refuse it).
+      const age = await supabase.from('audit_log').update({ at: old }).eq('id', aged.id);
+      const before = new Date(Date.now() - 730 * 86_400_000).toISOString();
+      const { count: swept } = await supabase.from('audit_log').delete({ count: 'exact' }).eq('tenant_id', probe.id).lt('at', before);
+      check(
+        t?.audit_retention_days === 730 && bad.error?.code === '23514' && !age.error && swept === 1,
+        'audit: audit_retention_days defaults to 730 and refuses 10 (23514); the sweep deletes exactly the one row aged past it',
+        `default ${t?.audit_retention_days} · bound ${bad.error?.code ?? 'ACCEPTED'} · aged ${age.error?.message ?? 'ok'} · swept ${swept}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'audit: setup', error.message);
+  } finally {
+    for (const id of probes) await supabase.from('tenants').delete().eq('id', id);
+    for (const id of users) await supabase.auth.admin.deleteUser(id);
   }
 }
 

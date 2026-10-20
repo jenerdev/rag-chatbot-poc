@@ -78,6 +78,8 @@ export interface Database {
           /** D-131: days a chat is kept after its last message, and guest details after check-out */
           chat_retention_days: number;
           guest_retention_days: number;
+          /** D-138: days an audit_log row is kept */
+          audit_retention_days: number;
           theme: Json;
           /** what the chat shows when the documents cannot answer, per reply language (D-047, D-048); a missing key or null = the built-in default */
           fallback_messages: Json | null;
@@ -101,6 +103,7 @@ export interface Database {
           policy_version?: string;
           chat_retention_days?: number;
           guest_retention_days?: number;
+          audit_retention_days?: number;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -121,6 +124,7 @@ export interface Database {
           policy_version?: string;
           chat_retention_days?: number;
           guest_retention_days?: number;
+          audit_retention_days?: number;
           theme?: Json;
           fallback_messages?: Json | null;
           suggested_questions?: Json | null;
@@ -852,6 +856,31 @@ export interface Database {
         Relationships: [];
       };
       /** schema-stay-notes.sql (D-132): staff notes on a stay, many per stay; read bookings:read, add and delete your own bookings:write */
+      /**
+       * schema-audit-log.sql (D-138): who did what, written by the audit_row()
+       * trigger and audit_note(); NO token inserts, updates or deletes a row,
+       * so Insert and Update are never.
+       */
+      audit_log: {
+        Row: {
+          id: number;
+          /** null: a platform-wide row */
+          tenant_id: number | null;
+          at: string;
+          actor_kind: 'staff' | 'super' | 'system';
+          actor_user: string | null;
+          area: string;
+          action: string;
+          subject: string | null;
+          label: string | null;
+          changed: string[] | null;
+          before: Json | null;
+          after: Json | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       stay_notes: {
         Row: {
           id: number;
@@ -1194,6 +1223,25 @@ export interface Database {
       rate_allow: {
         Args: { p_tenant_id: number; p_key: string; p_max: number; p_window_seconds: number };
         Returns: boolean;
+      };
+      /** schema-audit-log.sql (D-138): a login, logout or proof_opened row for the token's user; refuses a token with no user */
+      audit_note: {
+        Args: { p_tenant_id: number | null; p_action: string; p_subject?: string | null };
+        Returns: number;
+      };
+      /** schema-audit-log.sql (D-138): one page of a tenant's activity (or the platform's, p_tenant_id null); refuses a caller without activity:read or app_super */
+      activity_list: {
+        Args: {
+          p_tenant_id: number | null;
+          p_days?: number;
+          p_area?: string | null;
+          p_actor?: string | null;
+          p_q?: string | null;
+          p_before_at?: string | null;
+          p_before_key?: string | null;
+          p_limit?: number;
+        };
+        Returns: Json;
       };
       /** schema-features.sql (D-127): is the feature on for the tenant? no row = on */
       tenant_feature_on: {

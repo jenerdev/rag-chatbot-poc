@@ -7,7 +7,10 @@
 //   - stays whose last night is older than tenants.guest_retention_days
 //     lose the guest's name, phone, email and notes, and change requests
 //     lose the guest's reason (remove_guest_details()). The booking rows,
-//     dates, amounts and references stay, for the resort's books.
+//     dates, amounts and references stay, for the resort's books;
+//   - audit_log rows older than tenants.audit_retention_days are DELETED
+//     (D-138); the platform's own rows (no tenant) after PLATFORM_AUDIT_DAYS.
+//     A counted delete on service_role: no token may delete one (rule 1).
 // Receipts are storage-orphans' job (`-- --expired`, 180 days), unchanged.
 //
 // A DRY RUN by default: it lists what is due and removes nothing.
@@ -25,8 +28,10 @@ import { supabase } from '../dist/service.js';
 const remove = process.argv.includes('--remove');
 const only = process.argv.includes('--tenant') ? process.argv[process.argv.indexOf('--tenant') + 1] : null;
 const DAY = 86_400_000;
+/** How long the platform-wide audit rows (tenant_id null) are kept: two years, like a tenant's default. */
+const PLATFORM_AUDIT_DAYS = 730;
 
-let query = supabase.from('tenants').select('id, slug, chat_retention_days, guest_retention_days').order('id');
+let query = supabase.from('tenants').select('id, slug, chat_retention_days, guest_retention_days, audit_retention_days').order('id');
 if (only) query = query.eq('slug', only);
 const { data: tenants, error } = await query;
 if (error) throw new Error(`Could not list tenants: ${error.message}`);
@@ -76,7 +81,30 @@ for (const t of tenants) {
     const due = new Set([...lastNight].filter(([, d]) => d < guestBefore).map(([g]) => g));
     guestLine = `${rows.filter((r) => due.has(r.group_id)).length} booking row(s) in ${due.size} stay(s) ended before ${guestBefore} would lose the guest's details`;
   }
-  console.log(`${t.slug.padEnd(16)} ${chatLine} · ${guestLine}`);
+  // The audit log (D-138): counted either way; deleted with --remove.
+  const auditBefore = new Date(Date.now() - t.audit_retention_days * DAY).toISOString();
+  let auditLine;
+  if (remove) {
+    const { count, error: aError } = await supabase.from('audit_log').delete({ count: 'exact' }).eq('tenant_id', t.id).lt('at', auditBefore);
+    if (aError) throw new Error(`${t.slug}: could not delete old activity: ${aError.message}`);
+    auditLine = `deleted ${count ?? 0} activity row(s) older than ${t.audit_retention_days} days`;
+  } else {
+    const { count, error: aError } = await supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('tenant_id', t.id).lt('at', auditBefore);
+    if (aError) throw new Error(`${t.slug}: could not count old activity: ${aError.message}`);
+    auditLine = `${count ?? 0} activity row(s) older than ${t.audit_retention_days} days`;
+  }
+  console.log(`${t.slug.padEnd(16)} ${chatLine} · ${guestLine} · ${auditLine}`);
+}
+
+// The platform's own rows, once, unless one tenant was asked for.
+if (!only) {
+  const before = new Date(Date.now() - PLATFORM_AUDIT_DAYS * DAY).toISOString();
+  const q = remove
+    ? supabase.from('audit_log').delete({ count: 'exact' }).is('tenant_id', null).lt('at', before)
+    : supabase.from('audit_log').select('id', { count: 'exact', head: true }).is('tenant_id', null).lt('at', before);
+  const { count, error: pError } = await q;
+  if (pError) throw new Error(`platform: could not ${remove ? 'delete' : 'count'} old activity: ${pError.message}`);
+  console.log(`${'platform'.padEnd(16)} ${remove ? 'deleted ' : ''}${count ?? 0} activity row(s) older than ${PLATFORM_AUDIT_DAYS} days`);
 }
 
 console.log(remove ? (failures ? `\n${failures} COUNT(S) DID NOT MATCH` : '\nDone: every removal counted.') : '\nDRY RUN: nothing removed. Re-run with -- --remove to act.');

@@ -20,6 +20,7 @@
 //   tools.ts       the tools a tenant's chatbot is offered, and where they run
 //   unanswered.ts  the questions the documents could not answer, for staff
 //   conversations.ts  every chat of a tenant, listed and read back, for staff (D-115)
+//   activity.ts    who did what: the audit log and the stay log, listed for owners and the platform (D-138)
 //   voice.ts       the latest reply of a conversation, for the speak route (D-134)
 //   platform.ts    what a super user does to tenants: list, create, edit, archive, applications
 //   members.ts     who administers a tenant and as what, for owners and the platform alike
@@ -91,6 +92,8 @@ export type { BrandImageKind } from './brand-images.js';
 export { addMember, listMembers, removeMember, setMemberRole } from './members.js';
 export { CONVERSATION_DAYS, CONVERSATION_PAGE_SIZE, conversationDays, getTranscript, listConversations, messageKind } from './conversations.js';
 export type { ConversationDays, ConversationPage, ConversationSummary, MessageKind, Transcript, TranscriptMessage } from './conversations.js';
+export { ACTIVITY_AREAS, ACTIVITY_DAYS, ACTIVITY_PAGE_SIZE, activityArea, activityDays, listActivity, parseActivityPage } from './activity.js';
+export type { ActivityArea, ActivityDays, ActivityPage, ActivityQuery, ActivityRow } from './activity.js';
 export { latestReply, voiceVocabulary } from './voice.js';
 export { DASHBOARD_DAYS, dashboardDays, platformDashboard, tenantDashboard } from './dashboard.js';
 export type { PlatformPulse, TenantDashboard } from './dashboard.js';
