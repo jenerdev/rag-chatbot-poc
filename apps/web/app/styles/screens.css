@@ -960,7 +960,7 @@ select.compact { width: auto; min-height: var(--control-h-sm); padding: 2px var(
    stretched over the card; the copy buttons sit above it (D-114). */
 .stays-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
 .stays-toolbar .list-search { flex: 1 1 260px; }
-.stays-toolbar select { width: auto; flex: 0 1 200px; }
+.stays-toolbar select { width: auto; flex: 0 1 200px; margin-bottom: var(--space-3);}
 button.toggle { display: inline-flex; align-items: center; gap: var(--space-1);     margin-bottom: var(--space-3); }
 button.toggle.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 /* The groups fit a desktop row; on a phone they scroll inside their own box, never the page. */
