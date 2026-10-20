@@ -17,8 +17,13 @@
 > by `allow()` whose callers barely change, and the chat gets the limit it
 > never had. The chatbot's prompt and tools are untouched.
 >
-> Written 2026-10-20, against `3eb2e8f` on `master`. **Status: planned,
-> nothing built.** § 7's questions wait for the user.
+> Written 2026-10-20, against `3eb2e8f` on `master`. **Status: Phases 0–5
+> done 2026-10-20, walk included,** on `feat/rate-limit`; the record is
+> D-137. § 7's five questions were answered 2026-10-20: every
+> recommendation taken, by the user's word ("proceed with your
+> recomendations"). Learned on the way: § 2.3 (the sweep is per tenant,
+> not per key) and § 2.6 (the chat screen already shows a 429's words, so
+> no screen change).
 >
 > Read [§ 0](#0-the-six-rules) first.
 
@@ -120,12 +125,16 @@ another tenant with villa's id and expects `insufficient_privilege`.
 
 ### 2.3 The row count grows with visitors
 
-Every (tenant, key, window) is a row. The function deletes this key's rows
-whose `window_start` is older than two windows before the upsert, one
-indexed delete scoped to the key, so a key cleans itself as the `Map` did
-and a one-off visitor's row is gone the next time any key is bumped. The
+Every (tenant, key, window) is a row. The function deletes this TENANT's
+rows whose `window_start` is older than two windows before the upsert, one
+delete on `rate_windows_sweep_idx (tenant_id, window_start)`, so a one-off
+visitor's row is gone the next time anyone on that tenant is counted. The
 `retention` tool is not involved: nothing here is a person's data for
 longer than twenty minutes.
+
+**Learned in Phase 4:** the first draft swept per KEY, which reads well and
+is wrong: a visitor who never returns is never bumped again, so their row
+stayed forever. The sweep is per tenant, with its own index.
 
 ### 2.4 `date_bin` needs an origin
 
@@ -177,8 +186,8 @@ revoke all on public.rate_windows from anon, authenticated;
 create or replace function public.rate_allow(p_tenant_id bigint, p_key text, p_max int, p_window_seconds int)
 returns boolean … security definer set search_path = '' …
 --   if p_tenant_id is distinct from public.app_tenant_id() → insufficient_privilege
---   delete from public.rate_windows where tenant_id = p_tenant_id and key = p_key
---     and window_start < now() - make_interval(secs => 2 * p_window_seconds);
+--   delete from public.rate_windows where tenant_id = p_tenant_id
+--     and window_start < now() - make_interval(secs => 2 * p_window_seconds);   -- every key's (§ 2.3)
 --   insert … values (p_tenant_id, p_key, date_bin(make_interval(secs => p_window_seconds), now(), '2000-01-01'), 1)
 --     on conflict (tenant_id, key, window_start) do update set count = rate_windows.count + 1
 --     returning count into v_count;

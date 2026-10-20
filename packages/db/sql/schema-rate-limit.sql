@@ -18,9 +18,10 @@
 --
 -- The window is a fixed one: date_bin(window, now(), a fixed origin), so
 -- every instance computes the same window_start for the same instant (§ 2.4).
--- The function sweeps the key's windows older than two windows before it
--- bumps, so a key cleans itself the way the Map did (§ 2.3); nothing here is
--- a person's data for longer than twenty minutes.
+-- The function sweeps the TENANT's windows older than two windows before it
+-- bumps, so a one-off visitor's row is gone the next time anyone on that
+-- tenant is counted (§ 2.3; per key, a visitor who never returned would stay
+-- forever); nothing here is a person's data for longer than twenty minutes.
 --
 -- security definer, because the caller is a CHAT token (no sub, a tenant
 -- claim) and the table has no policy; set search_path = '' and every name
@@ -43,6 +44,8 @@ create table if not exists public.rate_windows (
   primary key (tenant_id, key, window_start),
   constraint rate_windows_key check (length(key) between 1 and 200)
 );
+-- The sweep's index: the tenant's stale rows by age, without reading its live ones.
+create index if not exists rate_windows_sweep_idx on public.rate_windows (tenant_id, window_start);
 alter table public.rate_windows enable row level security;
 revoke all on public.rate_windows from public, anon, authenticated;
 
@@ -65,10 +68,10 @@ begin
     raise exception 'rate_allow: max and window must be positive' using errcode = 'invalid_parameter_value';
   end if;
 
-  -- The sweep (§ 2.3): this key's windows that can no longer be current.
-  -- Scoped to the key, so it is one small indexed delete, never a scan.
+  -- The sweep (§ 2.3): this tenant's windows that can no longer be current,
+  -- every key's. One indexed delete (rate_windows_sweep_idx), never a scan.
   delete from public.rate_windows w
-  where w.tenant_id = p_tenant_id and w.key = p_key
+  where w.tenant_id = p_tenant_id
     and w.window_start < now() - 2 * v_window;
 
   -- Rule 1: one statement bumps and returns. The origin is fixed (§ 2.4), so

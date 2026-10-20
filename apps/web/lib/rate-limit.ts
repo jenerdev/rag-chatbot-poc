@@ -20,9 +20,9 @@ import type { TenantContext } from '@rag/pipeline';
 // under strain is the worst moment to have one.
 //
 // Fixed windows, keyed by tenant and IP (and by scope, so a Manage lookup
-// does not spend the booking page's allowance). The function sweeps a key's
-// stale windows itself, so the table cannot grow without bound from one-off
-// visitors.
+// does not spend the booking page's allowance). The function sweeps the
+// tenant's stale windows itself, so the table cannot grow without bound from
+// one-off visitors.
 //
 // No `server-only` import, on purpose: this file holds no secret and no
 // client. It is handed the tenant's own token client by a Route Handler, and
