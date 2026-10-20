@@ -33,6 +33,11 @@ import { supabase } from '../dist/service.js';
 // probe tenants' timezone. A fixed date went stale the day after it was written.
 const PAID_TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
+// D-138: every write a probe makes on villa or the platform on service_role is
+// a 'system' row in the live audit log (promos, the avatar, a super user added
+// and removed). The run sweeps its own at the end, counted, so an owner's
+// Activity screen does not fill with test runs.
+const RUN_START = new Date().toISOString();
 let failures = 0;
 const check = (ok, label, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
@@ -4951,6 +4956,13 @@ async function notificationChecks() {
     for (const id of probes) await supabase.from('tenants').delete().eq('id', id);
     for (const id of users) await supabase.auth.admin.deleteUser(id);
   }
+}
+
+{
+  const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').maybeSingle();
+  const { count, error } = await supabase.from('audit_log').delete({ count: 'exact' }).eq('actor_kind', 'system').gte('at', RUN_START).or(`tenant_id.is.null,tenant_id.eq.${villaRow?.id ?? -1}`);
+  console.log(`
+audit: swept ${error ? `? (${error.message})` : count ?? 0} system row(s) this run wrote on villa and the platform`);
 }
 
 console.log();

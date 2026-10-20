@@ -313,6 +313,11 @@ shows a limit of **30**, one limit shared by sign-ups and sign-ins. That covers
 password guessing at sign-in. It does not cover what happens after sign-in,
 and there is still no audit log.
 
+**The audit log exists (2026-10-20, D-138, R-54):** every staff and super-user
+write, each login, logout and proof opened, written by Postgres, read on S-18
+and the platform. What remains of this risk is the rate limit on our own
+endpoints, which is R-39's (closed by D-137) and Supabase's on sign-in.
+
 
 **Amended 2026-09-26, auth-rls Phases 5–6: the admin key is gone.**
 - Staff log in with Supabase Auth, which throttles sign-ups and sign-ins
@@ -329,6 +334,24 @@ Postgres (30 chat turns, 10 requests or lookups, 30 voice calls, per address
 per tenant per 10 minutes), and the OpenAI routes a per-tenant ceiling of
 600. Still missing: a limit on the reset request (Supabase's cap holds it),
 and the audit log.
+---
+
+## R-54 · The audit log is as safe as service_role · **Open by design (D-138)**
+
+No token can insert, update or delete an `audit_log` row: there is no policy
+for it, and `audit_note()` writes three named actions for the token's own
+user only. But `service_role`, and anyone holding `DATABASE_URL`, can do
+anything to the table, as to every table. A hash chain or a second store
+would be deployment work (D-013), and nothing in this project has a threat
+model where the operator is the adversary. Recorded, not mitigated
+(plan/audit-log.md § 7 q6).
+
+Two smaller things the log does NOT hold, by design: a failed login (a
+chat token must not be able to write the log, and Supabase's
+`auth.audit_log_entries` records sign-in failures itself), and a stay's
+decision note or a guest's details (Rule 2: `booking_events` is the stay's
+log, and the audit rows carry names of columns, not bodies).
+
 ---
 
 ## R-14 · The model states availability without calling the tool · **Re-opened by every tools-block edit**

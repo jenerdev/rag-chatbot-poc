@@ -16,10 +16,21 @@
 > Written 2026-10-20, against `e6fa5d0` on `master`, while `feat/rate-limit`
 > (plan/rate-limit.md, D-137, `schema-rate-limit.sql` the 42nd file, verify
 > 225–229) is being built in a parallel session: this plan's numbers start
-> after that one's. **Status: planned; § 7's eight questions answered
-> 2026-10-20, every recommendation taken, by the user's instruction. To be
-> built on `master` once `feat/rate-limit` has merged, on a branch
-> `feat/audit-log`, one commit per phase, the suites after Phase 5.**
+> after that one's. **Status: Phases 0–5 done 2026-10-20 on `feat/audit-log`,
+> walk included,** one commit per phase, after `feat/rate-limit` merged;
+> § 7's eight questions answered the same day, every recommendation
+> taken, by the user's instruction. The record is D-138 and R-54.
+> Deviations from the text below: the retention sweep is a counted
+> delete in the tool, not `audit_older_than()`; the platform's own log is
+> a **card on `/platform`**, not `/platform/activity`; S-18's notice names
+> no period (`tenant_public()` was not re-created for one line; the
+> platform's tab prints it); the trigger SKIPS a delete whose tenant is
+> already gone (a cascade delete would otherwise fail on the FK); the
+> platform's view of a tenant has no stay log (D-076: no policy on
+> `booking_events`); the isolation suites gained no check (they cannot run
+> without northwind and harbor; verify 233, 234 and 236 prove the walls);
+> verify and both walks sweep their own `system` rows. verify 241/241, the
+> walk 12/12, axe 16 states clean.
 >
 > Read [§ 0](#0-the-five-rules) first.
 

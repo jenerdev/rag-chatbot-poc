@@ -37,6 +37,7 @@ const realClick = async (page, sel) => {
   for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
 };
 
+const RUN_START = new Date().toISOString();
 const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', SLUG).single();
 const users = [];
 const groups = [];
@@ -169,7 +170,9 @@ try {
   const onePerson = await page.eval("({ url: location.search, chip: !!document.querySelector('.conversations-toolbar button[type=button]') })");
   onePerson.pressed = pressed;
   await page.type('.list-search input', LABEL);
-  await sleep(900);
+  // The search is debounced and then fetched: wait for the rows that carry the label, not the skeleton.
+  await page.until(`(() => { const w = [...document.querySelectorAll('.activity-what')].map(e => e.textContent); return w.length > 0 && w.every(t => t.includes(${JSON.stringify(LABEL)})); })()`, 15000);
+  await sleep(300);
   const searched = await page.eval("[...document.querySelectorAll('.activity-row .activity-what')].map(e => e.textContent)");
   check(onePerson.pressed && /actor=/.test(onePerson.url) && searched.length === 2 && searched.every((t) => t.includes(LABEL)), '8. a click on a name filters to that person (in the URL); the search finds the holiday by its label, set and removed', `${JSON.stringify(onePerson)} · ${searched.join(' | ')}`);
   await page.shot(join(OUT, 'activity-filtered-1280.png'));
@@ -223,6 +226,9 @@ try {
     const b = await supabase.from('audit_log').delete({ count: 'exact' }).in('subject', users);
     console.log(`cleaned audit rows: ${(a.count ?? 0) + (b.count ?? 0)}`);
   }
+  // The cleanup's own deletes on service_role are 'system' rows too: swept, counted.
+  const swept = await supabase.from('audit_log').delete({ count: 'exact' }).eq('actor_kind', 'system').gte('at', RUN_START).or(`tenant_id.is.null,tenant_id.eq.${tenant.id}`);
+  console.log(`swept ${swept.count ?? 0} system row(s) this run wrote`);
 }
 console.log(failures === 0 ? 'audit log walk: all pass' : `audit log walk: ${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

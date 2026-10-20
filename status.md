@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**Audit log (2026-10-20, D-138, built):** [`plan/audit-log.md`](./plan/audit-log.md), Phases 0–5 done on `feat/audit-log`, one commit per phase, built after the rate limit merged (the user's word: every § 7 recommendation taken). verify 241/241, web tests 210, the walk 12/12, axe 16 states clean; villa's and alteza's snapshots and villa's tool definitions byte-identical. Owed: merge into master; the isolation suites' new checks wait for the test tenants (northwind and harbor are deleted).
+
 **Shared rate limit (2026-10-20, D-137, done, walk included):** [`plan/rate-limit.md`](./plan/rate-limit.md). The per-IP window is ONE count in Postgres (`rate_windows` + `rate_allow()`, `schema-rate-limit.sql`, the 42nd file, applied), shared by every instance (R-39 closed); the chat route is limited for the first time; the chat and voice routes meet a per-tenant ceiling across addresses (R-53). verify **229/229**, `plan/rate-limit-walk.mjs` 8/8, voice walk 6/6, web tests 202, typecheck 13/13, rooms 56; villa's tool text byte-identical. **Merged** into `master` 2026-10-20 (fast-forward, `3dc96c3`), by the user's word. Nothing owed. Still owed before a public URL: guest email (manage-booking Phase 7), custom SMTP (R-21), an audit log (R-13).
 
 **Guest links (2026-10-20, D-136, done):** the chat, the booking page and Manage booking link to each other, from `navItems()`; the chat link on a guest page reads "Need help? Ask <assistant>" (`chatLinkLabel()`); web tests 193, `plan/guest-links-walk.mjs` 6/6. Nothing owed.
@@ -1860,6 +1862,14 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-20 — the audit log (`feat/audit-log`, D-138)
+- **Asked:** "create a plan for an audit log for staff and super user actions" (plan/audit-log.md, 8 questions answered by "take all your recommendations"), then "build it after rate-limit merges".
+- **Phase 0:** typecheck 13/13; tests push 10, chunker 13, openai 20, db 5, bookings 133, pipeline 370, web 202; verify 229/229; villa's tool definitions = `villa-tools-post-villa-prices.txt`; villa's and alteza's prompt snapshots saved; villa's audited tables counted (documents 8, units 1, unit_rooms 1, unit_rates 3, rate_calendar 12, slots 3, memberships 7, tenant_applications 1).
+- **Phase 1:** `schema-audit-log.sql` (43rd) applied by the scratch pg client, dry run then commit; the catalog: the table, 16 triggers, 4 functions, 1 policy, default 730, owner yes / admin no / grantable yes. **Trap met on the first verify run:** a tenant's hard delete cascades through the audited tables and each AFTER DELETE wrote a row for a tenant already gone: FK violation, every probe tenant's delete failed (verify 212, 223), 20 probe tenants left behind. The trigger now skips a delete whose tenant is gone; the 20 were removed.
+- **Phase 2:** verify 230–241 (4 expectations corrected after the first run: D-133 gives every unit a room, so a rename is two rows; the stranger reads its OWN tenant's rows; the slot was inserted before the count): 241/241. The retention sweep, the tenant-remove row.
+- **Phase 3–4:** the routes, the notes on login/logout/proof, Activity under Setup, `activity-words.ts` (10 tests), ONE list component; the walk 12/12 (check 8 made robust twice: the staff member's fresh sign-in was the first name; the search's rows read before the fetch); axe 16 states, 0 violations. The platform's view of a tenant is its audit rows alone (D-076 holds: no policy on booking_events).
+- **Phase 5:** typecheck 13/13, tests 761 across packages (web 210), verify 241/241, snapshots identical. **Found and fixed:** the suites leave `system` rows in villa's and the platform's LIVE log (49 in one afternoon); verify and both walks now sweep their own, counted.
 
 ### 2026-10-20 — the shared rate limit, the chat included (D-137)
 - **Asked:** "do you think this code is production ready?" → no, four things owed; then "create a plan for this" (the shared limit) and "proceed with your recomendations".

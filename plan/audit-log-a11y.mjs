@@ -22,6 +22,7 @@ const SLUG = 'villa';
 const AXE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui-refresh', 'axe', 'axe.min.js'), 'utf8');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const RUN_START = new Date().toISOString();
 const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', SLUG).single();
 const users = [];
 let browser;
@@ -97,6 +98,9 @@ try {
     await supabase.from('audit_log').delete().in('actor_user', users);
     await supabase.from('audit_log').delete().in('subject', users);
   }
+  // The cleanup's own deletes on service_role are 'system' rows too: swept, counted.
+  const swept = await supabase.from('audit_log').delete({ count: 'exact' }).eq('actor_kind', 'system').gte('at', RUN_START).or(`tenant_id.is.null,tenant_id.eq.${tenant.id}`);
+  console.log(`swept ${swept.count ?? 0} system row(s) this run wrote`);
 }
 console.log(`\n${audited} page states audited, ${found.length} violation(s)`);
 for (const f of found) console.log(`  ${f}`);

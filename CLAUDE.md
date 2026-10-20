@@ -315,6 +315,21 @@
 > - SQL files 37–40: `schema-room-inventory`, `-room-counts`, `-room-move`,
 >   `-room-views`.
 >
+> **Every staff and super-user action is logged** since 2026-10-20 (D-138,
+> [`plan/audit-log.md`](./plan/audit-log.md), Phases 0–5, all done, walk
+> included). `audit_log` (`sql/schema-audit-log.sql`, the 43rd file) is
+> written by Postgres alone: `audit_row()`, ONE trigger on the 16 tables a
+> staff or platform token may change, and `audit_note()` for a login, a
+> logout and a proof opened. No token inserts, updates or deletes a row.
+> Bookings keep `booking_events` (one event, one table); the log holds the
+> names of changed columns and a short allowlist per table, never a body
+> or a guest detail. `activity:read` (owners; grantable) reads it on S-18
+> `/t/<slug>/admin/activity`; a super user reads any tenant's on the
+> platform's Activity tab and the platform's own on `/platform`. A new
+> table that staff write needs a line in `audit_row()`'s case and the
+> attach list; a cascade delete of a tenant is skipped by the trigger;
+> verify and the walks sweep their own `system` rows (R-54).
+>
 > **The three guest pages link to each other** since 2026-10-20 (D-136):
 > `navItems()` lists Chat, Book a stay and Manage booking (each only when
 > the page exists); on a guest page the chat link reads "Need help? Ask
@@ -410,6 +425,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/unanswered/page.tsx  S-4 unanswered questions — staff only, every tenant
   app/t/[tenant]/admin/conversations/page.tsx  S-16 conversations (D-115) — every member (conversations:read), every tenant; filters in the URL
   app/t/[tenant]/admin/conversations/[id]/page.tsx  S-16a one transcript, read-only; ?m= scrolls to a message; the route is /api/t/[tenant]/admin/conversations/[id]
+  app/t/[tenant]/admin/activity/page.tsx  S-18 Activity (D-138): who did what, for activity:read (owners); the route is /api/t/[tenant]/admin/activity; filters in the URL
   app/t/[tenant]/admin/notifications/page.tsx  S-17 Notifications (D-116 § 8): the last 30 days, read or not; the sidebar's ONE badge is its unread count; 404 without bookings
   app/t/[tenant]/sw.js/route.ts, manifest.webmanifest/route.ts  the tenant's service worker (scope /t/<slug>/; source in lib/service-worker.ts) and staff app manifest (D-116)
   app/api/t/[tenant]/admin/attention, notifications, push  the poll (unread + newest), the feed and read marks, this device's subscription / all my devices (D-116)
@@ -448,6 +464,7 @@ apps/web/              Next.js 15, App Router
   components/voice.tsx   D-134: useVoice() (record, transcribe, read aloud, the on-device fallback, Escape), the mic, the status line, "Read replies aloud"
   lib/money.ts           centavos ↔ pesos, by string, never × 100 — browser-safe
   lib/conversation-words.ts  S-16's filters ↔ the URL, times in the TENANT's zone — pure, tested
+  lib/activity-words.ts  D-138: an audit row as a sentence (activityWords), who (actorWords), the filters ↔ the URL, the subject's screen — pure, tested; components/activity-list.tsx is the ONE list (S-18, the platform's tab, the platform's card)
   lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)
@@ -469,7 +486,7 @@ packages/
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     229 checks (225–229 the shared rate limit: ten in and the eleventh out with one row at 11, wall 2, no token reads the table, the sweep, keys apart, D-137; 196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     241 checks (230–241 the audit log: the trigger's rows, no token writes, RLS alone, activity_list() refuses, a grant, a super row, audit_note()'s refusals, a definer's write, no stay row, the keyset, retention, D-138; 225–229 the shared rate limit: ten in and the eleventh out with one row at 11, wall 2, no token reads the table, the sweep, keys apart, D-137; 196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -505,6 +522,7 @@ packages/
     src/tables.ts          pipeTable(): the ONE writer of a table into a reply (D-091); the browser's parser draws exactly this shape
     src/dates.ts           relative dates ("bukas", "next Friday"), ranges ("from X to Y", "X for 2 nights") and a party size ("for 3 guests") resolved in code; availability AND price turns checked up front (D-046, R-15, D-074)
     tools/prompt-eval.mjs  the battery, 63 cases (10 + 9 tool-* + 10 lang-* + 11 date-* + 15 rt-* + 5 book-* + 3 price-*; rt-count and rt-count-full, D-133, never run yet), three tenants; seeds its own bookings
+    src/activity.ts        listActivity() over activity_list(): a tenant's audit rows and stay log, or the platform's own, keyset-paged (D-138)
     src/conversations.ts   listConversations (over conversation_list()) and getTranscript, for staff: every message named question, answer, refusal, failed or interrupted (D-115)
     src/unanswered.ts      listUnanswered / resolve / reopen, one or many (the S-4 checkboxes): the questions answered with NO_ANSWER, for staff (D-045)
     src/platform.ts        what a super user does to tenants: list, get, create, edit, archive, applications; fromPostgrest(), the ONE code→status map
@@ -534,8 +552,9 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 224 checks, no API key needed
-pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period; a dry run unless --remove, counted
+pnpm --filter @rag/db verify    # 241 checks, no API key needed; sweeps its own system audit rows at the end
+pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period, and (D-138) audit rows past audit_retention_days; a dry run unless --remove, counted
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/audit-log-walk.mjs)   # 12 checks of S-18 and the platform's log on villa, HTTP and browser, shots in plan/audit-log/walk/; audit-log-a11y.mjs is axe over 16 states; needs pnpm dev
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
