@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { speak } from '@rag/openai';
 import { latestReply } from '@rag/pipeline';
 import { requireFeature } from '@/lib/feature-flags';
-import { allow, clientIp } from '@/lib/rate-limit';
+import { allowSpend, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { firstError, voiceSpeakSchema } from '@/lib/schemas';
 import { speakable } from '@/lib/speakable';
@@ -25,12 +25,12 @@ export const dynamic = 'force-dynamic';
  *   204  nothing to say (a reply of only emoji)
  *   400  no conversation id
  *   404  the tenant has voice off; no such conversation here, or no reply yet (one answer)
- *   429  the per-IP window
+ *   429  the per-IP window, or the tenant's ceiling across addresses (D-137)
  *   502  OpenAI failed or took longer than SPEAK_TIMEOUT_MS: the browser speaks it itself
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireFeature(tenant, 'voice');
-  if (!allow(`voice-out|${tenant.id}|${clientIp(request)}`, Date.now(), VOICE_REQUESTS_PER_WINDOW)) {
+  if (!(await allowSpend(tenant, 'voice-out', clientIp(request), VOICE_REQUESTS_PER_WINDOW))) {
     return NextResponse.json({ error: 'Too many spoken replies from here. The reply is on your screen.' }, { status: 429 });
   }
 

@@ -18,10 +18,10 @@ export const dynamic = 'force-dynamic';
  * only read is guest_stay(), security definer, which checks the token's
  * tenant and returns one stay's guest-facing columns.
  *
- * Two limits, weakest first (plan § 2.2): the per-IP window in memory
- * (lib/rate-limit.ts, its own key so lookups do not spend the booking
- * page's allowance), then guest_stay()'s lockout in SQL, 5 misses per
- * reference per hour, which holds whoever calls.
+ * Two limits, weakest first (plan § 2.2): the per-IP window, one count in
+ * Postgres for every instance (lib/rate-limit.ts, D-137; its own key so
+ * lookups do not spend the booking page's allowance), then guest_stay()'s
+ * lockout in SQL, 5 misses per reference per hour.
  *
  * A miss is a 404 with one sentence, the same for a wrong contact, an
  * unknown reference, a stay with no contact on file and a locked reference:
@@ -34,7 +34,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   const parsed = manageLookupSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
-  if (!allow(`manage|${tenant.id}|${clientIp(request)}`)) {
+  if (!(await allow(tenant, `manage|${tenant.id}|${clientIp(request)}`))) {
     return NextResponse.json({ error: 'Too many lookups from here. Please try again in a few minutes.' }, { status: 429 });
   }
 

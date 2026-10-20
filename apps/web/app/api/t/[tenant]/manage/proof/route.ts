@@ -37,7 +37,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   if (declared > MAX_PROOF_BYTES + 64 * 1024) {
     return badRequest(`The file is too large; the limit is ${MAX_PROOF_BYTES / 1048576} MB.`);
   }
-  if (!allow(`manage|${tenant.id}|${clientIp(request)}`)) {
+  if (!(await allow(tenant, `manage|${tenant.id}|${clientIp(request)}`))) {
     return NextResponse.json({ error: 'Too many attempts from here. Please try again in a few minutes.' }, { status: 429 });
   }
 

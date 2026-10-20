@@ -25,7 +25,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireFeature(tenant, 'manage_booking');
   const parsed = changeRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
-  if (!allow(`manage|${tenant.id}|${clientIp(request)}`)) {
+  if (!(await allow(tenant, `manage|${tenant.id}|${clientIp(request)}`))) {
     return NextResponse.json({ error: 'Too many attempts from here. Please try again in a few minutes.' }, { status: 429 });
   }
   const { reference, contact, kind, newCheckIn, reason, dryRun } = parsed.data;

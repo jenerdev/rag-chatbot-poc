@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { transcribe } from '@rag/openai';
 import { voiceVocabulary } from '@rag/pipeline';
 import { requireFeature } from '@/lib/feature-flags';
-import { allow, clientIp } from '@/lib/rate-limit';
+import { allowSpend, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { withTenantRoute } from '@/lib/tenant';
 import { MAX_AUDIO_BYTES, sniffAudio, transcriptionHint, VOICE_REQUESTS_PER_WINDOW } from '@/lib/voice';
@@ -23,12 +23,12 @@ export const dynamic = 'force-dynamic';
  *   400  no file, not audio (checked by its bytes), over MAX_AUDIO_BYTES
  *   404  the tenant has voice off
  *   422  nothing was heard
- *   429  the per-IP window (the weak limit, R-39, R-53)
+ *   429  the per-IP window, or the tenant's ceiling across addresses (D-137; R-39 closed, R-53)
  *   502  OpenAI failed or took too long: the composer says so and the guest types
  */
 export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireFeature(tenant, 'voice');
-  if (!allow(`voice-in|${tenant.id}|${clientIp(request)}`, Date.now(), VOICE_REQUESTS_PER_WINDOW)) {
+  if (!(await allowSpend(tenant, 'voice-in', clientIp(request), VOICE_REQUESTS_PER_WINDOW))) {
     return NextResponse.json({ error: 'Too many voice questions from here. Please type, or try again in a few minutes.' }, { status: 429 });
   }
 

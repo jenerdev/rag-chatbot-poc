@@ -1190,6 +1190,11 @@ export interface Database {
         Args: { p_permission: string };
         Returns: boolean;
       };
+      /** schema-rate-limit.sql (D-137): bump this key's window for the token's tenant and say whether the call is inside `p_max`; insufficient_privilege on another tenant's id */
+      rate_allow: {
+        Args: { p_tenant_id: number; p_key: string; p_max: number; p_window_seconds: number };
+        Returns: boolean;
+      };
       /** schema-features.sql (D-127): is the feature on for the tenant? no row = on */
       tenant_feature_on: {
         Args: { p_tenant_id: number; p_feature: string };

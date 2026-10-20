@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  *
  * Three limits, weakest first:
  *   - the honeypot: `website` is hidden from people, so a filled one is a bot;
- *   - a per-IP window in memory (lib/rate-limit.ts), weak on Vercel (R-39);
+ *   - a per-IP window, ONE count in Postgres for every instance (lib/rate-limit.ts, D-137);
  *   - request_booking()'s per-contact limit in SQL, the one that holds:
  *     BookingLimitError, a 429 through the one error map.
  *
@@ -36,7 +36,7 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   const { website, consent: _ticked, ...input } = parsed.data;
   if (website) return badRequest('The request could not be sent.');
 
-  if (!allow(`${tenant.id}|${clientIp(request)}`)) {
+  if (!(await allow(tenant, `${tenant.id}|${clientIp(request)}`))) {
     return NextResponse.json({ error: 'Too many requests from here. Please try again in a few minutes.' }, { status: 429 });
   }
 
