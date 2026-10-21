@@ -1,6 +1,7 @@
 // answer.ts — the query pipeline, from a typed question to a grounded answer.
 
-import { assistantToolCallMessage, chat, chatStream, embed, toolResultMessage } from '@rag/openai';
+import { assistantToolCallMessage, chat, chatStream, toolResultMessage } from '@rag/openai';
+import { embedQuery } from './embed-cache.js';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { roomPhotos } from '@rag/bookings';
 import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
@@ -147,7 +148,10 @@ async function prepareAnswer({
   //    one env var. If they differed, the vectors would live in unrelated
   //    coordinate spaces, the similarity numbers would still look plausible,
   //    and nothing would error (D-004, R-3).
-  const [questionVector] = await embed([searchQuery]);
+  //
+  //    A repeated query (a suggested question, D-089) comes from the
+  //    in-process cache, keyed by the text AND the model (embed-cache.ts).
+  const questionVector = await embedQuery(searchQuery);
 
   // 5. Retrieval: cosine search and keyword search, fused (D-015).
   const matches = await retrieve(tenant, searchQuery, questionVector!);

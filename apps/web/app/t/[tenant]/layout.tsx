@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { loadBranding } from '@/lib/branding';
 import { getTenant } from '@/lib/tenant';
+import { preconnect } from 'react-dom';
+import { ENV } from '@/lib/env';
 import { pinsLightScheme } from '@/lib/theme';
 
 // The tenant's frame: its colours, and its name in the browser tab.
@@ -27,6 +29,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TenantLayout({ children, params }: Props) {
   const tenant = await getTenant((await params).tenant);
+  // Every photo, logo and banner on a tenant page is fetched from Storage, so
+  // the browser is told to open that connection (DNS, TCP, TLS) before the
+  // first <img> asks, from the <head> React hoists this into (2026-10-21).
+  // The host alone is sent: the URL is public already (it is in every image
+  // URL), and no key goes with it (rule 2). Guarded, because a missing .env
+  // must still render the page's one-line error, not throw on new URL('').
+  if (ENV.SUPABASE_URL) preconnect(new URL(ENV.SUPABASE_URL).origin);
   const style = tenant ? (await loadBranding(tenant)).themeStyle : undefined;
   // A theme that sets a surface colour stays light in dark mode (D-101).
   return (

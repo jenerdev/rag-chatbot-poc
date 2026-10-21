@@ -23,7 +23,7 @@
 // image on the screen.
 
 import { randomUUID } from 'node:crypto';
-import { IMAGE_BUCKET, MAX_IMAGE_BYTES, MAX_IMAGES_PER_UNIT } from './constants.js';
+import { IMAGE_BUCKET, MAX_IMAGE_BYTES, MAX_IMAGES_PER_UNIT, PHOTO_CACHE_SECONDS } from './constants.js';
 import { requirePerRoom } from './bookings.js';
 import { BookingInputError } from './errors.js';
 import type { BookingTenant, ImageSummary } from './types.js';
@@ -95,7 +95,8 @@ export async function addImage(tenant: BookingTenant, unitId: unknown, bytes: Ui
   // Wall 1: the path comes from the server's tenant and the checked room id.
   const path = `${tenant.id}/${room}/${randomUUID()}.${type.ext}`;
   const bucket = tenant.db.storage.from(IMAGE_BUCKET);
-  const uploaded = await bucket.upload(path, bytes, { contentType: type.contentType, upsert: false });
+  // cacheControl: a year (PHOTO_CACHE_SECONDS); the path is a one-off UUID, so the object never changes under its URL.
+  const uploaded = await bucket.upload(path, bytes, { contentType: type.contentType, upsert: false, cacheControl: String(PHOTO_CACHE_SECONDS) });
   if (uploaded.error) throw new Error(`Could not store the photo: ${uploaded.error.message}`);
 
   const { data, error } = await tenant.db

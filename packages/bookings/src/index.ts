@@ -62,6 +62,8 @@ export {
   MAX_REQUEST_ROWS,
   MAX_STAY_NIGHTS,
   MIN_REQUEST_NAME,
+  IMAGE_BUCKET,
+  PHOTO_CACHE_SECONDS,
 } from './constants.js';
 export {
   BookingConflictError,

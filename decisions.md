@@ -4432,3 +4432,61 @@ every guest's network tab: a wall nobody tests (rule 6's lesson).
 again: a row on the Permissions tab cannot give a GUEST anything (there is
 no role), so that would be a feature flag (D-127) read by the same line in
 the route.
+
+## D-141 · What is cached, and what is not · **Added 2026-10-21**
+
+**Decision:** three caches, each where the cached thing cannot go stale,
+and a list of what stays uncached, after the user asked "do you think we
+can apply caching? in any that is applicable. image assets css. api."
+and then "implement if what you think would have a positive impact".
+
+1. **Room photos carry `Cache-Control: max-age=31536000`** at upload
+   (`PHOTO_CACHE_SECONDS`, `images.ts`), as brand images have since
+   D-123. Safe because a photo's path is a UUID written once
+   (`upsert: false`): a replaced photo is a new object at a new URL.
+   Storage's default was an hour, so every return to the booking page or
+   the lightbox re-validated every photo. `tools/photo-cache.mjs` rewrote
+   the seven existing objects (same path, same bytes) and reads the
+   header back past the CDN.
+2. **Tenant pages preconnect to the Storage host** (`preconnect()` in
+   `app/t/[tenant]/layout.tsx`): DNS, TCP and TLS are opened before the
+   first `<img>` asks. The host alone, which every image URL carries
+   already; no key goes with it (rule 2).
+3. **A question's embedding is remembered in-process**
+   (`packages/rag/src/embed-cache.ts`, `EMBED_CACHE_SIZE` 500, least
+   recently used out first), keyed by the text AND the model, so a change
+   of `OPENAI_EMBEDDING_MODEL` misses (trap 1). The query side only;
+   ingest never reads it. A tenant's suggested questions (D-089) are the
+   same text every time, so they hit from the second click. A map, not a
+   table: a table any token could read needs a policy and a definer
+   (R-22) for a saving an in-process map gives free; each instance warms
+   its own.
+
+**Not cached, on purpose:** the answer call (history, the date,
+availability; trap 24), availability and quotes (trap 8), the Manage
+booking lookups (rate-limited, lockouts), anything read under a tenant
+token across requests (a cache keyed by slug alone would hand one role's
+data, the sources list, to another), the service worker and the
+manifest (`no-cache`, as before), the dashboard JSON (staff want fresh
+counts; nobody has found it slow). **Tenant resolution per request**
+(`tenant_public()` plus about seven reads on the chat page) is left as
+is until measured: a TTL would delay a theme edit or a feature switch,
+which the walks check right after the PATCH, and the `TenantContext`
+holds a five-minute token that must not be cached. **OpenAI's prompt
+caching** is parked: its discount needs a repeated prefix of 1024
+tokens, and the prompt's stable part is about 300 before the context,
+with the tools block after it; moving the block is a `buildPrompt()`
+edit, Rule 1, and the battery cannot run until northwind and harbor are
+rebuilt.
+
+**Measured (2026-10-21):** before, a room photo answered
+`public, max-age=3600` (brand images a year); after `--apply`, all seven
+objects' metadata and their public URLs a year, though the CDN served
+the old header for some minutes after the rewrite (the tool's first
+read-back said 4 of 7 stale; the check now adds a throwaway query
+string). The page's head carries
+`<link rel="preconnect" href="https://<project>.supabase.co"/>`. Two
+identical turns on alteza: the second logged
+`[query] embedding from cache (1 held)`. rag tests 375 (5 new), bookings
+133, web 218, typecheck 13/13. No prompt or tool text changed; the
+pipeline's reply is the same vector, so retrieval is unchanged.

@@ -97,3 +97,11 @@ export const MAX_CALENDAR_LABEL = 100;
 /** D-090: a slot's name, and its length: 48 hours covers every stay shape a tenant has (22 hours is the longest today). */
 export const MAX_SLOT_NAME = 60;
 export const MAX_SLOT_MINUTES = 48 * 60;
+
+// How long a browser (and the CDN in front of Storage) may keep a room photo
+// without asking again, in seconds: a year, the most HTTP caches honour. Safe
+// because a photo's path is a UUID written once (upsert: false) and never
+// reused: a replaced photo is a NEW object at a new URL, so nothing stale can
+// be served. Storage's own default is an hour, which made every return visit
+// to the booking page or the lightbox re-validate every photo (2026-10-21).
+export const PHOTO_CACHE_SECONDS = 31_536_000;

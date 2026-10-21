@@ -20,7 +20,8 @@
     "test": "vitest run",
     "isolation": "node --conditions=react-server --env-file=../../.env tools/isolation.mjs",
     "rooms": "node --conditions=react-server --env-file=../../.env tools/rooms.mjs",
-    "storage-orphans": "node --conditions=react-server --env-file=../../.env tools/storage-orphans.mjs"
+    "storage-orphans": "node --conditions=react-server --env-file=../../.env tools/storage-orphans.mjs",
+    "photo-cache": "node --conditions=react-server --env-file=../../.env tools/photo-cache.mjs"
   },
   "dependencies": {
     "@rag/db": "workspace:*",

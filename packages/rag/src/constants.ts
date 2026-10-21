@@ -81,3 +81,10 @@ export const MAX_TOOL_ROUNDS = 2;
 // produce it — the short circuit, and the model following its system prompt —
 // and the UI should not be able to tell them apart.
 export const NO_ANSWER = "I don't know based on the documents I have.";
+
+// How many question embeddings the process remembers (embed-cache.ts): a
+// vector is 1536 floats, about 12 KB as numbers, so 500 is a few megabytes
+// and covers every suggested question of every tenant many times over. Least
+// recently used goes first. Provisional: a cache this size has not been
+// measured against a day's traffic, only reasoned about.
+export const EMBED_CACHE_SIZE = 500;

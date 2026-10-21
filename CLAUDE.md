@@ -535,8 +535,10 @@ packages/
     src/push-devices.ts    D-116: this member's devices: one, or all (R-51)
     tools/rooms.mjs        56 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b), references on staff stays (4f, 4g), moving a stay between rooms (38–41) and a type's rooms on S-5 and the staff form (42, 43)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
+    tools/photo-cache.mjs  every existing room photo on the one-year Cache-Control new uploads carry (D-141); dry run, `-- --apply` rewrites and reads the header back past the CDN
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
     src/voice.ts           latestReply(): the speak route's one read, both walls (D-134)
+    src/embed-cache.ts     embedQuery(): a question's vector remembered in-process, LRU of EMBED_CACHE_SIZE, keyed by text AND model (D-141); the query side only, ingest never reads it
     src/language.ts        the reply language, decided in code: Tagalog in → Taglish out (D-043)
     src/greeting.ts        small talk (greetings, thanks, "okay", goodbyes, English + Tagalog) answered in code, no retrieval (D-049)
     src/refusal.ts         NO_ANSWER is the internal marker; visitors see the tenant's fallback_messages[language] or a default (D-047, D-048)
@@ -588,6 +590,7 @@ pnpm --filter @rag/bookings isolation -- --filters-only   # the same 40, code fi
 pnpm --filter @rag/bookings rooms       # 56 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
 pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)
+pnpm --filter @rag/bookings photo-cache [-- --apply]     # D-141: every room photo on a one-year Cache-Control; count, or rewrite the same bytes with the header and read it back
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/manage-booking-phase2-walk.mjs)   # (and phase3, phase4, phase6) the Manage booking and Payments routes over HTTP, needs pnpm dev
 (cd packages/rag && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-villa-rates.mjs)   # villa's rates and the nightly slots, idempotent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/customer-booking-phase3-walk.mjs)   # the booking routes over HTTP, needs pnpm dev
