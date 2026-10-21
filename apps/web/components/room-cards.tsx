@@ -59,8 +59,8 @@ export function cardParts(header: string[], row: string[]): { facts: { label: st
   return { facts, texts };
 }
 
-/** "1 photo", "3 photos": the badge and the button's name say the same. */
-const photoCount = (n: number) => (n === 1 ? '1 photo' : `${n} photos`);
+/** "1 photo", "3 photos": the badge, the button and the grouped table's photo button (reply-text.tsx) all say the same. */
+export const photoCount = (n: number) => (n === 1 ? '1 photo' : `${n} photos`);
 
 export function RoomCards({ header, rows, cards }: { header: string[]; rows: string[][]; cards: RoomCard[] }) {
   const lightbox = useLightbox();

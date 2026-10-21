@@ -82,7 +82,7 @@ type Turn =
       sources: Source[] | null;
       /** Filled in by `tool` events, one per call, before the answer that uses them (plan/bookings.md Phase 7). */
       toolCalls: ToolCallRecord[];
-      /** From `meta` at a per_room tenant (D-094): the rooms' photos, drawn as cards or as a Photo column on the reply's table. */
+      /** From `meta` at a per_room tenant (D-094): the rooms' photos, drawn as cards or, grouped by room with the photo button under the name, on the reply's table. */
       roomCards?: RoomCard[];
       roomCardsView?: 'cards' | 'column';
       searchQuery: string;

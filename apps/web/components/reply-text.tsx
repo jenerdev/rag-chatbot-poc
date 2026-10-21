@@ -13,14 +13,24 @@
 // existed (lib/tables.test.ts: one segment, byte for byte).
 //
 // D-094: with the rooms' photos (`cards`), a table whose first column names
-// rooms is drawn as cards (`view: 'cards'`, a room-list turn) or as the
-// table plus a Photo column whose View button opens the lightbox
-// (`view: 'column'`: the rate card, a dated availability table, the
-// extra-guest terms). Any other table is a table.
+// rooms is drawn as cards (`view: 'cards'`, a room-list turn) or as a
+// GROUPED table (`view: 'column'`: the rate card, a dated availability
+// table, the extra-guest terms). Any other table is a table.
+//
+// Grouped (D-094 amended 2026-10-21, the user: "redundant info is photos
+// and room name"): the rate card has one row per room AND slot, so the
+// room's name was repeated on every slot row, and so was its photo button.
+// Now consecutive rows that name the same room are one <tbody>, the name
+// drawn once in a cell that spans them (rowSpan), with the room's photo
+// button under the name instead of in a column of its own. The TEXT is
+// untouched: the reply still holds every row, and a copy of the table
+// (or a screen reader) still reads the room on each. On a phone each
+// group is one card, headed by the room, its slots stacked inside.
 
 import type { RoomCard } from '@rag/pipeline';
 import { parseInline, parseSegments } from '@/lib/tables';
-import { cardFor, RoomCards, tableIsRooms } from '@/components/room-cards';
+import { cardFor, photoCount, RoomCards, tableIsRooms } from '@/components/room-cards';
+import { Icon } from '@/components/icons';
 import { Lightbox, useLightbox } from '@/components/lightbox';
 
 /** A cell that is an amount: "₱3,500.00". A leading emoji the model added does not change that. */
@@ -51,14 +61,40 @@ function amountColumns(rows: string[][]): boolean[] {
   });
 }
 
+/** A row's first cell as a grouping key: the model's `**` and case do not make two rooms. */
+const keyOf = (row: string[]) => (row[0] ?? '').replace(/\*\*/g, '').trim().toLowerCase();
+
 /**
- * One table. With `cards`, a Photo column is appended: a View button on
- * the rows whose room has photos, an empty cell on the rest.
+ * Consecutive rows with the same first cell, as one group each. Only
+ * NEIGHBOURS merge: a room named again further down is a new group, so the
+ * order the reply wrote is the order drawn. Pure, tested.
+ */
+export function groupRows(rows: string[][]): string[][][] {
+  const groups: string[][][] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && keyOf(last[0] ?? []) === keyOf(row)) last.push(row);
+    else groups.push([row]);
+  }
+  return groups;
+}
+
+/**
+ * One table. With `cards` (a table whose first column names rooms), the
+ * rows are grouped by room: one <tbody> per group, the room's name in a
+ * cell spanning its rows, and its photo button under the name on the
+ * rooms that have photos. Without `cards`, one row is one row.
  */
 function Table({ header, rows, cards }: { header: string[]; rows: string[][]; cards?: RoomCard[] }) {
   const lightbox = useLightbox();
   const amounts = amountColumns(rows);
-  const photoColumn = cards !== undefined;
+  const rooms = cards !== undefined;
+  const groups = rooms ? groupRows(rows) : [rows];
+  // When a room has several rows, the SECOND column is what tells them
+  // apart (the slot): on a phone it is drawn as a sub-heading inside the
+  // room's card, with the row's other cells under it (`td.sub`, chat.css).
+  // Decided per table, so every room reads the same way.
+  const subKey = rooms && groups.some((group) => group.length > 1);
   return (
     <>
       <div className="reply-table">
@@ -70,38 +106,55 @@ function Table({ header, rows, cards }: { header: string[]; rows: string[][]; ca
                   {cell}
                 </th>
               ))}
-              {photoColumn && <th className="photo">Photo</th>}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row, j) => {
-              const card = photoColumn ? cardFor(cards, row[0] ?? '') : undefined;
-              return (
-                <tr key={j}>
-                  {row.map((cell, k) => (
-                    // data-label: the column's name, which the phone layout
-                    // prints in front of the value (globals.css, 560px). An
-                    // attribute, so React escapes it like a child.
-                    <td key={k} data-label={header[k] ?? ''} className={amounts[k] ? 'amount' : undefined}>
-                      {inline(cell)}
-                    </td>
-                  ))}
-                  {photoColumn && (
-                    <td data-label="Photo" className="photo">
-                      {card && card.photos.length > 0 ? (
-                        <button type="button" className="photo-link" onClick={(event) => lightbox.show(card.name, card.photos, event.currentTarget)}>
-                          View{card.photos.length > 1 ? ` (${card.photos.length})` : ''}
-                        </button>
-                      ) : null}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
+          {groups.map((group, g) => (
+            <tbody key={g} className={rooms ? 'group' : undefined}>
+              {group.map((row, j) => {
+                const card = rooms && j === 0 ? cardFor(cards, row[0] ?? '') : undefined;
+                return (
+                  <tr key={j}>
+                    {row.map((cell, k) => {
+                      // The first cell is the row's key (the room, the slot,
+                      // the date): the card's title on a phone. In a group it
+                      // is drawn on the first row alone and spans the rest.
+                      if (k === 0 && rooms && j > 0) return null;
+                      if (k === 0) {
+                        return (
+                          <td key={k} data-label={header[0] ?? ''} className="key" rowSpan={group.length > 1 ? group.length : undefined}>
+                            {inline(cell)}
+                            {card && card.photos.length > 0 ? (
+                              // The name says what the badge says ("2 photos"): WCAG 2.5.3, what you see is what you say.
+                              <button
+                                type="button"
+                                className="photo-link"
+                                onClick={(event) => lightbox.show(card.name, card.photos, event.currentTarget)}
+                                aria-label={`See ${photoCount(card.photos.length)} of ${card.name}`}
+                              >
+                                <Icon name="image" size={14} />
+                                {photoCount(card.photos.length)}
+                              </button>
+                            ) : null}
+                          </td>
+                        );
+                      }
+                      return (
+                        // data-label: the column's name, which the phone layout
+                        // prints in front of the value (chat.css, 560px). An
+                        // attribute, so React escapes it like a child.
+                        <td key={k} data-label={header[k] ?? ''} className={[k === 1 && subKey ? 'sub' : '', amounts[k] ? 'amount' : ''].filter(Boolean).join(' ') || undefined}>
+                          {inline(cell)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
         </table>
       </div>
-      {photoColumn && <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} to={lightbox.to} />}
+      {rooms && <Lightbox open={lightbox.open} close={lightbox.close} step={lightbox.step} to={lightbox.to} />}
     </>
   );
 }

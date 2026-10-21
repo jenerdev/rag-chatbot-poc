@@ -518,7 +518,8 @@ export async function answerQuestion({
     searchQuery,
     toolCalls: records,
     // D-094: the rooms' photos at a per_room tenant, as cards on a room-list
-    // turn, as a Photo column on any other table that names rooms.
+    // turn, grouped by room with the photo button under the name on any
+    // other table that names rooms (D-094 amended 2026-10-21).
     ...(tools.rooms ? { roomCards: await roomPhotos(tenant), roomCardsView: listRooms !== null ? 'cards' : 'column' } : {}),
   };
 }
@@ -575,7 +576,8 @@ export async function answerQuestionStream({
 
   // D-094: a per_room tenant's rooms' photos travel in `meta`, before the
   // model is called: cards on a room-list turn (known from the message
-  // alone), a Photo column on any other table that names rooms.
+  // alone), grouped by room with the photo button under the name on any
+  // other table that names rooms (D-094 amended 2026-10-21).
   const roomCards = tools.rooms ? await roomPhotos(tenant) : undefined;
   const roomCardsView = roomListRooms(tools, message) !== null ? 'cards' : 'column';
   onMeta({ conversationId: id, searchQuery, sources, ...(roomCards ? { roomCards, roomCardsView } : {}) });

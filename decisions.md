@@ -2994,6 +2994,44 @@ the dev server: "Room rates please" and a dated room question at harbor
 `column` with 4 rooms, the room list `cards`, villa nothing; battery 57/61,
 the known set.
 
+**D-094 amended 2026-10-21 (the user: "improve the rate table layout. i
+think data a bit redundant. redundant info is photos and room name"):**
+the Photo column is gone. In column view a table whose first column names
+rooms is GROUPED by room (`groupRows()` in `reply-text.tsx`): consecutive
+rows with the same first cell (case and the model's `**` ignored;
+neighbours only, so the reply's order is the drawn order) are one
+`<tbody class="group">`, the room's name in a `td.key` that spans them
+(`rowSpan`), and the room's photos open from ONE small button under the
+name ("2 photos", the cards' badge wording, `aria-label` "See 2 photos of
+Casa Uno"), instead of a View button on every row. The reply's TEXT is
+unchanged: every row still carries the room, so a copy, a screen reader
+and the battery's `tableOk` read what they did. A table that names no
+room, and a room with one row, draw as before (the first cell is now
+`td.key` in every table; the phone layout keys on that class instead of
+`td:first-child`). The stripes alternate by room, not by row, with a
+hairline between rooms; on a phone each GROUP is the card, headed by the
+room and its button, the slots stacked inside with a rule between them.
+Measured on alteza (6 rooms × 2 slots): 6 groups, 6 buttons, 6 rowspans,
+12 rows; before, "Casa Uno" and "View (2)" twice each, and at 375 each slot
+a card of its own headed by the same room. The button opens the lightbox
+("Casa Uno", "1 of 2"), Escape closes it with focus back on the button.
+Web tests 218 (the column-view case rewritten, two new), typecheck.
+
+**And the same day (the user: "desktop view is ok. but need column
+devider, on mobile view. needs improvement. its hard to read and
+confusing"):** every reply table has column rules, a hairline on the
+right of every cell but the last (so a merged room cell draws one rule
+down its height); plan/ui-refresh.md Phase 4's "spaced, not boxed" is
+superseded for tables. On a phone, when a room has several rows, the
+SECOND column (the slot) is a sub-heading inside the room's card,
+"SLOT · Day Use" on a tint, with the row's rates indented under it, so
+the card reads room → slot → rates instead of one run of "Slot / Weekday
+/ Weekend / Holiday" lines (`td.sub`, set per table by `reply-text.tsx`
+when any group has more than one row; a table whose rooms have one row
+each draws as before). Web tests 218 (the grouping case asserts the
+class, the column-view case its absence).
+
+
 ## D-095 · A booking is born pending; staff confirm it, and confirming is what takes the span · **Added 2026-10-04. Extends D-070 to staff bookings**
 
 **Decision:** `createBookings()` (and `createBooking()`, which calls it)

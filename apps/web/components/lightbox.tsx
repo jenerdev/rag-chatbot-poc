@@ -1,7 +1,7 @@
 'use client';
 
 // The photo viewer (D-094, redrawn by plan/room-cards.md): a room's photos
-// large on a dark overlay. Shared by the room cards and the Photo column on
+// large on a dark overlay. Shared by the room cards and the photo button on
 // a room table (reply-text.tsx). Every string is a child or a `src`;
 // nothing is markup.
 //

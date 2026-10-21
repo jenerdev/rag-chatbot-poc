@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ReplyText } from '../components/reply-text';
+import { groupRows, ReplyText } from '../components/reply-text';
 
 // The component rendered to static markup: what React makes of the segments,
 // and above all that cell TEXT stays text (plan/tables.md Rule 1).
@@ -18,9 +18,9 @@ describe('ReplyText', () => {
     expect(html).toContain('<span class="reply-text">Here are our rooms:</span>');
     // The Price column is amounts, so its header carries the class too (centred by CSS).
     expect(html).toContain('<div class="reply-table"><table><thead><tr><th>Room</th><th>Guests</th><th class="amount">Price</th></tr></thead>');
-    // Each cell carries its column name for the phone layout.
+    // Each cell carries its column name for the phone layout; the first is the row's key (its title there).
     expect(html).toContain(
-      '<tr><td data-label="Room">Garden Room</td><td data-label="Guests">up to 2</td><td data-label="Price" class="amount">₱3,500.00 (weekend rate)</td></tr>',
+      '<tbody><tr><td data-label="Room" class="key">Garden Room</td><td data-label="Guests">up to 2</td><td data-label="Price" class="amount">₱3,500.00 (weekend rate)</td></tr></tbody>',
     );
     expect(html).toContain('<span class="reply-text">Tell me a date.</span>');
   });
@@ -39,7 +39,7 @@ describe('ReplyText', () => {
   it('renders **bold** as <strong> with a text child, in prose and in a cell', () => {
     expect(render('Our **Garden Room** sleeps 2.')).toBe('<span class="reply-text">Our <strong>Garden Room</strong> sleeps 2.</span>');
     const html = render('| Room | Guests |\n|---|---|\n| **Loft** | up to 3 |');
-    expect(html).toContain('<td data-label="Room"><strong>Loft</strong></td>');
+    expect(html).toContain('<td data-label="Room" class="key"><strong>Loft</strong></td>');
   });
 
   it('a bold run is still text, never markup', () => {
@@ -68,7 +68,7 @@ describe('ReplyText', () => {
     expect(html).toContain('<span class="reply-text">Tell me a date.</span>');
   });
 
-  it('in column view, a room table keeps its shape and gains a Photo column with a View button', () => {
+  it('in column view, a room table keeps its shape and the photo button sits under the room name', () => {
     const cards = [
       { name: 'Garden Room', photos: ['https://x/g1.webp', 'https://x/g2.webp'] },
       { name: 'Loft', photos: [] },
@@ -77,13 +77,44 @@ describe('ReplyText', () => {
     const html = renderToStaticMarkup(createElement(ReplyText, { text, cards, view: 'column' }));
     expect(html).toContain('<table');
     expect(html).not.toContain('room-cards');
-    expect(html).toContain('<th class="photo">Photo</th>');
-    expect(html).toContain('<td data-label="Photo" class="photo"><button type="button" class="photo-link">View (2)</button></td>');
-    // The Loft has no photo: an empty Photo cell.
-    expect(html).toContain('<td data-label="Room">Loft</td>');
-    expect(html).toContain('<td data-label="Photo" class="photo"></td>');
-    // The amount columns are still found with the extra column in place.
-    expect(html).toContain('<th class="amount">Weekday</th>');
+    // No Photo column (D-094 amended 2026-10-21): the header is the reply's own.
+    expect(html).toContain('<thead><tr><th>Room</th><th>Slot</th><th class="amount">Weekday</th><th class="amount">Weekend</th><th class="amount">Holiday</th></tr></thead>');
+    expect(html).not.toContain('Photo');
+    // One <tbody class="group"> per room; the button names what it opens, and says "2 photos" like the cards' badge.
+    expect(html).toMatch(
+      /<tbody class="group"><tr><td data-label="Room" class="key">Garden Room<button type="button" class="photo-link" aria-label="See 2 photos of Garden Room"><svg[^>]*>.*?<\/svg>2 photos<\/button><\/td><td data-label="Slot">Night<\/td>/,
+    );
+    // The Loft has no photo: its name alone, no button.
+    expect(html).toContain('<tbody class="group"><tr><td data-label="Room" class="key">Loft</td><td data-label="Slot">Night</td>');
+    expect(html).not.toContain('of Loft');
+    // Every room has one row, so no second cell is a sub-heading on a phone.
+    expect(html).not.toContain('class="sub"');
+  });
+
+  // D-094 amended 2026-10-21: the rate card has a row per room AND slot, so
+  // the room's rows are one group, the name drawn once across them.
+  it('groups the rows of one room: the name and the photo button once, spanning its slots', () => {
+    const cards = [{ name: 'Casa Uno', photos: ['https://x/c1.webp'] }, { name: 'Loft', photos: [] }];
+    const text =
+      '| Room | Slot | Weekday | Weekend |\n|---|---|---|---|\n| Casa Uno | Day Use | ₱2,500.00 | ₱3,200.00 |\n| **Casa Uno** | Overnight | ₱3,800.00 | ₱4,800.00 |\n| Loft | Overnight | ₱5,000.00 | ₱6,200.00 |';
+    const html = renderToStaticMarkup(createElement(ReplyText, { text, cards, view: 'column' }));
+    // Two groups: Casa Uno's two slots (the model's ** on the second does not split them), then the Loft's one.
+    expect(html.match(/<tbody class="group">/g)).toHaveLength(2);
+    expect(html).toMatch(
+      /<td data-label="Room" class="key" rowSpan="2">Casa Uno<button type="button" class="photo-link" aria-label="See 1 photo of Casa Uno">.*?1 photo<\/button><\/td><td data-label="Slot" class="sub">Day Use<\/td>/,
+    );
+    // The second slot's row starts at the Slot cell: no second name, no second button.
+    expect(html).toContain('</tr><tr><td data-label="Slot" class="sub">Overnight</td><td data-label="Weekday" class="amount">₱3,800.00</td>');
+    expect(html.match(/photo-link/g)).toHaveLength(1);
+    // A room with one row spans nothing.
+    expect(html).toContain('<td data-label="Room" class="key">Loft</td>');
+    expect(html).not.toContain('rowSpan="1"');
+  });
+
+  it('groupRows merges neighbours only, ignoring case and **', () => {
+    const rows = [['Kubo A', '1'], ['**kubo a**', '2'], ['Kubo B', '3'], ['Kubo A', '4']];
+    expect(groupRows(rows).map((g) => g.length)).toEqual([2, 1, 1]);
+    expect(groupRows([])).toEqual([]);
   });
 
   it('a table that names none of the rooms is still a table, cards or not', () => {
