@@ -4594,3 +4594,35 @@ listener decides); (6) the placeholder is real text and axe holds it to
 **Reverse if:** a tenant's guests turn out to prefer the phone's own
 wheel; then the booking page alone could pass a `native` prop. Nothing
 suggests it yet.
+
+---
+
+## D-144 · The Manage booking lookup shows the tenant's reference prefix and takes the code · **Added 2026-10-21**
+
+**Decision:** the lookup's reference field is two halves: the tenant's
+three letters and the dash, drawn and fixed ("ALT-"), and an input for
+the six-character code. The user: "every tenant has their own prefix of
+booking reference number? it is fixed for alteza using 'ALT-', so i dont
+want the user to type that manually".
+
+- `lib/reference.ts` (pure, 11 tests) mirrors the ONE rule in SQL
+  (`booking_reference()`, D-100): `referencePrefix(slug)` is the slug's
+  first three letters upper-cased, padded with X; `referenceCode()`
+  upper-cases, drops the tenant's own prefix when a whole reference is
+  pasted (the receipt's `?ref=` too), keeps letters and digits, six at
+  most; `fullReference()` joins them.
+- The server page passes `referencePrefix(tenant.slug)`; the screen
+  holds the code and asks the route for the joined reference. The route
+  and `guest_stay()` are unchanged: they still receive "ALT-7KQ4MX".
+- The prefix span is the input's `aria-describedby`, so a screen reader
+  hears "Booking reference, ALT-" and the sighted reader sees the same.
+  The hint under the form says the first part is filled in.
+
+**Measured:** web tests 240/240; on alteza at 375 the span reads "ALT-",
+typing "alt-7kq4mx" leaves "7KQ4MX", `?ref=ALT-7KQ4MX` pre-fills
+"7KQ4MX", villa shows "VIL-".
+
+**Reverse if:** the SQL rule ever stops deriving the prefix from the
+slug (a stored per-tenant prefix): then `tenant_public()` carries it and
+the page reads that column instead of the slug, and the lib's prefix
+function goes.

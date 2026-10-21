@@ -9993,3 +9993,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **What:** `--text-touch: 16px` in `tokens.css` (the one size that is not a step), and under `@media (pointer: coarse)` in `base.css`, AFTER the shared field rule: every input but checkboxes and radios, `select` (and `select.compact`), `textarea`, `button.date-trigger` and `input.time-field` at that size, so a row of fields stays level.
 - **Observed (CDP, touch emulation on, 375):** `#nights` 16px, `#slot` 16px, `#check-in` 16px, the chat composer 16px; touch off at 1280: 15px, as before. Two wrong turns on the way: the first rule sat in the earlier coarse block and the later field rule outranked it for `select` (same specificity, later wins), and `.date-trigger` in `screens.css` outranked `.date-trigger` in `base.css` (now `button.date-trigger`). The driver's `Emulation.setEmulatedMedia` does not emulate `pointer`; `setTouchEmulationEnabled` does.
 - **Owed:** the user's thumb on a real iPhone: tap Nights, no zoom.
+
+## 2026-10-21 · The reference prefix fixed on the Manage booking lookup (D-144)
+
+- **Asked:** first "'ALT-' is auto filled on ref field and cannot be removed", then the intent: "it is fixed for alteza using 'ALT-', so i dont want the user to type that manually".
+- **Found first:** the code had no prefix anywhere; the field loaded empty on alteza and villa in headless Chrome and cleared with select-all. The "ALT-" the user saw was their own device's autofill. The request was then the opposite: make it fixed.
+- **What:** `lib/reference.ts` + `reference.test.ts` (11); `manage/page.tsx` passes `referencePrefix(tenant.slug)`; `manage-booking.tsx` keeps `code` in state, derives `reference`, draws `.input-prefix.reference-prefix` (span "ALT-" + the code input, `aria-describedby` the span), the hint reworded; `.reference-prefix` in `screens.css`.
+- **Observed:** typecheck clean, web tests 240/240; alteza at 375: prefix "ALT-", "alt-7kq4mx" typed → "7KQ4MX", submit still disabled without a contact, `?ref=ALT-7KQ4MX` → "7KQ4MX"; villa "VIL-". Shot in the scratchpad only.
+- **Not changed:** the route's schema and `guest_stay()`: the server still gets the whole reference.

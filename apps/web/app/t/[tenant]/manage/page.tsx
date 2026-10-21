@@ -5,6 +5,7 @@ import { hasApplication } from '@/lib/applications';
 import { loadBranding } from '@/lib/branding';
 import { loadNavFeatures } from '@/lib/nav';
 import { featureOn } from '@/lib/feature-flags';
+import { referencePrefix } from '@/lib/reference';
 import { getTenant } from '@/lib/tenant';
 
 // S-13 · Manage booking (plan/manage-booking.md). PUBLIC, like the booking
@@ -47,6 +48,8 @@ export default async function TenantManagePage({
       bannerUrl={branding.bannerUrl}
       nav={nav}
       initialReference={initialReference}
+      // D-144: the tenant's fixed prefix ("ALT-"), shown, never typed; the same rule as booking_reference().
+      referencePrefix={referencePrefix(tenant.slug)}
       limits={{ maxProofBytes: MAX_PROOF_BYTES, maxProofEdge: MAX_PROOF_EDGE, maxPayerReference: MAX_PAYER_REFERENCE, proofRetentionDays: PROOF_RETENTION_DAYS }}
     />
   );

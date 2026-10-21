@@ -1589,3 +1589,7 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
   .date-day { min-height: 40px; }
 }
 .time-field { font-variant-numeric: tabular-nums; }
+/* The lookup's reference (D-144): the prefix is the tenant's own, so it reads as ink, not as a muted unit; the code is wide letters. */
+.reference-prefix { max-width: stretch; }
+.reference-prefix > span { color: var(--ink); font-weight: 600; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.reference-prefix input { letter-spacing: 0.08em; text-transform: uppercase; }

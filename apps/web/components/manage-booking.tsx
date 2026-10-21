@@ -1,4 +1,5 @@
 'use client';
+import { fullReference, referenceCode } from '@/lib/reference';
 import { DateField } from './date-field';
 
 // S-13 · Manage booking (plan/manage-booking.md). PUBLIC: a guest types the
@@ -44,6 +45,8 @@ export interface ManageBookingScreenProps {
   nav: NavFeatures;
   /** from `?ref=`, already checked for shape by the page; '' for none */
   initialReference: string;
+  /** the tenant's three letters, "ALT": shown before the dash, so a guest types the six-character code only (D-144) */
+  referencePrefix: string;
   /** the proof's limits, from @rag/bookings through the server page (never a copy) */
   limits: { maxProofBytes: number; maxProofEdge: number; maxPayerReference: number; proofRetentionDays: number };
 }
@@ -164,8 +167,10 @@ function timeLabel(iso: string, timezone: string): string {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
 }
 
-export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl, bannerUrl, nav, initialReference, limits }: ManageBookingScreenProps) {
-  const [reference, setReference] = useState(initialReference);
+export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl, bannerUrl, nav, initialReference, referencePrefix, limits }: ManageBookingScreenProps) {
+  // The guest holds the six-character code; the reference the server is asked for is the prefix joined to it.
+  const [code, setCode] = useState(() => referenceCode(initialReference, referencePrefix));
+  const reference = fullReference(referencePrefix, code);
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -371,18 +376,24 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
           <form onSubmit={lookUp} noValidate>
             <div className="field">
               <label htmlFor="reference">Booking reference</label>
-              <input
-                type="text"
-                id="reference"
-                required
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-                maxLength={20}
-                placeholder="ABC-7KQ4MX"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
+              {/* The prefix is the tenant's and fixed (D-144): drawn, read to a screen reader as the
+                  field's description, never typed. A whole reference pasted in loses it (referenceCode). */}
+              <div className="input-prefix reference-prefix">
+                <span id="reference-prefix">{referencePrefix}-</span>
+                <input
+                  type="text"
+                  id="reference"
+                  required
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  maxLength={10}
+                  placeholder="7KQ4MX"
+                  aria-describedby="reference-prefix"
+                  value={code}
+                  onChange={(e) => setCode(referenceCode(e.target.value, referencePrefix))}
+                />
+              </div>
             </div>
             <div className="field">
               <label htmlFor="contact">Email or mobile number</label>
@@ -410,7 +421,10 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
           </form>
           <p className="manage-help small muted">
             <Icon name="info" size={16} />
-            <span>Your reference was shown when you sent your booking request, like ABC-7KQ4MX: three letters, a dash, then six letters and numbers.</span>
+            <span>
+              Your reference was shown when you sent your booking request, like {referencePrefix}-7KQ4MX. The first part is already filled in: type the six
+              letters and numbers after the dash.
+            </span>
           </p>
         </section>
       </main>
