@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // S-10 · Promos (plan/promos.md, D-097). A discount the tenant defines: a
 // name, fixed or percent, a value, the STAY dates it covers, an optional code
@@ -449,11 +450,11 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="promo-from">From</label>
-                  <input id="promo-from" type="date" required value={draft.validFrom} onChange={(e) => setDraft({ ...draft, validFrom: e.target.value })} />
+                  <DateField id="promo-from" required value={draft.validFrom} onChange={(validFrom) => setDraft({ ...draft, validFrom })} />
                 </div>
                 <div className="field">
                   <label htmlFor="promo-to">To</label>
-                  <input id="promo-to" type="date" required min={draft.validFrom || undefined} value={draft.validTo} onChange={(e) => setDraft({ ...draft, validTo: e.target.value })} />
+                  <DateField id="promo-to" required min={draft.validFrom || undefined} value={draft.validTo} onChange={(validTo) => setDraft({ ...draft, validTo })} />
                 </div>
               </div>
               <p className="hint">Every night of the stay must fall within these dates.</p>

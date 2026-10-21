@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // S-6 · the customer booking page (plan/customer-booking.md). PUBLIC: a
 // customer picks a slot, a date (and, for an overnight slot, how many nights),
@@ -628,15 +629,17 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                 )}
                 <div className="field">
                   <label htmlFor="check-in">{slot.nightly ? 'Check-in date' : 'Date'}</label>
-                  <input
-                    type="date"
+                  {/* D-143: the picker greys the closed dates and the days past the horizon, with the reason; the hints below still say it in words. */}
+                  <DateField
                     id="check-in"
                     required
                     min={page.today}
                     max={page.lastDate}
+                    today={page.today}
+                    closed={closedDays}
                     value={checkIn}
                     aria-invalid={checkIn > page.lastDate || closedInStay !== null || undefined}
-                    onChange={(e) => setCheckIn(e.target.value)}
+                    onChange={setCheckIn}
                   />
                   {/* The tenant's booking horizon, said up front, and again the moment it is passed. */}
                   <div className={`hint${checkIn > page.lastDate ? ' field-error' : ''}`}>

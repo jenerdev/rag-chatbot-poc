@@ -960,7 +960,15 @@ All are expanded in `risks.md`.
   `--accent-fill` / `--danger-fill`, never the bare colour: dark mode
   darkens it (white on the dark accent was 3.68:1). Dim with colour, never
   opacity. `plan/ui-refresh-a11y.mjs` (axe, 160 page states) ends at 0
-  violations; keep it there.
+  violations; keep it there. Form controls are NATIVE elements (D-142):
+  hide what the browser draws inside them (the number spinner, the file
+  button: `.file-field`), never replace the element; a `<select>` stays a
+  `<select>`. The ONE exception is a date or a time (D-143): `DateField`
+  and `TimeField` (`components/date-field.tsx`, `time-field.tsx`; the
+  arithmetic and words in `lib/date-field.ts`, tested), and even there
+  the native `<input type="date">` stays in the DOM, invisible, so the
+  form validates it. A new date field uses `DateField`, never
+  `type="date"`; `plan/date-field-walk.mjs` is its walk.
 - Feedback (D-102): an action's result is a toast (`useNotice()`), a
   standing fact a `.notice` banner; a list shows `LoadState` until its rows
   arrive and `EmptyState` when there are none; a reason is a `Tip` or

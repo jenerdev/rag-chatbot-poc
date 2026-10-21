@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // S-3 · Bookings. ONE list of stays, one card per reference (D-100): every
 // web request and staff booking that has not ended, or the last 90 days too.
@@ -810,15 +811,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="date">{nightly ? 'Check-in' : 'Date'}</label>
-                  <input
-                    type="date"
-                    id="date"
-                    required
-                    min={setup.today}
-                    max={setup.lastDate}
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
+                  <DateField id="date" required min={setup.today} max={setup.lastDate} today={setup.today} value={date} onChange={setDate} />
                 </div>
                 {nightly && (
                   <div className="field narrow">

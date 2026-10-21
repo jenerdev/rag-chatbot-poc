@@ -4490,3 +4490,107 @@ identical turns on alteza: the second logged
 `[query] embedding from cache (1 held)`. rag tests 375 (5 new), bookings
 133, web 218, typecheck 13/13. No prompt or tool text changed; the
 pipeline's reply is the same vector, so retrieval is unchanged.
+
+---
+
+## D-142 · Native form controls stay; the browser's own chrome goes · **Added 2026-10-21**
+
+**Decision:** every form control remains a native element, and only the
+parts a browser draws by itself are hidden: the number spinner, and the
+file input's "Choose file" button. Nothing is replaced with a hand-written
+control. The user asked which fields were native ("i dont want to use the
+native form input fields as much as possible to make the ui looks
+consistent accross the all browswers") and, given the inventory, chose
+this first step.
+
+1. **Number fields** (24, every one an integer count: nights, guests,
+   days, hours, years) keep `type="number"` for min/max and the numeric
+   keyboard, and lose the spinner through two rules in `base.css`
+   (`appearance: textfield` and the WebKit pseudo-elements). Chrome and
+   Firefox drew arrows, Safari did not; now none does.
+2. **File inputs** (5): four were already a visually hidden input behind a
+   styled label (room photos, brand images, a document's text, the
+   knowledge base). The fifth, the guest's receipt on Manage booking, was
+   a bare native input. It is now `.file-field`: the native input
+   stretched over a dashed zone at opacity 0, a `span.button` and the
+   chosen file's name as the face. `required`, the label, Tab and the
+   validation bubble all still belong to the real input; the face is
+   `aria-hidden`.
+3. **Not replaced, on purpose:** the 15 `<select>`s (13 are staff
+   filters; a custom listbox has to re-implement arrow keys, typeahead,
+   Escape and the listbox roles the native one gives free), the 11
+   checkboxes and radios (`accent-color` already matches the theme), and
+   the 6 date fields and 1 time field, which are the only controls a
+   guest sees differ between an iPhone and Windows. Those are the next
+   step, one `DateField` component built once (the user's choice of
+   order).
+
+**Why not a component library:** D-101. A replacement is hand-written in
+`components/`, on tokens, and `plan/ui-refresh-a11y.mjs` stays at zero.
+
+**Observed:** web tests 218/218, typecheck clean; `/t/villa/book` at
+1280 and 375, the Nights field a plain box, computed
+`appearance: textfield`. The proof form is behind a guest's reference and
+contact, which the record does not read (a query for them was refused,
+rightly), so its zone was not photographed: the user walks it on a stay
+they know.
+
+**Reverse if:** a staff member asks for the spinner back on a field
+they step through (hours and minutes on Slots are the candidates); then
+that field alone gets `appearance: auto`.
+
+---
+
+## D-143 · One date picker of our own, the native input kept underneath · **Added 2026-10-21**
+
+**Decision:** every `type="date"` field (8) is `DateField`
+(`components/date-field.tsx`) and the one `type="time"` is `TimeField`:
+a button that reads like a field, a month grid in a small dialog under it
+(a sheet at the bottom of a phone), and the native input still in the DOM
+at opacity 0 holding the value. Step 2 of the user's "consistent across
+browsers" request (D-142 was step 1; the selects, checkboxes and radios
+stay native, D-142 § 3). [`plan/date-field.md`](./plan/date-field.md).
+
+1. **The form still validates the native input** (plan Rule 1). A form
+   without `noValidate` refuses an empty or out-of-range date as before;
+   the `invalid` event is cancelled and the same words are drawn under
+   the field, so even the message looks the same in every browser.
+2. **One lib, tested** (`lib/date-field.ts`, 16 tests): the grid
+   (`monthWeeks`, Monday-first on `calendar-range.ts`), the keys
+   (`moveDate`), the reasons (`dayState`, `reasonWords`), the names
+   (`dayName` on `longDate`), where to open (`openAt`), and the time
+   field's words. The component draws what it says.
+3. **Keyboard as the WAI-ARIA date picker dialog:** arrows, Home/End,
+   PageUp/PageDown (Shift: a year), Enter/Space, Escape back to the
+   button, roving tabindex, `aria-disabled` days that say why.
+4. **The tenant's today, never the device's,** wherever a tenant exists
+   (trap 9); the device's date only picks the month to open on for a
+   field with no tenant and no bounds, and is never written.
+5. **The time is text,** "14:00", `inputMode="numeric"`, the colon put in
+   as typed, the 12-hour reading under it; the value is still "HH:MM".
+
+**Measured (2026-10-21):** web tests 234/234, typecheck clean;
+`plan/date-field-walk.mjs` on villa 12/12 (the button and the hidden
+input, today focused on open, two arrows and Enter choose today + 2,
+ArrowDown reopens on it, Escape keeps it, Shift+PageDown clamps to the
+horizon with the days past it `aria-disabled` and Next disabled, a pointer
+outside closes, the 375 sheet fixed and inside the viewport; axe 0
+violations over the open dialog at 1280 and 375). Shots in
+`plan/date-field/`. Villa AND alteza pin the light scheme (each theme sets a surface key), so every "dark" shot here is
+light: the dark look is the tokens' and waits for a tenant without one.
+
+**Traps met:** (1) a `<label for>` on a button replaces its name, so the
+value reaches a screen reader through `aria-describedby`; (2) a
+`readOnly` input is exempt from constraint validation, so the hidden
+input is controlled with a real `onChange`; (3) cancelling `invalid` also
+cancels the browser's focus move, so the component focuses its button;
+(4) CDP's Enter carries no text and clicks no button, and a real Enter on
+a day button would have chosen twice: the grid handles Enter and Space
+itself with `preventDefault`; (5) on iOS a tap focuses nothing, so a blur
+with no `relatedTarget` must NOT close the dialog (the pointerdown
+listener decides); (6) the placeholder is real text and axe holds it to
+4.5:1 (`--muted`, not `--faint`).
+
+**Reverse if:** a tenant's guests turn out to prefer the phone's own
+wheel; then the booking page alone could pass a `native` prop. Nothing
+suggests it yet.

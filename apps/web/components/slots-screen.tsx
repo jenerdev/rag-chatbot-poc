@@ -1,4 +1,5 @@
 'use client';
+import { TimeField } from './time-field';
 
 // S-9 · Slots (D-090). The periods a tenant sells: a name, a start time, a
 // length, and whether a stay can repeat it night after night ("nightly").
@@ -294,7 +295,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="slot-start">Starts at</label>
-                  <input id="slot-start" type="time" required disabled={timesFixed} value={draft.startTime} onChange={(e) => setDraft({ ...draft, startTime: e.target.value })} />
+                  <TimeField id="slot-start" required disabled={timesFixed} value={draft.startTime} onChange={(startTime) => setDraft({ ...draft, startTime })} />
                 </div>
                 <div className="field narrow">
                   <label htmlFor="slot-hours">Hours</label>

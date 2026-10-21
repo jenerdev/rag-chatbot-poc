@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // The platform tenant form's Legal tab (D-129 – D-131, plan/legal.md § 5):
 // the data processing agreement's date (without it, bookings cannot be
@@ -68,7 +69,7 @@ export function LegalPanel({ legal, slug, busy, onSave }: { legal: LegalFields; 
         <div className="settings-fields">
           <div className="field narrow">
             <label htmlFor="legal-dpa-date">Signed on</label>
-            <input id="legal-dpa-date" type="date" value={d.dpa} onChange={set('dpa')} />
+            <DateField id="legal-dpa-date" value={d.dpa} onChange={(dpa) => setD({ ...d, dpa })} />
             <p className="hint">{d.dpa ? 'Recorded.' : 'Not signed yet.'}</p>
           </div>
         </div>

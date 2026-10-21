@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // S-13 · Manage booking (plan/manage-booking.md). PUBLIC: a guest types the
 // reference and the email or mobile number they booked with, and sees that
@@ -634,7 +635,7 @@ function PaymentPanel({
             <div className="field-row">
               <div className="field">
                 <label htmlFor="pay-date">Date paid</label>
-                <input id="pay-date" type="date" required value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
+                <DateField id="pay-date" required value={paidOn} onChange={setPaidOn} />
               </div>
               <div className="field grow">
                 <label htmlFor="pay-ref">
@@ -652,14 +653,25 @@ function PaymentPanel({
             </div>
             <div className="field">
               <label htmlFor="pay-file">Receipt (photo or PDF)</label>
-              <input
-                id="pay-file"
-                type="file"
-                required
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                aria-describedby="pay-file-kept"
-              />
+              {/* The zone is what a guest sees; the input over it is what the browser,
+                  the keyboard and a screen reader use (its name is the label above, its
+                  value the file's name), so the face is hidden from them. */}
+              <div className="file-field">
+                <input
+                  id="pay-file"
+                  type="file"
+                  required
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  aria-describedby="pay-file-kept"
+                />
+                <span className="button sm" aria-hidden="true">
+                  Choose a file
+                </span>
+                <span className={file ? 'file-field-name picked' : 'file-field-name'} aria-hidden="true">
+                  {file ? file.name : 'No file chosen'}
+                </span>
+              </div>
               {/* D-129: what happens to the file, before it is sent. */}
               <p className="hint" id="pay-file-kept">
                 Kept only to check your payment, and deleted {limits.proofRetentionDays} days after your stay. A photo&apos;s location
@@ -820,7 +832,7 @@ function ChangePanel({
             <div className="field-row">
               <div className="field">
                 <label htmlFor="new-check-in">New check-in date</label>
-                <input id="new-check-in" type="date" required value={newCheckIn} onChange={(e) => { setNewCheckIn(e.target.value); setQuote(null); }} />
+                <DateField id="new-check-in" required value={newCheckIn} onChange={(v) => { setNewCheckIn(v); setQuote(null); }} />
               </div>
               <div className="field">
                 <span className="small muted">Same rooms, nights and guests.</span>

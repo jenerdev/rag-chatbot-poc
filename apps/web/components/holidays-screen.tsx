@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 
 // S-7 · Holidays (plan/customer-booking.md § 2.3). Staff keep the list of
 // holiday and peak days that unit_price() reads: on a listed day every unit is
@@ -379,7 +380,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
             <div className="field-row">
               <div className="field">
                 <label htmlFor="day">Date</label>
-                <input type="date" id="day" required min={setup.today} value={day} onChange={(e) => setDay(e.target.value)} />
+                <DateField id="day" required min={setup.today} today={setup.today} value={day} onChange={setDay} />
               </div>
               <div className="field grow">
                 <label htmlFor="label">Name</label>

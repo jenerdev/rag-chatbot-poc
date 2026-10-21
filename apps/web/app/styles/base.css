@@ -303,6 +303,12 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 input[aria-invalid="true"]:focus, textarea[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px var(--danger-line); }
 input:disabled, select:disabled, textarea:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; }
+/* A number field is a text box, not a spinner: Chrome and Firefox draw the
+   arrows, Safari does not, and every number here is a count typed once
+   (nights, guests, days, hours). `type="number"` stays for min/max and the
+   numeric keyboard on a phone; only the browser's own chrome goes. */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .field { margin-bottom: var(--space-4); }
 .field-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
