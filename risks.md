@@ -917,7 +917,7 @@ D-001):
 | `next` | moderate ×2 | 15.5.27 | cache poisoning of SSG/ISR pages, cross-user content and persistent DoS (GHSA-mcj8-r9mp-w47p) |
 | `postcss` | high ×2, moderate ×2 | 8.5.23 | path traversal and file read through `sourceMappingURL`; XSS through an unescaped `</style>` |
 | `source-map-js` | high | 1.2.2 | event-loop DoS through an indexed source map |
-| `sharp` | high | 0.35.5 | a librsvg CVE in a dependency |
+| `sharp` | high | 0.35.5 | a librsvg CVE in a dependency; since D-146 a DIRECT dependency of the web app (the app icon), so the update is `apps/web` too |
 
 `postcss`, `source-map-js` and `sharp` are build-time and image-time
 (`next/image`) only, so an attacker needs to hand the build a stylesheet or

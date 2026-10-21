@@ -4670,3 +4670,45 @@ rows swept.
 **Reverse if:** a navigation is ever pending with no link involved (a
 `router.push` after a form): then a `useTransition`-driven bar in the
 frame joins this one, same CSS.
+
+---
+
+## D-146 · The staff app's icon is a PNG our route draws, for every tenant · **Added 2026-10-21**
+
+**Decision:** `GET /t/<slug>/app-icon.png?size=192|512|180` always answers
+a square PNG, and the manifest and the staff pages' `<head>` point at it.
+The user: "current no APP icon when PWA installed".
+
+- **Why there was none:** the manifest named the tenant's logo only when
+  it had one, as `sizes: any`, and a logo is a WebP of any shape
+  (`resize-image.ts` makes it so). Android's installer wants square PNGs
+  at 192 and 512; iOS reads its Home Screen icon from
+  `apple-touch-icon`, never from the manifest. Villa, with no logo, had
+  no icon at all; alteza's WebP was not one either.
+- **With a logo:** fetched from its bucket (5 s limit) and set by `sharp`
+  at 70 % of the side on a tile of the theme colour the logo's visible
+  pixels contrast with most (panel, accent or ink; alteza's cream mark
+  lands on its dark olive accent, a dark mark would land on the panel).
+  `sharp` is Next's own image library, now declared on the web app too:
+  the same copy from the store, no new download. Next's renderer
+  (`next/og`) was tried first and drew the WebP as a blank tile,
+  silently, so it keeps only the text case.
+- **Without one, or when the logo cannot be fetched or decoded:** the
+  business's initial on its accent through `next/og`, the mark
+  `BrandMark` draws.
+- **Sizes:** an allowlist of three; anything else is 512. The same 512
+  serves `maskable`: full-bleed, the mark inside the 40 % safe zone.
+  `Cache-Control: public, max-age=3600`, so a brand change reaches the
+  icon within the hour (installers re-read on update).
+- The response names the tile it chose in `X-App-Icon-Tile`.
+
+**Measured (2026-10-21):** villa and alteza: 192, 512 and 180 all
+`image/png` with the right IHDR dimensions; `?size=10000` answers 512;
+the admin `<head>` carries `rel="icon"`, `rel="apple-touch-icon"` and the
+manifest; alteza's tile `#2d3223 for a logo of #eae2c0`. Typecheck 13/13.
+Owed: the user's install on a phone and on Chrome, where the icon is
+judged.
+
+**Reverse if:** a tenant wants its icon separate from its logo: then the
+platform form takes an icon image and this route serves it, resized,
+unchanged otherwise.

@@ -448,6 +448,7 @@ apps/web/              Next.js 15, App Router
   app/t/[tenant]/admin/activity/page.tsx  S-18 Activity (D-138): who did what, for activity:read (owners); the route is /api/t/[tenant]/admin/activity; filters in the URL
   app/t/[tenant]/admin/notifications/page.tsx  S-17 Notifications (D-116 § 8): the last 30 days, read or not; the sidebar's ONE badge is its unread count; 404 without bookings
   app/t/[tenant]/sw.js/route.ts, manifest.webmanifest/route.ts  the tenant's service worker (scope /t/<slug>/; source in lib/service-worker.ts) and staff app manifest (D-116)
+  app/t/[tenant]/app-icon.png/route.ts  the staff app's icon (D-146): a square PNG at ?size=180|192|512, the logo via sharp on the tile it contrasts with, or the initial via next/og; named in the manifest and as apple-touch-icon
   app/api/t/[tenant]/admin/attention, notifications, push  the poll (unread + newest), the feed and read marks, this device's subscription / all my devices (D-116)
   app/t/[tenant]/admin/accommodations/page.tsx  S-5 rooms — 404 unless the tenant books per_room
   app/t/[tenant]/admin/reset/page.tsx     where invite and reset emails land; the token is in the #fragment

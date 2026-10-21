@@ -10,7 +10,14 @@ type Props = { children: ReactNode; params: Promise<{ tenant: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { tenant } = await params;
-  return { manifest: `/t/${encodeURIComponent(tenant)}/manifest.webmanifest`, appleWebApp: { capable: true, statusBarStyle: 'default' } };
+  const base = `/t/${encodeURIComponent(tenant)}`;
+  return {
+    manifest: `${base}/manifest.webmanifest`,
+    appleWebApp: { capable: true, statusBarStyle: 'default' },
+    // D-146: iOS reads the Home Screen icon from apple-touch-icon, never from the manifest;
+    // the tab's own icon comes from the same route.
+    icons: { apple: `${base}/app-icon.png?size=180`, icon: `${base}/app-icon.png?size=192` },
+  };
 }
 
 export default function AdminLayout({ children }: Props) {

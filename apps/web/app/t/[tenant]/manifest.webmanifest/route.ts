@@ -24,7 +24,14 @@ export const GET = withTenantRoute(async (_request, { tenant }) => {
     display: 'standalone',
     background_color: colour('bg'),
     theme_color: colour('accent'),
-    ...(branding.logoUrl ? { icons: [{ src: branding.logoUrl, sizes: 'any', purpose: 'any' }] } : {}),
+    // D-146: square PNGs from our own route, always, whatever the tenant's logo is (a WebP of any
+    // shape is not an installer's icon). The same 512 serves `maskable`: it is full-bleed with the
+    // mark inside the safe zone, so Android's mask cuts nothing that matters.
+    icons: [
+      { src: `/t/${tenant.slug}/app-icon.png?size=192`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `/t/${tenant.slug}/app-icon.png?size=512`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `/t/${tenant.slug}/app-icon.png?size=512`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
   };
   return new Response(JSON.stringify(manifest), { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' } });
 });
