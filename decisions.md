@@ -4626,3 +4626,47 @@ typing "alt-7kq4mx" leaves "7KQ4MX", `?ref=ALT-7KQ4MX` pre-fills
 slug (a stored per-tenant prefix): then `tenant_public()` carries it and
 the page reads that column instead of the slug, and the lib's prefix
 function goes.
+
+---
+
+## D-145 · A page on its way is shown, not said: the SessionCheck skeleton and the LinkProgress bar · **Added 2026-10-21**
+
+**Decision:** the sentence "Checking your session…" is gone from the 17
+staff and platform screens that opened on it. The user: "remove the text
+'checking your session' if possible to replace it with progress indicator
+or loading indicator when transitioning on different page?"
+
+1. **The whole staff page as a skeleton** (`components/staff-skeleton.tsx`;
+   the user: "it should be a page loading skeleton"): while the session
+   is checked, `StaffFrame` draws the shell itself, on the signed-in
+   shell's own classes, so every width is the real frame's for free and
+   nothing moves when the page lands: the sidebar with four sections of
+   link bones, the top bar's crumbs, bell and account, and the body
+   (`PageBones` in `session-check.tsx`: a toolbar, a card of rows, two
+   half cards), from the same Bones the lists use (D-102). What is
+   already known is real: the logo, the business name, the page title.
+   The 16 staff screens pass nothing while checking; the platform, with
+   its own frame, draws `SessionCheck` (PageBones as one status). The
+   words survive as the status's `aria-label`, for a screen reader only.
+2. **`LinkProgress`** (`components/route-progress.tsx`) sits inside every
+   sidebar link and the bell: Next's `useLinkStatus()` says whether that
+   link's navigation is pending, and while it is, a ring at the end of
+   the clicked link and a thin accent bar along the top of the viewport.
+   Both `aria-hidden`: the arriving page is the announcement. No store, no
+   timer, no route list: the hook is the whole state. Reduced motion
+   keeps both still and visible.
+3. **Not a `loading.tsx`:** a route segment's loading file would replace
+   the whole page, sidebar included, on every navigation; the bar keeps
+   the frame where it is.
+
+**Measured:** typecheck clean, web tests 240/240;
+`plan/session-progress-walk.mjs` 6/6 on villa with a second of latency
+emulated (the skeleton seen at first paint with the status's name and no
+sentence on screen, then the page; the bar at y = 0 and the ring on
+"Bookings" while in flight, gone on arrival; at 375 the skeleton fits).
+Shots in `plan/session-progress/`. The throwaway owner and its 3 audit
+rows swept.
+
+**Reverse if:** a navigation is ever pending with no link involved (a
+`router.push` after a form): then a `useTransition`-driven bar in the
+frame joins this one, same CSS.

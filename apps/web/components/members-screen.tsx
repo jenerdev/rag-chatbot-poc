@@ -61,7 +61,7 @@ export function MembersScreen({
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm api={api} slug={slug} onLoggedIn={() => void askSession()} />
           )}

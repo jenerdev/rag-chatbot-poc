@@ -294,7 +294,7 @@ export function DashboardScreen({ slug, businessName, logoUrl, nav, currency }: 
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm
               api={api}

@@ -189,7 +189,7 @@ export function ConversationsScreen({ slug, businessName, logoUrl, nav, initial 
     return (
       <StaffFrame {...frame}>
         {auth === 'checking' ? (
-          <div className="small muted">Checking your session…</div>
+          null
         ) : (
           <LoginForm
             api={api}

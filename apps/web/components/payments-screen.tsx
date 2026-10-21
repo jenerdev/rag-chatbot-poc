@@ -265,7 +265,7 @@ export function PaymentsScreen({ slug, businessName, logoUrl, nav, currency, tim
     return (
       <StaffFrame {...frame}>
         {auth === 'checking' ? (
-          <div className="small muted">Checking your session…</div>
+          null
         ) : (
           <LoginForm
             api={api}

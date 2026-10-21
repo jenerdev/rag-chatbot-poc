@@ -178,7 +178,7 @@ export function TranscriptScreen({ slug, id, businessName, assistantName, logoUr
     return (
       <StaffFrame {...frame}>
         {auth === 'checking' ? (
-          <div className="small muted">Checking your session…</div>
+          null
         ) : (
           <LoginForm
             api={api}

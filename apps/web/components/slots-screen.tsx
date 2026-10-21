@@ -234,7 +234,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm
               api={api}

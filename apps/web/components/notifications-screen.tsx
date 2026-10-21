@@ -184,7 +184,7 @@ export function NotificationsScreen({ slug, businessName, logoUrl, nav }: Notifi
     return (
       <StaffFrame {...frame}>
         {auth === 'checking' ? (
-          <div className="small muted">Checking your session…</div>
+          null
         ) : (
           <LoginForm
             api={api}

@@ -243,7 +243,7 @@ export function UnansweredScreen({ slug, businessName, logoUrl, nav, limit }: Un
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm api={api} slug={slug} onLoggedIn={() => {
                 setAuth('in');

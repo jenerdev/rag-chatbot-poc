@@ -663,7 +663,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm
               api={api}

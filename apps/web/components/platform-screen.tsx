@@ -1,4 +1,5 @@
 'use client';
+import { SessionCheck } from './session-check';
 
 // /platform (plan/tenant-management.md § 4.3): the super user's screen. A
 // login form until the session GET says `platform: true`; then the tenant
@@ -180,7 +181,7 @@ export function PlatformScreen() {
         {top}
         <main>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            <SessionCheck />
           ) : (
             <LoginForm
               api={API}

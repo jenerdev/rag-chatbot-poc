@@ -330,7 +330,7 @@ export function CalendarScreen({ slug, businessName, logoUrl, nav, perRoom, room
     return (
       <StaffFrame {...frame}>
         {auth === 'checking' ? (
-          <div className="small muted">Checking your session…</div>
+          null
         ) : (
           <LoginForm
             api={api}

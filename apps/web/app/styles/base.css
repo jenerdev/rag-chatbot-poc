@@ -646,3 +646,35 @@ button.danger.solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
   .platform-topbar .platform-name { white-space: nowrap; }
 }
 h1.platform-name { margin: 0; font-size: var(--text-base); }
+
+/* ——— A page on its way (D-145) ———
+   SessionCheck: a staff page's shape while the session is checked, the Bones
+   and skeleton rows the lists use. LinkProgress: inside the clicked sidebar
+   link, a ring at its end and a bar along the top of the viewport while the
+   next page is in flight (useLinkStatus). Reduced motion: the bar stands
+   still, still visible. */
+.link-pending { flex: none; width: 14px; height: 14px; margin-left: auto; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.sidebar-link .nav-badge + .visually-hidden + .link-pending { margin-left: var(--space-2); }
+/* The bar: portalled to <body> (route-progress.tsx), so it spans the viewport
+   over the sidebar too. A faint full-width track, and the accent sweeping
+   along it (the user: "make it full width"): the track is what makes the
+   bar read as the page's, not the sidebar's. */
+.route-progress { position: fixed; top: 0; left: 0; right: 0; z-index: 30; height: 3px; background-color: var(--accent-soft); background-image: linear-gradient(90deg, transparent, var(--accent) 30%, var(--accent) 70%, transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: route-progress 1s linear infinite; pointer-events: none; }
+@keyframes route-progress { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .route-progress { animation: none; background-image: none; background-color: var(--accent); }
+  .link-pending { animation: none; border-top-color: var(--line-strong); }
+}
+/* The staff shell as a skeleton (staff-skeleton.tsx, D-145): the real
+   classes carry the layout; these only keep the bones in their rows. */
+.staff-skeleton-inner { display: contents; }
+.staff-skeleton .sidebar-link { pointer-events: none; gap: var(--space-3); }
+.staff-skeleton .topbar-crumbs .bone { flex: none; }
+.page-bones { display: grid; gap: var(--space-4); }
+.page-bones-tools { display: flex; align-items: center; gap: var(--space-2); }
+.page-bones-right { margin-left: auto; }
+.page-bones-card { display: grid; gap: var(--space-3); }
+.page-bones-card .skeleton-list { margin-top: var(--space-1); }
+.page-bones-card .skeleton-row .skeleton-bar { max-width: none; }
+.page-bones-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); }
+.session-check { display: grid; }

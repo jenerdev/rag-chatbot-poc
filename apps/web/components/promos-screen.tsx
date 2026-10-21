@@ -265,7 +265,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm
               api={api}

@@ -287,7 +287,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm api={api} slug={slug} onLoggedIn={() => {
                 setAuth('in');

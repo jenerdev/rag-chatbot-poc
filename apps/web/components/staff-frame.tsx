@@ -31,6 +31,8 @@ import { BrandHeader } from './brand-header';
 import { AccountMenu } from './account-menu';
 import { PushControl } from './push-control';
 import { Icon, type IconName } from './icons';
+import { LinkProgress } from './route-progress';
+import { StaffShellSkeleton } from './staff-skeleton';
 import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
 import { groupNavItems, groupOf, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
@@ -143,6 +145,10 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
     };
   }, [open, close]);
 
+  // While the session is checked, the whole shell as a skeleton (D-145): the
+  // page that is coming, not a message. The screens pass no children here.
+  if (session.auth === 'checking') return <StaffShellSkeleton businessName={businessName} logoUrl={logoUrl} title={title} />;
+
   if (session.auth !== 'in') {
     return (
       <>
@@ -177,6 +183,7 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
           <span className="visually-hidden">, {item.badge} unread</span>
         </>
       ) : null}
+      <LinkProgress />
     </Link>
   );
 
@@ -234,6 +241,7 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
                     {waiting > 99 ? '99+' : waiting}
                   </span>
                 )}
+                <LinkProgress ring={false} />
               </Link>
             )}
             <AccountMenu

@@ -517,7 +517,7 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
       <>
         <StaffFrame {...frame}>
           {auth === 'checking' ? (
-            <div className="small muted">Checking your session…</div>
+            null
           ) : (
             <LoginForm
               api={api}
