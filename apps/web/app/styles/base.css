@@ -309,6 +309,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
    numeric keyboard on a phone; only the browser's own chrome goes. */
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* No zoom on focus (the user, 2026-10-21): every field at least 16px on a
+   touch screen, the compact select and the date trigger too, so a row of
+   fields stays level. Checkboxes and radios are not text and do not zoom.
+   AFTER the field rule above: `select` there is the same specificity, and
+   the later one wins. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), select, select.compact, textarea, button.date-trigger, input.time-field { font-size: var(--text-touch); }
+}
 
 .field { margin-bottom: var(--space-4); }
 .field-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }

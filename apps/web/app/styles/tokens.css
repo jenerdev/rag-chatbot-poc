@@ -63,6 +63,10 @@
   --text-xs: 12px;
   --text-sm: 13px;
   --text-base: 15px;
+  /* A field's text on a touch screen: iOS Safari zooms the page in when a
+     focused input, select or textarea is under 16px, and never zooms back
+     out. This is the one step that is not a step, used only there. */
+  --text-touch: 16px;
   --text-lg: 17px;
   --text-xl: 22px;
   --leading: 1.55;

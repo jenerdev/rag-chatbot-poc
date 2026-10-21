@@ -968,7 +968,10 @@ All are expanded in `risks.md`.
   arithmetic and words in `lib/date-field.ts`, tested), and even there
   the native `<input type="date">` stays in the DOM, invisible, so the
   form validates it. A new date field uses `DateField`, never
-  `type="date"`; `plan/date-field-walk.mjs` is its walk.
+  `type="date"`; `plan/date-field-walk.mjs` is its walk. On a touch
+  screen every field is `--text-touch` (16px) or iOS zooms the page on
+  focus; the rule is in `base.css` AFTER the field rule, and a new
+  field-like control that sets its own font-size joins its selector list.
 - Feedback (D-102): an action's result is a toast (`useNotice()`), a
   standing fact a `.notice` banner; a list shows `LoadState` until its rows
   arrive and `EmptyState` when there are none; a reason is a `Tip` or
