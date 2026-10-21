@@ -17,7 +17,6 @@
 // is. The panel stays MOUNTED while closed (`hidden`), so push's state,
 // read once on load, is not lost by closing it.
 
-import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons';
 import { ROLE_LABELS, type Role } from '@/lib/permissions';
@@ -73,11 +72,15 @@ export function AccountMenu({ role, label, links, device, onLogout }: { role: Ro
         {links.length > 0 && (
           <div className="account-section" role="group" aria-label="Guest pages">
             <span className="account-heading">Guest pages</span>
+            {/* A guest page opens in a NEW tab (the user, 2026-10-21): staff look at it beside their
+                work, not instead of it. A plain <a>, not <Link>: nothing to prefetch or soft-navigate
+                when the page leaves this tab. The hidden words say so to a screen reader (WCAG G201). */}
             {links.map((link) => (
-              <Link key={link.href} href={link.href} className="account-link" onClick={() => close(false)}>
+              <a key={link.href} href={link.href} className="account-link" target="_blank" rel="noopener" onClick={() => close(false)}>
                 <Icon name={link.icon} size={16} />
                 <span>{link.label}</span>
-              </Link>
+                <span className="visually-hidden"> (opens in a new tab)</span>
+              </a>
             ))}
           </div>
         )}

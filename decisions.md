@@ -4712,3 +4712,5 @@ judged.
 **Reverse if:** a tenant wants its icon separate from its logo: then the
 platform form takes an icon image and this route serves it, resized,
 unchanged otherwise.
+
+**Amended 2026-10-21 (the user: "on header account dropdown, chat, booking and manage booking page should be open a new tab"):** the staff account menu's three guest-page links open in a NEW tab (`target="_blank"`, `rel="noopener"`, a hidden "(opens in a new tab)"): staff look at a guest page beside their work, not instead of it. The other places that name the guest pages (the public pages' own headers and footers, the staff login header) still open in the same tab, as a guest would expect.

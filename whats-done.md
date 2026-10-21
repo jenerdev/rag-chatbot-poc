@@ -10021,3 +10021,9 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** both tenants: 200, `image/png`, PNG magic bytes, 192×192 / 512×512 / 180×180; `?size=10000` → 512; the admin head: manifest, `rel="icon"`, `rel="apple-touch-icon"`. Alteza's first render was a BLANK white tile: `next/og` drew the WebP as nothing and threw nothing, so the fallback never ran; with sharp the logo drew, but on white (faint cream): sharp's `stats().dominant` counted transparent pixels; the visible-pixel mean fixed it (`#2d3223 for a logo of #eae2c0`). Villa: a white V on teal. Typecheck 13/13.
 - **Risk note:** R-58 lists sharp (patched in 0.35.5); it is a direct dependency now, so the dependency update bumps it here too.
 - **Owed:** the user installs on a phone (Add to Home Screen) and in Chrome and sees the icon.
+
+## 2026-10-21 · The account menu's guest pages open in a new tab (D-136 amended)
+
+- **Asked:** "on header account dropdown, chat, booking and manage booking page should be open a new tab".
+- **What:** `account-menu.tsx`: the three guest-page links are plain `<a target="_blank" rel="noopener">` (not `<Link>`: nothing to prefetch or soft-navigate when the page leaves the tab), each with a visually hidden " (opens in a new tab)" so a screen reader is told (WCAG G201). `plan/nav-layout-walk.mjs` strips that suffix when it reads the links.
+- **Observed (a throwaway villa owner, the menu opened in headless Chrome):** Chat page `/t/villa`, Booking page `/t/villa/book`, Manage booking `/t/villa/manage`, each `target _blank`, `rel noopener`, text ending "(opens in a new tab)". Typecheck clean. The user swept with its audit rows.
