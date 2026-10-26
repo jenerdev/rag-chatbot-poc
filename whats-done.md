@@ -10082,6 +10082,7 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **What:** `export const preferredRegion = 'sin1'` in `apps/web/app/layout.tsx`, the root, inherited by every page and route (`reduceAppConfig()` in Next's build merges the segment chain; confirmed in `next/dist/build/utils.js`).
 - **Observed:** typecheck 13/13. The effect is on the deploy: the Functions tab of the next deployment should show `sin1` on every function, and a staff page change timed in the Network tab is the before/after. From Manila the Supabase host answers in 107–188 ms.
 - **Recommended and not done:** the session passed from the server page (do after measuring the deploy); one SQL read for applications, features and role rows (skip unless the measurement says the server render is still the long pole).
+- **Confirmed on the deploy (2026-10-27, the user):** "it works. the speed improves." No numbers were taken; the user's own feel of a page change was the complaint, and it is the measure. The session-as-a-prop item and the single SQL read stay closed unless a timed page change says otherwise.
 
 ## 2026-10-27 · AI employees: the plan (nothing built)
 
