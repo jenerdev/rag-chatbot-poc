@@ -111,6 +111,23 @@ describe('ReplyText', () => {
     expect(html).not.toContain('rowSpan="1"');
   });
 
+  // 2026-10-26, the user: "price table is broken when the resort is villa".
+  // A plain table (no cards: villa's rate card, one unit so no Room column)
+  // is one group of every row, and the span was set on each row's first
+  // cell, so the rows slid one column right in a staircase. A plain table
+  // spans nothing: every row starts at its own key cell.
+  it('a plain table of several rows spans nothing: each row starts at its own key cell', () => {
+    const html = render(
+      '💰 Here are our rates:\n\n| Slot | Weekday | Weekend | Holiday |\n|---|---|---|---|\n' +
+        '| 22-Hour Whole Day | ₱22,000.00 | ₱27,000.00 | ₱27,000.00 |\n| Day Tour | ₱9,500.00 | ₱12,000.00 | ₱12,000.00 |\n| Overnight | ₱16,000.00 | ₱20,000.00 | ₱20,000.00 |',
+    );
+    expect(html).not.toContain('rowSpan');
+    expect(html).not.toContain('class="group"');
+    expect(html.match(/<tr><td data-label="Slot" class="key">/g)).toHaveLength(3);
+    expect(html).toContain('<tr><td data-label="Slot" class="key">Day Tour</td><td data-label="Weekday" class="amount">₱9,500.00</td>');
+    expect(html).toContain('<tr><td data-label="Slot" class="key">Overnight</td><td data-label="Weekday" class="amount">₱16,000.00</td>');
+  });
+
   it('groupRows merges neighbours only, ignoring case and **', () => {
     const rows = [['Kubo A', '1'], ['**kubo a**', '2'], ['Kubo B', '3'], ['Kubo A', '4']];
     expect(groupRows(rows).map((g) => g.length)).toEqual([2, 1, 1]);

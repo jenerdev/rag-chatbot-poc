@@ -116,12 +116,19 @@ function Table({ header, rows, cards }: { header: string[]; rows: string[][]; ca
                   <tr key={j}>
                     {row.map((cell, k) => {
                       // The first cell is the row's key (the room, the slot,
-                      // the date): the card's title on a phone. In a group it
-                      // is drawn on the first row alone and spans the rest.
+                      // the date): the card's title on a phone. In a ROOMS
+                      // table it is drawn on the group's first row alone and
+                      // spans the rest. A plain table (villa's rate card, no
+                      // cards) is ONE "group" of every row, so the span is
+                      // gated on `rooms` like the skip above it: with the
+                      // skip alone, every row's key cell spanned the whole
+                      // table and each row slid one column right (the user,
+                      // 2026-10-26: "price table is broken when the resort
+                      // is villa").
                       if (k === 0 && rooms && j > 0) return null;
                       if (k === 0) {
                         return (
-                          <td key={k} data-label={header[0] ?? ''} className="key" rowSpan={group.length > 1 ? group.length : undefined}>
+                          <td key={k} data-label={header[0] ?? ''} className="key" rowSpan={rooms && group.length > 1 ? group.length : undefined}>
                             {inline(cell)}
                             {card && card.photos.length > 0 ? (
                               // The name says what the badge says ("2 photos"): WCAG 2.5.3, what you see is what you say.
