@@ -29,6 +29,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { SoundToggle, useAttention, useSound } from './attention';
 import { BrandHeader } from './brand-header';
 import { AccountMenu } from './account-menu';
+import { BuildTag } from './build-tag';
 import { PushControl } from './push-control';
 import { Icon, type IconName } from './icons';
 import { LinkProgress } from './route-progress';
@@ -208,6 +209,10 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
             </div>
           ))}
         </nav>
+        {/* D-148: which build this is, where a staff member looks last and a phone can read it. */}
+        <div className="sidebar-foot">
+          <BuildTag />
+        </div>
       </aside>
       <div className="sidebar-backdrop" aria-hidden="true" onClick={close} />
 

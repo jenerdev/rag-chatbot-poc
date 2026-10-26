@@ -4822,3 +4822,31 @@ left bar, an info icon, the rule in bold ("Children aged 3 and below stay
 free." then "Enter them apart from the guests of each room."), the hint
 muted under it. Both booking types; the rule left villa's muted rate line.
 `plan/free-guests/notice-*.png`.
+
+## D-148 · Every page says which build it is: the commit and the date, never a number bumped by hand · **Added 2026-10-26**
+
+**Decision:** "Build cd1c21a · 2026-10-26" on every page's foot: the public
+footers (the booking page, Manage booking), the chat's fine print, under
+the staff sidebar, beside the platform's name, the landing page's footer.
+The user: "please add version. so i know im accessing the latest version.
+please put it on the best position".
+
+- **The commit, not a number.** A version someone must remember to bump
+  says nothing reliable about what is deployed; the short commit and the
+  build date do, and change on every deploy by themselves. Vercel sets
+  `VERCEL_GIT_COMMIT_SHA`; on a machine `git rev-parse --short HEAD`, and
+  a "+" when the tree has uncommitted changes, so a dev build is never
+  mistaken for the deploy.
+- **Once.** `next.config.mjs` works it out at build time and inlines it as
+  `NEXT_PUBLIC_APP_VERSION`; `lib/version.ts` reads that and nothing
+  else; `components/build-tag.tsx` is the one element. Visible text, never
+  a title alone (D-102), so a phone can read it and a person can quote it.
+- **Where.** The foot of each page, where a person looks last and nothing
+  competes with it: small, muted, tabular digits.
+
+**Measured (2026-10-26):** all eight places read "Build cd1c21a+ ·
+2026-10-26" on the dev server (the "+" because the tree was uncommitted),
+at 1280 and 375 (`plan/version/*.png`); web 243; typecheck 13/13.
+
+**Reverse if:** a release name is wanted on top: the tag can carry it
+beside the commit, from the root package.json, bumped by a release step.

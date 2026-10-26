@@ -19,6 +19,7 @@ import { TenantMark } from '@/components/tenant-mark';
 import { Drawer } from '@/components/dialogs';
 import { Toaster } from '@/components/toast';
 import { AccountMenu } from '@/components/account-menu';
+import { BuildTag } from '@/components/build-tag';
 import { ActivityList } from '@/components/activity-list';
 
 type Auth = 'checking' | 'out' | 'in';
@@ -144,6 +145,7 @@ export function PlatformScreen() {
       {/* Signed out, "Platform" is the page's h1 (the login card's title is an
           h2); signed in, the list and a tenant have their own h1. */}
       {auth === 'in' ? <span className="platform-name">Platform</span> : <h1 className="platform-name">Platform</h1>}
+      <BuildTag />
       {auth === 'in' && (
         <nav className="topbar-crumbs" aria-label="Breadcrumb">
           {selected === null ? (

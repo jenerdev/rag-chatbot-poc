@@ -10058,3 +10058,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Asked:** "\"Children aged 3 and below stay free. Enter them apart from the guests of each room. Do not count children aged 3 and below.\" is not easy to see. can you make it visible".
 - **What:** the two small muted lines became one `.notice.party-notice` above the counts (booking-page.tsx, screens.css): accent tint, left bar, info icon, the rule in bold, the hint muted beneath. The whole-resort page gets the same banner; its muted rate line no longer repeats the rule.
 - **Observed:** alteza at 375 and 1280, villa at 1280 (`plan/free-guests/notice-*.png`); the walk 7/7 with check 3 reading the banner's text; web 243; typecheck clean. Alteza's rule stays at 3.
+
+## 2026-10-26 · The build on every page (D-148)
+
+- **Asked:** "please add version. so i know im accessing the latest version. please put it on the best position".
+- **What:** "Build cd1c21a · 2026-10-26" at the foot of every page: the short commit and the build date, worked out once per build in `next.config.mjs` and inlined (`lib/version.ts`, `components/build-tag.tsx`). A "+" after the commit means the build came from a tree with uncommitted changes. Placed where a person looks last: the public footers, the chat's fine print, under the staff sidebar, beside the platform's name, the landing footer.
+- **Observed:** all eight places read the same tag at 1280 and 375; web 243; typecheck 13/13.
+- **Why the commit and not a number:** a number must be bumped by hand and can be stale; the commit changes with every deploy by itself, and Vercel supplies it.

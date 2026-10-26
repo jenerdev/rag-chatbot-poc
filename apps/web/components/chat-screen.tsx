@@ -31,6 +31,7 @@
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { RoomCard, Source, ToolCallRecord } from '@rag/pipeline';
+import { BuildTag } from '@/components/build-tag';
 import { SourcesPanel } from '@/components/sources-panel';
 import { ReplyText } from '@/components/reply-text';
 import { describeFailure, readEventStream } from '@/lib/chat-stream';
@@ -598,6 +599,7 @@ export function ChatScreen({
             {nav.manage && <Link href={`/t/${slug}/manage`}>Manage booking</Link>}
             <Link href={`/t/${slug}/privacy`}>Privacy</Link>
             <Link href={`/t/${slug}/terms`}>Terms</Link>
+            <BuildTag />
           </nav>
           <div className="composer-side">
             <p className="composer-hint">

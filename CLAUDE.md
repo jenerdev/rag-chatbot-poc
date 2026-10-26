@@ -427,6 +427,15 @@
 >   change villa's bookings config while its DPA is unsigned: the gate
 >   fires on the upsert (R-62).
 >
+> **Every page says which build it is** since 2026-10-26 (D-148): "Build
+> cd1c21a · 2026-10-26", the short commit and the build date, worked out
+> ONCE in `next.config.mjs` (Vercel's `VERCEL_GIT_COMMIT_SHA`, or git on a
+> machine; a "+" marks uncommitted changes) and inlined as
+> `NEXT_PUBLIC_APP_VERSION` (`lib/version.ts`). `components/build-tag.tsx`
+> is the ONE way it is drawn: the public footers, the chat's fine print,
+> under the staff sidebar, beside the platform's name, the landing page's
+> footer. A number bumped by hand was rejected: the commit cannot be stale.
+>
 > **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
 > the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
 > remain. `pnpm eval`, both isolation suites and every harbor walk need
@@ -523,6 +532,7 @@ apps/web/              Next.js 15, App Router
   lib/conversation-words.ts  S-16's filters ↔ the URL, times in the TENANT's zone — pure, tested
   lib/activity-words.ts  D-138: an audit row as a sentence (activityWords), who (actorWords), the filters ↔ the URL, the subject's screen — pure, tested; components/activity-list.tsx is the ONE list (S-18, the platform's tab, the platform's card)
   lib/tables.ts          parseSegments(): the ONE block syntax the chat draws, a pipe table → elements (D-091) — pure, browser-safe
+  lib/version.ts         D-148: APP_VERSION, the build (short commit · date) inlined by next.config.mjs; components/build-tag.tsx draws it
   lib/welcome-text.ts    D-139: DEFAULT_WELCOME_TEXT, the welcome card's line when a tenant set none, and welcomeTextOf(); the bound lib/schemas.ts repeats — pure, browser-safe
   lib/resize-image.ts    canvas resize + WebP before upload; drops EXIF/GPS
   app/styles/            tokens.css (every colour, size, radius; dark mode; colours DERIVED from the five theme keys), base.css, chat.css, screens.css; globals.css imports them (D-101)

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BuildTag } from '@/components/build-tag';
 
 /**
  * The foot of the booking page and Manage booking (plan/public-brand.md):
@@ -13,6 +14,7 @@ export function PublicFooter({ slug, businessName, manage, book = false }: { slu
     <footer className="public-footer">
       <span>
         © {new Date().getFullYear()} {businessName}
+        <BuildTag />
       </span>
       <nav aria-label="More">
         {book && <Link href={`/t/${slug}/book`}>Book a stay</Link>}

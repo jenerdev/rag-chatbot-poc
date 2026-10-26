@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
+import { BuildTag } from "@/components/build-tag";
 
 // The root: a static landing page for the product (plan/landing.md, D-121).
 // What it does and why it helps a resort; no pricing yet.
@@ -258,6 +259,7 @@ export default function Home() {
       <footer className="landing-footer">
         <span>
           © {new Date().getFullYear()} {PRODUCT}
+          <BuildTag />
         </span>
         <span>An AI front desk and booking system for resorts.</span>
         {/* D-129: the platform's own privacy policy and terms. */}
