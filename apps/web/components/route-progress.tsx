@@ -23,9 +23,18 @@ import { useLinkStatus } from 'next/link';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-/** `ring`: the ring at the link's end; off for an icon-only link (the bell), where the bar alone is the sign. */
-export function LinkProgress({ ring = true }: { ring?: boolean } = {}) {
+/**
+ * `ring`: the ring at the link's end; off for an icon-only link (the bell),
+ * where the bar alone is the sign. `onPending`: told when this link's
+ * navigation starts and ends, for the frame that draws the coming page's
+ * bones in place of the old page meanwhile (staff-frame.tsx, D-149). The
+ * hook is still the whole state: this only repeats it upward.
+ */
+export function LinkProgress({ ring = true, onPending }: { ring?: boolean; onPending?: (pending: boolean) => void } = {}) {
   const { pending } = useLinkStatus();
+  useEffect(() => {
+    onPending?.(pending);
+  }, [pending, onPending]);
   // The portal needs the document; on the server and in the first client render there is none to agree on.
   // Its target is the tenant's root, not <body>: the theme's colours are custom properties on
   // `.tenant-root` (tokens.css), and a bar outside it would wear the default accent, not the tenant's.

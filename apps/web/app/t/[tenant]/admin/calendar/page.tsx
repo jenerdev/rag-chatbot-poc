@@ -28,17 +28,18 @@ export default async function TenantCalendarPage({
 }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
   // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
-  if (!(await featureOn(tenant, 'calendar'))) notFound();
-
-  const [branding, nav, config, units, query] = await Promise.all([
+  // Both 404 checks beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [bookings, on, branding, nav, config, units, query] = await Promise.all([
+    hasApplication(tenant, 'bookings'),
+    featureOn(tenant, 'calendar'),
     loadBranding(tenant),
     loadNavFeatures(tenant),
     bookingsConfig(tenant),
     listUnits(tenant).catch(() => []),
     searchParams,
   ]);
+  if (!bookings || !on) notFound();
   const one = (key: string) => (typeof query[key] === 'string' ? (query[key] as string) : null);
   const view = one('view');
   const date = one('date');

@@ -16,9 +16,9 @@ export default async function TenantDashboardPage({ params }: { params: Promise<
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
-  if (!(await featureOn(tenant, 'dashboard'))) notFound();
-
-  const [branding, nav, config] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant), bookingsConfig(tenant).catch(() => null)]);
+  // Checked beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [on, branding, nav, config] = await Promise.all([featureOn(tenant, 'dashboard'), loadBranding(tenant), loadNavFeatures(tenant), bookingsConfig(tenant).catch(() => null)]);
+  if (!on) notFound();
 
   return (
     <DashboardScreen

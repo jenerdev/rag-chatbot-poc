@@ -16,9 +16,9 @@ export default async function TenantUnansweredPage({ params }: { params: Promise
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
-  if (!(await featureOn(tenant, 'unanswered'))) notFound();
-
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // The 404 check beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [on, branding, nav] = await Promise.all([featureOn(tenant, 'unanswered'), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!on) notFound();
 
   return (
     <UnansweredScreen

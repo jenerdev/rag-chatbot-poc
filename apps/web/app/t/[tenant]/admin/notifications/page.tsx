@@ -16,11 +16,10 @@ export const dynamic = 'force-dynamic';
 export default async function TenantNotificationsPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
   // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
-  if (!(await featureOn(tenant, 'notifications'))) notFound();
-
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // Both 404 checks beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [bookings, on, branding, nav] = await Promise.all([hasApplication(tenant, 'bookings'), featureOn(tenant, 'notifications'), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!bookings || !on) notFound();
 
   return <NotificationsScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />;
 }

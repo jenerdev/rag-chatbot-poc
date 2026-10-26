@@ -15,9 +15,10 @@ export const dynamic = 'force-dynamic';
 export default async function TenantHolidaysPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
 
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // The 404 check beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [bookings, branding, nav] = await Promise.all([hasApplication(tenant, 'bookings'), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!bookings) notFound();
 
   return (
     <HolidaysScreen slug={tenant.slug} businessName={branding.businessName} logoUrl={branding.logoUrl} nav={nav} />

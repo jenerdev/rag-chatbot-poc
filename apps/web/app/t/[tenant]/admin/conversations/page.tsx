@@ -23,9 +23,9 @@ export default async function TenantConversationsPage({
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
   // A switched-off feature (D-127) has no page: the same 404 as a page that never existed.
-  if (!(await featureOn(tenant, 'conversations'))) notFound();
-
-  const [branding, nav, query] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant), searchParams]);
+  // The 404 check beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [on, branding, nav, query] = await Promise.all([featureOn(tenant, 'conversations'), loadBranding(tenant), loadNavFeatures(tenant), searchParams]);
+  if (!on) notFound();
 
   return (
     <ConversationsScreen

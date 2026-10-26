@@ -17,9 +17,10 @@ export default async function StayDetailPage({ params }: { params: Promise<{ ten
   const { tenant: slug, reference } = await params;
   const tenant = await getTenant(slug);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
 
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // The 404 check beside the loads, not before them (2026-10-27, bookings/page.tsx).
+  const [bookings, branding, nav] = await Promise.all([hasApplication(tenant, 'bookings'), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!bookings) notFound();
 
   return (
     <StayDetailScreen

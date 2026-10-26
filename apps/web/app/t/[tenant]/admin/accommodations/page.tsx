@@ -23,10 +23,12 @@ export const dynamic = 'force-dynamic';
 export default async function TenantAccommodationsPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
-  if ((await bookingsConfig(tenant))?.bookingType !== 'per_room') notFound();
 
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // Both 404 checks beside the loads, not before them (2026-10-27,
+  // bookings/page.tsx): two serial round trips became none. bookingsConfig()
+  // is null, not a throw, for a tenant without the application.
+  const [bookings, config, branding, nav] = await Promise.all([hasApplication(tenant, 'bookings'), bookingsConfig(tenant), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!bookings || config?.bookingType !== 'per_room') notFound();
 
   return (
     <AccommodationsScreen

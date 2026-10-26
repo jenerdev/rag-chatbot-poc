@@ -17,9 +17,11 @@ export const dynamic = 'force-dynamic';
 export default async function TenantBookingsPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenant((await params).tenant);
   if (!tenant) notFound();
-  if (!(await hasApplication(tenant, 'bookings'))) notFound();
-
-  const [branding, nav] = await Promise.all([loadBranding(tenant), loadNavFeatures(tenant)]);
+  // The 404 check runs BESIDE the loads, not before them (2026-10-27): it is
+  // the same cached question loadNavFeatures() asks, and awaiting it first
+  // was a serial round trip on every staff page. Still nothing renders on a miss.
+  const [bookings, branding, nav] = await Promise.all([hasApplication(tenant, 'bookings'), loadBranding(tenant), loadNavFeatures(tenant)]);
+  if (!bookings) notFound();
 
   return (
     <BookingsScreen

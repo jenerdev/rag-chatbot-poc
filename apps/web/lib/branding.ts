@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import type { CSSProperties } from 'react';
 import { anonClient } from '@rag/db';
 import type { TenantContext } from '@rag/pipeline';
@@ -51,8 +52,16 @@ export { themeVars };
  * Through `tenant_public(slug)`, the same function loadTenant() uses: no token
  * can read `tenants` directly (auth-rls Phase 1), and that function's column
  * list is the whole boundary: only public columns can reach a Client Component's props.
+ *
+ * Memoised per request with React `cache()`, like getTenant() and
+ * loadFeatures(): the tenant layout and the page it wraps both ask for the
+ * branding of the same request, and before this each paid its own
+ * `tenant_public` round trip (2026-10-27: three calls per staff page, one of
+ * them getTenant()'s). cache() compares the argument by identity, and
+ * getTenant() hands every caller the same TenantContext object, so this is
+ * one query per request.
  */
-export async function loadBranding(tenant: TenantContext): Promise<Branding> {
+export const loadBranding = cache(async (tenant: TenantContext): Promise<Branding> => {
   const { data: rows, error } = await anonClient().rpc('tenant_public', { p_slug: tenant.slug });
   const data = rows?.[0];
   if (error || !data) throw new Error(`Could not load branding for "${tenant.slug}": ${error?.message ?? 'no such tenant'}`);
@@ -72,4 +81,4 @@ export async function loadBranding(tenant: TenantContext): Promise<Branding> {
       guestRetentionDays: data.guest_retention_days ?? 1095,
     },
   };
-}
+});

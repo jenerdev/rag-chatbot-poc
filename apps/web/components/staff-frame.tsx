@@ -25,7 +25,7 @@
 // still asks requireAdmin() for its permission.
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { SoundToggle, useAttention, useSound } from './attention';
 import { BrandHeader } from './brand-header';
 import { AccountMenu } from './account-menu';
@@ -33,10 +33,11 @@ import { BuildTag } from './build-tag';
 import { PushControl } from './push-control';
 import { Icon, type IconName } from './icons';
 import { LinkProgress } from './route-progress';
+import { PageBones } from './session-check';
 import { StaffShellSkeleton } from './staff-skeleton';
 import { TenantNav, type SessionState } from './tenant-nav';
 import { Toaster } from './toast';
-import { groupNavItems, groupOf, navItems, type NavFeatures, type NavPage } from '@/lib/nav-items';
+import { groupNavItems, groupOf, navItems, type NavFeatures, type NavItem, type NavPage } from '@/lib/nav-items';
 import type { Role } from '@/lib/permissions';
 import { titleWithCount } from '@/lib/attention';
 
@@ -84,6 +85,17 @@ export interface StaffFrameProps {
 export function StaffFrame({ slug, businessName, logoUrl, features, current, title, session, mainClassName, actions, children }: StaffFrameProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  // The page a clicked link is bringing (D-149). While it is on its way (the
+  // next page's server render, in flight) the content column shows THAT
+  // page's title and the body bones instead of the old page, so a click
+  // answers at once; the sidebar and the top bar stay put. Before, the old
+  // page sat there until the new one arrived, the progress bar (D-145) the
+  // only sign. Not a Next loading boundary: that streams a 200 before a
+  // page can say 404, and a missing feature must still be a 404 (D-127).
+  // The new page mounts its own frame, so this state goes with the old one.
+  // The PAGE key, not the item: the items are rebuilt every render, and a
+  // state set to a fresh object each time would never settle.
+  const [pending, setPending] = useState<NavPage | null>(null);
   // What is new for this member (plan/notifications.md § 8): polled while
   // signed in on a tenant with bookings, the only one with anything to say.
   const sound = useSound();
@@ -161,18 +173,37 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
     );
   }
 
-  const { groups, topItems, publicItems } = groupNavItems(navItems(slug, features, session.role, attention));
+  const items = navItems(slug, features, session.role, attention);
+  const { groups, topItems, publicItems } = groupNavItems(items);
+  const coming = pending ? (items.find((item) => item.page === pending) ?? null) : null;
   const bell = topItems.find((item) => item.page === 'notifications');
-  const section = groupOf(current);
-  const here = groups.flatMap((g) => g.items).find((item) => item.page === current)?.label ?? title;
+  const section = groupOf(coming?.page ?? current);
+  const here = coming?.label ?? groups.flatMap((g) => g.items).find((item) => item.page === current)?.label ?? title;
+  // Set in the link's own click, synchronously: a report from useLinkStatus()
+  // arrives inside the navigation's optimistic render, and a state set from
+  // there did not draw until the page arrived (the walk: the ring and the
+  // bar showed, the bones never did). The hook still CLEARS it, for a
+  // navigation that ends without a new page (cancelled, or back). A plain
+  // left click only: a ctrl- or middle-click opens a tab and moves nothing
+  // here. A link to the page already shown leaves it be.
+  const goingTo = (item: NavItem) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (item.page === current || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    setPending(item.page);
+  };
+  const whenPending = (item: NavItem) => (on: boolean) => {
+    if (!on) setPending((was) => (was === item.page ? null : was));
+  };
   const guestPages = publicItems.map((item) => ({ label: item.page === 'book' ? 'Booking page' : item.page === 'manage' ? 'Manage booking' : 'Chat page', href: item.href, icon: ICON_OF[item.page] }));
   const link = (item: { page: NavPage; label: string; href: string; badge?: number }) => (
     <Link
       key={item.page}
       href={item.href}
       className="sidebar-link"
-      aria-current={item.page === current ? 'page' : undefined}
-      onClick={() => setOpen(false)}
+      aria-current={item.page === (coming?.page ?? current) ? 'page' : undefined}
+      onClick={(event) => {
+        setOpen(false);
+        goingTo(item)(event);
+      }}
     >
       <Icon name={ICON_OF[item.page]} size={18} />
       <span>{item.label}</span>
@@ -184,7 +215,7 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
           <span className="visually-hidden">, {item.badge} unread</span>
         </>
       ) : null}
-      <LinkProgress />
+      <LinkProgress onPending={whenPending(item)} />
     </Link>
   );
 
@@ -239,14 +270,14 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
           </nav>
           <div className="topbar-actions">
             {bell && (
-              <Link href={bell.href} className="button ghost topbar-bell" aria-current={current === 'notifications' ? 'page' : undefined} aria-label={waiting > 0 ? `Notifications, ${waiting} unread` : 'Notifications'}>
+              <Link href={bell.href} className="button ghost topbar-bell" aria-current={current === 'notifications' ? 'page' : undefined} aria-label={waiting > 0 ? `Notifications, ${waiting} unread` : 'Notifications'} onClick={goingTo(bell)}>
                 <Icon name="bell" size={18} />
                 {waiting > 0 && (
                   <span className="nav-badge bell-badge" aria-hidden="true">
                     {waiting > 99 ? '99+' : waiting}
                   </span>
                 )}
-                <LinkProgress ring={false} />
+                <LinkProgress ring={false} onPending={whenPending(bell)} />
               </Link>
             )}
             <AccountMenu
@@ -266,10 +297,20 @@ export function StaffFrame({ slug, businessName, logoUrl, features, current, tit
         </div>
         <main className={mainClassName ? `staff-content ${mainClassName}` : 'staff-content'}>
           <div className="page-head">
-            <h1 className="page-title">{title}</h1>
-            {actions && <div className="page-actions">{actions}</div>}
+            <h1 className="page-title">{coming ? coming.label : title}</h1>
+            {!coming && actions && <div className="page-actions">{actions}</div>}
           </div>
-          {children}
+          {coming ? (
+            // The same bones the coming page shows while it checks the
+            // session (staff-skeleton.tsx), so the hand-off moves nothing.
+            // Hidden and inert, as there: the page that arrives is the
+            // announcement (D-145).
+            <div className="page-pending" aria-hidden="true" inert>
+              <PageBones />
+            </div>
+          ) : (
+            children
+          )}
         </main>
         {/* The page's ONE toast region (components/toast.tsx). Signed out
             there is nothing to report: the login form says its own errors. */}
