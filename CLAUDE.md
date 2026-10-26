@@ -436,6 +436,23 @@
 > under the staff sidebar, beside the platform's name, the landing page's
 > footer. A number bumped by hand was rejected: the commit cannot be stale.
 >
+> **A staff page answers the click before it arrives** since 2026-10-27
+> (D-149): `StaffFrame` holds the page a clicked sidebar link (or the
+> bell) is bringing and draws its title, breadcrumb, current mark and
+> `PageBones` in place of the old page until the new one mounts. Set in the
+> link's CLICK, cleared by `useLinkStatus()` (`LinkProgress`'s `onPending`):
+> a state set from the hook's report never drew mid-navigation. NOT a
+> `loading.tsx`: that streams a 200 before a page can say 404, and a page's
+> 404 is asserted (D-127, two walks). `loadBranding()` is cached per request
+> like `getTenant()`, and every admin page's `hasApplication()` /
+> `featureOn()` runs inside its `Promise.all`, the `notFound()` after it. A
+> new admin page follows that shape. `plan/page-pending-walk.mjs` (5 checks).
+> **The functions run in Singapore, where the database is** (D-150):
+> `preferredRegion = 'sin1'` on the ROOT layout, inherited by every page
+> and route; Vercel's Functions → Region setting must agree. The other
+> tradeoff items (the session as a prop, one SQL read for the frame) are
+> listed in D-149, not done, pending a measurement on the deploy.
+>
 > **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
 > the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
 > remain. `pnpm eval`, both isolation suites and every harbor walk need
@@ -624,6 +641,7 @@ pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
 pnpm --filter @rag/db verify    # 243 checks, no API key needed; sweeps its own system audit rows at the end
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/sources-access-walk.mjs)   # 4 checks of who gets a reply's sources (D-140): guest, staff, admin, owner, and the per-tenant rows; nothing spent; needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/page-pending-walk.mjs)   # 5 checks of the staff frame mid-navigation (D-149): the bones on the click, the page after, a page's 404 still 404; a throwaway villa staff member, swept with its audit rows; needs pnpm dev
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/free-guests-walk.mjs)   # 7 checks of free guests (D-147): the platform shape, both doors, S-15, the list, Manage booking, the tool's note; villa's config set and restored; needs pnpm dev
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/welcome-text-walk.mjs)   # 4 checks of the welcome line (D-139): the platform route, tenant_public(), the card at 375, the audit row; a throwaway tenant and super user; needs pnpm dev
 pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period, and (D-138) audit rows past audit_retention_days; a dry run unless --remove, counted

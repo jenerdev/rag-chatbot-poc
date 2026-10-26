@@ -4850,3 +4850,99 @@ at 1280 and 375 (`plan/version/*.png`); web 243; typecheck 13/13.
 
 **Reverse if:** a release name is wanted on top: the tag can carry it
 beside the commit, from the root package.json, bumped by a release step.
+
+## D-149 · A staff page answers the click before it arrives, and costs fewer round trips to get there · **Added 2026-10-27**
+
+**Decision:** the user: "i feel that app is a bit slow when transitioning
+from pages"; then "implement first those who dont have tradeoffs". Four
+things, none of which changes what a page shows or who may see it.
+
+- **`loadBranding()` is cached per request** (React `cache()`, like
+  `getTenant()` and `loadFeatures()`). The tenant layout and the page it
+  wraps both asked, so every staff page paid `tenant_public` three times
+  (one of them getTenant()'s); now once.
+- **The 404 check runs beside the loads, not before them,** on the 13
+  admin pages that have one: `hasApplication()` / `featureOn()` go into
+  the page's `Promise.all` and the `notFound()` comes after it. They are
+  the same cached questions `loadNavFeatures()` asks, and awaiting them
+  first was one serial round trip per page (two on Rooms). Nothing renders
+  on a miss, as before.
+- **The frame draws the coming page on the click** (`staff-frame.tsx`):
+  the clicked link's label as the title and the breadcrumb, the sidebar's
+  current mark on it, and `PageBones` in place of the old page, while the
+  next page's server render is in flight; the sidebar and the top bar stay
+  put. Set in the link's own click (a plain left click only; a link to the
+  page shown does nothing), cleared by `useLinkStatus()` when a navigation
+  ends without a new page. The new page mounts its own frame, so the state
+  leaves with the old one. The same bones the page then shows while it
+  checks the session (D-145), so the hand-off moves nothing.
+- **`staffClient()` was NOT memoised:** no route asks it twice in one
+  request, so there was nothing to save.
+
+**Not a Next loading boundary.** The first version was
+`app/t/[tenant]/admin/loading.tsx` with the same skeleton. It streams the
+shell at once, which means a page's `notFound()` comes AFTER the status
+line: `/t/villa/admin/accommodations` and `/t/nope/admin/bookings`
+answered **200** with `<meta name="robots" content="noindex">` and the
+not-found page in the stream; with the file moved aside, 404 and 404.
+`plan/features-walk.mjs` (4) and `plan/tenant-management-phase4-walk.mjs`
+(9) assert a page's 404, and D-127 says a switched-off feature IS a 404.
+That is a tradeoff, so it went. The client-side version keeps every status.
+
+**Trap, measured:** the bones were first set from `LinkProgress`'s
+`useLinkStatus()` report in an effect. The ring and the bar drew, the bones
+never did: a 4-second timeline after the click read ring+bar at 64 ms, no
+`.page-pending` in 20 samples, the new page at 1067 ms. A state set from
+inside the navigation's optimistic render does not draw until the
+transition lands. Set in the click handler itself, it drew in 14 ms.
+
+**Measured (2026-10-27, `plan/page-pending-walk.mjs`, villa, a throwaway
+staff member, headless Chrome at 1280, the dev server):** 5/5 twice. On the
+click, title "Bookings", breadcrumb "Front desk › Bookings", the sidebar's
+current mark on Bookings, `.page-pending .page-bones` present, the sidebar
+present, no `.staff-skeleton`: after **14 ms** and **18 ms**; the real
+page (no bones, URL moved) after 1483 ms and 1245 ms. Back to Dashboard:
+the bones again, no search field or page action left under them. Rooms on
+villa and an unknown tenant: HTTP **404 · 404**. Dashboard and Bookings
+200. Web tests 243, typecheck clean. The round trips saved are by
+construction (one `cache()` and one `Promise.all` per page), not timed:
+the dev server's numbers are dominated by compilation.
+
+**Left on the table, each a tradeoff (the user's call):** pinning the
+function region to the database's (no `preferredRegion` is set, so every
+hop above crosses from Vercel's default region); the session passed from
+the server page instead of fetched after mount (one HTTP hop and three
+database hops per page, at the cost of the page repeating the route's
+check); one SQL function for applications, features and role rows.
+
+**Reverse if:** Next lets a loading boundary carry a page's own status
+code; then `loading.tsx` replaces the frame's state, and the walk's check
+4 is what proves it safe.
+
+## D-150 · The server code runs where the database is: `preferredRegion = 'sin1'` · **Added 2026-10-27**
+
+**Decision:** one export in `apps/web/app/layout.tsx`, the root: Vercel
+runs every page and route handler of this app in Singapore, the Supabase
+project's region (the user: "supabase region is in singapore"). Vercel's
+default is US East, which put the Pacific in every hop of the chain a
+staff page makes (D-149 counts them), and in the chat's too.
+
+- **Once, at the root.** Next's `reduceAppConfig()` merges each route's
+  segment configs down the tree (`next/dist/build/utils.js`), so a value on
+  the root layout is every segment's unless one overrides it. None does.
+- **The dashboard knob is the same decision by hand:** Vercel → Project →
+  Settings → Functions → Function Region. The deploy's Functions tab
+  shows each function's region; the first deploy after this is where the
+  line is checked, because nothing here can reach Vercel.
+- **The cost, named:** a visitor far from Singapore reaches the server
+  from further away, once per request, against a dozen hops that each got
+  shorter. For a Philippine resort's guests and staff there is no cost.
+
+**Measured:** typecheck clean. Not measurable on a machine: the deploy
+measures it (the Network tab's RSC request on a staff page change, before
+and after). From Manila, three probes of the Supabase REST host took 107,
+160 and 188 ms end to end, which is the floor the pinned function's hops
+should approach, not the US East round trip.
+
+**Reverse if:** the database moves (set this to its new region), or the
+tenants' staff spread across continents (then the database is what moves).
