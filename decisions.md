@@ -4714,3 +4714,111 @@ platform form takes an icon image and this route serves it, resized,
 unchanged otherwise.
 
 **Amended 2026-10-21 (the user: "on header account dropdown, chat, booking and manage booking page should be open a new tab"):** the staff account menu's three guest-page links open in a NEW tab (`target="_blank"`, `rel="noopener"`, a hidden "(opens in a new tab)"): staff look at a guest page beside their work, not instead of it. The other places that name the guest pages (the public pages' own headers and footers, the staff login header) still open in the same tab, as a guest would expect.
+
+## D-147 · Children up to a tenant's age stay free, counted apart from the guests; the price never sees them · **Added 2026-10-26**
+
+**Decision:** a tenant's rule "children aged N and below are free" is ONE
+number, `free_up_to_age` in the bookings config (0–17, absent = nobody is
+free), set by a super user on the platform form's Bookings tab beside max
+stay and the horizon (D-078). Every booking row carries a SECOND count,
+`free_guests` (0–50, default 0), written at birth by every door. The user:
+"we need to handle also guest who are free depending on age … for resort
+A. 3 years old and below are free. then resort B is 5 years old and
+below … configurable on platform if thats the best location"; then "no,
+platform is fine, go ahead" (no: a free child does not count toward the
+maximum).
+
+- **The price is untouched.** `unit_quote()` is still called with
+  `guest_count`, the PAYING count, by the trigger, both quotes and the
+  tool (extra-guests Rule 1, D-074, D-097). A free child is simply not in
+  that count. So no SQL, TypeScript or tool text gained an age test, and
+  the quote with 1 free child equals the quote without, measured.
+- **No age is stored** (D-129): the row says how many stay free, never
+  who or how old.
+- **Not the capacity either:** `bookings_compute_during`'s capacity test
+  reads `guest_count` alone, unchanged; "up to 4 guests" means paying
+  guests. One comparison would make it a head count if a resort needs it.
+- **Where it lives:** the platform, because the other two limits do
+  (D-078) and it is one number set once. The owner-side alternative
+  would be a new "Booking rules" screen for a single field. The Guest
+  hint stays for anything else the resort wants to say.
+- **The doors:** `request_booking()` gained `p_free int[] default null`
+  (one count per unit; null = every unit 0) and returns `free`; the
+  11-parameter signature is DROPPED (as promos dropped the 10), because
+  with both a call that omits `p_free` would match both; the consent
+  wrapper (D-129) gained the same parameter and passes it through. The
+  staff stay writes `free_guests`; `createBookings()` (the tools) leaves
+  the default. `guest_stay()` adds `free` on each room line.
+- **The words, once, twice:** `freeGuestsWords()` ("Children aged 3 and
+  below stay free."; at 0 "Infants under 1 stay free.") and
+  `partyWords()` ("4 guests + 1 child (free)") in `@rag/bookings`
+  (validate.ts) for the tool and the server, and the same two in
+  `apps/web/lib/party-words.ts` for the four Client Components, which
+  cannot import the server-only package; both test files pin the same
+  strings, so the wording cannot drift (the money.ts precedent).
+- **The screens:** the booking page and the staff form ask a second field
+  per room when the tenant has a rule ("Children aged 3 and below",
+  0–50, empty = 0), and nothing when it has none; the review, the receipt,
+  the staff list row, S-15's head and Manage booking's room lines print the
+  party as `partyWords()`.
+- **The chatbot:** the tool's definitions and the prompt are UNCHANGED
+  (villa's byte-identical to `villa-tools-post-villa-prices.txt`). The rule
+  reaches the model in the RESULT only, and only when the tenant has one
+  (`freeNote()`, the D-080 pattern beside `closedNote()`): the rule and
+  what `guests` means under it (the paying count). D-085's extra-guest
+  terms add the same sentence. No regex grew for ages (R-62).
+- **Guards (trap 20):** four older definitions are wrapped in a guard on
+  the column `bookings.free_guests`: `request_booking` in
+  schema-room-counts (step 7), the wrapper in schema-legal (with its
+  grants), `tenant_applications_validate` in schema-roles, `guest_stay`
+  in schema-stay-outcome. Each guard was run alone in a rolled-back
+  transaction: it skips, and the signatures stay as the 45th file made them.
+
+**Measured (2026-10-26):** `schema-free-guests.sql` applied over
+DATABASE_URL (17 rows, all 0); one `request_booking` (12 parameters), one
+wrapper (13); verify **243/243** (89b: `p_free [3]` stored and returned,
+priced 1650000 like the plain request; 51 and `[1, 1]` are 22023 with
+nothing saved; 103: 18, 3.5 and "3" refused, 3 and 0 accepted); rooms
+**57/57** (24b: the quote with 2 free equals the quote without, 3300000;
+stored 32+2 at the same price; listed and read back by the guest as 2; 51
+refused in words); bookings 137, rag 376, web 243 (party-words 2, the tool
+note 1); typecheck 13/13; `plan/free-guests-walk.mjs` **7/7** twice (the
+platform's 18 → 400 "config.free_up_to_age is a whole number of years from
+0 to 17"; S-15 "Whole property · 4 guests + 1 child (free) · Overnight";
+Manage booking `{"guests":2,"free":2}`; the tool's note present with the
+rule and absent after the restore). The bookings isolation suite and
+`pnpm eval` cannot run (northwind and harbor deleted, 2026-10-20).
+
+**Reverse if:** a resort's maximum is a head count: then Rule 5's one
+comparison becomes `guest_count + free_guests`, in the trigger and the
+two quotes' pre-checks, and the tool's `capacity` row needs the same
+words. Or if a tenant wants the rule on its own screen: the config key
+and every reader stay; only the form that writes it moves.
+
+**Amended 2026-10-26 (the user: "please improve the layout of number of
+guest inputs, including the children/free guest", then "the layout for
+guest input was good for tenant villa. but not for alteza … make Room #,
+Guest, Children input in one line if possible"):** the party inputs are
+`components/count-field.tsx`. A **CountField** is a small label OVER a
+compact number input, so "Guests" and "Children aged 3 and below" read the
+same way (before, one was a placeholder inside its box and the other a
+label beside it). A **PartyRow** holds one room's counts on ONE line,
+under the room's text, the card wrapping (`.room-pick { flex-wrap }`,
+`.room-pick-controls` a full-width row under a hairline): "Rooms (of 2) ·
+Guests · Children" when one room of a type is wanted; with several, the
+Rooms count on its own line and then "ROOM 1 · Guests · Children", "ROOM 2
+· …", the name inline. Before, the controls floated to the right of the
+description and squeezed it to a column. Three fields fit across a phone
+(`flex: 1 1 84px`). The staff form draws the same component, its party
+on its own row under the date (`.party-field`). Photographed on villa and
+alteza at 1280 and 375 (`plan/free-guests/party-*.png`); the walk 7/7
+again; web 243, typecheck 13/13.
+
+**Amended 2026-10-26 (the user: the rule and the hint "is not easy to see.
+can you make it visible"):** on the booking page the rule and the resort's
+own Guest hint are ONE standing notice above the counts, `.notice.party-notice`
+(D-102: a standing fact is a banner, not a muted line): the accent tint and
+left bar, an info icon, the rule in bold ("Children aged 3 and below stay
+free." then "Enter them apart from the guests of each room."), the hint
+muted under it. Both booking types; the rule left villa's muted rate line.
+`plan/free-guests/notice-*.png`.

@@ -122,6 +122,13 @@ create trigger stays_consent before insert on public.stays
 --    again). SECURITY DEFINER for the same reason as request_booking(); it
 --    checks the token's tenant itself and then calls that function, which
 --    checks everything else again.
+-- GUARDED (D-147, 2026-10-26): schema-free-guests.sql replaces this with p_free (and drops this signature).
+-- Once that file has run, re-running THIS file must not put a body with no
+-- free count back, so the definition is skipped (CLAUDE.md trap 20).
+do $guard$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'free_guests') then
+    execute $ddl$
 create or replace function public.request_booking_with_consent (
   p_tenant_id       bigint,
   p_slot_id         bigint,
@@ -170,8 +177,12 @@ begin
                                          p_name, p_phone, p_email, p_notes, p_promo_code);
 end;
 $$;
-revoke all on function public.request_booking_with_consent(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, text) from public, anon;
-grant execute on function public.request_booking_with_consent(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, text) to authenticated, service_role;
+$ddl$;
+    execute $ddl$ revoke all on function public.request_booking_with_consent(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, text) from public, anon $ddl$;
+    execute $ddl$ grant execute on function public.request_booking_with_consent(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, text) to authenticated, service_role $ddl$;
+  end if;
+end
+$guard$;
 
 -- 4. The DPA gate (D-130): the bookings application holds guests' personal
 --    data, so it cannot be switched on before the resort and the platform

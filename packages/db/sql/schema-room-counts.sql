@@ -383,6 +383,13 @@ grant execute on function public.check_room_availability(bigint, date, date, tex
 --    check counts the free rooms of each type against how many this
 --    request wants. Same signature, so its grants and its wrapper
 --    (request_booking_with_consent, schema-legal.sql) are unchanged.
+-- GUARDED (D-147, 2026-10-26): schema-free-guests.sql replaces this with p_free (and drops this signature).
+-- Once that file has run, re-running THIS file must not put a body with no
+-- free count back, so the definition is skipped (CLAUDE.md trap 20).
+do $guard$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'free_guests') then
+    execute $ddl$
 create or replace function public.request_booking (
   p_tenant_id  bigint,
   p_slot_id    bigint,
@@ -617,6 +624,10 @@ begin
     order by b.booked_date, un.sort_order, un.name;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 
 -- 8. stay_taken(), from schema-stay-outcome.sql: a pending stay cannot go
 --    ahead when, on some night, it needs more rooms of a type than other

@@ -26,6 +26,7 @@ import {
   checkPricedAvailability,
   checkRoomAvailability,
   bookingPage,
+  freeGuestsWords,
   hasBookingPage,
   lastBookingDate,
   listRooms,
@@ -324,6 +325,9 @@ export async function extraGuestLines(tenant: TenantContext): Promise<string[]> 
     'does not depend on the date, so do not ask for one. The terms, from the',
     'database:',
     ...terms,
+    // D-147: the free-guest rule, when the tenant has one; the terms above
+    // count paying guests, and this says who is not one.
+    ...(page.freeUpToAge === null ? [] : [`${freeGuestsWords(page.freeUpToAge)} They are not counted as guests.`]),
     // plan/tables.md Phase 3: the same terms as a table the model copies.
     // Rows are written in code (tables.ts), figures as above; "none" where
     // a room takes no extra guest.
@@ -375,6 +379,26 @@ function spokenDate(date: string): string {
  * lesson). Before this, "Is 10 December 2027 available?" was "Yes, open",
  * with prices, on both tenants, and the booking page refused that date.
  */
+/**
+ * D-147: a tenant's free-guest rule, said in the RESULT and only when the
+ * tenant has one, like closedNote(): the tool's text and the prompt are
+ * unchanged, so the three baselines hold. The model is told what `guests`
+ * means under the rule, the paying count, which is what it should pass.
+ * The words are the package's ONE wording (freeGuestsWords).
+ */
+function freeNote(config: BookingsConfig): { free_guests?: { rule: string; meaning: string } } {
+  const rule = freeGuestsWords(config.freeUpToAge);
+  if (rule === null) return {};
+  return {
+    free_guests: {
+      rule,
+      meaning:
+        'Children up to that age are not charged and are not counted in guests. If the user mentions such children, ' +
+        'count only the others as guests, and say that the children stay free.',
+    },
+  };
+}
+
 function horizonNote(dates: string[], lastDate: string): { not_yet_bookable?: { dates: string[]; meaning: string } } {
   if (dates.length === 0) return {};
   return {
@@ -605,6 +629,7 @@ export async function executeTool(tenant: TenantContext, call: ToolCall): Promis
         return done({
           ...closedNote(rooms),
           ...horizonNote(tooFar, lastDate),
+          ...freeNote(config),
           slots: rooms.map((r) => r.date > lastDate ? { date: r.date, unit: r.unit, slot: r.slot, status: 'not yet bookable' } : ({
             date: r.date,
             unit: r.unit,

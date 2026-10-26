@@ -392,6 +392,41 @@
 > evidence stays for everyone (rule 7). `plan/sources-access-walk.mjs` (4
 > checks). The pipeline is untouched.
 >
+> **Children up to a tenant's age stay free, counted apart,** since
+> 2026-10-26 (D-147, [`plan/free-guests.md`](./plan/free-guests.md),
+> Phases 0–6, all done, walk included).
+> - ONE number per tenant, `free_up_to_age` in the bookings config (0–17,
+>   checked by `tenant_applications_validate()`; absent = nobody is free),
+>   set by a super user on the platform form's Bookings tab beside max stay
+>   and the horizon (D-078).
+> - A SECOND count on every booking row, `bookings.free_guests`
+>   (`sql/schema-free-guests.sql`, the 45th file; 0–50, default 0), written
+>   at birth by every door: `request_booking()` gained `p_free int[]` (the
+>   11-parameter signature is dropped, the consent wrapper passes it
+>   through), the staff stay writes it, the tools' seeder leaves 0.
+> - **The price never reads it.** `unit_quote()` is still called with
+>   `guest_count`, the PAYING count. A free child does not count toward a
+>   unit's capacity (the user's choice). No age is ever stored.
+> - The words are ONE function twice: `freeGuestsWords()` / `partyWords()`
+>   in `@rag/bookings` (the tool, the server) and `apps/web/lib/party-words.ts`
+>   (the four Client Components); both test files pin the same strings.
+>   Every screen prints "4 guests + 1 child (free)".
+> - The chatbot's tool TEXT and the prompt are unchanged (villa's
+>   definitions byte-identical): the rule is in the RESULT only, and only
+>   when the tenant has one (`freeNote()`, beside `closedNote()`), and in
+>   D-085's extra-guest terms.
+> - Four older definitions are GUARDED on the column (trap 20):
+>   `request_booking` in schema-room-counts, the wrapper in schema-legal,
+>   the validator in schema-roles, `guest_stay` in schema-stay-outcome.
+> - The party inputs are `count-field.tsx` (D-147 amended): a CountField
+>   is a small label OVER a compact number input, a PartyRow holds one
+>   room's counts on ONE line, "Rooms (of 2) · Guests · Children aged 3 and
+>   below", or "ROOM 2 · Guests · Children" when a type is booked twice,
+>   under the room's text; the booking page and the staff form draw the same.
+> - `plan/free-guests-walk.mjs` (7 checks). The platform route cannot
+>   change villa's bookings config while its DPA is unsigned: the gate
+>   fires on the upsert (R-62).
+>
 > **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
 > the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
 > remain. `pnpm eval`, both isolation suites and every harbor walk need
@@ -482,6 +517,7 @@ apps/web/              Next.js 15, App Router
   lib/env.ts             fail-fast config (D-023)
   lib/limits.ts          MAX_CONTENT_LENGTH — importable by the browser
   lib/voice.ts, lib/speakable.ts  D-134: the voice limits and sniffAudio(); a reply made sayable, shared by the speak route and the browser's fallback voice — pure, tested
+  components/count-field.tsx  D-147 amended: CountField (a label over a compact number input) and PartyRow (a room's counts on one line), the booking page's and the staff form's party inputs; .party-row / .count-field in screens.css
   components/voice.tsx   D-134: useVoice() (record, transcribe, read aloud, the on-device fallback, Escape), the mic, the status line, "Read replies aloud"
   lib/money.ts           centavos ↔ pesos, by string, never × 100 — browser-safe
   lib/conversation-words.ts  S-16's filters ↔ the URL, times in the TENANT's zone — pure, tested
@@ -504,11 +540,11 @@ apps/web/              Next.js 15, App Router
 packages/
   chunker/             @rag/chunker — pure, isomorphic, ZERO dependencies
   openai/              @rag/openai — embed, chat, chatStream over raw fetch; tool calls in, never run
-  db/                  @rag/db — tenant-token clients, the types, sql/ (44 files; the 44th, schema-welcome-text.sql (the welcome line per tenant, D-139); the 43rd, schema-audit-log.sql (D-138); the 42nd, schema-rate-limit.sql (rate_windows and rate_allow(), the shared per-IP count, D-137); the 41st, schema-voice.sql (the voice switch, off with no row, D-134); the 37th–40th, schema-room-inventory.sql, schema-room-counts.sql, schema-room-move.sql and schema-room-views.sql (room types, D-133); the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
+  db/                  @rag/db — tenant-token clients, the types, sql/ (45 files; the 45th, schema-free-guests.sql (children up to a tenant's age stay free, counted apart, D-147); the 44th, schema-welcome-text.sql (the welcome line per tenant, D-139); the 43rd, schema-audit-log.sql (D-138); the 42nd, schema-rate-limit.sql (rate_windows and rate_allow(), the shared per-IP count, D-137); the 41st, schema-voice.sql (the voice switch, off with no row, D-134); the 37th–40th, schema-room-inventory.sql, schema-room-counts.sql, schema-room-move.sql and schema-room-views.sql (room types, D-133); the 36th, schema-stay-notes.sql (staff notes on a stay, D-132); the 35th, schema-legal.sql (consent, the DPA gate, retention, D-129–D-131); the 34th, schema-role-permissions.sql (role permissions per tenant, the platform's knowledge base, D-128); the 33rd, schema-features.sql (feature flags, D-127); the 31st and 32nd, schema-brand-images.sql (the brand-images bucket, super users only, D-123) and schema-assistant-avatar.sql (D-124); the 29th and 30th, schema-notifications.sql and schema-notification-reads.sql, D-116; the 28th, schema-conversations.sql, D-115; the 27th, schema-staff-terms.sql, D-113; the 26th, schema-walk-in.sql, D-111; the 25th, schema-stay-outcome.sql, D-110; the 22nd, schema-calendar.sql, D-103; the 23rd, schema-manage-booking.sql, D-104–D-109; the 24th, schema-holds.sql, D-106; the 16th, schema-pending-default.sql, D-095; the 17th, schema-decision-note.sql, D-096; the 18th, schema-promos.sql, D-097; the 19th, schema-dashboard.sql, D-098; the 20th, schema-taken-span.sql, D-099; the 21st, schema-staff-requests.sql, D-100), and server-only
     src/tenant-client.ts mintTenantToken and mintPlatformToken (ES256, D-039, D-076), one signer, scopedClient, anonClient
     src/service.ts       @rag/db/service: the RLS-BYPASSING client, for tools/ only (one exception: admin-auth.ts until auth-rls Phase 6)
     src/staff-auth.ts    signInStaff, staffClient (membership → { db, role }), platformClient (platform_admins → the platform token), password reset (Supabase Auth, D-040)
-    tools/verify.mjs     242 checks (102c the welcome line: set by the platform, read by anon, '' and 201 characters refused, null clears, D-139; 230–241 the audit log: the trigger's rows, no token writes, RLS alone, activity_list() refuses, a grant, a super row, audit_note()'s refusals, a definer's write, no stay row, the keyset, retention, D-138; 225–229 the shared rate limit: ten in and the eleventh out with one row at 11, wall 2, no token reads the table, the sweep, keys apart, D-137; 196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
+    tools/verify.mjs     243 checks (89b p_free on request_booking() and 103's free_up_to_age shape, D-147; 102c the welcome line: set by the platform, read by anon, '' and 201 characters refused, null clears, D-139; 230–241 the audit log: the trigger's rows, no token writes, RLS alone, activity_list() refuses, a grant, a super row, audit_note()'s refusals, a definer's write, no stay row, the keyset, retention, D-138; 225–229 the shared rate limit: ten in and the eleventh out with one row at 11, wall 2, no token reads the table, the sweep, keys apart, D-137; 196b voice off with no row, D-134; 212–223 room types: the backfill, RLS on unit_rooms, the per-room constraint, one room per stay, retire and delete, whole-resort keeps one, the counts, a type twice, staff pending, Confirm re-picks, the calendar and dashboard counting rooms, D-133; 16, 26 and 99 no longer need northwind; 207–211 staff notes on a stay: authorship, the walls, delete your own, a role override, retention, D-132; 202–206 the legal groundwork: consent recorded, the DPA gate, removing guest details, old chats, the public privacy columns, D-129–D-131; 197–201 role permissions per tenant: a row refuses the owner, a grant lets staff in, an impossible grant does nothing, only the platform sets them, the platform's documents, D-128; 192–196 feature flags: only a super user writes one, each tenant reads its own, the triggers refuse with the feature off, D-127; 188–191 the brand-images bucket and the assistant avatar, D-123–D-124; 173–187 notifications: devices, the outbox trigger, claim and done, the feed and read marks, D-116; 168–172 conversation_list(), D-115; 165–167 staff stay terms, D-113; 159–161 a stay that cannot go ahead: taken, declined, expired, D-110; 125–158 manage booking: stays, the event log, guest_stay, payments, review, holds, change requests; 119–124 the calendar; 117–118 the dashboard functions; 111–116 promos; 77–92 customer booking; 95–108 roles, the platform token, archive, the shapes, the lookups; 102b suggested questions), no API key
     tools/super.mjs      super:add / remove / list — who runs the platform; the bootstrap, on service_role
     tools/tenant.mjs     tenant:add, tenant:fallback, tenant:booking-type, tenant:archive, tenant:remove (the only hard delete; D-077) — the platform form does the first two and archive too
     tools/member.mjs     member:add [role] / role / remove / list / operator — who may administer a tenant, and as what (owners do this on the Members screen)
@@ -534,7 +570,7 @@ packages/
     src/notify.ts          D-116: the drain (notify_claim → sendPush → notify_done) and pushMessage(), the ONE wording of a notification
     src/notifications.ts   D-116 § 8: the member's feed and read marks (notification_feed, notification_read)
     src/push-devices.ts    D-116: this member's devices: one, or all (R-51)
-    tools/rooms.mjs        56 checks of rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b), references on staff stays (4f, 4g), moving a stay between rooms (38–41) and a type's rooms on S-5 and the staff form (42, 43)
+    tools/rooms.mjs        57 checks of rooms, groups, quotes, extra guests, free guests (24b, D-147), photos, stays, holidays, rate kinds, requests, closed dates, slots, decisions, promos, the taken-span trigger (4d, 4e, 26b), references on staff stays (4f, 4g), moving a stay between rooms (38–41) and a type's rooms on S-5 and the staff form (42, 43)
     tools/storage-orphans.mjs  objects in the photo bucket with no row (R-30); dry run, `-- --remove` deletes, counted
     tools/photo-cache.mjs  every existing room photo on the one-year Cache-Control new uploads carry (D-141); dry run, `-- --apply` rewrites and reads the header back past the CDN
   rag/                 @rag/pipeline — ingest, retrieve, prompt, answer, tenant, applications, tools
@@ -576,8 +612,9 @@ scripts/check-service-imports.mjs  run by `pnpm typecheck`: fails on @rag/db/ser
 ```sh
 pnpm dev                        # http://localhost:3000
 pnpm build · typecheck · test   # typecheck runs the service-import check first
-pnpm --filter @rag/db verify    # 242 checks, no API key needed; sweeps its own system audit rows at the end
+pnpm --filter @rag/db verify    # 243 checks, no API key needed; sweeps its own system audit rows at the end
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/sources-access-walk.mjs)   # 4 checks of who gets a reply's sources (D-140): guest, staff, admin, owner, and the per-tenant rows; nothing spent; needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/free-guests-walk.mjs)   # 7 checks of free guests (D-147): the platform shape, both doors, S-15, the list, Manage booking, the tool's note; villa's config set and restored; needs pnpm dev
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/welcome-text-walk.mjs)   # 4 checks of the welcome line (D-139): the platform route, tenant_public(), the card at 375, the audit row; a throwaway tenant and super user; needs pnpm dev
 pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period, and (D-138) audit rows past audit_retention_days; a dry run unless --remove, counted
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/audit-log-walk.mjs)   # 12 checks of S-18 and the platform's log on villa, HTTP and browser, shots in plan/audit-log/walk/; audit-log-a11y.mjs is axe over 16 states; needs pnpm dev
@@ -588,7 +625,7 @@ pnpm --filter @rag/pipeline isolation -- --filters-only   # 22 of them, code fil
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/dashboard-phase4-walk.mjs)   # the dashboard route by role over HTTP, needs pnpm dev
 pnpm --filter @rag/bookings isolation   # 42 cross-tenant booking checks, on operator staff tokens, no API key
 pnpm --filter @rag/bookings isolation -- --filters-only   # the same 40, code filters alone
-pnpm --filter @rag/bookings rooms       # 56 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
+pnpm --filter @rag/bookings rooms       # 57 checks: rooms, groups, quotes, extra guests, photos, stays, holidays, rate kinds, requests, promos, closed dates, slots, the taken-span trigger, staff references; no API key
 pnpm --filter @rag/bookings storage-orphans [-- --remove]   # photo AND proof objects with no row (R-30): list, or delete and count
 pnpm --filter @rag/bookings storage-orphans -- --expired     # proof files 180 days after the stay: delete, keep the payment row (D-107)
 pnpm --filter @rag/bookings photo-cache [-- --apply]     # D-141: every room photo on a one-year Cache-Control; count, or rewrite the same bytes with the header and read it back

@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { BookingInputError } from './errors.js';
-import { daysBetween, isIsoDate, localDate, optionalText, requireText, validateRange } from './validate.js';
+import { daysBetween, freeGuestsWords, isIsoDate, localDate, optionalText, parseConfig, partyWords, requireText, validateRange } from './validate.js';
 
 describe('isIsoDate', () => {
   it.each(['2026-10-01', '2028-02-29', '2026-12-31'])('accepts %s', (d) => {
@@ -116,5 +116,33 @@ describe('requireText / optionalText', () => {
     expect(optionalText('   ', 'Notes', 10)).toBeNull();
     expect(optionalText(undefined, 'Notes', 10)).toBeNull();
     expect(optionalText(' hi ', 'Notes', 10)).toBe('hi');
+  });
+});
+
+// D-147 (plan/free-guests.md): the config's free age and the ONE wording.
+describe('parseConfig: free_up_to_age (D-147)', () => {
+  const base = { timezone: 'Asia/Manila' };
+  it('absent is null; a whole number from 0 to 17 is kept; anything else is refused', () => {
+    expect(parseConfig(base, 't').freeUpToAge).toBeNull();
+    expect(parseConfig({ ...base, free_up_to_age: 3 }, 't').freeUpToAge).toBe(3);
+    expect(parseConfig({ ...base, free_up_to_age: 0 }, 't').freeUpToAge).toBe(0);
+    expect(parseConfig({ ...base, free_up_to_age: 17 }, 't').freeUpToAge).toBe(17);
+    for (const bad of [18, -1, 2.5, '3', true]) {
+      expect(() => parseConfig({ ...base, free_up_to_age: bad }, 't')).toThrow(/free_up_to_age/);
+    }
+  });
+});
+
+describe('freeGuestsWords / partyWords (D-147)', () => {
+  it('says the rule once, in one way', () => {
+    expect(freeGuestsWords(null)).toBeNull();
+    expect(freeGuestsWords(3)).toBe('Children aged 3 and below stay free.');
+    expect(freeGuestsWords(0)).toBe('Infants under 1 stay free.');
+  });
+  it('prints the party the same everywhere', () => {
+    expect(partyWords(4, 0)).toBe('4 guests');
+    expect(partyWords(1, 0)).toBe('1 guest');
+    expect(partyWords(4, 1)).toBe('4 guests + 1 child (free)');
+    expect(partyWords(2, 2)).toBe('2 guests + 2 children (free)');
   });
 });

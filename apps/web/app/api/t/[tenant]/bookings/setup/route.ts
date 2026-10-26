@@ -38,6 +38,8 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
     // its inputs carry the same limits the server checks (D-078).
     maxNights: config.maxStayNights,
     lastDate: lastBookingDate(localDate(config.timezone), config.maxAdvanceDays),
+    // D-147: the tenant's free-guest rule; null = the form asks one count.
+    freeUpToAge: config.freeUpToAge,
     units,
     slots,
     promos,

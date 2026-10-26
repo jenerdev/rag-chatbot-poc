@@ -985,6 +985,28 @@ test tenants are rebuilt from `fixtures/`, the `leak-*` cases, the only
 test that one tenant's facts cannot be answered as another's, cannot run.
 Deploying without them is deploying R-11 untested.
 
+## R-62 · "3 guests" in the chat may include a free child, and villa's config cannot be edited on the platform while its DPA is unsigned · **Found 2026-10-26; two small ones, recorded, not fixed**
+
+- **The chat's party size.** `dates.ts`'s `guestCount()` turns "for 3
+  guests" into `guests: 3`. Under D-147 a visitor who says "2 adults and
+  a toddler" is parsed as 2, which is right; "3 guests" with a toddler
+  among them is parsed as 3, which can add one extra-guest fee to the
+  QUOTE the chat shows. The chat does not book (D-069): the page's two
+  fields are what count, and the tool's result note tells the model the
+  rule so it can say so. No regex grew for ages on purpose (trap 10: a
+  tools-block sentence can cost a documents answer; the battery cannot
+  run to measure one until the test tenants are rebuilt).
+- **The DPA gate fires on the upsert.** `setApplication()` upserts
+  `tenant_applications`, and `tenant_applications_dpa` (D-130) refuses a
+  tenant without `dpa_signed_on` on INSERT, which an upsert of an
+  existing row still fires. So a super user cannot change villa's
+  bookings config at all (max stay, the horizon, the new free age) until
+  villa's DPA date is recorded on the Legal tab. The walk met it
+  ("Record the signed data processing agreement first") and tests the
+  platform route on a throwaway tenant with a signed DPA instead. The
+  fix, when wanted: an UPDATE path in `setApplication()` for a row that
+  exists, or the trigger skipping `on conflict` updates.
+
 ---
 
 ## Explicitly still missing after tenancy

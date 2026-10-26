@@ -31,7 +31,7 @@ import { addDays, localDate, optionalPositiveInt, parseRequest, type ParsedReque
 /** What the staff form sends: the booking page's fields, a picked promo, and Walk in. */
 export interface NewStaffStay {
   slotId?: unknown;
-  /** `[{ unitId, guests }]`; a whole-resort tenant sends one */
+  /** `[{ unitId, guests, free? }]`; a whole-resort tenant sends one; `free` (D-147) the children who stay free */
   rooms?: unknown;
   checkIn?: unknown;
   nights?: unknown;
@@ -101,9 +101,9 @@ export async function quoteStaffStay(tenant: BookingTenant, input: NewStaffStay)
 }
 
 /** Every unit × night of a checked stay, night by night: the order the quote priced them in. */
-function stayRows(request: ParsedRequest): { date: string; unitId: number; guests: number }[] {
+function stayRows(request: ParsedRequest): { date: string; unitId: number; guests: number; free: number }[] {
   return Array.from({ length: request.nights }, (_, n) => addDays(request.checkIn, n)).flatMap((date) =>
-    request.rooms.map((r) => ({ date, unitId: r.unitId, guests: r.guests })),
+    request.rooms.map((r) => ({ date, unitId: r.unitId, guests: r.guests, free: r.free })),
   );
 }
 
@@ -151,6 +151,8 @@ export async function createStaffStay(tenant: BookingTenant, input: NewStaffStay
         guest_phone: request.phone,
         guest_email: request.email,
         guest_count: row.guests,
+        // D-147: counted apart; the trigger prices guest_count alone.
+        free_guests: row.free,
         notes: request.notes,
         group_id: groupId,
         promo_id: promoId,

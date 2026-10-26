@@ -698,6 +698,8 @@ export interface Database {
           guest_name: string;
           guest_phone: string | null;
           guest_count: number | null;
+          /** schema-free-guests.sql (D-147): children who stay free, counted apart from guest_count; in no price; 0 to 50 */
+          free_guests: number;
           notes: string | null;
           /** schema-decision-note.sql (D-096): what staff wrote when they confirmed, cancelled or declined; at most 500 characters */
           decision_note: string | null;
@@ -739,6 +741,8 @@ export interface Database {
           guest_name: string;
           guest_phone?: string | null;
           guest_count?: number | null;
+          /** D-147: defaults to 0 */
+          free_guests?: number;
           notes?: string | null;
           /** written by the decision, never at creation */
           decision_note?: never;
@@ -773,6 +777,7 @@ export interface Database {
           guest_name?: string;
           guest_phone?: string | null;
           guest_count?: number | null;
+          free_guests?: number;
           notes?: string | null;
           decision_note?: string | null;
           promo_id?: number | null;
@@ -1478,6 +1483,8 @@ export interface Database {
           p_notes: string | null;
           /** schema-promos.sql (D-097): a code, or null for the automatic promo if any */
           p_promo_code?: string | null;
+          /** schema-free-guests.sql (D-147): one free count per unit, 0 to 50; null = every unit 0 */
+          p_free?: number[] | null;
         };
         Returns: {
           reference: string;
@@ -1487,6 +1494,8 @@ export interface Database {
           starts_at: string;
           ends_at: string;
           guests: number;
+          /** schema-free-guests.sql (D-147): the row's free guests */
+          free: number;
           base_price: number;
           /** schema-promos.sql (D-097): this night's discount, part of `price`; 0 or more */
           discount: number | null;
@@ -1512,6 +1521,8 @@ export interface Database {
           /** schema-promos.sql (D-097): a code, or null for the automatic promo if any */
           p_promo_code: string | null;
           p_consent_version: string;
+          /** schema-free-guests.sql (D-147): passed through to request_booking() */
+          p_free?: number[] | null;
         };
         Returns: {
           reference: string;
@@ -1521,6 +1532,8 @@ export interface Database {
           starts_at: string;
           ends_at: string;
           guests: number;
+          /** schema-free-guests.sql (D-147): the row's free guests */
+          free: number;
           base_price: number;
           /** schema-promos.sql (D-097): this night's discount, part of `price`; 0 or more */
           discount: number | null;

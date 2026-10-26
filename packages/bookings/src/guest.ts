@@ -30,7 +30,8 @@ export interface GuestStay {
   ended: boolean;
   nights: number;
   createdAt: string;
-  rooms: { unit: string; slot: string; guests: number }[];
+  /** `free` (D-147): the children who stay free, counted apart from `guests` */
+  rooms: { unit: string; slot: string; guests: number; free: number }[];
   /** sums of the stored rows; null for rows priced before prices were stored */
   price: { base: number | null; extraGuests: number | null; surcharge: number | null; discount: number | null; total: number | null };
   timezone: string;
@@ -172,7 +173,12 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
     createdAt: text(r.created_at, 'created_at'),
     rooms: rooms.map((room, i) => {
       const x = room as Record<string, unknown>;
-      return { unit: text(x.unit, `rooms[${i}].unit`), slot: text(x.slot, `rooms[${i}].slot`), guests: count(x.guests, `rooms[${i}].guests`) };
+      return {
+        unit: text(x.unit, `rooms[${i}].unit`),
+        slot: text(x.slot, `rooms[${i}].slot`),
+        guests: count(x.guests, `rooms[${i}].guests`),
+        free: x.free === undefined || x.free === null ? 0 : count(x.free, `rooms[${i}].free`),
+      };
     }),
     price: {
       base: amount(price.base, 'price.base'),

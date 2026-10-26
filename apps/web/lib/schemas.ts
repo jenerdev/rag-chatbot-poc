@@ -156,6 +156,8 @@ export const imageOrderSchema = z
 const requestRoom = z.object({
   unitId: z.number({ required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
   guests: z.number({ required_error: 'Enter the number of guests', invalid_type_error: 'Enter the number of guests' }),
+  /** D-147: the children who stay free, counted apart from `guests`; absent = 0. The bound (0 to 50) is parseRequest()'s and request_booking()'s. */
+  free: z.number({ invalid_type_error: 'Free guests must be a number' }).nullish(),
 });
 
 /** A price for a stay, before sending it. */

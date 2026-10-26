@@ -90,6 +90,13 @@ create trigger payments_refuse_taken
 
 -- 3. guest_stay(), as schema-manage-booking.sql § 16 has it, plus
 --    decision_note, declined and taken.
+-- GUARDED (D-147, 2026-10-26): schema-free-guests.sql replaces this with 'free' on each room line.
+-- Once that file has run, re-running THIS file must not put a body with no
+-- free count back, so the definition is skipped (CLAUDE.md trap 20).
+do $guard$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'free_guests') then
+    execute $ddl$
 create or replace function guest_stay(p_tenant_id bigint, p_reference text, p_contact text)
 returns jsonb
 language plpgsql
@@ -186,6 +193,10 @@ begin
   return v_out;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 
 revoke all on function guest_stay(bigint, text, text) from public, anon;
 grant execute on function guest_stay(bigint, text, text) to authenticated, service_role;

@@ -39,6 +39,7 @@ import { QuickNotes } from '@/components/quick-notes';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
+import { partyWords } from '@/lib/party-words';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { confirmQuickNotes, quickNotes } from '@/lib/quick-notes';
 import { stayActions } from '@/lib/stay-actions';
@@ -471,6 +472,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
   const waitingProof = stay.payments.find((p) => actions.review.includes(p.id));
   const ended = outcome(stay);
   const guests = stay.units.reduce((sum, u) => sum + (u.guests ?? 0), 0);
+  const free = stay.units.reduce((sum, u) => sum + u.free, 0);
   const tracked = stay.payment.status !== 'not_tracked';
   // A bar for the eye only; the figures beside it are the server's, unchanged.
   const goal = stay.payment.required ?? stay.payment.price;
@@ -499,7 +501,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
             </div>
             <h2>{stay.guestName}</h2>
             <p className="stay-head-sub">
-              {stay.units.map((u) => u.unit).join(', ')} · {guests > 0 ? `${guests} guest${guests === 1 ? '' : 's'} · ` : ''}
+              {stay.units.map((u) => u.unit).join(', ')} · {guests > 0 ? `${partyWords(guests, free)} · ` : ''}
               {stay.slot}
             </p>
           </div>

@@ -52,7 +52,8 @@ export interface StayDetail {
   declined: boolean;
   /** when the stay reached its present status, from the event log; null before the log began */
   statusAt: string | null;
-  units: { unitId: number; unit: string; guests: number | null }[];
+  /** `free` (D-147): the children who stay free, counted apart from `guests` */
+  units: { unitId: number; unit: string; guests: number | null; free: number }[];
   /** the stored rows, night by night: the price breakdown as it was saved */
   lines: RequestLine[];
   /** centavos, the sum of the stored prices; null when a row has none */
@@ -103,7 +104,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
 
   const { data: all, error } = await tenant.db
     .from('bookings')
-    .select('id, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, created_at')
+    .select('id, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, free_guests, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, created_at')
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
     .order('booked_date')
@@ -183,7 +184,12 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
     endsAt: lastSpan ? new Date(lastSpan[1]).toISOString() : null,
     declined: status === 'cancelled' && !history.some((e) => e.kind === 'status' && e.to === 'confirmed'),
     statusAt: lastStatus?.at ?? null,
-    units: unitIds.map((unitId) => ({ unitId, unit: unitName.get(unitId) ?? '(unknown unit)', guests: rows.find((r) => r.unit_id === unitId)?.guest_count ?? null })),
+    units: unitIds.map((unitId) => ({
+      unitId,
+      unit: unitName.get(unitId) ?? '(unknown unit)',
+      guests: rows.find((r) => r.unit_id === unitId)?.guest_count ?? null,
+      free: rows.find((r) => r.unit_id === unitId)?.free_guests ?? 0,
+    })),
     lines: rows.map((r) => ({
       date: r.booked_date,
       unitId: r.unit_id,
@@ -192,6 +198,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
       roomId: r.room_id,
       room: roomName.get(r.room_id) ?? null,
       guests: r.guest_count ?? 0,
+      free: r.free_guests ?? 0,
       basePrice: r.base_price ?? r.price ?? 0,
       extraGuestPrice: r.extra_guest_price ?? 0,
       surcharge: r.surcharge ?? 0,

@@ -7,6 +7,8 @@
 
 import {
   MAX_BOOKING_ADVANCE_DAYS,
+  MAX_FREE_GUESTS,
+  MAX_FREE_UP_TO_AGE,
   MAX_PRICE,
   MAX_REQUEST_EMAIL,
   MAX_REQUEST_NAME,
@@ -180,6 +182,13 @@ export function parseConfig(raw: unknown, slug: string): BookingsConfig {
     throw new Error(`The bookings configuration for "${slug}" has max_advance_days ${JSON.stringify(maxAdvance)}`);
   }
 
+  // D-147: 0 to 17, like the trigger; absent = nobody is free. The booking
+  // page, the staff form and the chatbot's tool all read this one value.
+  const freeAge = config.free_up_to_age ?? null;
+  if (freeAge !== null && (typeof freeAge !== 'number' || !Number.isInteger(freeAge) || freeAge < 0 || freeAge > MAX_FREE_UP_TO_AGE)) {
+    throw new Error(`The bookings configuration for "${slug}" has free_up_to_age ${JSON.stringify(freeAge)}`);
+  }
+
   return {
     timezone,
     bookingType: type as BookingType,
@@ -187,7 +196,27 @@ export function parseConfig(raw: unknown, slug: string): BookingsConfig {
     currency,
     maxStayNights: maxStay,
     maxAdvanceDays: maxAdvance,
+    freeUpToAge: freeAge,
   };
+}
+
+/**
+ * D-147: the ONE wording of a tenant's free-guest rule, for the booking
+ * page, the staff form, Manage booking and the chatbot's tool result
+ * (plan/free-guests.md Rule 3). "Children aged 3 and below stay free";
+ * at 0, "Infants under 1 stay free". Null when the tenant has no rule.
+ */
+export function freeGuestsWords(freeUpToAge: number | null): string | null {
+  if (freeUpToAge === null) return null;
+  if (freeUpToAge === 0) return 'Infants under 1 stay free.';
+  return `Children aged ${freeUpToAge} and below stay free.`;
+}
+
+/** D-147: "4 guests + 1 child (free)", the party as every screen prints it. Pure. */
+export function partyWords(guests: number, free: number): string {
+  const paying = `${guests} ${guests === 1 ? 'guest' : 'guests'}`;
+  if (free <= 0) return paying;
+  return `${paying} + ${free} ${free === 1 ? 'child' : 'children'} (free)`;
 }
 
 /** One room of a booking, as createBookings inserts it. */
@@ -226,6 +255,16 @@ export function parseRooms(input: { unitId?: unknown; rooms?: unknown; guestCoun
     throw new BookingInputError('The same room is listed twice.');
   }
   return rooms;
+}
+
+/** D-147: a room's free guests: absent, null or '' is 0; else a whole number from 0 to MAX_FREE_GUESTS. */
+function freeCount(value: unknown): number {
+  if (value === undefined || value === null || value === '') return 0;
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > MAX_FREE_GUESTS) {
+    throw new BookingInputError(`Free guests must be a whole number from 0 to ${MAX_FREE_GUESTS}.`);
+  }
+  return n;
 }
 
 /** YYYY-MM-DD plus `days`, as UTC midnights, so no DST. */
@@ -269,7 +308,8 @@ export function normaliseEmail(value: unknown): string | null {
 /** A customer's request, checked. What request_booking() receives. */
 export interface ParsedRequest {
   slotId: number;
-  rooms: { unitId: number; guests: number }[];
+  /** `free` (D-147): children who stay free, 0 when the room sends none; never in a price */
+  rooms: { unitId: number; guests: number; free: number }[];
   checkIn: string;
   nights: number;
   name: string;
@@ -287,7 +327,10 @@ export interface ParsedRequest {
  * (CLAUDE.md trap 9). The first night starting later today is allowed here;
  * whether it has already started is the function's call, from the slot time.
  *
- * `rooms` is `[{ unitId, guests }]`; a whole-resort tenant sends one.
+ * `rooms` is `[{ unitId, guests, free? }]`; a whole-resort tenant sends one.
+ * `free` (D-147) is the children who stay free: 0 to MAX_FREE_GUESTS,
+ * absent = 0. It is checked here and again in request_booking(), and no
+ * price ever reads it.
  */
 export function parseRequest(
   input: {
@@ -327,8 +370,8 @@ export function parseRequest(
     throw new BookingInputError(`One request holds at most ${MAX_UNITS_PER_BOOKING} rooms.`);
   }
   const rooms = input.rooms.map((room: unknown) => {
-    const r = (room ?? {}) as { unitId?: unknown; guests?: unknown };
-    return { unitId: positiveInt(r.unitId, 'Room'), guests: positiveInt(r.guests, 'Guests') };
+    const r = (room ?? {}) as { unitId?: unknown; guests?: unknown; free?: unknown };
+    return { unitId: positiveInt(r.unitId, 'Room'), guests: positiveInt(r.guests, 'Guests'), free: freeCount(r.free) };
   });
   // D-133: a room TYPE may be listed once per room wanted ("Casa Uno ×2");
   // the database caps it at the type's free rooms, in words.

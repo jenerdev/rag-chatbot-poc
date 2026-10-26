@@ -51,11 +51,13 @@ import { StaffFrame } from '@/components/staff-frame';
 import type { NavFeatures } from '@/lib/nav-items';
 import { isRole, type Role } from '@/lib/permissions';
 import { formatMoney } from '@/lib/money';
+import { MAX_FREE_GUESTS, freeFieldLabel, partyWords } from '@/lib/party-words';
 import { Drawer } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { StayLines } from '@/components/stay-lines';
+import { CountField, PartyRow } from '@/components/count-field';
 import { CopyText } from '@/components/copy-button';
 import { ListSearch } from '@/components/list-search';
 import { PAGE_SIZE, matches } from '@/lib/search';
@@ -78,6 +80,8 @@ interface Setup {
   /** D-111: the longest stay and the last check-in date, the limits the server checks (D-078) */
   maxNights: number;
   lastDate: string;
+  /** D-147: the tenant's free-guest rule; null = one count per room */
+  freeUpToAge: number | null;
   /** inactive ones included, so the list can still name a retired room */
   units: UnitSummary[];
   slots: SlotSummary[];
@@ -86,6 +90,9 @@ interface Setup {
 }
 
 type Auth = 'checking' | 'out' | 'in';
+
+/** D-147: an empty free box is 0; the server refuses anything else odd. */
+const freeOf = (value: string | undefined) => (value === undefined || value === '' ? 0 : Number(value));
 
 // "Show past" reaches this far back: stays whose last night was within it.
 const PAST_DAYS = 90;
@@ -183,6 +190,7 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
   const day = new Date(`${stay.checkIn}T00:00:00Z`);
   const part = (o: Intl.DateTimeFormatOptions) => day.toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
   const guests = stay.units.reduce((sum, u) => sum + (u.guests ?? 0), 0);
+  const free = stay.units.reduce((sum, u) => sum + u.free, 0);
   // The day's events staff act on: who arrives today, who leaves today.
   const today_ = stay.status !== 'cancelled' && stay.status !== 'expired' && stay.checkIn === today ? 'Arrives today' : group === 'staying' && checkOut === addDays(today, 1) ? 'Leaves tomorrow' : null;
   return (
@@ -209,7 +217,7 @@ function StayRow({ stay, today, currency, href }: { stay: BookingRequest; today:
           </span>
           <span>
             {stay.units.map((u) => u.unit).join(', ')}
-            {guests > 0 ? ` · ${guests} guest${guests === 1 ? '' : 's'}` : ''}
+            {guests > 0 ? ` · ${partyWords(guests, free)}` : ''}
           </span>
         </div>
         <div className="stay-row-contact">
@@ -372,6 +380,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
   const [guestPhone, setGuestPhone] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestCount, setGuestCount] = useState('');
+  // D-147: the children who stay free, counted apart (whole_resort).
+  const [freeCount, setFreeCount] = useState('');
   const [notes, setNotes] = useState('');
   // D-111: a label on the stay, nothing more (still pending, still paid).
   const [walkIn, setWalkIn] = useState(false);
@@ -386,6 +396,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
   // Per picked room TYPE, the guests of each of its rooms wanted (D-133: a
   // type of several rooms may be booked more than once in one stay).
   const [chosen, setChosen] = useState<Record<number, string[]>>({});
+  // D-147: beside `chosen`, the free children of each room wanted.
+  const [chosenFree, setChosenFree] = useState<Record<number, string[]>>({});
   const [quote, setQuote] = useState<{ quote: RequestQuote | null; message: string | null }>({ quote: null, message: null });
   // While a price is being asked the footer shows a placeholder, never the
   // last price, which may no longer be true (the booking page's rule).
@@ -486,20 +498,21 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
   const chosenRooms = useMemo(
     () =>
       Object.entries(chosen).flatMap(([id, list]) =>
-        list.map((guests) => ({
+        list.map((guests, i) => ({
           unitId: Number(id),
           guestCount: guests === '' ? null : Number(guests),
+          free: freeOf(chosenFree[Number(id)]?.[i]),
         })),
       ),
-    [chosen],
+    [chosen, chosenFree],
   );
   // What the stay books, in the booking page's shape, `[{ unitId, guests }]`;
   // null until every unit has its guests (the page's rule, D-111).
   const stayRooms = useMemo(() => {
-    const picked = perRoom ? chosenRooms : unitId === null ? [] : [{ unitId, guestCount: guestCount === '' ? null : Number(guestCount) }];
+    const picked = perRoom ? chosenRooms : unitId === null ? [] : [{ unitId, guestCount: guestCount === '' ? null : Number(guestCount), free: freeOf(freeCount) }];
     if (picked.length === 0 || picked.some((r) => r.guestCount === null)) return null;
-    return picked.map((r) => ({ unitId: r.unitId, guests: r.guestCount as number }));
-  }, [chosenRooms, guestCount, perRoom, unitId]);
+    return picked.map((r) => ({ unitId: r.unitId, guests: r.guestCount as number, free: r.free }));
+  }, [chosenRooms, freeCount, guestCount, perRoom, unitId]);
   // Why Book is not ready yet, in words, instead of a silently disabled button.
   const missing =
     slotId === null
@@ -602,6 +615,8 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
         setGuestPhone('');
         setGuestEmail('');
         setGuestCount('');
+        setFreeCount('');
+        setChosenFree({});
         setNotes('');
         setNights('1');
         setWalkIn(false);
@@ -829,17 +844,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                   </div>
                 )}
                 {!perRoom && (
-                  <div className="field narrow">
-                    <label htmlFor="guest-count">Guests</label>
-                    <input
-                      type="number"
-                      id="guest-count"
-                      required
-                      min={1}
-                      step={1}
-                      value={guestCount}
-                      onChange={(e) => setGuestCount(e.target.value)}
-                    />
+                  // The party in one row, the booking page's shape (count-field.tsx).
+                  <div className="field party-field">
+                    <PartyRow>
+                      <CountField label="Guests" id="guest-count" required min={1} value={guestCount} onChange={(e) => setGuestCount(e.target.value)} />
+                      {setup.freeUpToAge !== null && (
+                        <CountField label={freeFieldLabel(setup.freeUpToAge)} id="free-count" min={0} max={MAX_FREE_GUESTS} placeholder="0" value={freeCount} onChange={(e) => setFreeCount(e.target.value)} />
+                      )}
+                    </PartyRow>
                   </div>
                 )}
               </div>
@@ -877,6 +889,24 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                         const wanted = chosen[r.id] ?? [];
                         // D-133: how many of this type there are; more than one offers a count.
                         const roomsOfType = r.rooms.filter((x) => x.active).length;
+                        // How many of this type (count-field.tsx): drawn once, on the first row or on its own.
+                        const roomsField = (
+                          <CountField
+                            label={`Rooms (of ${roomsOfType})`}
+                            min={1}
+                            max={roomsOfType}
+                            aria-label={`How many ${r.name} rooms, of ${roomsOfType}`}
+                            value={wanted.length}
+                            onChange={(e) => {
+                              const n = Math.max(1, Math.min(roomsOfType, Math.floor(Number(e.target.value) || 1)));
+                              setChosen((current) => {
+                                const list = [...(current[r.id] ?? [''])].slice(0, n);
+                                while (list.length < n) list.push('');
+                                return { ...current, [r.id]: list };
+                              });
+                            }}
+                          />
+                        );
                         return (
                           <div key={r.id} className={`room-pick${picked ? ' picked' : ''}`}>
                             <label>
@@ -907,48 +937,49 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                                 </span>
                               </span>
                             </label>
-                            {picked && roomsOfType > 1 && (
-                              <label className="room-pick-guests">
-                                <span className="small muted">Rooms</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={roomsOfType}
-                                  step={1}
-                                  aria-label={`How many ${r.name} rooms, of ${roomsOfType}`}
-                                  value={wanted.length}
-                                  onChange={(e) => {
-                                    const n = Math.max(1, Math.min(roomsOfType, Math.floor(Number(e.target.value) || 1)));
-                                    setChosen((current) => {
-                                      const list = [...(current[r.id] ?? [''])].slice(0, n);
-                                      while (list.length < n) list.push('');
-                                      return { ...current, [r.id]: list };
-                                    });
-                                  }}
-                                />
-                              </label>
+                            {picked && (
+                              // The party under the room's text, the booking page's shape (count-field.tsx).
+                              <div className="room-pick-controls">
+                                {roomsOfType > 1 && wanted.length > 1 && <PartyRow>{roomsField}</PartyRow>}
+                                {wanted.map((guests, i) => (
+                                  <PartyRow key={i} name={wanted.length > 1 ? `Room ${i + 1}` : undefined}>
+                                    {i === 0 && roomsOfType > 1 && wanted.length === 1 && roomsField}
+                                    <CountField
+                                      label="Guests"
+                                      min={1}
+                                      max={r.capacity ?? undefined}
+                                      required
+                                      aria-label={wanted.length > 1 ? `Guests in ${r.name}, room ${i + 1}` : `Guests in ${r.name}`}
+                                      value={guests}
+                                      onChange={(e) =>
+                                        setChosen((current) => {
+                                          const list = [...(current[r.id] ?? [])];
+                                          list[i] = e.target.value;
+                                          return { ...current, [r.id]: list };
+                                        })
+                                      }
+                                    />
+                                    {setup.freeUpToAge !== null && (
+                                      <CountField
+                                        label={freeFieldLabel(setup.freeUpToAge)}
+                                        min={0}
+                                        max={MAX_FREE_GUESTS}
+                                        placeholder="0"
+                                        aria-label={wanted.length > 1 ? `${freeFieldLabel(setup.freeUpToAge)} in ${r.name}, room ${i + 1}` : `${freeFieldLabel(setup.freeUpToAge)} in ${r.name}`}
+                                        value={chosenFree[r.id]?.[i] ?? ''}
+                                        onChange={(e) =>
+                                          setChosenFree((current) => {
+                                            const list = [...(current[r.id] ?? [])];
+                                            list[i] = e.target.value;
+                                            return { ...current, [r.id]: list };
+                                          })
+                                        }
+                                      />
+                                    )}
+                                  </PartyRow>
+                                ))}
+                              </div>
                             )}
-                            {wanted.map((guests, i) => (
-                              <label key={i} className="room-pick-guests">
-                                <span className="small muted">{wanted.length > 1 ? `Guests, room ${i + 1}` : 'Guests'}</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={r.capacity ?? undefined}
-                                  step={1}
-                                  required
-                                  aria-label={wanted.length > 1 ? `Guests in ${r.name}, room ${i + 1}` : `Guests in ${r.name}`}
-                                  value={guests}
-                                  onChange={(e) =>
-                                    setChosen((current) => {
-                                      const list = [...(current[r.id] ?? [])];
-                                      list[i] = e.target.value;
-                                      return { ...current, [r.id]: list };
-                                    })
-                                  }
-                                />
-                              </label>
-                            ))}
                           </div>
                         );
                       })}

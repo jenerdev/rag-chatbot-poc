@@ -105,3 +105,12 @@ export const MAX_SLOT_MINUTES = 48 * 60;
 // be served. Storage's own default is an hour, which made every return visit
 // to the booking page or the lightbox re-validate every photo (2026-10-21).
 export const PHOTO_CACHE_SECONDS = 31_536_000;
+
+/**
+ * D-147 (plan/free-guests.md): the most free guests one unit may carry on a
+ * stay, and the oldest age a tenant may make free. request_booking() and
+ * the check bookings_free_guests_range say 0 to 50; the config trigger says
+ * 0 to 17 (schema-free-guests.sql). If one side changes alone, the tests say.
+ */
+export const MAX_FREE_GUESTS = 50;
+export const MAX_FREE_UP_TO_AGE = 17;

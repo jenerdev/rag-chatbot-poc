@@ -51,6 +51,7 @@ interface BookingsFields {
   weekendDays: string;
   maxStayNights: string;
   maxAdvanceDays: string;
+  freeUpToAge: string;
   instructions: string;
   guestHint: string;
 }
@@ -68,6 +69,7 @@ function bookingsFieldsOf(config: unknown): BookingsFields {
     weekendDays: Array.isArray(c.weekend_days) ? c.weekend_days.join(',') : '',
     maxStayNights: asNumberString(c.max_stay_nights),
     maxAdvanceDays: asNumberString(c.max_advance_days),
+    freeUpToAge: asNumberString(c.free_up_to_age),
     instructions: asString(page.instructions),
     guestHint: asString(page.guest_hint),
   };
@@ -81,6 +83,7 @@ function bookingsConfigOf(f: BookingsFields): Record<string, unknown> {
   if (f.weekendDays.trim()) config.weekend_days = f.weekendDays.split(',').map((d) => Number(d.trim())).filter((d) => !Number.isNaN(d));
   if (f.maxStayNights.trim()) config.max_stay_nights = Number(f.maxStayNights);
   if (f.maxAdvanceDays.trim()) config.max_advance_days = Number(f.maxAdvanceDays);
+  if (f.freeUpToAge.trim()) config.free_up_to_age = Number(f.freeUpToAge);
   const page: Record<string, string> = {};
   if (f.instructions.trim()) page.instructions = f.instructions.trim();
   if (f.guestHint.trim()) page.guest_hint = f.guestHint.trim();
@@ -631,7 +634,7 @@ export function TenantForm({
       <section className="settings-section" aria-labelledby="sec-limits">
         <div className="settings-about">
           <h2 id="sec-limits">Limits</h2>
-          <p>The longest stay, and how far ahead a date can be booked. Empty uses the default.</p>
+          <p>The longest stay, how far ahead a date can be booked, and which children stay free. Empty uses the default.</p>
         </div>
         <div className="settings-fields">
           <div className="field-row">
@@ -642,6 +645,17 @@ export function TenantForm({
             <div className="field">
               <label htmlFor="bk-days">Booking horizon, days</label>
               <input id="bk-days" type="number" min={1} max={730} value={bookings.maxAdvanceDays} onChange={(e) => setBookings({ ...bookings, maxAdvanceDays: e.target.value })} placeholder="365" />
+            </div>
+          </div>
+          {/* D-147: the oldest age that stays free. The booking page and the staff form then ask
+              for those children apart from the guests; the price never counts them. */}
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="bk-free">Children stay free up to age</label>
+              <input id="bk-free" type="number" min={0} max={17} step={1} value={bookings.freeUpToAge} onChange={(e) => setBookings({ ...bookings, freeUpToAge: e.target.value })} placeholder="none" />
+              <p className="hint">
+                &ldquo;3&rdquo; means children aged 3 and below are not charged: every booking counts them apart from the guests, and the price covers the guests alone. Empty: everyone counts.
+              </p>
             </div>
           </div>
         </div>

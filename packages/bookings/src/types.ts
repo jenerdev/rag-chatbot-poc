@@ -201,6 +201,8 @@ export interface BookingsConfig {
   maxStayNights: number;
   /** how many days after the tenant's today a stay may start (D-078); absent in config means MAX_BOOKING_ADVANCE_DAYS */
   maxAdvanceDays: number;
+  /** D-147: children this age and below stay free; null (absent in config) = nobody is free */
+  freeUpToAge: number | null;
 }
 
 /**
@@ -427,6 +429,8 @@ export interface BookingPage {
   maxNights: number;
   instructions: string | null;
   guestHint: string | null;
+  /** D-147: children this age and below stay free, counted apart from the guests; null = the page asks one count */
+  freeUpToAge: number | null;
   /** how a request is paid and confirmed (policy, no amounts); null when the tenant takes no payment on the page */
   payment: PaymentFlow | null;
   slots: SlotSummary[];
@@ -468,6 +472,8 @@ export interface RequestLine {
   roomId?: number;
   room?: string | null;
   guests: number;
+  /** D-147: free guests (children up to the tenant's age) in the room that night; in no price */
+  free: number;
   basePrice: number;
   extraGuestPrice: number;
   surcharge: number;
@@ -540,7 +546,8 @@ export interface BookingRequest {
   slot: string;
   checkIn: string;
   nights: number;
-  units: { unitId: number; unit: string; guests: number | null }[];
+  /** `free` (D-147): the children who stay free, counted apart from `guests` */
+  units: { unitId: number; unit: string; guests: number | null; free: number }[];
   bookingIds: number[];
   /** centavos, the sum of the stored prices */
   total: number | null;

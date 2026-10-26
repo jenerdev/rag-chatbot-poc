@@ -38,7 +38,9 @@ describe('parseGuestStay', () => {
     const stay = parseGuestStay(raw)!;
     expect(stay.reference).toBe('HAR-7KQ4MX');
     expect(stay.guestName).toBe('Maria Santos');
-    expect(stay.rooms).toEqual([{ unit: 'Garden Room', slot: 'Overnight', guests: 2 }]);
+    // D-147: 'free' absent from an older row is 0; present, it is kept.
+    expect(stay.rooms).toEqual([{ unit: 'Garden Room', slot: 'Overnight', guests: 2, free: 0 }]);
+    expect(parseGuestStay({ ...raw, rooms: [{ unit: 'Garden Room', slot: 'Overnight', guests: 2, free: 1 }] })!.rooms[0]!.free).toBe(1);
     expect(stay.price).toEqual({ base: 400000, extraGuests: 0, surcharge: 50000, discount: 0, total: 450000 });
     expect(stay.payBy).toBe('2026-10-11T03:00:00+00:00');
     expect(stay.heldUntil).toBeNull();

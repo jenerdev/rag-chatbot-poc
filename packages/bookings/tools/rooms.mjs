@@ -42,6 +42,7 @@ import {
   quoteRequest,
   removeCalendarDay,
   requestBooking,
+  guestStay,
   setCalendarDay,
   checkRoomAvailability,
   createAccommodation,
@@ -748,6 +749,32 @@ try {
           && receipt.total === sum && sum === 3700000 && receipt.endsAt === `${next(FRI, 1)}T04:00:00+00:00`,
         'request: 2 pending web rows, one reference, total = the stored prices',
         `${receipt.reference} · ${stored.length} rows ${stored.map((b) => b.status).join(',')} · receipt ${receipt.total}, stored ${sum} · ends ${receipt.endsAt}`,
+      );
+    }
+
+    // 24b. D-147: free guests ride on the request and change no price. The
+    //      quote with 2 free equals the quote without; the stored rows carry
+    //      free_guests 2 at the same price; staff (listRequests) and the
+    //      guest (guestStay) read the count back; 51 is refused in words.
+    {
+      const WED = next(THU, 20);
+      const party = { ...contact(7), checkIn: WED, nights: 2 };
+      const plain = await quoteRequest(chat, stay(party));
+      const withFree = await quoteRequest(chat, stay({ ...party, rooms: [{ unitId: hall.id, guests: 32, free: 2 }] }));
+      const r = await requestBooking(chat, stay({ ...party, rooms: [{ unitId: hall.id, guests: 32, free: 2 }] }));
+      const { data: rows } = await probe.db.from('bookings').select('guest_count, free_guests, price').eq('tenant_id', probe.id).eq('reference', r.reference);
+      const listed = (await listRequests(probe, { from: WED })).find((x) => x.reference === r.reference);
+      const seen = await guestStay(chat, r.reference, contact(7).email);
+      const bad = await thrown(() => requestBooking(chat, stay({ ...contact(8), checkIn: next(THU, 24), rooms: [{ unitId: hall.id, guests: 32, free: 51 }] })));
+      const storedSum = (rows ?? []).reduce((t, x) => t + x.price, 0);
+      check(
+        withFree.total === plain.total && withFree.lines.every((l) => l.free === 2) && plain.lines.every((l) => l.free === 0)
+          && r.lines.every((l) => l.free === 2) && r.total === plain.total
+          && rows?.length === 2 && rows.every((x) => x.guest_count === 32 && x.free_guests === 2) && storedSum === plain.total
+          && listed?.units[0]?.free === 2 && listed.units[0].guests === 32 && seen?.rooms[0]?.free === 2
+          && bad instanceof BookingInputError && /Free guests/.test(bad.message),
+        'free guests (D-147): 2 free on a 32-guest stay prices like 32; stored, listed and read back by the guest as 2; 51 refused in words',
+        `quote ${plain.total} vs ${withFree.total} · receipt ${r.total} · rows ${JSON.stringify(rows)} · listed ${listed?.units[0]?.guests}+${listed?.units[0]?.free} · guest ${seen?.rooms[0]?.guests}+${seen?.rooms[0]?.free} · 51 ${described(bad)}`,
       );
     }
 

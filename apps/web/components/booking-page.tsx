@@ -36,10 +36,12 @@ import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
+import { MAX_FREE_GUESTS, freeFieldLabel, freeGuestsWords, partyWords } from '@/lib/party-words';
 import { Icon } from '@/components/icons';
 import { StayLines } from '@/components/stay-lines';
 import { Bone } from '@/components/load-state';
 import { Lightbox, useLightbox } from '@/components/lightbox';
+import { CountField, PartyRow } from '@/components/count-field';
 
 export interface BookingPageScreenProps {
   slug: string;
@@ -194,6 +196,12 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   // each with one guest count per room wanted (D-133: "Casa Uno ×2").
   const [guests, setGuests] = useState('');
   const [chosen, setChosen] = useState<Record<number, string[]>>({});
+  // D-147: the children who stay free, counted apart from the guests: one
+  // count for the whole resort, or one per room wanted, beside `chosen`.
+  // Asked only when the tenant has a rule (page.freeUpToAge); never priced.
+  const [freeKids, setFreeKids] = useState('');
+  const [chosenFree, setChosenFree] = useState<Record<number, string[]>>({});
+  const freeRule = page.freeUpToAge;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -226,15 +234,18 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   const nightCount = slot.nightly ? Number(nights) : 1;
 
   const rooms = useMemo(() => {
+    // D-147: an empty free box is 0; the server refuses anything else odd.
+    const freeOf = (value: string | undefined) => (value === undefined || value === '' ? 0 : Number(value));
     if (!perRoom) {
       const unit = units[0];
-      return unit && guests !== '' ? [{ unitId: unit.id, guests: Number(guests) }] : [];
+      return unit && guests !== '' ? [{ unitId: unit.id, guests: Number(guests), free: freeOf(freeKids) }] : [];
     }
     return Object.entries(chosen)
       .filter(([id]) => units.some((u) => u.id === Number(id)))
-      .flatMap(([id, list]) => list.map((g) => ({ unitId: Number(id), guests: g === '' ? NaN : Number(g) })));
-  }, [chosen, guests, perRoom, units]);
-  const roomsComplete = rooms.length > 0 && rooms.every((r) => Number.isInteger(r.guests) && r.guests > 0);
+      .flatMap(([id, list]) => list.map((g, i) => ({ unitId: Number(id), guests: g === '' ? NaN : Number(g), free: freeOf(chosenFree[Number(id)]?.[i]) })));
+  }, [chosen, chosenFree, freeKids, guests, perRoom, units]);
+  const roomsComplete =
+    rooms.length > 0 && rooms.every((r) => Number.isInteger(r.guests) && r.guests > 0 && Number.isInteger(r.free) && r.free >= 0 && r.free <= MAX_FREE_GUESTS);
   const nightsValid = Number.isInteger(nightCount) && nightCount >= 1 && nightCount <= page.maxNights;
   // Closed dates (D-080), from the calendar the page already has. Said up
   // front, and again when the stay touches one; the server refuses it anyway.
@@ -325,6 +336,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     setCheckIn('');
     setNights('1');
     setGuests('');
+    setFreeKids('');
+    setChosenFree({});
     setChosen({});
     setNotes('');
     setQuote({ quote: null, message: null });
@@ -461,9 +474,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                   <li key={i}>
                     <Icon name="bed" size={16} />
                     <span className="grow">{l.unit}</span>
-                    <span className="small muted">
-                      {l.guests} {l.guests === 1 ? 'guest' : 'guests'}
-                    </span>
+                    <span className="small muted">{partyWords(l.guests, l.free)}</span>
                   </li>
                 ))}
               </ul>
@@ -689,28 +700,37 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
             {/* 2 · who and where */}
             <section className="card book-step" aria-labelledby="step-guests" hidden={step !== 1}>
               {heading(1, 'step-guests', perRoom ? 'Rooms and guests' : 'Guests')}
+              {/* The rule, and the resort's own guest hint, as ONE standing notice (D-102: a
+                  standing fact is a banner) above the counts: as small muted lines they were
+                  missed (the user, 2026-10-26: "is not easy to see. can you make it visible"). */}
+              {(freeRule !== null || page.guestHint) && (
+                <div className="notice party-notice" role="note">
+                  <Icon name="info" size={18} />
+                  <div>
+                    {freeRule !== null && (
+                      <>
+                        <strong>{freeGuestsWords(freeRule)}</strong> {perRoom ? 'Enter them apart from the guests of each room.' : 'Enter them apart from the guests.'}
+                      </>
+                    )}
+                    {page.guestHint && <span className="party-notice-hint">{page.guestHint}</span>}
+                  </div>
+                </div>
+              )}
               {!perRoom && (
                 <>
-                  <div className="field narrow-field">
-                    <label htmlFor="guests">Guests</label>
-                    <input
-                      type="number"
-                      id="guests"
-                      min={1}
-                      max={units[0]?.capacity ?? undefined}
-                      step={1}
-                      required
-                      value={guests}
-                      onChange={(e) => setGuests(e.target.value)}
-                    />
-                  </div>
+                  {/* The party in one row: the guests, and the children who stay free (count-field.tsx). */}
+                  <PartyRow>
+                    <CountField label="Guests" id="guests" min={1} max={units[0]?.capacity ?? undefined} required value={guests} onChange={(e) => setGuests(e.target.value)} />
+                    {freeRule !== null && (
+                      <CountField label={freeFieldLabel(freeRule)} id="free-guests" min={0} max={MAX_FREE_GUESTS} placeholder="0" value={freeKids} onChange={(e) => setFreeKids(e.target.value)} />
+                    )}
+                  </PartyRow>
                   {units[0] && (
                     <div className="small muted">
                       {units[0].standardCapacity !== null && units[0].extraPersonRate
                         ? `The rate covers ${units[0].standardCapacity} guests; each guest above that is ${formatMoney(units[0].extraPersonRate, page.currency)}. `
                         : ''}
                       {units[0].capacity !== null ? `At most ${units[0].capacity} guests. ` : ''}
-                      {page.guestHint ?? ''}
                     </div>
                   )}
                 </>
@@ -718,7 +738,6 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
 
               {perRoom && (
                 <>
-                  {page.guestHint && <p className="small muted step-hint">{page.guestHint}</p>}
                   <div className="room-picks" role="group" aria-label="Rooms">
                     {units.map((u) => {
                       const wanted = chosen[u.id];
@@ -728,6 +747,24 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                       // server refuses more anyway (request_booking()).
                       const free = quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
                       const cap = Math.max(1, free === null ? u.rooms : Math.min(u.rooms, free));
+                      // How many of this type (count-field.tsx): drawn once, on the first row or on its own.
+                      const roomsField = (
+                        <CountField
+                          label={`Rooms (of ${cap})`}
+                          min={1}
+                          max={cap}
+                          aria-label={`How many ${u.name} rooms, of ${cap}`}
+                          value={wanted?.length ?? 1}
+                          onChange={(e) => {
+                            const n = Math.max(1, Math.min(cap, Math.floor(Number(e.target.value) || 1)));
+                            setChosen((current) => {
+                              const list = [...(current[u.id] ?? [''])].slice(0, n);
+                              while (list.length < n) list.push('');
+                              return { ...current, [u.id]: list };
+                            });
+                          }}
+                        />
+                      );
                       return (
                         <div key={u.id} className={`room-pick${picked ? ' picked' : ''}`}>
                           {/* The room's photo, OUTSIDE the label: a tap looks, it does not choose. */}
@@ -777,36 +814,20 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                             </span>
                           </label>
                           {picked && (
+                            // The party, under the room's text (count-field.tsx): the Rooms count,
+                            // then one row per room wanted with its guests and, with a rule, the
+                            // children who stay free (D-147).
                             <div className="room-pick-controls">
-                              {u.rooms > 1 && (
-                                <label className="room-pick-guests">
-                                  <span className="small muted">Rooms</span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={cap}
-                                    step={1}
-                                    aria-label={`How many ${u.name} rooms, of ${cap}`}
-                                    value={wanted.length}
-                                    onChange={(e) => {
-                                      const n = Math.max(1, Math.min(cap, Math.floor(Number(e.target.value) || 1)));
-                                      setChosen((current) => {
-                                        const list = [...(current[u.id] ?? [''])].slice(0, n);
-                                        while (list.length < n) list.push('');
-                                        return { ...current, [u.id]: list };
-                                      });
-                                    }}
-                                  />
-                                </label>
-                              )}
-                              {wanted.map((g, i) => {
-                                const box = (
-                                  <input
-                                    type="number"
+                              {/* One room wanted: the Rooms count, the guests and the children on ONE line.
+                                  Several: the Rooms count on its own line, then "Room 2 · guests · children". */}
+                              {u.rooms > 1 && wanted.length > 1 && <PartyRow>{roomsField}</PartyRow>}
+                              {wanted.map((g, i) => (
+                                <PartyRow key={i} name={wanted.length > 1 ? `Room ${i + 1}` : undefined}>
+                                  {i === 0 && u.rooms > 1 && wanted.length === 1 && roomsField}
+                                  <CountField
+                                    label="Guests"
                                     min={1}
                                     max={u.capacity ?? undefined}
-                                    step={1}
-                                    placeholder="Guests"
                                     aria-label={wanted.length > 1 ? `Guests in ${u.name}, room ${i + 1}` : `Guests in ${u.name}`}
                                     value={g}
                                     onChange={(e) =>
@@ -817,17 +838,25 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                       })
                                     }
                                   />
-                                );
-                                // Several rooms: each box says which room it is, filled or not.
-                                return wanted.length > 1 ? (
-                                  <label key={i} className="room-pick-guests">
-                                    <span className="small muted">Guests, room {i + 1}</span>
-                                    {box}
-                                  </label>
-                                ) : (
-                                  <span key={i}>{box}</span>
-                                );
-                              })}
+                                  {freeRule !== null && (
+                                    <CountField
+                                      label={freeFieldLabel(freeRule)}
+                                      min={0}
+                                      max={MAX_FREE_GUESTS}
+                                      placeholder="0"
+                                      aria-label={wanted.length > 1 ? `${freeFieldLabel(freeRule)} in ${u.name}, room ${i + 1}` : `${freeFieldLabel(freeRule)} in ${u.name}`}
+                                      value={chosenFree[u.id]?.[i] ?? ''}
+                                      onChange={(e) =>
+                                        setChosenFree((current) => {
+                                          const list = [...(current[u.id] ?? [])];
+                                          list[i] = e.target.value;
+                                          return { ...current, [u.id]: list };
+                                        })
+                                      }
+                                    />
+                                  )}
+                                </PartyRow>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -901,13 +930,11 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                     {perRoom ? (
                       rooms.map((r, i) => (
                         <span key={i}>
-                          {units.find((u) => u.id === r.unitId)?.name} · {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
+                          {units.find((u) => u.id === r.unitId)?.name} · {partyWords(r.guests, r.free)}
                         </span>
                       ))
                     ) : (
-                      <span>
-                        {guests} {guests === '1' ? 'guest' : 'guests'}
-                      </span>
+                      <span>{partyWords(Number(guests), rooms[0]?.free ?? 0)}</span>
                     )}
                   </div>
                   <button type="button" className="link" onClick={() => go(1)}>

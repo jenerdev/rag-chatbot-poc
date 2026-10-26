@@ -21,6 +21,8 @@ vi.mock('@rag/bookings', () => {
     lastBookingDate: vi.fn(() => '2027-09-30'),
     listRooms: vi.fn(),
     bookingsConfig: vi.fn(),
+    // D-147: the package's ONE wording, repeated here because the whole module is mocked.
+    freeGuestsWords: vi.fn((age: number | null | undefined) => (age === null || age === undefined ? null : age === 0 ? 'Infants under 1 stay free.' : `Children aged ${age} and below stay free.`)),
     listSlots: vi.fn(),
     localDate: vi.fn(),
     MAX_AVAILABILITY_DAYS: 31,
@@ -260,8 +262,18 @@ describe('per_room: check_availability checks rooms', () => {
     expect(priced).not.toHaveBeenCalled();
   });
 
-  // D-074: a whole-resort tenant whose unit has a rate (villa) is priced from
-  // the same function as a room, and its rows carry the price as text.
+  // D-147: the free-guest rule is in the RESULT only, and only when the
+  // tenant has one; the tool text is untouched (the baselines say so).
+  it('says the free-guest rule in the result when the tenant has one, and nothing otherwise', async () => {
+    const { record: none } = await executeTool(HARBOR, { id: 'c1', name: 'check_availability', arguments: '{"date_from":"2026-09-28"}' });
+    expect(none.result).not.toHaveProperty('free_guests');
+    config.mockResolvedValue({ timezone: 'Asia/Manila', bookingType: 'per_room', weekendDays: [5, 6, 7], currency: 'PHP', freeUpToAge: 3 } as never);
+    const { record, content } = await executeTool(HARBOR, { id: 'c2', name: 'check_availability', arguments: '{"date_from":"2026-09-28"}' });
+    expect((record.result as { free_guests: { rule: string } }).free_guests.rule).toBe('Children aged 3 and below stay free.');
+    expect(content).toContain('not counted in guests');
+  });
+
+  // D-074: a whole-resort tenant whose unit has a rate (villa) is priced from  // the same function as a room, and its rows carry the price as text.
   it('a whole_resort tenant WITH a rate gets priced rows, from checkPricedAvailability', async () => {
     config.mockResolvedValue({ timezone: 'Asia/Manila', bookingType: 'whole_resort', weekendDays: [5, 6, 7], currency: 'PHP' } as never);
     hasPage.mockResolvedValue(true);

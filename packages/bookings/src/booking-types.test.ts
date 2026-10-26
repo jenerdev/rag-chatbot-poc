@@ -18,13 +18,14 @@ describe('parseConfig', () => {
       currency: 'PHP',
       maxStayNights: 14,
       maxAdvanceDays: 365,
+      freeUpToAge: null,
     });
   });
 
   it('reads a per_room config as written', () => {
     expect(
       parseConfig({ timezone: 'Asia/Manila', booking_type: 'per_room', weekend_days: [6, 7], currency: 'USD', max_stay_nights: 3, max_advance_days: 90 }, 'harbor'),
-    ).toEqual({ timezone: 'Asia/Manila', bookingType: 'per_room', weekendDays: [6, 7], currency: 'USD', maxStayNights: 3, maxAdvanceDays: 90 });
+    ).toEqual({ timezone: 'Asia/Manila', bookingType: 'per_room', weekendDays: [6, 7], currency: 'USD', maxStayNights: 3, maxAdvanceDays: 90, freeUpToAge: null });
   });
 
   it.each([

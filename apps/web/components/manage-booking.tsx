@@ -32,6 +32,7 @@ import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import { timeLeft } from '@/lib/countdown';
 import { centavosToInput, formatMoney } from '@/lib/money';
+import { partyWords } from '@/lib/party-words';
 import { resizeImage } from '@/lib/resize-image';
 import type { NavFeatures } from '@/lib/nav-items';
 
@@ -300,9 +301,7 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
                     <span className="grow">
                       {r.unit} <span className="muted">· {r.slot}</span>
                     </span>
-                    <span className="small muted">
-                      {r.guests} {r.guests === 1 ? 'guest' : 'guests'}
-                    </span>
+                    <span className="small muted">{partyWords(r.guests, r.free)}</span>
                   </li>
                 ))}
               </ul>

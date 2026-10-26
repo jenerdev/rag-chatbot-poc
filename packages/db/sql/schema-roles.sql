@@ -266,6 +266,13 @@ create trigger tenant_applications_no_delete_live
 --    SECURITY DEFINER and search_path = '' (its live-bookings count must not
 --    run under a super token's empty view of bookings, trap 12; and trap 19),
 --    qualified names, and the two new limits. Its other rules are unchanged.
+-- GUARDED (D-147, 2026-10-26): schema-free-guests.sql replaces this with the free_up_to_age check.
+-- Once that file has run, re-running THIS file must not put a body with no
+-- free count back, so the definition is skipped (CLAUDE.md trap 20).
+do $guard$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'free_guests') then
+    execute $ddl$
 create or replace function tenant_applications_validate() returns trigger
 language plpgsql
 security definer
@@ -347,6 +354,10 @@ begin
   return new;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 -- The trigger itself (tenant_applications_validate, before insert or update)
 -- already exists from schema-bookings.sql and now runs this body.
 

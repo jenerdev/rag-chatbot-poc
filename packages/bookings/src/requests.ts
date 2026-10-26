@@ -112,6 +112,7 @@ export async function bookingPage(tenant: BookingTenant): Promise<BookingPage> {
     maxNights: config.maxStayNights,
     instructions: settings.instructions,
     guestHint: settings.guestHint,
+    freeUpToAge: config.freeUpToAge,
     payment: paymentFlow(app.data.config),
     slots: slots.filter((s) => offered.has(s.id)),
     units: priced,
@@ -244,8 +245,10 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
   const lines: RequestLine[] = [];
   let available = true;
   for (const date of dates) {
-    for (const { unitId, guests } of request.rooms) {
+    for (const { unitId, guests, free: freeGuests } of request.rooms) {
       const unit = unitById.get(unitId)!;
+      // D-147: `guests` is the paying count; `free` rides on the line and
+      // reaches no price.
       const { data, error } = await tenant.db.rpc('unit_quote', {
         p_tenant_id: tenant.id,
         p_unit_id: unitId,
@@ -262,6 +265,7 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
         unitId,
         unit: unit.name,
         guests,
+        free: freeGuests,
         basePrice: q.base_price,
         extraGuestPrice: q.extra_guest_price,
         surcharge: q.surcharge,
@@ -363,6 +367,9 @@ export async function requestBooking(
     p_slot_id: request.slotId,
     p_unit_ids: request.rooms.map((r) => r.unitId),
     p_guests: request.rooms.map((r) => r.guests),
+    // D-147: one free count per unit, beside the paying count; the function
+    // stores it and prices on p_guests alone.
+    p_free: request.rooms.map((r) => r.free),
     p_check_in: request.checkIn,
     p_nights: request.nights,
     p_name: request.name,
@@ -399,6 +406,7 @@ export async function requestBooking(
     unitId: idByName.get(r.unit) ?? 0,
     unit: r.unit,
     guests: r.guests,
+    free: r.free ?? 0,
     basePrice: r.base_price,
     extraGuestPrice: r.extra_guest_price,
     surcharge: r.surcharge,
@@ -501,7 +509,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
 
   const { data, error } = await tenant.db
     .from('bookings')
-    .select('id, group_id, reference, source, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, guest_name, guest_phone, guest_email, guest_count, notes, decision_note, price, created_at')
+    .select('id, group_id, reference, source, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, guest_name, guest_phone, guest_email, guest_count, free_guests, notes, decision_note, price, created_at')
     .eq('tenant_id', tenant.id)
     // D-100: every source. A staff booking is a group with a reference too and
     // waits for the same decision; the row says which door it came through.
@@ -566,6 +574,7 @@ export async function listRequests(tenant: BookingTenant, range: { from?: unknow
           unitId,
           unit: unitName.get(unitId) ?? '(unknown unit)',
           guests: rows.find((r) => r.unit_id === unitId)?.guest_count ?? null,
+          free: rows.find((r) => r.unit_id === unitId)?.free_guests ?? 0,
         })),
         bookingIds: rows.map((r) => r.id),
         total: rows.every((r) => r.price !== null) ? rows.reduce((sum, r) => sum + (r.price ?? 0), 0) : null,

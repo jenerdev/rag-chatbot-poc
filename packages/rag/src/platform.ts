@@ -323,7 +323,8 @@ export async function archiveTenant(platform: PlatformContext, tenantId: number,
 /**
  * Switch an application on with a config, or replace the config of one that
  * is on. The triggers decide what a config may say (timezone, booking_type,
- * weekend_days, currency, max_stay_nights, max_advance_days, booking_page)
+ * weekend_days, currency, max_stay_nights, max_advance_days, free_up_to_age,
+ * booking_page)
  * and whether the booking type may change now; their messages come back.
  */
 export async function setApplication(platform: PlatformContext, tenantId: number, key: ApplicationKey, config: Json): Promise<TenantDetail> {

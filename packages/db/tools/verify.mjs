@@ -1418,6 +1418,28 @@ async function customerBookingChecks() {
       check(error?.code === '22023' && after === before, 'request_booking: a slot with no price is refused, nothing saved', `${error ? `${error.code} ${error.message}` : 'ACCEPTED'} · rows ${before} → ${after}`);
     }
 
+    // 89b. D-147: p_free rides on the request and changes no price. One count
+    //      per unit, 0 to 50; 51 and a list of the wrong length are refused
+    //      in words (22023), and nothing is saved for them.
+    {
+      const far = addDays(thursday, 230);
+      const who = { p_phone: '09170000009', p_email: 'free@example.com', p_check_in: far, p_nights: 1 };
+      const plain = await request(chat, { ...who, p_phone: '09170000010', p_email: 'free-plain@example.com' });
+      const withFree = await request(chat, { ...who, p_free: [3] });
+      const before = (await rowsOf()).length;
+      const tooMany = await request(chat, { ...who, p_check_in: addDays(far, 2), p_free: [51] });
+      const mismatch = await request(chat, { ...who, p_check_in: addDays(far, 3), p_free: [1, 1] });
+      const after = (await rowsOf()).length;
+      const { data: stored } = await supabase.from('bookings').select('guest_count, free_guests, price').eq('tenant_id', bookId).eq('reference', withFree.data?.[0]?.reference ?? '-');
+      check(
+        !plain.error && !withFree.error && withFree.data[0].free === 3 && plain.data[0].free === 0 && withFree.data[0].price === plain.data[0].price
+          && stored?.length === 1 && stored[0].free_guests === 3 && stored[0].guest_count === 32
+          && tooMany.error?.code === '22023' && mismatch.error?.code === '22023' && after === before,
+        'request_booking: p_free stored and returned, priced as if absent; 51 and a mismatched list refused (22023), nothing saved',
+        `plain ${plain.error?.message ?? `${plain.data?.[0]?.free} @ ${plain.data?.[0]?.price}`} · free ${withFree.error?.message ?? `${withFree.data?.[0]?.free} @ ${withFree.data?.[0]?.price}`} · stored ${JSON.stringify(stored)} · 51 ${tooMany.error?.code ?? 'ACCEPTED'} · mismatch ${mismatch.error?.code ?? 'ACCEPTED'} · rows ${before} → ${after}`,
+      );
+    }
+
     // 90. rate_calendar under tokens: staff write; the chat token reads its
     //     tenant's rows and cannot write; villa's token sees none of ours.
     {
@@ -1933,12 +1955,21 @@ async function rolesChecks() {
         ['3.5 nights', { timezone: 'Asia/Manila', max_stay_nights: 3.5 }],
         ['"7" as a string', { timezone: 'Asia/Manila', max_stay_nights: '7' }],
         ['800 days', { timezone: 'Asia/Manila', max_advance_days: 800 }],
+        // D-147: the free age, 0 to 17 and whole.
+        ['18 years free', { timezone: 'Asia/Manila', free_up_to_age: 18 }],
+        ['3.5 years free', { timezone: 'Asia/Manila', free_up_to_age: 3.5 }],
+        ['"3" years free', { timezone: 'Asia/Manila', free_up_to_age: '3' }],
       ]) {
         const { error } = await app(config);
         if (error?.code !== '23514') bad.push(`${label}: ${error ? error.code : 'ACCEPTED'}`);
       }
-      const good = await app({ timezone: 'Asia/Manila', max_stay_nights: 7, max_advance_days: 90 }).select('config');
-      check(bad.length === 0 && !good.error, 'roles: max_stay_nights and max_advance_days validated by the trigger', bad.length ? bad.join(' · ') : `4 refused · 7 / 90 accepted`);
+      const good = await app({ timezone: 'Asia/Manila', max_stay_nights: 7, max_advance_days: 90, free_up_to_age: 3 }).select('config');
+      const zero = await app({ timezone: 'Asia/Manila', free_up_to_age: 0 }).select('config');
+      check(
+        bad.length === 0 && !good.error && good.data?.[0]?.config?.free_up_to_age === 3 && !zero.error,
+        'roles: max_stay_nights, max_advance_days and free_up_to_age (D-147) validated by the trigger',
+        bad.length ? bad.join(' · ') : `7 refused · 7 / 90 / 3 accepted · 0 accepted`,
+      );
     }
 
     // 104. member_emails(): a member sees the tenant's members with emails; a

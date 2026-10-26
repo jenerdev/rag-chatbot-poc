@@ -46,7 +46,7 @@ describe('parseRequest', () => {
   it('trims, normalises and fills the defaults', () => {
     expect(parse()).toEqual({
       slotId: 7,
-      rooms: [{ unitId: 3, guests: 32 }],
+      rooms: [{ unitId: 3, guests: 32, free: 0 }],
       checkIn: '2026-11-12',
       nights: 2,
       name: 'Maria Santos',
@@ -94,8 +94,8 @@ describe('parseRequest', () => {
     expect(parse({ rooms: two }, 'per_room').rooms).toHaveLength(2);
     // Two rooms of one type: the database caps it at the type's free rooms, in words.
     expect(parse({ rooms: [{ unitId: 1, guests: 2 }, { unitId: 1, guests: 3 }] }, 'per_room').rooms).toEqual([
-      { unitId: 1, guests: 2 },
-      { unitId: 1, guests: 3 },
+      { unitId: 1, guests: 2, free: 0 },
+      { unitId: 1, guests: 3, free: 0 },
     ]);
     expect(refused({ rooms: [{ unitId: 1, guests: 2 }, { unitId: 1, guests: 3 }] })).toMatch(/booked as a whole/);
     expect(refused({ rooms: [] }, 'per_room')).toMatch(/at least one room/);
@@ -230,5 +230,22 @@ describe('clashes: a pending stay against the nights other stays take', () => {
     // Two rows of ANOTHER stay in one room (a long stay) are one room taken.
     const sameRoom = [inRoom('x', 'confirmed', 10), { ...inRoom('x', 'confirmed', 10), during: '["2026-10-16 07:00:00+00","2026-10-16 09:00:00+00")' }];
     expect(clashes([night('me', 1, 'pending')], 'me', takingRows(sameRoom, now), rooms)).toBe(false);
+  });
+});
+
+// D-147 (plan/free-guests.md): a room's free guests are a second count,
+// checked here as request_booking() checks them (0 to 50, whole), 0 when
+// absent, and never part of a price (the quote and the trigger take guests).
+describe('parseRequest: free guests (D-147)', () => {
+  it('fills 0 when absent, keeps a count, and refuses a bad one in words', () => {
+    expect(parse().rooms).toEqual([{ unitId: 3, guests: 32, free: 0 }]);
+    expect(parse({ rooms: [{ unitId: 3, guests: 32, free: 2 }] }).rooms).toEqual([{ unitId: 3, guests: 32, free: 2 }]);
+    expect(parse({ rooms: [{ unitId: 3, guests: 32, free: '1' }] }).rooms[0]!.free).toBe(1);
+    expect(parse({ rooms: [{ unitId: 3, guests: 32, free: null }] }).rooms[0]!.free).toBe(0);
+    expect(refused({ rooms: [{ unitId: 3, guests: 32, free: -1 }] })).toMatch(/Free guests must be a whole number from 0 to 50/);
+    expect(refused({ rooms: [{ unitId: 3, guests: 32, free: 1.5 }] })).toMatch(/Free guests/);
+    expect(refused({ rooms: [{ unitId: 3, guests: 32, free: 51 }] })).toMatch(/Free guests/);
+    // The paying count is still required: a room of children alone is not a booking.
+    expect(refused({ rooms: [{ unitId: 3, guests: 0, free: 2 }] })).toMatch(/Guests/);
   });
 });
