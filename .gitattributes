@@ -1,0 +1,7 @@
+# The office's files stay LF on every checkout (D-153). With core.autocrlf a
+# Windows checkout writes CRLF, and Claude Code then silently drops every
+# agent whose description holds ": " (seven of ten, measured 2026-10-28).
+.claude/agents/** text eol=lf
+.claude/skills/** text eol=lf
+office/** text eol=lf
+plan/ai-employees/organization.md text eol=lf

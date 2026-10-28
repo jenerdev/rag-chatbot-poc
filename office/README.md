@@ -30,6 +30,13 @@ A new employee is `node office/office.mjs hire <name> "<title>" --role <role> --
 - One question from any session: `@agent-george what is owed on bookings?`
 - Employee to employee, durable: `node office/office.mjs msg --to <name> --from <me> "…"`; every employee reads its inbox and its board first on every wake.
 - Employee to employee, live: agent teams, switched on for a session with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; a decision reached live is written to a board or an inbox before the session ends, or it did not happen.
+- **In a browser: `pnpm office`** ([`plan/office-app.md`](../plan/office-app.md), D-153). It prints `http://127.0.0.1:4600/?token=…`; open that. The floor is five rooms (Product, Design studio, Engineering, Front office, Review), each employee at a desk. A click opens their Chat, Board and Inbox.
+  - **A chat is a real `claude --agent <name>` session.** `claude --resume <id>` in a terminal continues it.
+  - **The board and the inbox are these files**, written through `office.mjs`.
+  - **The top bar shows today's spend** against `OFFICE_DAILY_USD` (default 10), and the page asks before a turn that goes over it.
+  - **One builder-or-tester turn runs at a time**; a second is queued.
+  - **Local only:** 127.0.0.1, a token, Origin and Host checked. Never deploy it.
+  - `OFFICE_PORT` picks the port. `node --test office/app/*.test.mjs` runs its tests, and `plan/office-app-walk.mjs` is its browser walk; both use a fake `claude` and spend nothing.
 
 ## The script
 
