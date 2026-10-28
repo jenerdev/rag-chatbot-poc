@@ -13,3 +13,4 @@ dist/
 # turborepo local cache
 .turbo/
 *.tsbuildinfo
+office/.lock/

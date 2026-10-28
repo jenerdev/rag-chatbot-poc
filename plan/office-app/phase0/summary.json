@@ -1,0 +1,123 @@
+{
+  "first": {
+    "exit": 0,
+    "seconds": 7,
+    "session": "fc021029-60b5-439d-8576-a6803d04964c",
+    "usd": 0.34141140000000003,
+    "is_error": false,
+    "result": "pong",
+    "permission_denials": [],
+    "types": [
+      "system/hook_started",
+      "system/hook_response",
+      "system/init",
+      "assistant",
+      "rate_limit_event",
+      "system/notification",
+      "result/success"
+    ]
+  },
+  "resume": {
+    "exit": 0,
+    "seconds": 7,
+    "session": "fc021029-60b5-439d-8576-a6803d04964c",
+    "usd": 0.38669020000000004,
+    "is_error": false,
+    "result": "pong",
+    "permission_denials": [],
+    "types": [
+      "system/hook_started",
+      "system/hook_response",
+      "system/init",
+      "assistant",
+      "rate_limit_event",
+      "system/notification",
+      "result/success"
+    ],
+    "same_session": true
+  },
+  "partial": {
+    "exit": 0,
+    "seconds": 7,
+    "session": "2dbe3713-76fe-4b98-8455-3d24c02122ba",
+    "usd": 0.30778360000000005,
+    "is_error": false,
+    "result": "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\neleven\ntwelve",
+    "permission_denials": [],
+    "types": [
+      "system/hook_started",
+      "system/hook_response",
+      "system/init",
+      "system/status",
+      "stream_event:message_start",
+      "stream_event:content_block_start",
+      "stream_event:content_block_delta",
+      "assistant",
+      "stream_event:content_block_stop",
+      "stream_event:message_delta",
+      "stream_event:message_stop",
+      "rate_limit_event",
+      "system/notification",
+      "result/success"
+    ],
+    "text_deltas": 5
+  },
+  "refusal": {
+    "exit": 0,
+    "seconds": 10,
+    "session": "5e098ac4-1c82-4016-8965-2c7283afd0cf",
+    "usd": 0.3318372,
+    "is_error": false,
+    "result": "`PreToolUse:Write hook error: [node office/hooks/guard.mjs]: guard: george may not do this — Write to apps/office-phase0.md: george (read-only) writes under office/ only (plan/ai-employees.md Rule 11)`",
+    "permission_denials": [
+      {
+        "tool_name": "Write",
+        "tool_use_id": "toolu_013sqXLvhTDVD1fB3D2byvxP",
+        "tool_input": {
+          "file_path": "C:\\Users\\jsi6724\\Desktop\\Projects\\rag-chatbot-poc\\.worktrees\\office-app\\apps\\office-phase0.md",
+          "content": "hi"
+        }
+      }
+    ],
+    "types": [
+      "system/hook_started",
+      "system/hook_response",
+      "system/init",
+      "system/thinking_tokens",
+      "assistant",
+      "rate_limit_event",
+      "user",
+      "system/notification",
+      "result/success"
+    ],
+    "tool_errors": [
+      "PreToolUse:Write hook error: [node office/hooks/guard.mjs]: guard: george may not do this — Write to apps/office-phase0.md: george (read-only) writes under office/ only (plan/ai-employees.md Rule 11)\n"
+    ]
+  },
+  "kill": {
+    "exit": 1,
+    "seconds": 11,
+    "session": "ecb27386-9503-4933-a1fa-3dc48aaf6315",
+    "usd": null,
+    "is_error": null,
+    "result": null,
+    "permission_denials": null,
+    "types": [
+      "system/hook_started",
+      "system/hook_response",
+      "system/init",
+      "system/thinking_tokens",
+      "assistant",
+      "user",
+      "rate_limit_event"
+    ],
+    "killed_after_s": 10,
+    "tree_before_kill": [
+      {
+        "pid": "24580",
+        "name": "claude"
+      }
+    ],
+    "alive_after_kill": []
+  }
+}

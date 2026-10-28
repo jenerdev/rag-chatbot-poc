@@ -15,7 +15,8 @@
     "eval": "turbo eval",
     "scores": "turbo scores",
     "office:check": "node office/office.mjs check",
-    "office:test": "node --test office/office.test.mjs"
+    "office:test": "node --test office/office.test.mjs office/app/server.test.mjs office/app/text.test.mjs",
+    "office": "node office/app/server.mjs"
   },
   "devDependencies": {
     "turbo": "^2"

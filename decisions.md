@@ -5019,3 +5019,50 @@ discipline alone as the staff wall (S-A2: one future `<Link>` breaks it).
 **Rests on:** GA4 behaviour nobody has read yet (R-63). The plan's Phase 0
 confirms each fact before any code.
 
+
+## D-153 · The office is a page on this machine: a chat IS a `claude --agent` session · **Added 2026-10-28**
+
+**Decision:** `pnpm office` (`office/app/server.mjs`, zero dependencies)
+serves one page on 127.0.0.1: the floor, five rooms with each employee at a
+desk, and a panel per employee with Chat, Board and Inbox
+([`plan/office-app.md`](./plan/office-app.md), the user: "make the office
+runnable on a web app … i can talk to ai employees via chat … an animated
+office with depart partition").
+
+- **A chat is the command line.** Each turn runs
+  `claude --agent <name> -p … --resume <id> --output-format stream-json --include-partial-messages --allowedTools <the profile's list>`.
+  The charter, the tools and the guard hook apply unchanged. There is no
+  API key in the app and no permission bypass (the classifier refused one
+  on 2026-10-28, rightly). `claude --resume <id>` in a terminal continues
+  the page's chat (measured).
+- **`office.mjs` stays the ONE writer.** The page moves a card through
+  `taskMove()`. `snapshot()` is the files parsed by `check`'s own parsers.
+  A watcher pushes `changed`.
+- **Every writer takes ONE lock**, a directory, re-entrant, stale after
+  30 s. Two processes adding 20 tasks each got 40 distinct ids.
+- **Local only:** a random token in a cookie, Host and Origin checked, a
+  POST without Origin refused, a strict CSP. It is never deployed: a
+  remote door to an agent that writes files is what this must not make.
+- **Money:** each turn's cost is shown, and today's spend is summed from
+  `sessions.json`'s per-turn log. Over `OFFICE_DAILY_USD` the page asks
+  first (402).
+- **One builder-or-tester turn at a time**; another is queued (trap 16's
+  reason).
+- **The floor** is hand-written SVG and CSS. Every state is also text, and
+  reduced motion stops every loop.
+
+**Measured:**
+- tests 43/43: office 25, server 15, text 3;
+- the walk 16/16, three runs in a row (axe 0 on 7 states, no CSP or script
+  error);
+- Phase 0 (`plan/office-app/phase0.md`): the CLI contract;
+- Phase 5 (`phase5.md`): 8/8 with the real `claude`, 1.67 USD.
+
+**Found on the way:**
+- With `core.autocrlf`, Claude Code silently drops every agent whose
+  description holds `": "`, seven of ten. `.gitattributes` keeps those
+  files LF, and `check` names a CRLF agent.
+
+**Rests on:**
+- R-65 (the local door);
+- the stream-json shape of Claude Code 2.1.312 (Phase 0 recorded it).
