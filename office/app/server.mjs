@@ -220,12 +220,14 @@ export function startOffice({ port = Number(process.env.OFFICE_PORT ?? 4600), to
 
   function transcript(id) {
     if (!UUID.test(id)) throw new HttpError(404, 'no such session');
-    if (!existsSync(projectsDir)) throw new HttpError(404, 'no such session');
+    if (!existsSync(projectsDir)) return [];
     for (const d of readdirSync(projectsDir)) {
       const f = join(projectsDir, d, `${id}.jsonl`);
       if (existsSync(f)) return readTranscript(readFileSync(f, 'utf8'), repo);
     }
-    throw new HttpError(404, 'no such session');
+    // In the index but not on disk (~/.claude cleaned, another machine):
+    // an empty history, not an error; new turns still --resume it.
+    return [];
   }
 
   const routes = [

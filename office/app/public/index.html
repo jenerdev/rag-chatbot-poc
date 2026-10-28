@@ -1,1 +1,43 @@
-<!doctype html><title>Office</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The office</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/public/office.css">
+  <script type="module" src="/public/office.js"></script>
+</head>
+<body>
+  <a class="skip" href="#floor">Skip to the floor</a>
+  <header class="topbar">
+    <div class="brand">
+      <h1>The office</h1>
+      <p>Local only · every chat is a <code>claude --agent</code> session</p>
+    </div>
+    <p id="busy" class="topbar-item" aria-live="polite">Loading…</p>
+    <p id="spent" class="topbar-item">Today 0.00 USD</p>
+    <button id="pipeline-toggle" type="button" class="btn" aria-expanded="true" aria-controls="pipeline">Pipeline</button>
+  </header>
+  <p id="problems" class="problems" role="alert" hidden></p>
+  <main id="floor" class="floor" tabindex="-1" aria-label="The office floor"></main>
+  <section id="pipeline" class="pipeline" aria-labelledby="pipeline-title">
+    <h2 id="pipeline-title">The pipeline</h2>
+    <ol id="pipeline-rungs" class="rungs"></ol>
+  </section>
+  <aside id="panel" class="panel" hidden></aside>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="ask" aria-labelledby="ask-title">
+    <form id="ask-form" method="dialog">
+      <h2 id="ask-title"></h2>
+      <p id="ask-message"></p>
+      <label id="ask-label" for="ask-input" hidden></label>
+      <input id="ask-input" maxlength="400" hidden>
+      <div class="ask-row">
+        <button type="submit" class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button id="ask-ok" type="submit" class="btn btn-primary" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
