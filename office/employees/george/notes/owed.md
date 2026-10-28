@@ -42,7 +42,7 @@ Oldest first within a section. The record wins any disagreement.
 | A subdomain per tenant on Vercel (noted 2026-09-28, not built) | status.md:1823–1838 |
 | Voice Phase 0: listen to `plan/voice/phase0/` (the peso amount, the Taglish) | status.md:89 |
 | AI employees: Python for security-guidance's hooks; the three `/mcp` logins (Context7, GitHub, Supabase) | whats-done.md:10095, 10115 |
-| AI employees: q13, the user's APPROVE on the requirements gate (gate 2) and the architecture gate (gate 5) of `analytics`, when Rhea and Theo write DONE / SUBMITTED (q11 and q12 answered 2026-10-27: the nine named; analytics full lane, free-guest-field short lane) | plan/ai-employees.md § 4.2, § 9 q12–q13; status.md:59 ("q11 and q12 answered") |
+| ~~AI employees: q13, the user's APPROVE on gates 2 and 5 of `analytics`~~ DONE: both APPROVED by the user 2026-10-28 (office/pipeline.md). **Analytics ON HOLD by the user, 2026-10-28** ("we will put the analytics on hold for now"): T-018 (Finn, the build) dropped with that note; gates 1–5 stand. To resume: the user's word, then re-task Finn from plan/analytics.md Phase 0 (needs Context7 authorised; BR-7 still holds real guests until a lawyer confirms docs/legal/analytics.md § 6) | office/pipeline.md; T-018's note; M-028 |
 | AI employees Phase 4: the interactive teammate run, the user's hand | whats-done.md:10105; plan § 8 Phase 4 |
 | AI employees Phase 3: the tokens and seconds of this build and of a second wake, and security-guidance's Stop cost, "measured and recorded" (George cannot measure her own session; the user reads them) | plan/ai-employees.md § 8 Phase 3 |
 
@@ -90,6 +90,6 @@ first task.
 
 | Slug | Title | Lane | From | Entered | First task |
 |---|---|---|---|---|---|
-| analytics | Google Analytics on the public pages (the chat, the booking page, Manage booking) | full | user (todo.md:9); q12 | 2026-10-27, `idea add` | T-001 on ivy's board (gate 1, `docs/product/analytics.md`); M-001 carries the context (plan.md:678's seam, R-55, D-127, D-129–D-131, R-60) |
+| analytics | Google Analytics on the public pages (the chat, the booking page, Manage booking) | full | user (todo.md:9); q12 | 2026-10-27, `idea add` | T-001 on ivy's board (gate 1, `docs/product/analytics.md`); M-001 carries the context (plan.md:678's seam, R-55, D-127, D-129–D-131, R-60). **ON HOLD 2026-10-28** (the user): Approved through gate 5, not built; T-018 dropped |
 | free-guest-field | The platform form's free-guest field seen on screen | short (Approved at birth) | the record (status.md:65, whats-done.md:10047); q12 | 2026-10-27, `idea add` | T-002 on finn's board (gate 6, then quinn on gate 7); M-002 carries the context (plan/free-guests.md § 3.3 and Phase 3, R-62b, trap 26, trap 16, Rule 7: no money) |
 | messenger | Facebook Messenger | full | user (todo.md:1) | not yet on the pipeline | "a second full run once the first has amended § 4.2" (q12) |

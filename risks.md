@@ -1037,6 +1037,36 @@ reach Google in a shape the requirements forbid, and nothing would error.
 confirmed or wrong. A wrong fact goes to the owner of the FR it breaks.
 Phase 6's walk intercepts every hit and checks it against the allowlist.
 
+## R-64 · next 15.5.28 pins postcss 8.4.31: three highs remain in `pnpm audit --prod` · **Found 2026-10-28 (T-013); accepted, not exploitable as the app uses it**
+
+**The risk:** after the deps upgrade (whats-done.md, 2026-10-28) `pnpm audit
+--prod` still reports 5: 3 high, 2 moderate, every one in `next > postcss`
+8.4.31 or `next > postcss > source-map-js` 1.2.1:
+- high GHSA-6g55-p6wh-862q and GHSA-r28c-9q8g-f849 (postcss reads a file
+  named by an attacker's `/*# sourceMappingURL= */` comment);
+- high GHSA-68fv-2mgg-jv7q (source-map-js blocks the event loop on an
+  indexed source map's huge offset);
+- moderate GHSA-qx2v-qp2m-jg93, GHSA-fxqj-rqcc-2cmp (postcss).
+
+**Why they stay:** next 15.5.28 declares `"postcss": "8.4.31"` exactly,
+and no 15.5.x declares another. All three need attacker-controlled CSS
+or source maps handed to postcss, and next loads postcss at BUILD time
+only (`dist/build/webpack/config/blocks/css`, the font loader,
+`resolve-url-loader`, the CSS minimizer; read 2026-10-28). It processes
+the app's own `app/styles/*.css`, nothing a visitor or tenant writes:
+tenant colours reach the page as CSS custom properties through the
+`style` prop (D-030), never through postcss. The one runtime user in
+next's tree is the AMP optimizer, and the app has no AMP page.
+
+**The fix, when wanted (the user's choice, not taken in T-013):**
+- next 16 (16.4.3 pins postcss 8.5.23, which clears all five), a major
+  with its own migration; or
+- a `pnpm.overrides` entry forcing postcss ≥ 8.5.28 under next 15.5.x,
+  a version next 15 was not released with.
+
+**Reverse if:** the app starts running postcss on CSS it did not write
+(a tenant stylesheet, an upload), or a 15.5.x release unpins postcss.
+
 ---
 
 ## Explicitly still missing after tenancy

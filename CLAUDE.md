@@ -397,7 +397,7 @@
 > Phases 0–6, all done, walk included).
 > - ONE number per tenant, `free_up_to_age` in the bookings config (0–17,
 >   checked by `tenant_applications_validate()`; absent = nobody is free),
->   set by a super user on the platform form's Bookings tab beside max stay
+>   set by a super user on the platform form's Applications tab (Bookings card) beside max stay
 >   and the horizon (D-078).
 > - A SECOND count on every booking row, `bookings.free_guests`
 >   (`sql/schema-free-guests.sql`, the 45th file; 0–50, default 0), written

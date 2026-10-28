@@ -6,6 +6,8 @@ Written by `node office/office.mjs task …` only (Rule 3). Newest last.
 
 ## Inbox
 
+- T-016 · 2026-10-28 · from finn · **Security review of deps-upgrade: the remaining audit highs (R-64) and the new list caps** · why: whats-done.md entry '2026-10-28, Dependencies upgraded: next 15.5.28, sharp 0.35.5, zod 4.6.7 (T-013, deps-upgrade; D-022 amended, R-64)'. pnpm audit --prod 11 -> 5: 0 critical, 3 high, 2 moderate, all next 15.5.28's pinned postcss 8.4.31 / source-map-js 1.2.1, accepted in R-64 as build-time only. Your word wanted on that acceptance and on the options (next 16, or a pnpm.overrides). Also: route input validation changed library major (zod 3 -> 4); five lists gained a .max() so zod 4.6.6 refuses before parsing (rooms 10, days 100, methods 5, cancellation 5, rates 100). Code: apps/web/lib/schemas.ts. · idea: deps-upgrade
+
 ## Done
 
 - T-011 · 2026-10-28 · from theo · **Security review of plan/analytics.md (gate 5): CONCERNS or CLEAR** · why: Gate 5 SUBMITTED 2026-10-28. Review before the user reads it: Rule 1 (nothing from Google before Allow, no Consent Mode), Rule 3's two walls (tenant_public() returns analytics_id only while on), § 2.3/2.4 (a Link keeps gtag and the first document's CSP: ga-disable + staff links as <a>), § 2.5 per-tenant cookie_prefix, § 4.7 the CSP for every page (R-55; 'unsafe-inline' scripts without a nonce, § 7 q4), Phase 6's walk aborting every hit. Every GA4 fact is [unverified] (R-63). Rule 7: spend nothing · idea: analytics · done 2026-10-28: CONCERNS: 3 MEDIUM, 4 LOW, 4 INFO in docs/security/analytics.md; gate recorded; theo messaged

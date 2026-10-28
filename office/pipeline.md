@@ -21,4 +21,9 @@ Every idea, its lane, its gates and its status, DERIVED from the gates (plan/ai-
 - qa · PASS · by quinn · 2026-10-28 · file: docs/qa/free-guest-field.md
 - release · READY WITH DOCUMENTED RISKS · by quinn · 2026-10-28 · file: docs/qa/free-guest-field.md
 
-## deps-upgrade · Bump next, sharp and zod past the advisories Sage's pnpm audit found (docs/security/analytics.md, plan/analytics.md section 9) · short lane · from user · 2026-10-28 · **Approved**
+## deps-upgrade · Bump next, sharp and zod past the advisories Sage's pnpm audit found (docs/security/analytics.md, plan/analytics.md section 9) · short lane · from user · 2026-10-28 · **Reviewed**
+
+- implementation · DONE · by finn · 2026-10-28 · file: whats-done.md · note: 2026-10-28, Dependencies upgraded: next 15.5.28, sharp 0.35.5, zod 4.6.7 (T-013, deps-upgrade; D-022 amended, R-64)
+- qa · PASS · by quinn · 2026-10-28 · file: docs/qa/deps-upgrade.md
+
+## office-app · The office as a local web app: an animated floor of five rooms, each employee at a desk, chat with each, their board and inbox (plan/office-app.md) · short lane · from user · 2026-10-28 · **Approved**

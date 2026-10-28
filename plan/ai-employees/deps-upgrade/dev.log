@@ -1,0 +1,690 @@
+$ turbo dev
+• turbo 2.11.2
+
+   • Packages in scope: @rag/bookings, @rag/chunker, @rag/db, @rag/openai, @rag/pipeline, @rag/push, @rag/tsconfig, web
+   • Running dev in 8 packages
+   • Remote caching disabled
+
+web:dev: cache bypass, force executing e1cb3e556bebfe2f
+web:dev: $ next dev --port 3000
+web:dev:    ▲ Next.js 15.5.28
+web:dev:    - Local:        http://localhost:3000
+web:dev:    - Network:      http://192.168.100.152:3000
+web:dev: 
+web:dev:  ✓ Starting...
+web:dev:  ✓ Ready in 2s
+web:dev:  ○ Compiling / ...
+web:dev:  ✓ Compiled / in 2.7s (620 modules)
+web:dev:  GET / 200 in 3101ms
+web:dev:  GET / 200 in 74ms
+web:dev:  ○ Compiling /t/[tenant] ...
+web:dev:  ✓ Compiled /t/[tenant] in 1079ms (785 modules)
+web:dev:  GET /t/villa 200 in 4349ms
+web:dev:  GET /t/villa 200 in 892ms
+web:dev:  HEAD /t/villa 200 in 870ms
+web:dev:  ✓ Compiled in 749ms (540 modules)
+web:dev:  ✓ Compiled in 663ms (540 modules)
+web:dev:  ✓ Compiled in 517ms (540 modules)
+web:dev:  ✓ Compiled in 423ms (540 modules)
+web:dev:  ✓ Compiled in 441ms (540 modules)
+web:dev:  ✓ Compiled in 299ms (540 modules)
+web:dev:  ✓ Compiled in 211ms (540 modules)
+web:dev:  ✓ Compiled in 235ms (540 modules)
+web:dev:  ✓ Compiled in 247ms (540 modules)
+web:dev:  ✓ Compiled in 196ms (540 modules)
+web:dev:  ✓ Compiled in 180ms (540 modules)
+web:dev:  ✓ Compiled in 164ms (540 modules)
+web:dev:  ✓ Compiled in 308ms (540 modules)
+web:dev:  ✓ Compiled in 191ms (540 modules)
+web:dev:  ✓ Compiled in 375ms (540 modules)
+web:dev:  ✓ Compiled in 235ms (540 modules)
+web:dev:  ✓ Compiled /t/[tenant]/app-icon.png in 331ms (787 modules)
+web:dev:  GET /t/villa/app-icon.png?size=180 200 in 1801ms
+web:dev:  GET /t/villa/app-icon.png?size=192 200 in 340ms
+web:dev:  GET /t/villa/app-icon.png?size=512 200 in 373ms
+web:dev:  GET /t/villa/app-icon.png?size=999 200 in 321ms
+web:dev:  GET /t/alteza/app-icon.png?size=180 200 in 634ms
+web:dev:  GET /t/alteza/app-icon.png?size=192 200 in 353ms
+web:dev:  GET /t/alteza/app-icon.png?size=512 200 in 370ms
+web:dev:  GET /t/alteza/app-icon.png?size=999 200 in 388ms
+web:dev:  ○ Compiling /api/platform/tenants ...
+web:dev:  ✓ Compiled /api/platform/tenants in 611ms (889 modules)
+web:dev: [error] Platform login required
+web:dev:  GET /api/platform/tenants 401 in 851ms
+web:dev:  HEAD /t/villa/app-icon.png?size=192 200 in 492ms
+web:dev:  HEAD /t/alteza/app-icon.png?size=192 200 in 346ms
+web:dev:  ○ Compiling /t/[tenant]/book ...
+web:dev:  ✓ Compiled /t/[tenant]/book in 537ms (909 modules)
+web:dev:  GET /t/alteza/book 200 in 2846ms
+web:dev:  ✓ Compiled /api/t/[tenant]/book/quote in 290ms (594 modules)
+web:dev:  POST /api/t/villa/book/quote 200 in 3113ms
+web:dev:  POST /api/t/villa/book/quote 200 in 1136ms
+web:dev:  POST /api/t/villa/book/quote 400 in 318ms
+web:dev:  POST /api/t/villa/book/quote 400 in 334ms
+web:dev:  POST /api/t/villa/book/quote 400 in 344ms
+web:dev:  POST /api/t/villa/book/quote 400 in 443ms
+web:dev:  POST /api/t/villa/book/quote 400 in 351ms
+web:dev:  POST /api/t/villa/book/quote 400 in 350ms
+web:dev:  POST /api/t/villa/book/quote 400 in 308ms
+web:dev:  POST /api/t/villa/book/quote 400 in 324ms
+web:dev:  POST /api/t/villa/book/quote 400 in 314ms
+web:dev:  POST /api/t/villa/book/quote 400 in 339ms
+web:dev:  POST /api/t/villa/book/quote 400 in 355ms
+web:dev:  POST /api/t/villa/book/quote 400 in 315ms
+web:dev:  POST /api/t/villa/book/quote 400 in 336ms
+web:dev:  POST /api/t/villa/book/quote 400 in 351ms
+web:dev:  POST /api/t/villa/book/quote 400 in 349ms
+web:dev:  POST /api/t/alteza/book/quote 200 in 1376ms
+web:dev:  POST /api/t/alteza/book/quote 200 in 1091ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 333ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 360ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 372ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 350ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 381ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 335ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 312ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 343ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 313ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 334ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 351ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 311ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 323ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 330ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 575ms
+web:dev:  ✓ Compiled /api/t/[tenant]/book/request in 323ms (598 modules)
+web:dev:  POST /api/t/villa/book/request 400 in 1310ms
+web:dev:  POST /api/t/villa/book/request 400 in 339ms
+web:dev:  POST /api/t/villa/book/request 400 in 346ms
+web:dev:  POST /api/t/villa/book/request 400 in 382ms
+web:dev:  POST /api/t/villa/book/request 400 in 354ms
+web:dev:  POST /api/t/villa/book/request 400 in 332ms
+web:dev:  ✓ Compiled /api/platform/session in 148ms (603 modules)
+web:dev:  POST /api/platform/session 200 in 1065ms
+web:dev:  ✓ Compiled /api/platform/tenants in 221ms (344 modules)
+web:dev:  POST /api/platform/tenants 400 in 563ms
+web:dev:  POST /api/platform/tenants 400 in 146ms
+web:dev:  POST /api/platform/tenants 400 in 141ms
+web:dev:  POST /api/platform/tenants 400 in 133ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b created tenant 2319 "deps-walk-367df0"
+web:dev:  POST /api/platform/tenants 201 in 567ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id] in 186ms (607 modules)
+web:dev:  PATCH /api/platform/tenants/2319 400 in 1057ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 154ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 142ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 163ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 130ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 146ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 180ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 162ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 169ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 149ms
+web:dev:  PATCH /api/platform/tenants/2319 400 in 142ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b updated tenant 2319: suggested_questions
+web:dev:  PATCH /api/platform/tenants/2319 200 in 792ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b updated tenant 2319: suggested_questions
+web:dev:  PATCH /api/platform/tenants/2319 200 in 703ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 186ms (609 modules)
+web:dev:  PUT /api/platform/tenants/2319/applications/bookings 400 in 974ms
+web:dev:  PUT /api/platform/tenants/2319/applications/bookings 400 in 147ms
+web:dev: [error] Record the signed data processing agreement first (the Legal tab), then switch bookings on.
+web:dev:  PUT /api/platform/tenants/2319/applications/bookings 400 in 313ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b updated tenant 2319: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2319 200 in 723ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b set bookings on tenant 2319
+web:dev:  PUT /api/platform/tenants/2319/applications/bookings 200 in 486ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/permissions in 191ms (611 modules)
+web:dev:  PUT /api/platform/tenants/2319/permissions 400 in 1054ms
+web:dev:  PUT /api/platform/tenants/2319/permissions 400 in 145ms
+web:dev:  PUT /api/platform/tenants/2319/permissions 400 in 141ms
+web:dev:  PUT /api/platform/tenants/2319/permissions 400 in 153ms
+web:dev:  PUT /api/platform/tenants/2319/permissions 400 in 145ms
+web:dev: [platform] d8483fbf-6c68-4679-8724-e61b063b090b set 1 role permission row(s) for tenant 2319
+web:dev:  PUT /api/platform/tenants/2319/permissions 200 in 487ms
+web:dev:  ✓ Compiled /t/[tenant]/app-icon.png in 163ms (358 modules)
+web:dev:  GET /t/alteza/app-icon.png?size=192 200 in 1111ms
+web:dev:  GET /t/alteza/app-icon.png?size=512 200 in 317ms
+web:dev:  ✓ Compiled /api/t/[tenant]/admin/session in 259ms (621 modules)
+web:dev:  POST /api/t/villa/admin/session 200 in 2019ms
+web:dev:  ○ Compiling /t/[tenant]/admin/bookings ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/bookings in 1175ms (963 modules)
+web:dev:  GET /t/villa/admin/bookings 200 in 2698ms
+web:dev:  ✓ Compiled /t/[tenant]/manifest.webmanifest in 398ms (965 modules)
+web:dev:  ✓ Compiled /t/[tenant]/admin/dashboard in 456ms (975 modules)
+web:dev:  GET /api/t/villa/admin/session 200 in 2075ms
+web:dev:  ○ Compiling /api/t/[tenant]/admin/push ...
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 3622ms
+web:dev:  GET /t/villa/app-icon.png?size=192 200 in 2992ms
+web:dev:  ✓ Compiled /api/t/[tenant]/admin/push in 1158ms (981 modules)
+web:dev:  GET /api/t/villa/admin/push 200 in 1523ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 1528ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 1528ms
+web:dev:  GET /api/t/villa/admin/push 200 in 1525ms
+web:dev:  GET /t/villa/admin/dashboard 200 in 2225ms
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 310ms
+web:dev:  GET /api/t/villa/admin/session 200 in 412ms
+web:dev:  ○ Compiling /api/t/[tenant]/dashboard ...
+web:dev:  ✓ Compiled /api/t/[tenant]/dashboard in 823ms (983 modules)
+web:dev:  GET /api/t/villa/admin/push 200 in 1599ms
+web:dev:  GET /api/t/villa/admin/push 200 in 1902ms
+web:dev:  GET /t/villa/admin/bookings 200 in 896ms
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 377ms
+web:dev:  GET /api/t/villa/admin/session 200 in 382ms
+web:dev:  GET /api/t/villa/admin/session 200 in 395ms
+web:dev: [dashboard] villa 30d: 245 conversations, 44 open, bookings yes, money no
+web:dev:  GET /api/t/villa/dashboard?days=30 200 in 2978ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 884ms
+web:dev:  GET /api/t/villa/admin/push 200 in 1011ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 1091ms
+web:dev:  GET /api/t/villa/admin/push 200 in 829ms
+web:dev:  GET /t/villa/admin/dashboard 200 in 824ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings/requests ...
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/requests in 994ms (985 modules)
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 1410ms
+web:dev:  GET /api/t/villa/admin/session 200 in 1530ms
+web:dev:  GET /api/t/villa/admin/session 200 in 505ms
+web:dev:  ○ Compiling /t/[tenant]/admin/accommodations ...
+web:dev:  GET /api/t/villa/admin/attention 200 in 1042ms
+web:dev: [dashboard] villa 30d: 245 conversations, 44 open, bookings yes, money no
+web:dev:  GET /api/t/villa/dashboard?days=30 200 in 1274ms
+web:dev:  GET /api/t/villa/admin/push 200 in 1275ms
+web:dev:  ✓ Compiled /t/[tenant]/admin/accommodations in 1510ms (995 modules)
+web:dev:  GET /api/t/villa/bookings/requests?from=2026-10-28 200 in 3926ms
+web:dev:  GET /api/t/villa/admin/push 200 in 2138ms
+web:dev:  GET /t/villa/admin/accommodations 404 in 3958ms
+web:dev:  GET /t/nope-1793149047942/admin/bookings 404 in 378ms
+web:dev:  GET /t/villa/admin/dashboard 200 in 830ms
+web:dev:  GET /t/villa/admin/bookings 200 in 1125ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 11603ms
+web:dev: [error] Could not read the notifications: notification_feed: not a member of tenant 3
+web:dev:  POST /api/platform/session 200 in 740ms
+web:dev:  POST /api/t/villa/admin/session 200 in 659ms
+web:dev: [platform] 8b8e38d9-5b79-47af-8521-ca63b930c529 created tenant 2320 "free-walk-f6ec0a"
+web:dev:  POST /api/platform/tenants 201 in 481ms
+web:dev: [platform] 8b8e38d9-5b79-47af-8521-ca63b930c529 updated tenant 2320: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2320 200 in 673ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2320/applications/bookings 400 in 761ms
+web:dev: [platform] 8b8e38d9-5b79-47af-8521-ca63b930c529 set bookings on tenant 2320
+web:dev:  PUT /api/platform/tenants/2320/applications/bookings 200 in 487ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 660ms
+web:dev:  POST /api/t/villa/book/quote 200 in 932ms
+web:dev:  POST /api/t/villa/book/quote 200 in 912ms
+web:dev: [error] Free guests must be a whole number from 0 to 50.
+web:dev:  POST /api/t/villa/book/quote 400 in 421ms
+web:dev:  ○ Compiling /t/[tenant]/book ...
+web:dev:  ✓ Compiled /t/[tenant]/book in 851ms (716 modules)
+web:dev:  GET /t/villa/book 200 in 2588ms
+web:dev:  GET /api/t/villa/admin/session 200 in 287ms
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings in 469ms (1002 modules)
+web:dev: [bookings] villa staff stay #23466: 2027-02-25 × 1 night(s), unit 1, slot 2, pending, group 91eb9323-773a-463f-9a36-23a519e78fe6
+web:dev:  POST /api/t/villa/bookings 201 in 3596ms
+web:dev:  GET /api/t/villa/bookings/requests?from=2027-02-25 200 in 1485ms
+web:dev:  ○ Compiling /t/[tenant]/admin/bookings/[reference] ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/bookings/[reference] in 1150ms (1018 modules)
+web:dev:  GET /t/villa/admin/bookings/VIL-FHMPYE 200 in 2974ms
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 332ms
+web:dev:  GET /t/villa/app-icon.png?size=192 200 in 381ms
+web:dev:  GET /api/t/villa/admin/session 200 in 679ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings/stay/[reference] ...
+web:dev:  GET /api/t/villa/admin/attention 200 in 1009ms
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/stay/[reference] in 1198ms (1020 modules)
+web:dev:  GET /api/t/villa/admin/push 200 in 2209ms
+web:dev:  GET /api/t/villa/admin/push 200 in 2263ms
+web:dev:  GET /api/t/villa/bookings/stay/VIL-FHMPYE 200 in 4216ms
+web:dev:  GET /t/villa/admin/bookings 200 in 969ms
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 322ms
+web:dev:  GET /api/t/villa/admin/session 200 in 470ms
+web:dev:  GET /api/t/villa/admin/push 200 in 738ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 751ms
+web:dev:  GET /api/t/villa/admin/push 200 in 795ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 848ms
+web:dev:  GET /api/t/villa/bookings/requests?from=2026-10-28 200 in 1395ms
+web:dev:  ✓ Compiled /api/t/[tenant]/book/request in 357ms (728 modules)
+web:dev: [bookings] villa request VIL-SYFFH9: 2027-02-27 × 1 night(s), 1 unit(s), 1 row(s), pending
+web:dev:  POST /api/t/villa/book/request 201 in 1891ms
+web:dev:  ✓ Compiled /api/t/[tenant]/manage in 484ms (1024 modules)
+web:dev:  POST /api/t/villa/manage 200 in 1787ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 762ms
+web:dev:  POST /api/platform/session 200 in 651ms
+web:dev: [platform] f59400ba-e523-41a4-ab6c-9ce1eac8cb05 created tenant 2321 "welcome-walk-57b980"
+web:dev:  POST /api/platform/tenants 201 in 2245ms
+web:dev:  ○ Compiling /t/[tenant] ...
+web:dev:  ✓ Compiled /t/[tenant] in 745ms (746 modules)
+web:dev:  GET /t/welcome-walk-57b980 200 in 1440ms
+web:dev:  PATCH /api/platform/tenants/2321 400 in 218ms
+web:dev:  PATCH /api/platform/tenants/2321 400 in 114ms
+web:dev: [platform] f59400ba-e523-41a4-ab6c-9ce1eac8cb05 updated tenant 2321: welcome_text
+web:dev:  PATCH /api/platform/tenants/2321 200 in 564ms
+web:dev:  GET /t/welcome-walk-57b980 200 in 328ms
+web:dev: [platform] f59400ba-e523-41a4-ab6c-9ce1eac8cb05 updated tenant 2321: welcome_text
+web:dev:  PATCH /api/platform/tenants/2321 200 in 733ms
+web:dev:  GET /t/welcome-walk-57b980 200 in 346ms
+web:dev:  POST /api/t/walk-book/admin/session 200 in 1000ms
+web:dev:  POST /api/t/walk-other/admin/session 200 in 747ms
+web:dev:  ○ Compiling /api/t/[tenant]/holidays/copy ...
+web:dev:  ✓ Compiled /api/t/[tenant]/holidays/copy in 1494ms (1038 modules)
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  GET /api/t/walk-book/bookings/requests 401 in 1750ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  DELETE /api/t/walk-book/holidays/2027-01-28 401 in 2847ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  GET /api/t/walk-book/holidays 401 in 2972ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  POST /api/t/walk-book/holidays/copy 401 in 3016ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  PUT /api/t/walk-book/holidays 401 in 3056ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  PATCH /api/t/walk-book/bookings/requests/00000000-0000-0000-0000-000000000000 401 in 3097ms
+web:dev:  POST /api/t/walk-book/book/quote 200 in 1260ms
+web:dev:  POST /api/t/no-such-tenant/book/quote 404 in 125ms
+web:dev:  POST /api/t/northwind/book/quote 404 in 120ms
+web:dev:  POST /api/t/walk-book/book/quote 200 in 1080ms
+web:dev: [bookings] walk-book request WAL-NQREKX: 2026-12-31 × 2 night(s), 1 unit(s), 2 row(s), pending
+web:dev:  POST /api/t/walk-book/book/request 201 in 1185ms
+web:dev:  POST /api/t/walk-book/book/request 400 in 310ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 547ms
+web:dev:  POST /api/t/walk-book/book/request 400 in 320ms
+web:dev:  GET /api/t/walk-book/bookings/requests?from=2026-12-31 200 in 1269ms
+web:dev: [error] Admin login required for "walk-book"
+web:dev:  GET /api/t/walk-book/bookings/requests 401 in 120ms
+web:dev: [bookings] walk-book request WAL-4XGCJC: 2026-12-31 × 2 night(s), 1 unit(s), 2 row(s), pending
+web:dev:  POST /api/t/walk-book/book/request 201 in 1132ms
+web:dev: [bookings] walk-book request c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 → confirmed (2 row(s))
+web:dev:  PATCH /api/t/walk-book/bookings/requests/c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 200 in 674ms
+web:dev: [bookings] walk-book request c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 → confirmed (2 row(s))
+web:dev:  PATCH /api/t/walk-book/bookings/requests/c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 200 in 601ms
+web:dev:  GET /api/t/walk-book/bookings/requests?from=2026-12-31 200 in 1318ms
+web:dev: [error] A night of this request was confirmed for another booking. Decline it, or cancel the other booking first.
+web:dev:  PATCH /api/t/walk-book/bookings/requests/7223abf0-f0a4-41e8-9018-0ffff6513819 409 in 708ms
+web:dev: [bookings] walk-book request 7223abf0-f0a4-41e8-9018-0ffff6513819 → cancelled (2 row(s))
+web:dev:  PATCH /api/t/walk-book/bookings/requests/7223abf0-f0a4-41e8-9018-0ffff6513819 200 in 578ms
+web:dev:  PATCH /api/t/walk-other/bookings/requests/c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 404 in 597ms
+web:dev: [error] That is not a request id.
+web:dev:  PATCH /api/t/walk-book/bookings/requests/not-a-uuid 400 in 520ms
+web:dev:  PATCH /api/t/walk-book/bookings/requests/c2b3e4ad-d84d-4b42-91a1-6181ebfd2451 400 in 399ms
+web:dev: [error] That date is no longer available. Please choose another.
+web:dev:  POST /api/t/walk-book/book/request 409 in 785ms
+web:dev: [bookings] walk-book calendar 2027-01-28 peak "Walk peak" +100000
+web:dev:  PUT /api/t/walk-book/holidays 200 in 693ms
+web:dev:  GET /api/t/walk-book/holidays?from=2027-01-28&to=2027-01-28 200 in 596ms
+web:dev:  GET /api/t/walk-other/holidays?from=2027-01-28&to=2027-01-28 200 in 564ms
+web:dev:  POST /api/t/walk-book/book/quote 200 in 979ms
+web:dev: [bookings] walk-book calendar copied 1 date(s) to 2028
+web:dev:  POST /api/t/walk-book/holidays/copy 200 in 714ms
+web:dev: [bookings] walk-book calendar 2027-01-28 removed
+web:dev:  DELETE /api/t/walk-book/holidays/2027-01-28 200 in 599ms
+web:dev:  DELETE /api/t/walk-book/holidays/2027-01-28 404 in 696ms
+web:dev:  PUT /api/t/walk-book/holidays 400 in 489ms
+web:dev: [bookings] walk-book request WAL-CTKQDF: 2027-03-01 × 1 night(s), 1 unit(s), 1 row(s), pending
+web:dev:  POST /api/t/walk-book/book/request 201 in 1127ms
+web:dev: [bookings] walk-book request WAL-TQNBCF: 2027-03-08 × 1 night(s), 1 unit(s), 1 row(s), pending
+web:dev:  POST /api/t/walk-book/book/request 201 in 1117ms
+web:dev: [bookings] walk-book request WAL-UERP6S: 2027-03-22 × 1 night(s), 1 unit(s), 1 row(s), pending
+web:dev:  POST /api/t/walk-book/book/request 201 in 1092ms
+web:dev: [error] There are already 3 open requests for this contact; the resort will reply to those first
+web:dev:  POST /api/t/walk-book/book/request 429 in 809ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 532ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 537ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 510ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 540ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 496ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 505ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 509ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 542ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 522ms
+web:dev: [error] Enter a mobile number like 0917 123 4567.
+web:dev:  POST /api/t/walk-book/book/request 400 in 549ms
+web:dev:  POST /api/t/walk-book/book/request 429 in 478ms
+web:dev:  POST /api/t/walk-book/book/request 429 in 429ms
+web:dev:  ○ Compiling /api/t/[tenant]/accommodations/[id]/rates ...
+web:dev:  ✓ Compiled /api/t/[tenant]/accommodations/[id]/rates in 766ms (1021 modules)
+web:dev: [bookings] walk-book rates for room #4689: slot 2770 350000/450000
+web:dev:  PUT /api/t/walk-book/accommodations/4689/rates 200 in 2933ms
+web:dev:  POST /api/platform/session 200 in 711ms
+web:dev:  POST /api/platform/session 401 in 403ms
+web:dev:  POST /api/platform/session 401 in 208ms
+web:dev:  POST /api/platform/session 401 in 121ms
+web:dev:  GET /api/platform/session 200 in 31ms
+web:dev:  POST /api/platform/tenants 400 in 123ms
+web:dev: [error] new row for relation "tenants" violates check constraint "tenants_slug_reserved"
+web:dev:  POST /api/platform/tenants 400 in 275ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 created tenant 2325 "probe-tm"
+web:dev:  POST /api/platform/tenants 201 in 1010ms
+web:dev: [error] A workspace with the slug "probe-tm": already exists.
+web:dev:  POST /api/platform/tenants 409 in 249ms
+web:dev:  GET /api/platform/tenants 200 in 265ms
+web:dev:  GET /api/platform/tenants/2325 200 in 1465ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 updated tenant 2325: business_name, theme, fallback_messages
+web:dev:  PATCH /api/platform/tenants/2325 200 in 2353ms
+web:dev:  GET /t/probe-tm 200 in 472ms
+web:dev:  PATCH /api/platform/tenants/2325 400 in 248ms
+web:dev:  PATCH /api/platform/tenants/2325 400 in 163ms
+web:dev:  PATCH /api/platform/tenants/2325 400 in 177ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/applications/[key] ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 696ms (725 modules)
+web:dev: [error] Record the signed data processing agreement first (the Legal tab), then switch bookings on.
+web:dev:  PUT /api/platform/tenants/2325/applications/bookings 400 in 1183ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 updated tenant 2325: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2325 200 in 764ms
+web:dev: [error] The bookings application needs config.timezone, e.g. {"timezone":"Asia/Manila"}
+web:dev:  PUT /api/platform/tenants/2325/applications/bookings 400 in 346ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 set bookings on tenant 2325
+web:dev:  PUT /api/platform/tenants/2325/applications/bookings 200 in 510ms
+web:dev: [error] config.max_stay_nights is a whole number of nights from 1 to 60
+web:dev:  PUT /api/platform/tenants/2325/applications/bookings 400 in 301ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 set bookings on tenant 2325
+web:dev:  PUT /api/platform/tenants/2325/applications/bookings 200 in 582ms
+web:dev:  PUT /api/platform/tenants/2325/applications/payments 400 in 179ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/members ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/members in 709ms (1020 modules)
+web:dev: [error] No account for ghost-1793149148700@example.com. Invite one from the command line: pnpm --filter @rag/db member:add -- probe-tm ghost-1793149148700@example.com owner
+web:dev:  POST /api/platform/tenants/2325/members 404 in 1776ms
+web:dev: [members] tenant 2325: added f7759d03-ab00-47f7-b9cb-026a6d6431bc as owner
+web:dev:  POST /api/platform/tenants/2325/members 201 in 825ms
+web:dev: [members] tenant 2325: added 0a570e38-4830-4a74-aaaa-33b7dbf27834 as staff
+web:dev:  POST /api/platform/tenants/2325/members 201 in 791ms
+web:dev: [error] walk-tm-staffer-1793149148700@example.com is already a member. Change the role instead.
+web:dev:  POST /api/platform/tenants/2325/members 409 in 688ms
+web:dev: [error] Tenant 2325 would be left with no owner
+web:dev:  PATCH /api/platform/tenants/2325/members 409 in 531ms
+web:dev: [members] tenant 2325: added 7998b761-27be-4393-b896-7637b1416fd0 as owner
+web:dev:  POST /api/platform/tenants/2325/members 201 in 614ms
+web:dev: [members] tenant 2325: removed 7998b761-27be-4393-b896-7637b1416fd0
+web:dev:  DELETE /api/platform/tenants/2325/members 200 in 754ms
+web:dev:  POST /api/t/probe-tm/admin/session 200 in 1059ms
+web:dev:  ✓ Compiled /api/t/[tenant]/members in 469ms (1022 modules)
+web:dev:  GET /api/t/probe-tm/members 200 in 1614ms
+web:dev: [members] tenant 2325: 0a570e38-4830-4a74-aaaa-33b7dbf27834 is now admin
+web:dev:  PATCH /api/t/probe-tm/members 200 in 638ms
+web:dev:  POST /api/t/probe-tm/admin/session 200 in 852ms
+web:dev: [error] Your role (admin) may not do this (members:manage) in "probe-tm". An owner can change your role; what each role may do is set by the platform.
+web:dev:  GET /api/t/probe-tm/members 403 in 371ms
+web:dev:  ✓ Compiled /api/t/[tenant]/documents in 489ms (1024 modules)
+web:dev:  GET /api/t/probe-tm/documents 200 in 1762ms
+web:dev: [error] Admin login required for "probe-tm"
+web:dev:  GET /api/t/probe-tm/members 401 in 181ms
+web:dev: [error] Platform login required
+web:dev:  GET /api/platform/tenants 401 in 37ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/archive ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/archive in 512ms (1026 modules)
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 archived tenant 2325
+web:dev:  POST /api/platform/tenants/2325/archive 200 in 1663ms
+web:dev:  GET /t/probe-tm 404 in 357ms
+web:dev:  ○ Compiling /t/[tenant]/admin ...
+web:dev:  ✓ Compiled /t/[tenant]/admin in 859ms (1028 modules)
+web:dev:  GET /t/probe-tm/admin 404 in 1877ms
+web:dev:  ○ Compiling /api/t/[tenant]/chat ...
+web:dev:  ✓ Compiled /api/t/[tenant]/chat in 548ms (1030 modules)
+web:dev:  POST /api/t/probe-tm/chat 404 in 1345ms
+web:dev:  GET /api/platform/tenants/2325 200 in 370ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 unarchived tenant 2325
+web:dev:  DELETE /api/platform/tenants/2325/archive 200 in 469ms
+web:dev:  GET /t/probe-tm 200 in 849ms
+web:dev: [platform] 7998b761-27be-4393-b896-7637b1416fd0 switched bookings off for tenant 2325
+web:dev:  DELETE /api/platform/tenants/2325/applications/bookings 200 in 450ms
+web:dev: [error] Tenant 2325 does not have the bookings application.
+web:dev:  DELETE /api/platform/tenants/2325/applications/bookings 404 in 275ms
+web:dev: [error] This account no longer runs the platform. Log in again.
+web:dev:  GET /api/platform/tenants 401 in 167ms
+web:dev:  GET /api/platform/session 200 in 163ms
+web:dev:  POST /api/t/routes-rooms/admin/session 200 in 811ms
+web:dev:  POST /api/t/routes-whole/admin/session 200 in 806ms
+web:dev:  ○ Compiling /api/t/[tenant]/accommodations/[id] ...
+web:dev:  ✓ Compiled /api/t/[tenant]/accommodations/[id] in 1442ms (1038 modules)
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  PUT /api/t/routes-rooms/accommodations/1/rates 401 in 1783ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  POST /api/t/routes-rooms/accommodations/1/images 401 in 2504ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  GET /api/t/routes-rooms/accommodations 401 in 2558ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  POST /api/t/routes-rooms/accommodations 401 in 2635ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  POST /api/t/routes-rooms/bookings/quote 401 in 2649ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  DELETE /api/t/routes-rooms/accommodations/1/images/1 401 in 2672ms
+web:dev: [error] Admin login required for "routes-rooms"
+web:dev:  PATCH /api/t/routes-rooms/accommodations/1 401 in 2670ms
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/setup in 474ms (747 modules)
+web:dev: [error] Admin login required for "routes-whole"
+web:dev:  GET /api/t/routes-whole/bookings/setup 401 in 810ms
+web:dev: [error] "routes-whole" does not book by room
+web:dev:  GET /api/t/routes-whole/accommodations 404 in 588ms
+web:dev: [error] "routes-whole" does not book by room
+web:dev:  POST /api/t/routes-whole/accommodations 404 in 644ms
+web:dev:  POST /api/t/routes-whole/bookings/quote 400 in 491ms
+web:dev:  GET /api/t/routes-whole/bookings/setup 200 in 805ms
+web:dev: [bookings] routes-rooms added room #4694 "Garden Room"
+web:dev:  POST /api/t/routes-rooms/accommodations 201 in 1217ms
+web:dev: [bookings] routes-rooms added room #4695 "Family Room"
+web:dev:  POST /api/t/routes-rooms/accommodations 201 in 1179ms
+web:dev: [bookings] routes-rooms rates for room #4694: slot 2772 350000/450000
+web:dev:  PUT /api/t/routes-rooms/accommodations/4694/rates 200 in 1301ms
+web:dev: [bookings] routes-rooms rates for room #4695: slot 2772 600000/750000
+web:dev:  PUT /api/t/routes-rooms/accommodations/4695/rates 200 in 1222ms
+web:dev: [error] Weekday price must be a whole number of centavos from 0 to 100000000.
+web:dev:  PUT /api/t/routes-rooms/accommodations/4694/rates 400 in 588ms
+web:dev:  GET /api/t/routes-rooms/bookings/setup 200 in 771ms
+web:dev:  POST /api/t/routes-rooms/bookings/quote 400 in 458ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings ...
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings in 686ms (739 modules)
+web:dev:  POST /api/t/routes-rooms/bookings 400 in 1429ms
+web:dev:  POST /api/t/routes-rooms/bookings 400 in 625ms
+web:dev:  POST /api/t/routes-rooms/bookings 400 in 579ms
+web:dev:  GET /api/t/routes-rooms/bookings?from=2026-12-28&unit=4694 200 in 1151ms
+web:dev:  GET /api/t/routes-rooms/bookings?from=2026-12-28&unit=4693 200 in 1298ms
+web:dev: [bookings] routes-rooms photo #2745 for room #4694: 2327/4694/9c1dba8a-6c12-4a9a-9726-9ec5e62bbad9.png, 70 bytes
+web:dev:  POST /api/t/routes-rooms/accommodations/4694/images 201 in 2206ms
+web:dev: [error] A photo must be a JPEG, PNG or WebP image.
+web:dev:  POST /api/t/routes-rooms/accommodations/4694/images 400 in 584ms
+web:dev:  POST /api/t/routes-rooms/accommodations/4694/images 400 in 502ms
+web:dev:  POST /api/t/routes-rooms/accommodations/4693/images 404 in 707ms
+web:dev:  PATCH /api/t/routes-rooms/accommodations/4694/images/2745 200 in 828ms
+web:dev:  DELETE /api/t/routes-rooms/accommodations/4695/images/2745 404 in 753ms
+web:dev: [bookings] routes-rooms removed photo #2745: 2327/4694/9c1dba8a-6c12-4a9a-9726-9ec5e62bbad9.png
+web:dev:  DELETE /api/t/routes-rooms/accommodations/4694/images/2745 200 in 1016ms
+web:dev:  DELETE /api/t/routes-rooms/accommodations/4694/images/2745 404 in 681ms
+web:dev: [bookings] routes-rooms changed room #4695: active
+web:dev:  PATCH /api/t/routes-rooms/accommodations/4695 200 in 960ms
+web:dev:  PATCH /api/t/routes-rooms/accommodations/4693 404 in 573ms
+web:dev:  GET /api/t/routes-rooms/accommodations/999999999 404 in 849ms
+web:dev: [bookings] routes-rooms added room #4696 "Quad"
+web:dev:  POST /api/t/routes-rooms/accommodations 201 in 1089ms
+web:dev: [bookings] routes-rooms rates for room #4696: slot 2772 350000/450000
+web:dev:  PUT /api/t/routes-rooms/accommodations/4696/rates 200 in 1032ms
+web:dev:  POST /api/t/routes-rooms/bookings/quote 400 in 500ms
+web:dev:  POST /api/t/routes-rooms/bookings/quote 400 in 482ms
+web:dev:  POST /api/t/routes-rooms/bookings 400 in 512ms
+web:dev:  POST /api/t/routes-rooms/bookings 400 in 406ms
+web:dev: [error] Standard guests cannot be more than the maximum.
+web:dev:  PATCH /api/t/routes-rooms/accommodations/4696 400 in 658ms
+web:dev:  ○ Compiling /api/t/[tenant]/manage ...
+web:dev:  ✓ Compiled /api/t/[tenant]/manage in 721ms (739 modules)
+web:dev:  POST /api/t/manage-walk/manage 200 in 1793ms
+web:dev:  ○ Compiling /api/t/[tenant]/manage/proof ...
+web:dev:  ✓ Compiled /api/t/[tenant]/manage/proof in 947ms (1036 modules)
+web:dev:  POST /api/t/manage-walk/manage/proof 201 in 2801ms
+web:dev:  POST /api/t/manage-walk/manage 200 in 624ms
+web:dev:  POST /api/t/manage-walk/manage/proof 201 in 811ms
+web:dev: [error] A payment for this booking is already being checked. Please wait for the resort to review it.
+web:dev:  POST /api/t/manage-walk/manage/proof 409 in 891ms
+web:dev:  POST /api/t/manage-walk/manage/proof 400 in 349ms
+web:dev: [error] The proof must be a JPG, PNG or WebP photo, or a PDF.
+web:dev:  POST /api/t/manage-walk/manage/proof 400 in 488ms
+web:dev:  POST /api/t/manage-walk/manage/proof 404 in 636ms
+web:dev:  POST /api/t/manage-walk/manage 404 in 553ms
+web:dev:  ✓ Compiled /api/t/[tenant]/book/quote in 279ms (705 modules)
+web:dev:  POST /api/t/villa/book/quote 200 in 1984ms
+web:dev:  POST /api/t/villa/book/quote 200 in 1240ms
+web:dev:  POST /api/t/villa/book/quote 400 in 319ms
+web:dev:  POST /api/t/villa/book/quote 400 in 388ms
+web:dev:  POST /api/t/villa/book/quote 400 in 306ms
+web:dev:  POST /api/t/villa/book/quote 400 in 382ms
+web:dev:  POST /api/t/villa/book/quote 400 in 391ms
+web:dev:  POST /api/t/villa/book/quote 400 in 308ms
+web:dev:  POST /api/t/villa/book/quote 400 in 307ms
+web:dev:  POST /api/t/villa/book/quote 400 in 335ms
+web:dev:  POST /api/t/villa/book/quote 400 in 338ms
+web:dev:  POST /api/t/villa/book/quote 400 in 333ms
+web:dev:  POST /api/t/villa/book/quote 400 in 320ms
+web:dev:  POST /api/t/villa/book/quote 400 in 310ms
+web:dev:  POST /api/t/villa/book/quote 400 in 330ms
+web:dev:  POST /api/t/villa/book/quote 400 in 327ms
+web:dev:  POST /api/t/villa/book/quote 400 in 306ms
+web:dev:  POST /api/t/alteza/book/quote 200 in 1053ms
+web:dev:  POST /api/t/alteza/book/quote 200 in 989ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 323ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 326ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 348ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 315ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 309ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 339ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 320ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 339ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 413ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 307ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 368ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 341ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 328ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 333ms
+web:dev:  POST /api/t/alteza/book/quote 400 in 316ms
+web:dev:  ✓ Compiled /api/t/[tenant]/book/request in 234ms (701 modules)
+web:dev:  POST /api/t/villa/book/request 400 in 638ms
+web:dev:  POST /api/t/villa/book/request 400 in 332ms
+web:dev:  POST /api/t/villa/book/request 400 in 321ms
+web:dev:  POST /api/t/villa/book/request 400 in 325ms
+web:dev:  POST /api/t/villa/book/request 400 in 334ms
+web:dev:  POST /api/t/villa/book/request 400 in 308ms
+web:dev:  ✓ Compiled /api/platform/session in 202ms (705 modules)
+web:dev:  POST /api/platform/session 200 in 990ms
+web:dev:  ✓ Compiled /api/platform/tenants in 214ms (707 modules)
+web:dev:  POST /api/platform/tenants 400 in 426ms
+web:dev:  POST /api/platform/tenants 400 in 131ms
+web:dev:  POST /api/platform/tenants 400 in 124ms
+web:dev:  POST /api/platform/tenants 400 in 135ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce created tenant 2330 "deps-walk-93093b"
+web:dev:  POST /api/platform/tenants 201 in 750ms
+web:dev:  ○ Compiling /api/platform/tenants/[id] ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id] in 576ms (709 modules)
+web:dev:  PATCH /api/platform/tenants/2330 400 in 940ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 141ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 127ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 131ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 134ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 129ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 135ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 121ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 122ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 124ms
+web:dev:  PATCH /api/platform/tenants/2330 400 in 154ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce updated tenant 2330: suggested_questions
+web:dev:  PATCH /api/platform/tenants/2330 200 in 577ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce updated tenant 2330: suggested_questions
+web:dev:  PATCH /api/platform/tenants/2330 200 in 625ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 256ms (711 modules)
+web:dev:  PUT /api/platform/tenants/2330/applications/bookings 400 in 626ms
+web:dev:  PUT /api/platform/tenants/2330/applications/bookings 400 in 133ms
+web:dev: [error] Record the signed data processing agreement first (the Legal tab), then switch bookings on.
+web:dev:  PUT /api/platform/tenants/2330/applications/bookings 400 in 240ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce updated tenant 2330: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2330 200 in 625ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce set bookings on tenant 2330
+web:dev:  PUT /api/platform/tenants/2330/applications/bookings 200 in 427ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/permissions in 270ms (713 modules)
+web:dev:  PUT /api/platform/tenants/2330/permissions 400 in 624ms
+web:dev:  PUT /api/platform/tenants/2330/permissions 400 in 140ms
+web:dev:  PUT /api/platform/tenants/2330/permissions 400 in 148ms
+web:dev:  PUT /api/platform/tenants/2330/permissions 400 in 137ms
+web:dev:  PUT /api/platform/tenants/2330/permissions 400 in 130ms
+web:dev: [platform] c524bba9-2cb2-43c5-b65b-42d34e0739ce set 1 role permission row(s) for tenant 2330
+web:dev:  PUT /api/platform/tenants/2330/permissions 200 in 438ms
+web:dev:  ○ Compiling /t/[tenant]/app-icon.png ...
+web:dev:  ✓ Compiled /t/[tenant]/app-icon.png in 566ms (720 modules)
+web:dev:  GET /t/alteza/app-icon.png?size=192 200 in 1383ms
+web:dev:  GET /t/alteza/app-icon.png?size=512 200 in 338ms
+web:dev:  ✓ Compiled / in 317ms (728 modules)
+web:dev:  GET / 200 in 576ms
+web:dev:  ○ Compiling /platform ...
+web:dev:  ✓ Compiled /platform in 1856ms (1254 modules)
+web:dev:  GET /platform 200 in 2104ms
+web:dev:  GET /t/villa 200 in 1095ms
+web:dev:  GET /t/villa/book 200 in 1508ms
+web:dev:  ○ Compiling /t/[tenant]/manage ...
+web:dev:  ✓ Compiled /t/[tenant]/manage in 607ms (1267 modules)
+web:dev:  GET /t/villa/manage 200 in 2308ms
+web:dev:  ○ Compiling /t/[tenant]/privacy ...
+web:dev:  ✓ Compiled /t/[tenant]/privacy in 743ms (1277 modules)
+web:dev:  GET /t/villa/privacy 200 in 2598ms
+web:dev:  ○ Compiling /t/[tenant]/terms ...
+web:dev:  ✓ Compiled /t/[tenant]/terms in 1289ms (1279 modules)
+web:dev:  GET /t/villa/terms 200 in 2634ms
+web:dev:  GET /t/alteza/book 200 in 1339ms
+web:dev:  GET /t/no-such-tenant-x 404 in 482ms
+web:dev:  ○ Compiling /t/[tenant]/manifest.webmanifest ...
+web:dev:  ✓ Compiled /t/[tenant]/manifest.webmanifest in 798ms (869 modules)
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 1273ms
+web:dev:  ○ Compiling /t/[tenant]/sw.js ...
+web:dev:  ✓ Compiled /t/[tenant]/sw.js in 680ms (1284 modules)
+web:dev:  GET /t/villa/sw.js 200 in 1405ms
+web:dev:  ○ Compiling /api/t/[tenant]/admin/session ...
+web:dev:  ✓ Compiled /api/t/[tenant]/admin/session in 517ms (874 modules)
+web:dev:  POST /api/t/villa/admin/session 200 in 1943ms
+web:dev:  GET /t/villa/admin/dashboard 200 in 797ms
+web:dev:  GET /t/villa/admin/bookings 200 in 903ms
+web:dev:  ○ Compiling /t/[tenant]/admin/calendar ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/calendar in 1593ms (1299 modules)
+web:dev:  GET /t/villa/admin/calendar 200 in 3099ms
+web:dev:  ○ Compiling /t/[tenant]/admin/payments ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/payments in 1186ms (1309 modules)
+web:dev:  GET /t/villa/admin/payments 200 in 2710ms
+web:dev:  ○ Compiling /t/[tenant]/admin/notifications ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/notifications in 1723ms (1317 modules)
+web:dev:  GET /t/villa/admin/notifications 200 in 2980ms
+web:dev:  ○ Compiling /t/[tenant]/admin/conversations ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/conversations in 1201ms (1326 modules)
+web:dev:  GET /t/villa/admin/conversations 200 in 2652ms
+web:dev:  ○ Compiling /t/[tenant]/admin/unanswered ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/unanswered in 1100ms (1334 modules)
+web:dev:  GET /t/villa/admin/unanswered 200 in 2548ms
+web:dev:  ○ Compiling /t/[tenant]/admin/documents ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/documents in 815ms (1344 modules)
+web:dev:  GET /t/villa/admin/documents 200 in 2252ms
+web:dev:  ○ Compiling /t/[tenant]/admin/holidays ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/holidays in 1268ms (1352 modules)
+web:dev:  GET /t/villa/admin/holidays 200 in 2957ms
+web:dev:  ○ Compiling /t/[tenant]/admin/slots ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/slots in 1672ms (1364 modules)
+web:dev:  GET /t/villa/admin/slots 200 in 3160ms
+web:dev:  ○ Compiling /t/[tenant]/admin/promos ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/promos in 1257ms (1372 modules)
+web:dev:  GET /t/villa/admin/promos 200 in 2558ms
+web:dev:  ○ Compiling /t/[tenant]/admin/members ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/members in 1448ms (1380 modules)
+web:dev:  GET /t/villa/admin/members 200 in 3079ms
+web:dev:  ○ Compiling /t/[tenant]/admin/activity ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/activity in 2s (1390 modules)
+web:dev:  GET /t/villa/admin/activity 200 in 3320ms
+web:dev:  ○ Compiling /t/[tenant]/admin/accommodations ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/accommodations in 1145ms (956 modules)
+web:dev:  GET /t/villa/admin/accommodations 404 in 2387ms
+web:dev:  DELETE /api/t/villa/admin/session 200 in 517ms
+web:dev:  POST /api/t/alteza/admin/session 200 in 818ms
+web:dev:  GET /t/alteza/admin/accommodations 200 in 585ms
+web:dev:  DELETE /api/t/alteza/admin/session 200 in 490ms
+web:dev:  GET /t/villa 200 in 1708ms
+web:dev: [?25h
+
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    16m3.933s 
+

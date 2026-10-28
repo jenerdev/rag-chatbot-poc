@@ -748,6 +748,38 @@ PostgREST. Those are still casts at the boundary (`as EmbeddingsResponse`), and
 a cast is a claim about someone else's JSON. Validating them would be a real
 improvement and a real dependency on the hot path; not taken during a port.
 
+**Amended 2026-10-28 (T-013, deps-upgrade): zod 4, with zod 3's words.**
+Zod 3.25.76 is the last 3.x, and GHSA-mrhx-c7xc-m3w5 (high: an array
+parse keeps an issue for every failing element) is fixed only in 4.6.6.
+So zod is now `^4.6.6` (4.6.7 installed), a major, for a fix 3.x does not
+have. The contract above is unchanged:
+- `typeError(required, invalid)` and `failedWith(words)` in `schemas.ts`
+  say what zod 3's `required_error` / `invalid_type_error` and a refine's
+  message function said.
+- `v3Words`, set ONCE with `z.config({ customError })`, gives zod 3's
+  default wording to every issue no schema names. It has zod 4's lowest
+  precedence, so every written message still wins.
+- Every list a route takes has a `.max()`: zod 4 refuses an over-cap
+  list before parsing one element, and an uncapped list is still parsed
+  whole. Five gained one, at the bound and in the words the package or
+  SQL already used (`rooms` 10, `days` 100, `methods` 5,
+  `cancellation` 5); `rates` 100 is new.
+- `zod/v3` (zod 3's code, shipped inside zod 4) was not used: it is the
+  old parser, without the fix.
+
+**Measured:** a fixed corpus of 32,673 inputs over all 45 schemas gave
+the same first message on zod 3 and zod 4, the only one `firstError()`
+shows, for every input. The pass/fail answer and the parsed data were
+the same too. 701 inputs differ only after the first issue: zod 4 runs a
+length check on a value that already failed its type, and skips a bound
+after a failed `.int()`. A million empty `rooms`: zod 3 made 2,000,001
+issues in 1,136 ms and +379 MB of heap; zod 4 with the cap made 1 issue
+in 2 ms.
+
+**Reverse if:** a route needs more than one message from a parse (then
+the later issues matter and differ), or zod 4 changes the precedence
+that lets `v3Words` sit under every written message.
+
 ---
 
 ## D-023 · The env check logs at import and throws per request · **Migration, added 2026-09-22**
@@ -4719,7 +4751,7 @@ unchanged otherwise.
 
 **Decision:** a tenant's rule "children aged N and below are free" is ONE
 number, `free_up_to_age` in the bookings config (0–17, absent = nobody is
-free), set by a super user on the platform form's Bookings tab beside max
+free), set by a super user on the platform form's Applications tab (Bookings card) beside max
 stay and the horizon (D-078). Every booking row carries a SECOND count,
 `free_guests` (0–50, default 0), written at birth by every door. The user:
 "we need to handle also guest who are free depending on age … for resort

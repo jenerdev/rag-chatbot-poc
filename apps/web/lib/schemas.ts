@@ -14,10 +14,88 @@ import { MAX_CONTENT_LENGTH, MAX_MESSAGE_LENGTH } from './limits';
 // string comes back in `error`, so these are the POC's wordings character for
 // character — including the counts, which tell a user pasting a long document
 // how much they need to cut rather than just that it was too much.
+//
+// zod 4 (T-013, 2026-10-28; zod 3 had no fix for GHSA-mrhx-c7xc-m3w5). zod 3's
+// `required_error` / `invalid_type_error` / `errorMap` are gone; these two
+// helpers say the same thing, and `v3Words` (below) keeps zod 3's default
+// wording for every issue no schema here names a message for. A 32,673-input
+// corpus answered identically on both versions (whats-done.md, 2026-10-28).
+
+/** zod 3's name for a value's type ("Expected string, received number"). */
+function v3Type(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'number') return Number.isNaN(value) ? 'nan' : 'number';
+  return typeof value;
+}
+
+const quoted = (values: readonly unknown[], sep: string) =>
+  values.map((v) => (typeof v === 'string' ? `'${v}'` : String(v))).join(sep);
+
+/**
+ * zod 3's default messages, for the issues no schema here words itself: a
+ * client sending the wrong type, an unknown key, a bound with no message.
+ * Lowest precedence in zod 4 (a schema's or a check's own words win).
+ */
+type V3Issue = {
+  code?: string; input?: unknown; expected?: string; origin?: string; format?: string;
+  minimum?: unknown; maximum?: unknown; inclusive?: boolean; exact?: boolean;
+  keys?: string[]; values?: readonly unknown[]; inst?: unknown;
+};
+function v3Words(issue: V3Issue): string | undefined {
+  const bound = (v: unknown) => String(v);
+  switch (issue.code) {
+    case 'invalid_type':
+      if (issue.input === undefined) return 'Required';
+      if (issue.expected === 'int') return 'Expected integer, received float';
+      return `Expected ${issue.expected === 'record' ? 'object' : issue.expected}, received ${v3Type(issue.input)}`;
+    case 'unrecognized_keys':
+      return `Unrecognized key(s) in object: ${quoted(issue.keys ?? [], ', ')}`;
+    case 'too_small': {
+      const how = issue.exact ? 'exactly' : issue.inclusive ? 'at least' : 'more than';
+      if (issue.origin === 'array') return `Array must contain ${how} ${bound(issue.minimum)} element(s)`;
+      if (issue.origin === 'string') return `String must contain ${issue.exact ? 'exactly' : issue.inclusive ? 'at least' : 'over'} ${bound(issue.minimum)} character(s)`;
+      return `Number must be ${issue.exact ? 'exactly equal to ' : issue.inclusive ? 'greater than or equal to ' : 'greater than '}${bound(issue.minimum)}`;
+    }
+    case 'too_big': {
+      if (issue.origin === 'array') return `Array must contain ${issue.exact ? 'exactly' : issue.inclusive ? 'at most' : 'less than'} ${bound(issue.maximum)} element(s)`;
+      if (issue.origin === 'string') return `String must contain ${issue.exact ? 'exactly' : issue.inclusive ? 'at most' : 'under'} ${bound(issue.maximum)} character(s)`;
+      return `Number must be ${issue.exact ? 'exactly' : issue.inclusive ? 'less than or equal to' : 'less than'} ${bound(issue.maximum)}`;
+    }
+    case 'invalid_value': {
+      const kind = (issue.inst as { _zod?: { def?: { type?: string } } } | undefined)?._zod?.def?.type;
+      const values = issue.values ?? [];
+      if (kind === 'literal') return `Invalid literal value, expected ${JSON.stringify(values[0])}`;
+      return `Invalid enum value. Expected ${quoted(values, ' | ')}, received ${typeof issue.input === 'string' ? `'${issue.input}'` : String(issue.input)}`;
+    }
+    case 'invalid_format':
+      if (issue.format === 'email' || issue.format === 'url' || issue.format === 'uuid') return `Invalid ${issue.format}`;
+      return 'Invalid';
+    case 'invalid_union':
+    case 'custom':
+      return 'Invalid input';
+    default:
+      return undefined;
+  }
+}
+z.config({ customError: v3Words });
+
+/** zod 3's `{ required_error, invalid_type_error }`: missing says `required`, the wrong type `invalid`; undefined = the default words. */
+function typeError(required?: string, invalid?: string) {
+  return {
+    error: (issue: { code?: string; input?: unknown }) =>
+      issue.code !== 'invalid_type' ? undefined : issue.input === undefined ? required : invalid,
+  };
+}
+
+/** zod 3's `.refine(check, (value) => ({ message }))`: the message is built from the value that failed. */
+function failedWith(words: (value: string) => string) {
+  return { error: (issue: { input?: unknown }) => words(String(issue.input)) };
+}
 
 export const createDocumentSchema = z.object({
   title: z
-    .string({ required_error: 'A title is required', invalid_type_error: 'A title is required' })
+    .string(typeError('A title is required', 'A title is required'))
     .trim()
     .min(1, 'A title is required'),
   source: z
@@ -28,49 +106,39 @@ export const createDocumentSchema = z.object({
     // An empty or whitespace-only source is stored as NULL, not as ''.
     .transform((value) => (value === undefined || value === '' ? null : value)),
   content: z
-    .string({
-      required_error: 'Document content is required',
-      invalid_type_error: 'Document content is required',
-    })
+    .string(typeError('Document content is required', 'Document content is required'))
     .min(1, 'Document content is required')
     .refine((value) => value.trim() !== '', 'Document content is required')
     .refine(
       (value) => value.length <= MAX_CONTENT_LENGTH,
-      (value) => ({
-        message: `Document is ${value.length} characters; the limit is ${MAX_CONTENT_LENGTH}`,
-      }),
+      failedWith((value) => `Document is ${value.length} characters; the limit is ${MAX_CONTENT_LENGTH}`),
     ),
 });
 
 /** POST voice/speak (D-134): a conversation, never text (plan/voice.md Rule 2). */
 export const voiceSpeakSchema = z.object({
-  conversationId: z.string({ required_error: 'A conversation is required', invalid_type_error: 'A conversation is required' }).uuid('That is not a conversation'),
+  conversationId: z.string(typeError('A conversation is required', 'A conversation is required')).uuid('That is not a conversation'),
 });
 
 export const chatSchema = z.object({
   // A uuid from a previous reply, or absent on the first message of a session.
   // Anything else is a client bug worth surfacing rather than ignoring.
   conversationId: z
-    .string({ invalid_type_error: 'conversationId must be a string' })
+    .string(typeError(undefined, 'conversationId must be a string'))
     .nullish()
     .transform((value) => value || null),
   message: z
-    .string({
-      required_error: 'A message is required',
-      invalid_type_error: 'A message is required',
-    })
+    .string(typeError('A message is required', 'A message is required'))
     .min(1, 'A message is required')
     .refine((value) => value.trim() !== '', 'A message is required')
     .refine(
       (value) => value.length <= MAX_MESSAGE_LENGTH,
-      (value) => ({
-        message: `Question is ${value.length} characters; the limit is ${MAX_MESSAGE_LENGTH}`,
-      }),
+      failedWith((value) => `Question is ${value.length} characters; the limit is ${MAX_MESSAGE_LENGTH}`),
     ),
 });
 
 const email = z
-  .string({ required_error: 'An email is required', invalid_type_error: 'An email is required' })
+  .string(typeError('An email is required', 'An email is required'))
   .trim()
   .min(1, 'An email is required')
   .max(320, 'That is not an email address')
@@ -79,7 +147,7 @@ const email = z
 // Supabase Auth's minimum is 6 by default. The cap stops a megabyte
 // "password" from reaching Supabase at all.
 const password = z
-  .string({ required_error: 'A password is required', invalid_type_error: 'A password is required' })
+  .string(typeError('A password is required', 'A password is required'))
   .min(1, 'A password is required')
   .max(256, 'That password is too long');
 
@@ -92,7 +160,7 @@ export const passwordResetSchema = z.object({ email });
 /** A new password, with the access token from the reset (or invite) link. */
 export const setPasswordSchema = z.object({
   accessToken: z
-    .string({ required_error: 'The reset link is incomplete', invalid_type_error: 'The reset link is incomplete' })
+    .string(typeError('The reset link is incomplete', 'The reset link is incomplete'))
     .min(1, 'The reset link is incomplete')
     .max(8192, 'The reset link is not valid'),
   password: password.min(8, 'Use at least 8 characters'),
@@ -105,33 +173,36 @@ export const setPasswordSchema = z.object({
  * The rate is CENTAVOS, like every price.
  */
 export const createAccommodationSchema = z.object({
-  name: z.string({ required_error: 'A room name is required', invalid_type_error: 'A room name is required' }),
-  description: z.string({ invalid_type_error: 'Description must be text' }).nullish(),
-  capacity: z.number({ invalid_type_error: 'Maximum guests must be a number' }).nullish(),
-  maxCapacity: z.number({ invalid_type_error: 'Maximum guests must be a number' }).nullish(),
-  standardCapacity: z.number({ invalid_type_error: 'Standard guests must be a number' }).nullish(),
-  extraPersonRate: z.number({ invalid_type_error: 'The extra guest rate must be a number' }).nullish(),
-  sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
+  name: z.string(typeError('A room name is required', 'A room name is required')),
+  description: z.string(typeError(undefined, 'Description must be text')).nullish(),
+  capacity: z.number(typeError(undefined, 'Maximum guests must be a number')).nullish(),
+  maxCapacity: z.number(typeError(undefined, 'Maximum guests must be a number')).nullish(),
+  standardCapacity: z.number(typeError(undefined, 'Standard guests must be a number')).nullish(),
+  extraPersonRate: z.number(typeError(undefined, 'The extra guest rate must be a number')).nullish(),
+  sortOrder: z.number(typeError(undefined, 'Order must be a number')).optional(),
 });
 
 /** A change to a room: any subset, including `active: false` to retire it. */
 export const updateAccommodationSchema = createAccommodationSchema.partial().extend({
-  active: z.boolean({ invalid_type_error: 'Active must be true or false' }).optional(),
+  active: z.boolean(typeError(undefined, 'Active must be true or false')).optional(),
 });
 
 /** A room's rates, in CENTAVOS, one entry per slot being set. */
 export const setRatesSchema = z.object({
   rates: z.array(
     z.object({
-      slotId: z.number({ required_error: 'A slot is required', invalid_type_error: 'A slot is required' }),
-      weekdayPrice: z.number({ required_error: 'A weekday price is required', invalid_type_error: 'A weekday price is required' }),
-      weekendPrice: z.number({ required_error: 'A weekend price is required', invalid_type_error: 'A weekend price is required' }),
+      slotId: z.number(typeError('A slot is required', 'A slot is required')),
+      weekdayPrice: z.number(typeError('A weekday price is required', 'A weekday price is required')),
+      weekendPrice: z.number(typeError('A weekend price is required', 'A weekend price is required')),
       // Optional (customer booking § 2.3): null = the weekend price on a
       // holiday. All rates or none is @rag/bookings' rule (setRates).
-      holidayPrice: z.number({ invalid_type_error: 'A holiday price must be a number' }).nullish(),
+      holidayPrice: z.number(typeError(undefined, 'A holiday price must be a number')).nullish(),
     }),
-    { required_error: 'Rates are required', invalid_type_error: 'Rates must be a list' },
-  ),
+    typeError('Rates are required', 'Rates must be a list'),
+  )
+    // GHSA-mrhx-c7xc-m3w5: a cap is what lets zod 4 refuse a huge list before
+    // it parses one element. One rate per slot; no tenant has near 100 slots.
+    .max(100, 'Send at most 100 rates at once.'),
 });
 
 /**
@@ -140,10 +211,11 @@ export const setRatesSchema = z.object({
  */
 export const imageOrderSchema = z
   .object({
-    // errorMap, not invalid_type_error: a union reports its own "invalid_union"
-    // issue, which invalid_type_error never reaches (code review, 2026-09-28).
-    move: z.union([z.literal(-1), z.literal(1)], { errorMap: () => ({ message: 'move is -1 or 1' }) }).optional(),
-    sortOrder: z.number({ invalid_type_error: 'Order must be a number' }).optional(),
+    // The union's own `error`, not a type error: a union reports its own
+    // "invalid_union" issue, which a type error never reaches (code review,
+    // 2026-09-28; zod 3's errorMap, zod 4's error).
+    move: z.union([z.literal(-1), z.literal(1)], { error: 'move is -1 or 1' }).optional(),
+    sortOrder: z.number(typeError(undefined, 'Order must be a number')).optional(),
   })
   .refine((v) => (v.move === undefined) !== (v.sortOrder === undefined), { message: 'Send either move or sortOrder' });
 
@@ -154,24 +226,27 @@ export const imageOrderSchema = z
 // unknown keys, and the function would not take them anyway.
 
 const requestRoom = z.object({
-  unitId: z.number({ required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
-  guests: z.number({ required_error: 'Enter the number of guests', invalid_type_error: 'Enter the number of guests' }),
+  unitId: z.number(typeError('Choose what to book', 'Choose what to book')),
+  guests: z.number(typeError('Enter the number of guests', 'Enter the number of guests')),
   /** D-147: the children who stay free, counted apart from `guests`; absent = 0. The bound (0 to 50) is parseRequest()'s and request_booking()'s. */
-  free: z.number({ invalid_type_error: 'Free guests must be a number' }).nullish(),
+  free: z.number(typeError(undefined, 'Free guests must be a number')).nullish(),
 });
 
 /** A price for a stay, before sending it. */
 export const bookQuoteSchema = z.object({
-  slotId: z.number({ required_error: 'Choose a booking slot', invalid_type_error: 'Choose a booking slot' }),
-  rooms: z.array(requestRoom, { required_error: 'Choose what to book', invalid_type_error: 'Choose what to book' }),
-  checkIn: z.string({ required_error: 'Choose a date', invalid_type_error: 'Choose a date' }),
-  nights: z.number({ invalid_type_error: 'Nights must be a number' }).optional(),
+  slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
+  // The cap (GHSA-mrhx-c7xc-m3w5: zod 4 refuses an over-long list before it
+  // parses an element) is MAX_UNITS_PER_BOOKING, in parseRequest()'s own
+  // words; this file reaches the browser, so it cannot import @rag/bookings.
+  rooms: z.array(requestRoom, typeError('Choose what to book', 'Choose what to book')).max(10, 'One request holds at most 10 rooms.'),
+  checkIn: z.string(typeError('Choose a date', 'Choose a date')),
+  nights: z.number(typeError(undefined, 'Nights must be a number')).optional(),
   /**
    * D-097: a promo code the customer typed. Shape only (the database's
    * code shape); whether it exists, covers the dates or has uses left is
    * promo_for_request()'s answer, in words, on the quote.
    */
-  promoCode: z.string({ invalid_type_error: 'The promo code must be text' }).max(32, 'That is not a promo code').nullish(),
+  promoCode: z.string(typeError(undefined, 'The promo code must be text')).max(32, 'That is not a promo code').nullish(),
 });
 
 /**
@@ -179,14 +254,14 @@ export const bookQuoteSchema = z.object({
  * hides from people, so only a form-filling bot fills it (plan § 2.1).
  */
 export const bookRequestSchema = bookQuoteSchema.extend({
-  name: z.string({ required_error: 'Your name is required', invalid_type_error: 'Your name is required' }),
-  phone: z.string({ required_error: 'Your mobile number is required', invalid_type_error: 'Your mobile number is required' }),
-  email: z.string({ required_error: 'Your email is required', invalid_type_error: 'Your email is required' }),
-  notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
+  name: z.string(typeError('Your name is required', 'Your name is required')),
+  phone: z.string(typeError('Your mobile number is required', 'Your mobile number is required')),
+  email: z.string(typeError('Your email is required', 'Your email is required')),
+  notes: z.string(typeError(undefined, 'Notes must be text')).nullish(),
   website: z.string().optional(),
   /** D-129: the box ticked, and the version of the policy it was ticked for. Postgres checks the version is current. */
-  consent: z.literal(true, { errorMap: () => ({ message: 'Please read and agree to the Privacy Policy and Terms.' }) }),
-  consentVersion: z.string({ required_error: 'Please read and agree to the Privacy Policy and Terms.' }).min(1).max(20),
+  consent: z.literal(true, { error: 'Please read and agree to the Privacy Policy and Terms.' }),
+  consentVersion: z.string(typeError('Please read and agree to the Privacy Policy and Terms.')).min(1).max(20),
 });
 
 /**
@@ -196,7 +271,7 @@ export const bookRequestSchema = bookQuoteSchema.extend({
  */
 export const staffQuoteSchema = bookQuoteSchema.omit({ promoCode: true }).extend({
   /** D-097: a promo the staff member picked; the trigger checks it and stores the discount */
-  promoId: z.number({ invalid_type_error: 'Promo must be a number' }).nullish(),
+  promoId: z.number(typeError(undefined, 'Promo must be a number')).nullish(),
 });
 
 /**
@@ -206,11 +281,11 @@ export const staffQuoteSchema = bookQuoteSchema.omit({ promoCode: true }).extend
  * (the trigger's, plan Rule 2).
  */
 export const staffStaySchema = staffQuoteSchema.extend({
-  name: z.string({ required_error: "The guest's name is required", invalid_type_error: "The guest's name is required" }),
-  phone: z.string({ required_error: "The guest's mobile number is required", invalid_type_error: "The guest's mobile number is required" }),
-  email: z.string({ required_error: "The guest's email is required", invalid_type_error: "The guest's email is required" }),
-  notes: z.string({ invalid_type_error: 'Notes must be text' }).nullish(),
-  walkIn: z.boolean({ invalid_type_error: 'Walk in is true or false' }).optional(),
+  name: z.string(typeError("The guest's name is required", "The guest's name is required")),
+  phone: z.string(typeError("The guest's mobile number is required", "The guest's mobile number is required")),
+  email: z.string(typeError("The guest's email is required", "The guest's email is required")),
+  notes: z.string(typeError(undefined, 'Notes must be text')).nullish(),
+  walkIn: z.boolean(typeError(undefined, 'Walk in is true or false')).optional(),
 });
 
 /**
@@ -220,11 +295,8 @@ export const staffStaySchema = staffQuoteSchema.extend({
  * refuses what is not text.
  */
 export const manageLookupSchema = z.object({
-  reference: z.string({ required_error: 'Your booking reference is required', invalid_type_error: 'Your booking reference is required' }),
-  contact: z.string({
-    required_error: 'Your email or mobile number is required',
-    invalid_type_error: 'Your email or mobile number is required',
-  }),
+  reference: z.string(typeError('Your booking reference is required', 'Your booking reference is required')),
+  contact: z.string(typeError('Your email or mobile number is required', 'Your email or mobile number is required')),
 });
 
 /**
@@ -233,24 +305,24 @@ export const manageLookupSchema = z.object({
  * decides the rest in words (the range, "I checked the account", a reason).
  */
 export const reviewPaymentSchema = z.object({
-  action: z.enum(['verify', 'reject'], { errorMap: () => ({ message: 'The action is "verify" or "reject".' }) }),
-  amount: z.string({ invalid_type_error: 'The amount must be text, like 1500 or 1,500.00' }).nullish(),
-  accountChecked: z.boolean({ invalid_type_error: '"I checked the account" is true or false' }).optional(),
-  note: z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish(),
-  confirm: z.boolean({ invalid_type_error: '"confirm" is true or false' }).optional(),
+  action: z.enum(['verify', 'reject'], { error: 'The action is "verify" or "reject".' }),
+  amount: z.string(typeError(undefined, 'The amount must be text, like 1500 or 1,500.00')).nullish(),
+  accountChecked: z.boolean(typeError(undefined, '"I checked the account" is true or false')).optional(),
+  note: z.string(typeError(undefined, 'The note must be text.')).max(500, 'The note is too long (500 characters at most).').nullish(),
+  confirm: z.boolean(typeError(undefined, '"confirm" is true or false')).optional(),
 });
 
 /** A refund made elsewhere, recorded (record_refund() checks it against what was received). */
 export const recordRefundSchema = z.object({
-  groupId: z.string({ required_error: 'Which booking?', invalid_type_error: 'Which booking?' }),
-  amount: z.string({ required_error: 'The amount refunded is required', invalid_type_error: 'The amount must be text, like 1500' }),
-  method: z.string({ required_error: 'How was it returned?', invalid_type_error: 'How was it returned?' }),
-  note: z.string({ required_error: 'A note is required', invalid_type_error: 'The note must be text.' }),
+  groupId: z.string(typeError('Which booking?', 'Which booking?')),
+  amount: z.string(typeError('The amount refunded is required', 'The amount must be text, like 1500')),
+  method: z.string(typeError('How was it returned?', 'How was it returned?')),
+  note: z.string(typeError('A note is required', 'The note must be text.')),
 });
 
 const payMethod = z.object({
-  kind: z.enum(['gcash', 'bank', 'other'], { errorMap: () => ({ message: 'A way to pay is GCash, bank or other.' }) }),
-  label: z.string({ required_error: 'Each way to pay needs a label', invalid_type_error: 'Each way to pay needs a label' }),
+  kind: z.enum(['gcash', 'bank', 'other'], { error: 'A way to pay is GCash, bank or other.' }),
+  label: z.string(typeError('Each way to pay needs a label', 'Each way to pay needs a label')),
   accountName: z.string().nullish(),
   accountNumber: z.string().nullish(),
   instructions: z.string().nullish(),
@@ -260,18 +332,22 @@ const payMethod = z.object({
 export const paymentSettingsSchema = z.object({
   settings: z
     .object({
-      methods: z.array(payMethod),
+      // The SQL validator's bound and words (schema-manage-booking.sql); a cap lets zod 4 refuse before parsing (GHSA-mrhx-c7xc-m3w5).
+      methods: z.array(payMethod).max(5, 'config.payments.methods is a list of 1 to 5 ways to pay'),
       fee: z.union([
         z.object({ kind: z.literal('full') }),
-        z.object({ kind: z.enum(['fixed', 'percent']), value: z.number({ invalid_type_error: 'The fee is a number' }) }),
+        z.object({ kind: z.enum(['fixed', 'percent']), value: z.number(typeError(undefined, 'The fee is a number')) }),
       ]),
       payWithinHours: z.number().nullable(),
       reviewWithinHours: z.number().nullable(),
       terms: z.string().nullable(),
       // Absent = "none", so a caller written before Phase 5 keeps today's rule.
-      hold: z.enum(['none', 'on_proof', 'on_request'], { errorMap: () => ({ message: 'The hold is "none", "on_proof" or "on_request".' }) }).default('none'),
+      hold: z.enum(['none', 'on_proof', 'on_request'], { error: 'The hold is "none", "on_proof" or "on_request".' }).default('none'),
       // Phase 6; absent = no refund tiers, no rescheduling on the page.
-      cancellation: z.array(z.object({ daysBefore: z.number(), refundPercent: z.number() })).default([]),
+      cancellation: z
+        .array(z.object({ daysBefore: z.number(), refundPercent: z.number() }))
+        .max(5, 'config.payments.cancellation is up to 5 tiers of {"days_before": 0–365, "refund_percent": 0–100}, whole numbers')
+        .default([]),
       rescheduleUntilDaysBefore: z.number().nullable().default(null),
     })
     .nullable(),
@@ -279,7 +355,7 @@ export const paymentSettingsSchema = z.object({
 
 /** Phase 6: a guest's change request (or its quote, `dryRun`). request_change() decides the rest. */
 export const changeRequestSchema = manageLookupSchema.extend({
-  kind: z.enum(['cancel', 'reschedule'], { errorMap: () => ({ message: 'A change is "cancel" or "reschedule".' }) }),
+  kind: z.enum(['cancel', 'reschedule'], { error: 'A change is "cancel" or "reschedule".' }),
   newCheckIn: z.string().nullish(),
   reason: z.string().max(500, 'The reason is too long (500 characters at most).').nullish(),
   dryRun: z.boolean().optional(),
@@ -287,12 +363,12 @@ export const changeRequestSchema = manageLookupSchema.extend({
 
 /** Phase 6: staff decide a change request. */
 export const decideChangeSchema = z.object({
-  action: z.enum(['approve', 'reject'], { errorMap: () => ({ message: 'The action is "approve" or "reject".' }) }),
+  action: z.enum(['approve', 'reject'], { error: 'The action is "approve" or "reject".' }),
   note: z.string().max(500, 'The note is too long (500 characters at most).').nullish(),
 });
 
 /** The optional note on a decision (D-096): the package bounds it too. */
-const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).max(500, 'The note is too long (500 characters at most).').nullish();
+const decisionNote = z.string(typeError(undefined, 'The note must be text.')).max(500, 'The note is too long (500 characters at most).').nullish();
 
 /**
  * A promo (D-097). `value` is an INTEGER: centavos for a fixed amount,
@@ -301,29 +377,29 @@ const decisionNote = z.string({ invalid_type_error: 'The note must be text.' }).
  * validates the rest in words (the range, the code shape, the limit).
  */
 export const createPromoSchema = z.object({
-  name: z.string({ required_error: 'A name is required', invalid_type_error: 'A name is required' }),
-  kind: z.enum(['fixed', 'percent'], { errorMap: () => ({ message: 'Kind is "fixed" or "percent"' }) }),
-  value: z.number({ required_error: 'A value is required', invalid_type_error: 'The value must be a number' }),
-  validFrom: z.string({ required_error: '"Valid from" is required', invalid_type_error: '"Valid from" must be a date' }),
-  validTo: z.string({ required_error: '"Valid to" is required', invalid_type_error: '"Valid to" must be a date' }),
-  code: z.string({ invalid_type_error: 'The code must be text' }).nullish(),
-  maxUses: z.number({ invalid_type_error: 'The usage limit must be a number' }).nullish(),
+  name: z.string(typeError('A name is required', 'A name is required')),
+  kind: z.enum(['fixed', 'percent'], { error: 'Kind is "fixed" or "percent"' }),
+  value: z.number(typeError('A value is required', 'The value must be a number')),
+  validFrom: z.string(typeError('"Valid from" is required', '"Valid from" must be a date')),
+  validTo: z.string(typeError('"Valid to" is required', '"Valid to" must be a date')),
+  code: z.string(typeError(undefined, 'The code must be text')).nullish(),
+  maxUses: z.number(typeError(undefined, 'The usage limit must be a number')).nullish(),
 });
 
 /** A change to a promo: any subset, including `active: false` to retire it. */
 export const updatePromoSchema = createPromoSchema.partial().extend({
-  active: z.boolean({ invalid_type_error: 'Active must be true or false' }).optional(),
+  active: z.boolean(typeError(undefined, 'Active must be true or false')).optional(),
 });
 
 /** Staff decide a request: the whole group, one action, an optional note. */
 /** A staff note on a stay (D-132): POST /bookings/stay/[reference]/notes. Empty and too long are @rag/bookings' to say, in words. */
 export const stayNoteSchema = z.object({
-  body: z.string({ required_error: 'Write the note first.', invalid_type_error: 'The note must be text.' }),
+  body: z.string(typeError('Write the note first.', 'The note must be text.')),
 });
 
 export const decideRequestSchema = z.object({
   action: z.enum(['confirm', 'decline', 'cancel'], {
-    errorMap: () => ({ message: 'action is "confirm", "decline" or "cancel"' }),
+    error: 'action is "confirm", "decline" or "cancel"',
   }),
   note: decisionNote,
 });
@@ -331,42 +407,42 @@ export const decideRequestSchema = z.object({
 /** Staff confirm or cancel ONE booking (D-095, D-096): PATCH /bookings/[id]. */
 /** A physical room of a room type (D-133): its name. @rag/bookings bounds it again. */
 export const unitRoomSchema = z.object({
-  name: z.string({ required_error: 'Name the room.', invalid_type_error: 'The name must be text.' }).trim().min(1, 'Name the room.').max(80, 'A room name is at most 80 characters.'),
+  name: z.string(typeError('Name the room.', 'The name must be text.')).trim().min(1, 'Name the room.').max(80, 'A room name is at most 80 characters.'),
 });
 
 /** Rename a room, or retire it / offer it again. */
 export const unitRoomUpdateSchema = z
   .object({
     name: unitRoomSchema.shape.name.optional(),
-    active: z.boolean({ invalid_type_error: 'active must be true or false.' }).optional(),
+    active: z.boolean(typeError(undefined, 'active must be true or false.')).optional(),
   })
   .refine((v) => v.name !== undefined || v.active !== undefined, { message: 'Nothing to change.' });
 
 /** Move a stay to another room of its type (D-133): the room, and why (required, like every decision, D-096). */
 export const roomMoveSchema = z.object({
-  roomId: z.number({ required_error: 'Choose a room.', invalid_type_error: 'roomId must be a number.' }).int().positive('Choose a room.'),
-  note: z.string({ required_error: 'Write why the booking moves.', invalid_type_error: 'The note must be text.' }).trim().min(1, 'Write why the booking moves.').max(500, 'The note is too long (500 characters at most).'),
+  roomId: z.number(typeError('Choose a room.', 'roomId must be a number.')).int().positive('Choose a room.'),
+  note: z.string(typeError('Write why the booking moves.', 'The note must be text.')).trim().min(1, 'Write why the booking moves.').max(500, 'The note is too long (500 characters at most).'),
 });
 
 export const bookingActionSchema = z.object({
   action: z.enum(['confirm', 'cancel'], {
-    errorMap: () => ({ message: 'action is "confirm" or "cancel"' }),
+    error: 'action is "confirm" or "cancel"',
   }),
   note: decisionNote,
 });
 
 /** A holiday, peak or closed day (D-080). Surcharge in CENTAVOS; a closed day has none. */
 export const holidaySchema = z.object({
-  day: z.string({ required_error: 'A date is required', invalid_type_error: 'A date is required' }),
-  kind: z.enum(['holiday', 'peak', 'closed'], { errorMap: () => ({ message: 'kind is "holiday", "peak" or "closed"' }) }).optional(),
-  label: z.string({ required_error: 'A label is required', invalid_type_error: 'A label is required' }),
-  surcharge: z.number({ invalid_type_error: 'The surcharge must be a number' }).nullish(),
+  day: z.string(typeError('A date is required', 'A date is required')),
+  kind: z.enum(['holiday', 'peak', 'closed'], { error: 'kind is "holiday", "peak" or "closed"' }).optional(),
+  label: z.string(typeError('A label is required', 'A label is required')),
+  surcharge: z.number(typeError(undefined, 'The surcharge must be a number')).nullish(),
 });
 
 /** Copy chosen days to the same month and day of another year. */
 export const copyHolidaysSchema = z.object({
-  days: z.array(z.string(), { required_error: 'Choose dates to copy', invalid_type_error: 'Choose dates to copy' }),
-  toYear: z.number({ required_error: 'A year is required', invalid_type_error: 'A year is required' }),
+  days: z.array(z.string(), typeError('Choose dates to copy', 'Choose dates to copy')).max(100, 'Copy at most 100 dates at once.'), // calendar.ts's cap, in its words (GHSA-mrhx-c7xc-m3w5)
+  toYear: z.number(typeError('A year is required', 'A year is required')),
 });
 
 /**
@@ -450,11 +526,11 @@ const suggestedQuestionsSchema = z
 
 export const createTenantSchema = z.object({
   slug: z
-    .string({ required_error: 'A slug is required', invalid_type_error: 'A slug is required' })
+    .string(typeError('A slug is required', 'A slug is required'))
     .trim()
     .regex(SLUG, 'A slug is 3–32 lower-case letters, digits and hyphens, not starting or ending with a hyphen'),
-  businessName: z.string({ required_error: 'A business name is required' }).trim().min(1, 'A business name is required').max(100, 'A business name is at most 100 characters'),
-  assistantName: z.string({ required_error: 'An assistant name is required' }).trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters'),
+  businessName: z.string(typeError('A business name is required')).trim().min(1, 'A business name is required').max(100, 'A business name is at most 100 characters'),
+  assistantName: z.string(typeError('An assistant name is required')).trim().min(1, 'An assistant name is required').max(50, 'An assistant name is at most 50 characters'),
 });
 
 /** D-139: the same bound as tenants_welcome_text_length, said first in the form's words. */
@@ -490,7 +566,7 @@ export const updateTenantSchema = z
 
 /** An application's config: an object. What it must hold is the trigger's to say. */
 export const applicationConfigSchema = z.object({
-  config: z.record(z.unknown(), { required_error: 'A config object is required', invalid_type_error: 'A config object is required' }),
+  config: z.record(z.string(), z.unknown(), typeError('A config object is required', 'A config object is required')),
 });
 
 /**
@@ -502,22 +578,22 @@ export const rolePermissionsSchema = z.object({
   rows: z
     .array(
       z.object({
-        role: z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) }),
-        permission: z.enum(CONFIGURABLE_PERMISSIONS as [string, ...string[]], { errorMap: () => ({ message: 'That permission cannot be changed per tenant' }) }),
-        allowed: z.boolean({ invalid_type_error: 'allowed is true or false' }),
+        role: z.enum(ROLES, { error: `The role is one of ${ROLES.join(', ')}` }),
+        permission: z.enum(CONFIGURABLE_PERMISSIONS as [string, ...string[]], { error: 'That permission cannot be changed per tenant' }),
+        allowed: z.boolean(typeError(undefined, 'allowed is true or false')),
       }),
-      { required_error: 'The rows are required', invalid_type_error: 'The rows are a list' },
+      typeError('The rows are required', 'The rows are a list'),
     )
     .max(ROLES.length * CONFIGURABLE_PERMISSIONS.length, 'Too many rows'),
 });
 
 /** PUT /api/platform/tenants/[id]/features/[key] (D-127): on or off. The key is in the URL, checked against lib/features.ts. */
 export const featureSwitchSchema = z.object({
-  enabled: z.boolean({ required_error: 'Say whether the feature is on (enabled: true or false)', invalid_type_error: 'enabled is true or false' }),
+  enabled: z.boolean(typeError('Say whether the feature is on (enabled: true or false)', 'enabled is true or false')),
 });
 
-const role = z.enum(ROLES, { errorMap: () => ({ message: `The role is one of ${ROLES.join(', ')}` }) });
-const userId = z.string({ required_error: 'A user id is required' }).uuid('That is not a user id');
+const role = z.enum(ROLES, { error: `The role is one of ${ROLES.join(', ')}` });
+const userId = z.string(typeError('A user id is required')).uuid('That is not a user id');
 
 /** An existing account, by email (the form) or by user id (the platform adding itself). One of the two. */
 export const addMemberSchema = z
@@ -530,7 +606,7 @@ export const removeMemberSchema = z.object({ userId });
 export function unansweredIdsSchema(max: number) {
   return z.object({
     ids: z
-      .array(z.number().int().positive(), { required_error: 'Choose at least one question', invalid_type_error: 'Choose at least one question' })
+      .array(z.number().int().positive(), typeError('Choose at least one question', 'Choose at least one question'))
       .min(1, 'Choose at least one question')
       .max(max, `At most ${max} questions at once`),
   });
@@ -542,24 +618,24 @@ export function unansweredIdsSchema(max: number) {
  * checked by the package (a known push service); the database checks the
  * keys' shapes again.
  */
-const notifyKind = z.enum(['request', 'proof', 'change'], { message: 'A kind is request, proof or change' });
+const notifyKind = z.enum(['request', 'proof', 'change'], { error: 'A kind is request, proof or change' });
 export const pushDeviceSchema = z.object({
-  endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000, 'The endpoint is too long'),
+  endpoint: z.string(typeError('An endpoint is required')).url('The endpoint must be a URL').max(1000, 'The endpoint is too long'),
   keys: z.object({
     p256dh: z.string().regex(/^[A-Za-z0-9_-]{86,88}=?$/, 'The device key is not a P-256 key'),
     auth: z.string().regex(/^[A-Za-z0-9_-]{21,24}={0,2}$/, 'The device secret is not 16 bytes'),
   }),
   kinds: z.array(notifyKind).min(1, 'Choose at least one kind').max(3).transform((k) => [...new Set(k)]),
 });
-export const pushEndpointSchema = z.object({ endpoint: z.string({ required_error: 'An endpoint is required' }).url('The endpoint must be a URL').max(1000) });
+export const pushEndpointSchema = z.object({ endpoint: z.string(typeError('An endpoint is required')).url('The endpoint must be a URL').max(1000) });
 /** DELETE /admin/push: this device, or (R-51) every device of the member. */
-export const pushRemoveSchema = z.union([pushEndpointSchema, z.object({ all: z.literal(true) })], { errorMap: () => ({ message: 'Send { endpoint } or { all: true }' }) });
+export const pushRemoveSchema = z.union([pushEndpointSchema, z.object({ all: z.literal(true) })], { error: 'Send { endpoint } or { all: true }' });
 
 /**
  * POST /admin/notifications (plan/notifications.md § 8): mark these read, or
  * `all`. Ids are the outbox's; one that is not the member's marks nothing.
  */
 export const notificationsReadSchema = z.union([
-  z.object({ ids: z.array(z.number().int().positive(), { message: 'ids is a list of notification ids' }).min(1, 'Name at least one notification').max(200) }),
+  z.object({ ids: z.array(z.number().int().positive(), { error: 'ids is a list of notification ids' }).min(1, 'Name at least one notification').max(200) }),
   z.object({ all: z.literal(true) }),
-], { errorMap: () => ({ message: 'Send { ids: [...] } or { all: true }' }) });
+], { error: 'Send { ids: [...] } or { all: true }' });

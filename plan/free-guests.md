@@ -36,7 +36,7 @@
 | "only ask for number of guest per room" | `guest_count int` per booking row (one unit, one night); the booking page, the staff form (D-111) and `request_booking()` each take `[{ unitId, guests }]` | A second count beside it, `free_guests`, from the same three doors |
 | "guest who are free depending on age" | nothing structural; `guest_hint` is free text | `free_up_to_age` in the bookings config: the oldest age that stays free; absent = nobody is free |
 | "resort A … 3 and below, resort B … 5 and below" | the config is per tenant already (`tenant_applications.config`, checked by `tenant_applications_validate`) | one whole number, 0–17, in that config |
-| "configurable on platform" | max stay and horizon are set there (D-078, the Limits section of the tenant form's Bookings tab) | the third field in that section: "Children stay free up to age" |
+| "configurable on platform" | max stay and horizon are set there (D-078, the Limits section of the tenant form's Applications tab, Bookings card) | the third field in that section: "Children stay free up to age" |
 | the price | `unit_quote(p_guests)` charges `greatest(0, guests − standard_capacity) × extra_person_rate` | **unchanged**: `p_guests` is the PAYING count, as today |
 
 ---
@@ -179,7 +179,7 @@ below are free, so count the paying guests". No regex grows for ages.
 
 ### 3.3 The platform
 
-- `tenant-form.tsx`, Bookings tab, Limits section: "Children stay free up
+- `tenant-form.tsx`, Applications tab, Bookings card, Limits section: "Children stay free up
   to age" (number, 0–17, empty = nobody), written to
   `config.free_up_to_age`; `platform.ts`'s comment lists the key.
 - The Guest hint stays: it is for anything else the resort wants to say.

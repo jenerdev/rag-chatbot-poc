@@ -17,11 +17,11 @@
     "@rag/openai": "workspace:*",
     "@rag/pipeline": "workspace:*",
     "@rag/push": "workspace:*",
-    "next": "^15",
+    "next": "^15.5.28",
     "react": "^19",
     "react-dom": "^19",
-    "sharp": "^0.35.4",
-    "zod": "^3.23.0"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@rag/tsconfig": "workspace:*",
