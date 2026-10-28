@@ -19,6 +19,7 @@ board or an inbox.
 | ![rhea](employees/rhea/avatar.svg) | Rhea | Product Requirements Analyst | author: `docs/requirements/` and the office; read-only git | 2026-10-27 |
 | ![sage](employees/sage/avatar.svg) | Sage | Security Reviewer | author: `docs/security/` and the office; read-only git and `pnpm audit` | 2026-10-27 |
 | ![theo](employees/theo/avatar.svg) | Theo | Technical Architect | author: `docs/architecture/` (as `plan/`, `decisions.md`, `risks.md`) and the office; read-only git | 2026-10-27 |
+| ![todd](employees/todd/avatar.svg) | Todd | Task Tracker | read-only: changes no file; read-only git and the script; lists what is pending, who owns it, what is next | 2026-10-28 |
 | ![uma](employees/uma/avatar.svg) | Uma | UX Architect | author: `docs/ux/` and the office; read-only git | 2026-10-27 |
 | ![vera](employees/vera/avatar.svg) | Vera | Visual Designer | author: `docs/design/` and the office; read-only git | 2026-10-27 |
 

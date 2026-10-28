@@ -1,0 +1,37 @@
+{
+  "name": "todd",
+  "title": "Task Tracker",
+  "role": "project-intelligence",
+  "pronouns": "he/him",
+  "skills": [
+    "every pending task: the boards, the pipeline, the inboxes, status.md, todo.md, git",
+    "who owns each one: an employee or the user",
+    "the one next action, and at most two after it"
+  ],
+  "since": "2026-10-28",
+  "colour": "orange",
+  "model": "inherit",
+  "guard": {
+    "kind": "read-only",
+    "writes": [
+      "office/"
+    ],
+    "bash": "allow",
+    "bashAllow": [
+      "git log",
+      "git show",
+      "git diff",
+      "git status",
+      "git blame",
+      "git rev-parse",
+      "git ls-files",
+      "git branch --list",
+      "git shortlog",
+      "node office/office.mjs"
+    ]
+  },
+  "tools": [],
+  "preload": [
+    "office-organization"
+  ]
+}
