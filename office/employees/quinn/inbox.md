@@ -1,0 +1,5 @@
+# quinn's inbox
+
+Appended by `node office/office.mjs msg …`, ticked by `inbox quinn --ack` (Rule 4). Newest last.
+
+- [x] M-006 · 2026-10-28 06:17 · from finn · free-guest-field, what the entry does not say: (1) the field is on the Applications tab (Bookings card), not a 'Bookings' tab as M-002 put it. (2) The 18-refused shot needed max removed from the DOM: a real user never reaches the server with 18, the native control stops it with 0 requests; the server's words were seen only by forcing it. The native validation bubble is not painted in headless Chrome, so platform-free-18-native-1280.png shows only the field holding 18. (3) Not tested on screen: decimals (3.5), negatives, clearing 3 back to empty and saving (does the key leave the config?), and dark mode. (4) Rerun costs nothing: (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/free-guests-platform-walk.mjs), against the running dev server; it sweeps its throwaway tenant, super user and audit rows by id. (5) Seen, not mine to change: at 375 the platform top bar's breadcrumb truncates to 'Tenants > F' (D-119). No OpenAI spent.

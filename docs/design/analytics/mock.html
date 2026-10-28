@@ -1,0 +1,82 @@
+<!doctype html>
+<!-- Vera's mockup for docs/design/analytics.md: NOT app code. It loads the
+     app's own stylesheets and adds only the proposed .consent-* rules below,
+     every value a token. Open as a file; no server. ?scheme=dark|light,
+     ?page=chat|book, ?words=long|short. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analytics consent: mockup</title>
+<link rel="stylesheet" href="../../../apps/web/app/styles/tokens.css">
+<link rel="stylesheet" href="../../../apps/web/app/styles/base.css">
+<link rel="stylesheet" href="../../../apps/web/app/styles/chat.css">
+<link rel="stylesheet" href="../../../apps/web/app/styles/screens.css">
+<style>
+/* ---- proposed: the ConsentBar (docs/design/analytics.md § 3) ---- */
+.consent-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "text actions";
+  column-gap: var(--space-5);
+  row-gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.consent-text { grid-area: text; margin: 0; color: var(--muted); text-wrap: pretty; }
+.consent-bar h2 { display: inline; margin: 0 var(--space-1) 0 0; font-size: inherit; font-weight: 600; letter-spacing: 0; color: var(--ink); }
+.consent-text p { display: inline; margin: 0; }
+.consent-text a { white-space: nowrap; text-underline-offset: 2px; }
+.consent-actions { grid-area: actions; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+/* S-1: the composer's column, above the field. */
+.composer .consent-bar { max-width: 760px; margin: 0 auto var(--space-2); }
+/* S-6 / S-13: its own slot between the band and <main>. */
+.consent-slot { margin: 0 auto; /* its width: joins the .book-main rule (the mock adds that class) */ padding: var(--space-6) var(--space-5) 0; }
+@media (max-width: 560px) {
+  .consent-bar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "text" "actions"; padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+  .consent-actions button { width: 100%; }
+  .consent-slot { padding: var(--space-4) var(--space-4) 0; }
+}
+@media (max-width: 319px) { .consent-actions { grid-template-columns: 1fr; } }
+
+/* ---- mock scaffolding only ---- */
+.mock-chat { height: 100vh; display: flex; flex-direction: column; }
+.mock-chat .mock-messages { flex: 1; overflow: auto; padding: var(--space-5); color: var(--muted); }
+.mock-band { height: 96px; background: linear-gradient(135deg, var(--accent), var(--hero-deep)); color: var(--on-overlay); display: flex; align-items: center; padding: 0 var(--space-5); font-weight: 600; font-size: var(--text-xl); }
+</style>
+</head>
+<body>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get('scheme')) document.documentElement.dataset.scheme = q.get('scheme') === 'light' ? 'light' : '';
+  if (q.get('scheme') === 'dark') document.documentElement.style.colorScheme = 'dark';
+  const LONG = 'Villa Esperanza would like to use Google Analytics, which keeps a cookie on this device, to count visits and where they come from. It never receives what you type, your contact details or your booking.';
+  const SHORT = 'Villa Esperanza would like to count visits with Google Analytics, which keeps a cookie on this device. It never gets what you type or your booking.';
+  const words = q.get('words') === 'short' ? SHORT : LONG;
+  const bar = `<section class="consent-bar" aria-labelledby="analytics-title">
+      <div class="consent-text"><h2 id="analytics-title">Analytics</h2> <p>${words} <a href="#">How we use analytics</a></p></div>
+      <div class="consent-actions"><button type="button">Don't allow</button><button type="button">Allow</button></div>
+    </section>`;
+  const page = q.get('page') || 'chat';
+  document.body.innerHTML = page === 'chat' ? `
+    <div class="mock-chat">
+      <main class="mock-messages"><p>Welcome card and messages (unchanged).</p></main>
+      <section class="composer" aria-label="Ask a question">
+        ${bar}
+        <form class="composer-inner"><textarea rows="1" placeholder="Ask a question…"></textarea><button class="primary composer-send" type="button" aria-label="Send">↑</button></form>
+        <div class="composer-foot"><p class="composer-notice">Mara is an AI assistant. Chats are saved, read by Villa Esperanza's staff and processed by OpenAI. Don't share passwords or card numbers.</p>
+        <nav class="composer-links" aria-label="More"><a href="#">Book a stay</a><a href="#">Manage booking</a><a href="#">Privacy</a><a href="#">Terms</a></nav>
+        <div class="composer-side"><p class="composer-hint"><kbd>Enter</kbd> to send</p></div></div>
+      </section>
+    </div>` : `
+    <div class="mock-band">Online booking</div>
+    <div class="consent-slot book-main">${bar}</div>
+    <main class="book-main"><h1 class="page-title">Request a booking</h1><p class="book-intro">The form, unchanged.</p><div class="card">Step 1</div></main>`;
+</script>
+</body>
+</html>

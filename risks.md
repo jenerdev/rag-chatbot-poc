@@ -1007,6 +1007,36 @@ Deploying without them is deploying R-11 untested.
   fix, when wanted: an UPDATE path in `setApplication()` for a row that
   exists, or the trigger skipping `on conflict` updates.
 
+## R-63 · The analytics design rests on GA4 behaviour nobody has read · **Found 2026-10-28 (plan/analytics.md); open until its Phase 0**
+
+**The risk:** FR-analytics-011–014's answers (plan/analytics.md § 1) assume
+several things about GA4, and none has been read in Google's
+documentation:
+- gtag uses `page_location` and `page_referrer` instead of the browser's
+  `location` and `referrer`;
+- `ga-disable-<ID>` stops sending;
+- `cookie_prefix` and `cookie_expires` exist;
+- enhanced measurement and granular location and device collection can be
+  switched off;
+- the 2-month retention setting limits explorations only;
+- a property has no row-level access;
+- the CSP hosts are the ones the plan lists.
+
+If one of them is wrong, a guest's address, referrer or identifier could
+reach Google in a shape the requirements forbid, and nothing would error.
+
+**Also known:**
+- GA4 adds its own technical fields (client and session ids, screen
+  resolution, user-agent hints, a location derived from the IP address),
+  which no setting removes.
+- Signed-in staff testing the guest pages are counted (Q7 = no).
+- Tenants share one host, which is why each tenant gets its own cookie
+  prefix.
+
+**What to do:** the plan's Phase 0 reads each fact and records it as
+confirmed or wrong. A wrong fact goes to the owner of the FR it breaks.
+Phase 6's walk intercepts every hit and checks it against the allowlist.
+
 ---
 
 ## Explicitly still missing after tenancy

@@ -4946,3 +4946,44 @@ should approach, not the US East round trip.
 
 **Reverse if:** the database moves (set this to its new region), or the
 tenants' staff spread across continents (then the database is what moves).
+
+## D-151 · GA4 on the three guest pages: nothing from Google before Allow, one property per tenant, the app sends only what it wrote · **Proposed 2026-10-28 (gate 5, plan/analytics.md); not approved, not built**
+
+**Decision (proposed):** the `analytics` feature (OFF with no row, like
+voice) loads `gtag.js` only after a guest allows it on S-1, S-6 or S-13.
+Consent Mode is not used in any form. The decision is made on the device
+(localStorage `analytics:<slug>`, 180 days, re-asked on a new
+`policy_version`; GPC or DNT counts as Decline). The app sets
+`page_location` (path, plus `utm_*` only on S-1 and S-6), `page_referrer`
+(an origin) and a fixed title itself, and `track()` takes a step name and
+nothing else. Each tenant has its own GA4 property in the user's GA
+account, with the owner a Viewer on it and never more (M-021 q1;
+plan Rule 9). `tenants.analytics_id` (`schema-analytics.sql`, the 46th
+file) is unique across tenants, and `tenant_public()` returns it only
+while the switch is on. The switch goes on only with an ID and the
+tenant's written-instruction date, `tenants.analytics_instructed_on`
+(FR-analytics-028). The FIRST switch-on bumps `policy_version` and stamps
+`analytics_since`; a re-enable does not (A-R5). A CSP for the whole app
+(R-55, a host allowlist, M-021 q4) allows Google's hosts on the three
+measured paths only, and gives the proof viewer `frame-src`. StaffFrame
+reloads any document that held gtag.js, so a staff screen never shares a
+document with it.
+
+**Amended 2026-10-28 (gate 5, round 2):** from the user's answers (M-021),
+Rhea's amendments (M-023) and Sage's review (M-020, S-A1–S-A10). Round 1
+bumped the version on every flip, and had no instruction date, no
+uniqueness, no `frame-src` and no StaffFrame guard. `plan/analytics.md` § 8
+maps each change to its concern.
+
+**Rejected:** the tenant layout as the place (it wraps `/admin/**`).
+Consent Mode, basic or advanced (Google code before a choice). One platform
+property (GA4 cannot restrict an owner to one tenant's rows, so FR-022
+would fail). The Measurement Protocol from the server (a second open
+write route, and GA4's sessions and sources would be lost). A nonce CSP for
+now (it makes `/` dynamic; R-55 keeps it open). A bump of the version on
+every flip (FR-019 says first switch-on and text changes). Link
+discipline alone as the staff wall (S-A2: one future `<Link>` breaks it).
+
+**Rests on:** GA4 behaviour nobody has read yet (R-63). The plan's Phase 0
+confirms each fact before any code.
+

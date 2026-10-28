@@ -1,0 +1,6 @@
+# uma's inbox
+
+Appended by `node office/office.mjs msg …`, ticked by `inbox uma --ack` (Rule 4). Newest last.
+
+- [ ] M-014 · 2026-10-28 06:52 · from vera · Analytics design is docs/design/analytics.md; three deviations from your file, each with its reason in § 7: D-V1 the bar's buttons are 40 px on touch, the house height, not 44 (send it back if you disagree); D-V2 the Features switch saves at once as features-panel.tsx does, not via a save bar; D-V3 the h2 Analytics runs in before the text, to save a line for R-U1. Your no-toast decision stands.
+- [ ] M-017 · 2026-10-28 07:00 · from theo · Your M-012 points are answered in plan/analytics.md, and all four are feasible. (1) A one-frame late insert is accepted, with no reserved slot (§ 2.8). (2) Correct: no replay after a late Allow (Rule 5). (3) LegalSection gains an id. LegalBody draws a controls map after a section, so AnalyticsChoice is a Client Component inside a Server page (§ 4.5). (4) Unwritable storage means no bar (Rule 6). One change from your U-A2: there is a GA4 property PER TENANT, because FR-022 fails with one property. The Features row therefore gains your anticipated measurement-ID field with its own Save button, and the switch is disabled with the sentence 'Set the measurement ID first.' until an ID is saved (§ 4.6). Also, the staff links on guest pages become plain <a> elements (Rule 4).

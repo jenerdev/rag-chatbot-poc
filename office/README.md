@@ -1,0 +1,65 @@
+# The office
+
+The AI employees who develop this repository ([`plan/ai-employees.md`](../plan/ai-employees.md)).
+Each one is an agent file in [`.claude/agents/`](../.claude/agents/) (what
+Claude Code reads: tools, model, colour, hooks, the charter) and a folder
+under `employees/` (what people read: the profile, the avatar, the task
+board, the inbox, the notes). `office.mjs` is the only thing that writes a
+board or an inbox.
+
+## Who works here
+
+| | Name | Title | Guard | Since |
+|---|---|---|---|---|
+| ![finn](employees/finn/avatar.svg) | Finn | Full-Stack Engineer | builder: everything but a board, an inbox and the user's hand (commit, push, merge, deploy) | 2026-10-27 |
+| ![george](employees/george/avatar.svg) | George | Project Intelligence | read-only: writes under `office/` only; read-only git and the script; no plugin skill, no MCP server | 2026-10-27 |
+| ![ivy](employees/ivy/avatar.svg) | Ivy | Idea Strategist | author: `docs/product/` and the office; read-only git | 2026-10-27 |
+| ![lex](employees/lex/avatar.svg) | Lex | Legal Reviewer | author: `docs/legal/` and the office; read-only git | 2026-10-27 |
+| ![quinn](employees/quinn/avatar.svg) | Quinn | QA Engineer | tester: test files and `docs/qa/`; every command but the user's hand | 2026-10-27 |
+| ![rhea](employees/rhea/avatar.svg) | Rhea | Product Requirements Analyst | author: `docs/requirements/` and the office; read-only git | 2026-10-27 |
+| ![sage](employees/sage/avatar.svg) | Sage | Security Reviewer | author: `docs/security/` and the office; read-only git and `pnpm audit` | 2026-10-27 |
+| ![theo](employees/theo/avatar.svg) | Theo | Technical Architect | author: `docs/architecture/` (as `plan/`, `decisions.md`, `risks.md`) and the office; read-only git | 2026-10-27 |
+| ![uma](employees/uma/avatar.svg) | Uma | UX Architect | author: `docs/ux/` and the office; read-only git | 2026-10-27 |
+| ![vera](employees/vera/avatar.svg) | Vera | Visual Designer | author: `docs/design/` and the office; read-only git | 2026-10-27 |
+
+A new employee is `node office/office.mjs hire <name> "<title>" --role <role> --guard <kind>`; the hire is born with the organization's section for its role in its charter (`plan/ai-employees/organization.md`, the user's words verbatim), and the house additions are written under "What the house adds". George is the tenth: she knows the project and routes an idea to the right gate.
+
+## Talking to an employee
+
+- A whole session as one: `claude --agent george`.
+- One question from any session: `@agent-george what is owed on bookings?`
+- Employee to employee, durable: `node office/office.mjs msg --to <name> --from <me> "…"`; every employee reads its inbox and its board first on every wake.
+- Employee to employee, live: agent teams, switched on for a session with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; a decision reached live is written to a board or an inbox before the session ends, or it did not happen.
+
+## The script
+
+```
+node office/office.mjs hire <name> "<title>" [--colour c] [--model m] [--pronouns p] [--guard read-only|builder]
+node office/office.mjs task add --to <name> --from <who> "<title>" --why "<why>" [--doing]
+node office/office.mjs task move <T-id> doing|done|dropped [--note "<note>"]
+node office/office.mjs task list [<name>] [--all] [--json]
+node office/office.mjs msg --to <name> --from <who> "<text>"
+node office/office.mjs inbox <name> [--ack <M-id> | --ack-all]
+node office/office.mjs index [<name>]      George's mechanical digests: every decision, the open risks, the watermark
+node office/office.mjs check               the audit: exit 1 on any mismatch
+pnpm office:check · pnpm office:test       the same check, and node --test
+```
+
+`from` and `to` are an employee's name or `user`; an unknown name is an
+error, never a new employee. Ids (`T-001`, `M-001`) are one sequence for
+the whole office (`sequence.json`). A task is `done` or `dropped` with a
+note.
+
+## The rules, in a paragraph
+
+George never changes code, and a hook says so (`hooks/guard.mjs`, in her
+agent file and mirrored in `.claude/settings.json`): writes under `office/`
+only, read-only git and this script only. The record (`status.md`,
+`whats-done.md`, `decisions.md`, `risks.md`, `plan/*.md`) stays the one
+source of truth; George keeps digests of it with a watermark, and the
+employee who does a step writes the record, George audits. A task exists
+only on a board file, in git; the session's own task list is a mirror.
+Every employee is one agent file and one folder, and `check` proves they
+agree. The office is files and this one zero-dependency script. An
+employee spends nothing it was not asked to spend. Employees never commit,
+merge, push or deploy: that is the user's hand.

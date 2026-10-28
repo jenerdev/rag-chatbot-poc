@@ -1,0 +1,33 @@
+{
+  "name": "finn",
+  "title": "Full-Stack Engineer",
+  "role": "full-stack-engineer",
+  "pronouns": "they/them",
+  "skills": [],
+  "since": "2026-10-27",
+  "colour": "green",
+  "model": "inherit",
+  "guard": {
+    "kind": "builder",
+    "writes": [
+      "/"
+    ],
+    "bash": "deny",
+    "bashDeny": [
+      "\\bgit\\s+(commit|push|merge|rebase|reset|checkout|switch|stash|cherry-pick|revert|tag)\\b",
+      "\\bgit\\s+branch\\s+(-[dDm]|--delete|--move)\\b",
+      "\\bgit\\s+-C\\s+\\S+\\s+(commit|push|merge|rebase|reset|checkout)\\b",
+      "\\bgh\\s+(pr|release)\\s+(create|merge|edit|close)\\b",
+      "\\bvercel\\b"
+    ]
+  },
+  "tools": [],
+  "preload": [
+    "office-organization",
+    "project-record",
+    "superpowers:test-driven-development",
+    "superpowers:systematic-debugging",
+    "superpowers:verification-before-completion",
+    "supabase:supabase-postgres-best-practices"
+  ]
+}

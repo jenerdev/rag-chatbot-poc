@@ -13,7 +13,9 @@
     "typecheck": "node scripts/check-service-imports.mjs && turbo typecheck",
     "test": "turbo test",
     "eval": "turbo eval",
-    "scores": "turbo scores"
+    "scores": "turbo scores",
+    "office:check": "node office/office.mjs check",
+    "office:test": "node --test office/office.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2"

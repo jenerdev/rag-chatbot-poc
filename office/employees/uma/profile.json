@@ -1,0 +1,36 @@
+{
+  "name": "uma",
+  "title": "UX Architect",
+  "role": "ux-architect",
+  "pronouns": "they/them",
+  "skills": [],
+  "since": "2026-10-27",
+  "colour": "pink",
+  "model": "inherit",
+  "guard": {
+    "kind": "author:ux",
+    "writes": [
+      "office/",
+      "docs/ux/"
+    ],
+    "bash": "allow",
+    "bashAllow": [
+      "git log",
+      "git show",
+      "git diff",
+      "git status",
+      "git blame",
+      "git rev-parse",
+      "git ls-files",
+      "git branch --list",
+      "git shortlog",
+      "node office/office.mjs"
+    ]
+  },
+  "tools": [
+    "mcp__plugin_playwright_playwright"
+  ],
+  "preload": [
+    "office-organization"
+  ]
+}

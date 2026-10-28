@@ -1,0 +1,41 @@
+{
+  "name": "theo",
+  "title": "Technical Architect",
+  "role": "technical-architect",
+  "pronouns": "they/them",
+  "skills": [],
+  "since": "2026-10-27",
+  "colour": "cyan",
+  "model": "inherit",
+  "guard": {
+    "kind": "author:architecture",
+    "writes": [
+      "office/",
+      "plan/",
+      "decisions.md",
+      "risks.md"
+    ],
+    "bash": "allow",
+    "bashAllow": [
+      "git log",
+      "git show",
+      "git diff",
+      "git status",
+      "git blame",
+      "git rev-parse",
+      "git ls-files",
+      "git branch --list",
+      "git shortlog",
+      "node office/office.mjs"
+    ]
+  },
+  "tools": [
+    "mcp__plugin_supabase_supabase",
+    "mcp__plugin_context7_context7"
+  ],
+  "preload": [
+    "office-organization",
+    "superpowers:writing-plans",
+    "supabase:supabase-postgres-best-practices"
+  ]
+}

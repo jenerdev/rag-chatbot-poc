@@ -1,0 +1,37 @@
+{
+  "name": "vera",
+  "title": "Visual Designer",
+  "role": "visual-designer",
+  "pronouns": "they/them",
+  "skills": [],
+  "since": "2026-10-27",
+  "colour": "purple",
+  "model": "inherit",
+  "guard": {
+    "kind": "author:design",
+    "writes": [
+      "office/",
+      "docs/design/"
+    ],
+    "bash": "allow",
+    "bashAllow": [
+      "git log",
+      "git show",
+      "git diff",
+      "git status",
+      "git blame",
+      "git rev-parse",
+      "git ls-files",
+      "git branch --list",
+      "git shortlog",
+      "node office/office.mjs"
+    ]
+  },
+  "tools": [
+    "mcp__plugin_playwright_playwright"
+  ],
+  "preload": [
+    "office-organization",
+    "frontend-design:frontend-design"
+  ]
+}

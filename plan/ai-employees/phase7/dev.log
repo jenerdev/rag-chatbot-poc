@@ -1,0 +1,646 @@
+$ turbo dev
+• turbo 2.11.2
+
+   • Packages in scope: @rag/bookings, @rag/chunker, @rag/db, @rag/openai, @rag/pipeline, @rag/push, @rag/tsconfig, web
+   • Running dev in 8 packages
+   • Remote caching disabled
+
+web:dev: cache bypass, force executing 4705c99bdef53ffc
+web:dev: $ next dev --port 3000
+web:dev:    ▲ Next.js 15.5.25
+web:dev:    - Local:        http://localhost:3000
+web:dev:    - Network:      http://192.168.100.152:3000
+web:dev: 
+web:dev:  ✓ Starting...
+web:dev:  ✓ Ready in 31.6s
+web:dev:  ○ Compiling / ...
+web:dev:  ✓ Compiled / in 1617ms (591 modules)
+web:dev:  GET / 200 in 3208ms
+web:dev:  GET / 200 in 124ms
+web:dev:  ○ Compiling /api/platform/session ...
+web:dev:  ✓ Compiled /api/platform/session in 1277ms (457 modules)
+web:dev:  POST /api/platform/session 200 in 4679ms
+web:dev:  ✓ Compiled /api/platform/tenants in 317ms (459 modules)
+web:dev: [platform] 1a3d7fe9-b0c8-4c8d-aeca-4e80185a07b8 created tenant 2152 "free-platform-1a2d48"
+web:dev:  POST /api/platform/tenants 201 in 2100ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id] in 187ms (461 modules)
+web:dev: [platform] 1a3d7fe9-b0c8-4c8d-aeca-4e80185a07b8 updated tenant 2152: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2152 200 in 2436ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/applications/[key] ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 1816ms (463 modules)
+web:dev: [platform] 1a3d7fe9-b0c8-4c8d-aeca-4e80185a07b8 set bookings on tenant 2152
+web:dev:  PUT /api/platform/tenants/2152/applications/bookings 200 in 3607ms
+web:dev:  ○ Compiling /platform ...
+web:dev:  ✓ Compiled /platform in 2s (849 modules)
+web:dev:  GET /platform 200 in 2485ms
+web:dev:  GET /api/platform/session 200 in 449ms
+web:dev:  ○ Compiling /api/platform/activity ...
+web:dev:  ✓ Compiled /api/platform/activity in 749ms (851 modules)
+web:dev:  GET /api/platform/tenants 200 in 1294ms
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 1481ms
+web:dev:  ○ Compiling /api/platform/dashboard ...
+web:dev:  ✓ Compiled /api/platform/dashboard in 987ms (853 modules)
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 1432ms
+web:dev:  GET /api/platform/dashboard 200 in 1760ms
+web:dev:  GET /api/platform/tenants/2152 200 in 1731ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/members ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/members in 844ms (859 modules)
+web:dev: [platform] 1a3d7fe9-b0c8-4c8d-aeca-4e80185a07b8 set bookings on tenant 2152
+web:dev:  PUT /api/platform/tenants/2152/applications/bookings 200 in 1010ms
+web:dev:  GET /api/platform/tenants 200 in 279ms
+web:dev:  GET /api/platform/dashboard 200 in 362ms
+web:dev:  GET /api/platform/tenants/2152/documents 200 in 2144ms
+web:dev:  GET /api/platform/tenants/2152/members 200 in 2143ms
+web:dev:  GET /api/platform/tenants/2152/activity?days=30 200 in 2143ms
+web:dev:  GET /platform 200 in 507ms
+web:dev: [activity] tenant=2152 days=30: 4 of 4
+web:dev:  GET /api/platform/session 200 in 159ms
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 213ms
+web:dev:  GET /api/platform/tenants 200 in 352ms
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 245ms
+web:dev:  GET /api/platform/dashboard 200 in 272ms
+web:dev:  GET /api/platform/tenants/2152 200 in 257ms
+web:dev:  GET /api/platform/tenants/2152/documents 200 in 327ms
+web:dev: [activity] tenant=2152 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2152/activity?days=30 200 in 404ms
+web:dev:  GET /api/platform/tenants/2152/members 200 in 586ms
+web:dev: [activity] tenant=2152 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2152/activity?days=30 200 in 279ms
+web:dev:  GET /api/platform/tenants/2152/documents 200 in 492ms
+web:dev:  GET /api/platform/tenants/2152/members 200 in 411ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2152/applications/bookings 400 in 493ms
+web:dev:  GET /platform 200 in 118ms
+web:dev:  GET /api/platform/session 200 in 145ms
+web:dev:  GET /api/platform/tenants 200 in 609ms
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 622ms
+web:dev:  GET /api/platform/dashboard 200 in 256ms
+web:dev: [activity] tenant=platform days=30: 29 of 29
+web:dev:  GET /api/platform/activity?days=30 200 in 438ms
+web:dev:  GET /api/platform/tenants/2152 200 in 487ms
+web:dev:  GET /api/platform/tenants/2152/members 200 in 486ms
+web:dev: [activity] tenant=2152 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2152/activity?days=30 200 in 544ms
+web:dev:  GET /api/platform/tenants/2152/documents 200 in 707ms
+web:dev: [activity] tenant=2152 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2152/activity?days=30 200 in 252ms
+web:dev:  GET /api/platform/tenants/2152/members 200 in 361ms
+web:dev:  ○ Compiling / ...
+web:dev:  ✓ Compiled / in 521ms (423 modules)
+web:dev:  GET / 200 in 910ms
+web:dev:  ✓ Compiled /api/platform/session in 212ms (570 modules)
+web:dev:  POST /api/platform/session 200 in 2631ms
+web:dev:  ✓ Compiled /api/platform/tenants in 145ms (572 modules)
+web:dev: [platform] 86ea2df1-f068-43f0-9d3f-629170a745de created tenant 2153 "free-platform-606848"
+web:dev:  POST /api/platform/tenants 201 in 1471ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id] in 225ms (574 modules)
+web:dev: [platform] 86ea2df1-f068-43f0-9d3f-629170a745de updated tenant 2153: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2153 200 in 1227ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 262ms (576 modules)
+web:dev: [platform] 86ea2df1-f068-43f0-9d3f-629170a745de set bookings on tenant 2153
+web:dev:  PUT /api/platform/tenants/2153/applications/bookings 200 in 1181ms
+web:dev:  GET /platform 200 in 321ms
+web:dev:  GET /api/platform/session 200 in 178ms
+web:dev:  ✓ Compiled /api/platform/activity in 477ms (578 modules)
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 1058ms
+web:dev:  GET /api/platform/tenants 200 in 1072ms
+web:dev:  ✓ Compiled /api/platform/dashboard in 208ms (580 modules)
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 310ms
+web:dev:  GET /api/platform/dashboard 200 in 746ms
+web:dev:  GET /api/platform/tenants/2153 200 in 522ms
+web:dev:  ○ Compiling /api/platform/tenants/[id]/activity ...
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/activity in 623ms (582 modules)
+web:dev:  ✓ Compiled in 0ms (586 modules)
+web:dev:  ✓ Compiled in 0ms (586 modules)
+web:dev:  ✓ Compiled in 1ms (586 modules)
+web:dev:  GET /api/platform/tenants/2153/documents 200 in 2445ms
+web:dev: [activity] tenant=2153 days=30: 3 of 3
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 2510ms
+web:dev: [platform] 86ea2df1-f068-43f0-9d3f-629170a745de set bookings on tenant 2153
+web:dev:  PUT /api/platform/tenants/2153/applications/bookings 200 in 2173ms
+web:dev:  GET /api/platform/tenants/2153/members 200 in 2853ms
+web:dev: [activity] tenant=2153 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 342ms
+web:dev:  GET /api/platform/tenants/2153/documents 200 in 579ms
+web:dev:  GET /api/platform/tenants 200 in 285ms
+web:dev:  GET /api/platform/dashboard 200 in 321ms
+web:dev:  GET /api/platform/tenants/2153/members 200 in 550ms
+web:dev:  GET /platform 200 in 320ms
+web:dev:  GET /api/platform/session 200 in 158ms
+web:dev:  GET /api/platform/tenants 200 in 300ms
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 370ms
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 197ms
+web:dev:  GET /api/platform/dashboard 200 in 291ms
+web:dev:  GET /api/platform/tenants/2153 200 in 335ms
+web:dev: [activity] tenant=2153 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 367ms
+web:dev:  GET /api/platform/tenants/2153/members 200 in 474ms
+web:dev:  GET /api/platform/tenants/2153/documents 200 in 496ms
+web:dev: [activity] tenant=2153 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 252ms
+web:dev:  GET /api/platform/tenants/2153/documents 200 in 331ms
+web:dev:  GET /api/platform/tenants/2153/members 200 in 381ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2153/applications/bookings 400 in 331ms
+web:dev:  GET /platform 200 in 99ms
+web:dev:  GET /api/platform/session 200 in 173ms
+web:dev:  GET /api/platform/tenants 200 in 277ms
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 306ms
+web:dev: [activity] tenant=platform days=30: 31 of 31
+web:dev:  GET /api/platform/activity?days=30 200 in 228ms
+web:dev:  GET /api/platform/dashboard 200 in 293ms
+web:dev:  GET /api/platform/tenants/2153 200 in 631ms
+web:dev: [activity] tenant=2153 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 323ms
+web:dev: [activity] tenant=2153 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2153/activity?days=30 200 in 285ms
+web:dev:  GET /api/platform/tenants/2153/documents 200 in 781ms
+web:dev:  GET /api/platform/tenants/2153/members 200 in 780ms
+web:dev:  POST /api/platform/session 200 in 916ms
+web:dev:  ○ Compiling /api/t/[tenant]/admin/session ...
+web:dev:  ✓ Compiled /api/t/[tenant]/admin/session in 671ms (870 modules)
+web:dev:  POST /api/t/villa/admin/session 200 in 2595ms
+web:dev: [platform] efb35b06-304c-4ee1-abd4-b7cc42ae5c31 created tenant 2154 "free-walk-6219a7"
+web:dev:  POST /api/platform/tenants 201 in 503ms
+web:dev: [platform] efb35b06-304c-4ee1-abd4-b7cc42ae5c31 updated tenant 2154: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2154 200 in 629ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2154/applications/bookings 400 in 374ms
+web:dev: [platform] efb35b06-304c-4ee1-abd4-b7cc42ae5c31 set bookings on tenant 2154
+web:dev:  PUT /api/platform/tenants/2154/applications/bookings 200 in 413ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings/setup ...
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/setup in 626ms (873 modules)
+web:dev:  GET /api/t/villa/bookings/setup 200 in 2089ms
+web:dev:  ○ Compiling /api/t/[tenant]/book/quote ...
+web:dev:  ✓ Compiled /api/t/[tenant]/book/quote in 523ms (877 modules)
+web:dev:  POST /api/t/villa/book/quote 200 in 2473ms
+web:dev:  POST /api/t/villa/book/quote 200 in 988ms
+web:dev: [error] Free guests must be a whole number from 0 to 50.
+web:dev:  POST /api/t/villa/book/quote 400 in 435ms
+web:dev:  ○ Compiling /t/[tenant]/book ...
+web:dev:  ✓ Compiled /t/[tenant]/book in 961ms (913 modules)
+web:dev:  GET /t/villa/book 200 in 3129ms
+web:dev:  GET /api/t/villa/admin/session 200 in 221ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings ...
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings in 524ms (915 modules)
+web:dev: [bookings] villa staff stay #22072: 2027-02-25 × 1 night(s), unit 1, slot 2, pending, group 359a1560-91df-44b7-b23e-ecc967857b4f
+web:dev:  POST /api/t/villa/bookings 201 in 3498ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings/requests ...
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/requests in 512ms (917 modules)
+web:dev:  GET /api/t/villa/bookings/requests?from=2027-02-25 200 in 2600ms
+web:dev:  ○ Compiling /t/[tenant]/admin/bookings/[reference] ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/bookings/[reference] in 1332ms (948 modules)
+web:dev:  GET /t/villa/admin/bookings/VIL-F4QC4A 200 in 3109ms
+web:dev:  ○ Compiling /t/[tenant]/app-icon.png ...
+web:dev:  ✓ Compiled /t/[tenant]/app-icon.png in 2.2s (949 modules)
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 4972ms
+web:dev:  GET /api/t/villa/admin/session 200 in 4581ms
+web:dev:  ○ Compiling /api/t/[tenant]/bookings/stay/[reference] ...
+web:dev:  GET /t/villa/app-icon.png?size=192 200 in 5768ms
+web:dev:  ✓ Compiled /api/t/[tenant]/bookings/stay/[reference] in 1752ms (956 modules)
+web:dev:  GET /api/t/villa/admin/push 200 in 3731ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 4486ms
+web:dev:  GET /api/t/villa/admin/push 200 in 4494ms
+web:dev:  GET /api/t/villa/bookings/stay/VIL-F4QC4A 200 in 4994ms
+web:dev:  ○ Compiling /t/[tenant]/admin/bookings ...
+web:dev:  ✓ Compiled /t/[tenant]/admin/bookings in 1039ms (966 modules)
+web:dev:  GET /t/villa/admin/bookings 200 in 3055ms
+web:dev:  GET /t/villa/manifest.webmanifest 200 in 325ms
+web:dev:  GET /api/t/villa/admin/session 200 in 469ms
+web:dev:  GET /api/t/villa/admin/attention 200 in 757ms
+web:dev:  GET /api/t/villa/admin/push 200 in 924ms
+web:dev:  GET /api/t/villa/admin/push 200 in 937ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 1033ms
+web:dev:  GET /api/t/villa/bookings/requests?from=2026-10-28 200 in 1513ms
+web:dev:  ○ Compiling /api/t/[tenant]/book/request ...
+web:dev:  ✓ Compiled /api/t/[tenant]/book/request in 664ms (969 modules)
+web:dev: [bookings] villa request VIL-DQVD9U: 2027-02-27 × 1 night(s), 1 unit(s), 1 row(s), pending
+web:dev:  POST /api/t/villa/book/request 201 in 3102ms
+web:dev:  ○ Compiling /api/t/[tenant]/manage ...
+web:dev:  ✓ Compiled /api/t/[tenant]/manage in 909ms (972 modules)
+web:dev:  POST /api/t/villa/manage 200 in 2615ms
+web:dev:  GET /api/t/villa/bookings/setup 200 in 873ms
+web:dev:  ✓ Compiled in 405ms (653 modules)
+web:dev:  ✓ Compiled in 751ms (653 modules)
+web:dev:  ✓ Compiled in 2.5s (653 modules)
+web:dev:  ✓ Compiled in 1159ms (644 modules)
+web:dev:  ✓ Compiled in 1356ms (644 modules)
+web:dev:  ✓ Compiled in 808ms (642 modules)
+web:dev:  ✓ Compiled in 521ms (642 modules)
+web:dev:  ○ Compiling /api/platform/session ...
+web:dev:  ✓ Compiled /api/platform/session in 722ms (617 modules)
+web:dev:  POST /api/platform/session 200 in 2956ms
+web:dev:  ✓ Compiled /api/platform/tenants in 360ms (619 modules)
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d created tenant 2155 "free-platform-qa-359693"
+web:dev:  POST /api/platform/tenants 201 in 1637ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id] in 198ms (621 modules)
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d updated tenant 2155: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2155 200 in 1095ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/applications/[key] in 218ms (623 modules)
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d set bookings on tenant 2155
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 200 in 983ms
+web:dev:  GET /platform 200 in 284ms
+web:dev:  GET /api/platform/session 200 in 161ms
+web:dev:  ✓ Compiled /api/platform/activity in 261ms (625 modules)
+web:dev:  GET /api/platform/tenants 200 in 854ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 1034ms
+web:dev:  ✓ Compiled /api/platform/dashboard in 260ms (627 modules)
+web:dev:  ✓ Compiled in 1ms (627 modules)
+web:dev:  ✓ Compiled in 1ms (627 modules)
+web:dev:  ✓ Compiled in 0ms (627 modules)
+web:dev:  GET /api/platform/dashboard 200 in 1499ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 1323ms
+web:dev:  GET /api/platform/tenants/2155 200 in 1595ms
+web:dev:  ✓ Compiled /api/platform/tenants/[id]/activity in 458ms (629 modules)
+web:dev:  ✓ Compiled (633 modules)
+web:dev: [activity] tenant=2155 days=30: 3 of 3
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 1245ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 1315ms
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d set bookings on tenant 2155
+web:dev:  GET /api/platform/tenants/2155/members 200 in 1398ms
+web:dev: [activity] tenant=2155 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 221ms
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 200 in 1179ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 385ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 433ms
+web:dev:  GET /api/platform/tenants 200 in 415ms
+web:dev:  GET /api/platform/dashboard 200 in 242ms
+web:dev:  GET /platform 200 in 253ms
+web:dev:  GET /api/platform/session 200 in 152ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 255ms
+web:dev:  GET /api/platform/tenants 200 in 298ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 217ms
+web:dev:  GET /api/platform/dashboard 200 in 177ms
+web:dev:  GET /api/platform/tenants/2155 200 in 330ms
+web:dev: [activity] tenant=2155 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 415ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 419ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 477ms
+web:dev: [activity] tenant=2155 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 238ms
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d set bookings on tenant 2155
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 200 in 422ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 572ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 512ms
+web:dev:  GET /api/platform/tenants 200 in 358ms
+web:dev:  GET /api/platform/dashboard 200 in 252ms
+web:dev:  GET /platform 200 in 91ms
+web:dev:  GET /api/platform/session 200 in 128ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 237ms
+web:dev:  GET /api/platform/tenants 200 in 292ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 232ms
+web:dev:  GET /api/platform/dashboard 200 in 276ms
+web:dev:  GET /api/platform/tenants/2155 200 in 258ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 407ms
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 584ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 585ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 172ms
+web:dev:  GET /platform 200 in 159ms
+web:dev:  GET /api/platform/session 200 in 157ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 267ms
+web:dev:  GET /api/platform/tenants 200 in 328ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 251ms
+web:dev:  GET /api/platform/dashboard 200 in 211ms
+web:dev:  GET /api/platform/tenants/2155 200 in 317ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 483ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 633ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 328ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 517ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 2151ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 716ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /platform 200 in 111ms
+web:dev:  GET /api/platform/session 200 in 248ms
+web:dev:  GET /api/platform/tenants 200 in 334ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 346ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 261ms
+web:dev:  GET /api/platform/dashboard 200 in 277ms
+web:dev:  GET /api/platform/tenants/2155 200 in 398ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 445ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 500ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 564ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 261ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 467ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 409ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 400 in 290ms
+web:dev:  GET /platform 200 in 95ms
+web:dev:  GET /api/platform/session 200 in 162ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 284ms
+web:dev:  GET /api/platform/tenants 200 in 314ms
+web:dev:  GET /api/platform/dashboard 200 in 200ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 283ms
+web:dev:  GET /api/platform/tenants/2155 200 in 381ms
+web:dev: [activity] tenant=2155 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 441ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 509ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 588ms
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d set bookings on tenant 2155
+web:dev: [activity] tenant=2155 days=30: 6 of 6
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 248ms
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 200 in 474ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 602ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 527ms
+web:dev:  GET /api/platform/tenants 200 in 422ms
+web:dev:  GET /api/platform/dashboard 200 in 277ms
+web:dev:  GET /platform 200 in 128ms
+web:dev:  GET /api/platform/session 200 in 167ms
+web:dev:  GET /api/platform/tenants 200 in 253ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 297ms
+web:dev:  GET /api/platform/dashboard 200 in 278ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 245ms
+web:dev:  GET /api/platform/tenants/2155 200 in 322ms
+web:dev: [activity] tenant=2155 days=30: 6 of 6
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 443ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 505ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 568ms
+web:dev: [platform] c9b912b9-8241-44d3-bea1-b5d1078c070d set bookings on tenant 2155
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 298ms
+web:dev:  PUT /api/platform/tenants/2155/applications/bookings 200 in 478ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 476ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 419ms
+web:dev:  GET /api/platform/tenants 200 in 281ms
+web:dev:  GET /api/platform/dashboard 200 in 280ms
+web:dev:  GET /platform 200 in 132ms
+web:dev:  GET /api/platform/session 200 in 299ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 207ms
+web:dev:  GET /api/platform/tenants 200 in 293ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 268ms
+web:dev:  GET /api/platform/dashboard 200 in 267ms
+web:dev:  GET /api/platform/tenants/2155 200 in 306ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 424ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 469ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 535ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 292ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 483ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 413ms
+web:dev:  GET /platform 200 in 102ms
+web:dev:  GET /api/platform/session 200 in 178ms
+web:dev:  GET /api/platform/tenants 200 in 283ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 413ms
+web:dev:  GET /api/platform/dashboard 200 in 250ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 298ms
+web:dev:  GET /api/platform/tenants/2155 200 in 298ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 413ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 467ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 474ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 323ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 444ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 440ms
+web:dev:  GET /platform 200 in 193ms
+web:dev:  GET /api/platform/session 200 in 168ms
+web:dev:  GET /api/platform/tenants 200 in 281ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 285ms
+web:dev: [activity] tenant=platform days=30: 35 of 35
+web:dev:  GET /api/platform/activity?days=30 200 in 225ms
+web:dev:  GET /api/platform/dashboard 200 in 279ms
+web:dev:  GET /api/platform/tenants/2155 200 in 401ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 364ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 415ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 467ms
+web:dev: [activity] tenant=2155 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2155/activity?days=30 200 in 192ms
+web:dev:  GET /api/platform/tenants/2155/members 200 in 418ms
+web:dev:  GET /api/platform/tenants/2155/documents 200 in 411ms
+web:dev:  POST /api/platform/session 200 in 1282ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 created tenant 2156 "free-platform-qa-e81ab0"
+web:dev:  POST /api/platform/tenants 201 in 504ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 updated tenant 2156: dpa_signed_on
+web:dev:  PATCH /api/platform/tenants/2156 200 in 642ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 set bookings on tenant 2156
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 200 in 505ms
+web:dev:  GET /platform 200 in 115ms
+web:dev:  GET /api/platform/session 200 in 159ms
+web:dev:  GET /api/platform/tenants 200 in 265ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 286ms
+web:dev:  GET /api/platform/dashboard 200 in 328ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 337ms
+web:dev:  GET /api/platform/tenants/2156 200 in 389ms
+web:dev: [activity] tenant=2156 days=30: 3 of 3
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 351ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 489ms
+web:dev: [activity] tenant=2156 days=30: 3 of 3
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 231ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 670ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 set bookings on tenant 2156
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 200 in 526ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 441ms
+web:dev:  GET /api/platform/tenants 200 in 267ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 562ms
+web:dev:  GET /api/platform/dashboard 200 in 306ms
+web:dev:  GET /platform 200 in 168ms
+web:dev:  GET /api/platform/session 200 in 174ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 284ms
+web:dev:  GET /api/platform/tenants 200 in 345ms
+web:dev:  GET /api/platform/dashboard 200 in 205ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 301ms
+web:dev:  GET /api/platform/tenants/2156 200 in 307ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 402ms
+web:dev: [activity] tenant=2156 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 412ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 490ms
+web:dev: [activity] tenant=2156 days=30: 4 of 4
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 317ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 set bookings on tenant 2156
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 442ms
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 200 in 509ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 517ms
+web:dev:  GET /api/platform/tenants 200 in 264ms
+web:dev:  GET /api/platform/dashboard 200 in 260ms
+web:dev:  GET /platform 200 in 125ms
+web:dev:  GET /api/platform/session 200 in 161ms
+web:dev:  GET /api/platform/tenants 200 in 253ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 290ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 198ms
+web:dev:  GET /api/platform/dashboard 200 in 278ms
+web:dev:  GET /api/platform/tenants/2156 200 in 313ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 284ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 471ms
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 212ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 501ms
+web:dev:  GET /platform 200 in 134ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/session 200 in 178ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 319ms
+web:dev:  GET /api/platform/tenants 200 in 327ms
+web:dev:  GET /api/platform/dashboard 200 in 212ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 297ms
+web:dev:  GET /api/platform/tenants/2156 200 in 350ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 320ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 462ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 271ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 674ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 565ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 616ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 400 in 393ms
+web:dev:  GET /platform 200 in 103ms
+web:dev:  GET /api/platform/session 200 in 219ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 488ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 415ms
+web:dev:  GET /api/platform/tenants 200 in 11808ms
+web:dev:  GET /api/platform/dashboard 200 in 309ms
+web:dev:  GET /api/platform/tenants/2156 200 in 547ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 483ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 504ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 578ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 349ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 469ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 442ms
+web:dev: [error] config.free_up_to_age is a whole number of years from 0 to 17
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 400 in 300ms
+web:dev:  GET /platform 200 in 115ms
+web:dev:  GET /api/platform/session 200 in 143ms
+web:dev:  GET /api/platform/tenants 200 in 278ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 295ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 269ms
+web:dev:  GET /api/platform/dashboard 200 in 309ms
+web:dev:  GET /api/platform/tenants/2156 200 in 407ms
+web:dev: [activity] tenant=2156 days=30: 5 of 5
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 715ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 set bookings on tenant 2156
+web:dev:  GET /api/platform/tenants/2156/members 200 in 911ms
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 200 in 638ms
+web:dev: [activity] tenant=2156 days=30: 6 of 6
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 246ms
+web:dev:  GET /api/platform/tenants 200 in 267ms
+web:dev:  GET /api/platform/dashboard 200 in 290ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 660ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 1672ms
+web:dev:  GET /platform 200 in 106ms
+web:dev:  GET /api/platform/session 200 in 162ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 307ms
+web:dev:  GET /api/platform/tenants 200 in 340ms
+web:dev:  GET /api/platform/dashboard 200 in 232ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 279ms
+web:dev:  GET /api/platform/tenants/2156 200 in 327ms
+web:dev: [activity] tenant=2156 days=30: 6 of 6
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 641ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 680ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 784ms
+web:dev: [platform] 1b08b426-8d75-49cd-bf6f-ee5ddc5b8ea2 set bookings on tenant 2156
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 220ms
+web:dev:  PUT /api/platform/tenants/2156/applications/bookings 200 in 537ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 600ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 630ms
+web:dev:  GET /api/platform/tenants 200 in 522ms
+web:dev:  GET /platform 200 in 128ms
+web:dev:  GET /api/platform/session 200 in 154ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 314ms
+web:dev:  GET /api/platform/tenants 200 in 414ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 263ms
+web:dev:  GET /api/platform/dashboard 200 in 253ms
+web:dev:  GET /api/platform/tenants/2156 200 in 486ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 504ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 537ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 668ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 449ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 571ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 420ms
+web:dev:  GET /platform 200 in 134ms
+web:dev:  GET /api/platform/session 200 in 194ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 306ms
+web:dev:  GET /api/platform/tenants 200 in 456ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 338ms
+web:dev:  GET /api/platform/dashboard 200 in 214ms
+web:dev:  GET /api/platform/tenants/2156 200 in 306ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 452ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 448ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 535ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 233ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 493ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 501ms
+web:dev:  GET /platform 200 in 168ms
+web:dev:  GET /api/platform/session 200 in 177ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 325ms
+web:dev:  GET /api/platform/tenants 200 in 349ms
+web:dev:  GET /api/platform/dashboard 200 in 205ms
+web:dev: [activity] tenant=platform days=30: 37 of 37
+web:dev:  GET /api/platform/activity?days=30 200 in 315ms
+web:dev:  GET /api/platform/tenants/2156 200 in 413ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 407ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 466ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 485ms
+web:dev: [activity] tenant=2156 days=30: 7 of 7
+web:dev:  GET /api/platform/tenants/2156/activity?days=30 200 in 342ms
+web:dev:  GET /api/platform/tenants/2156/members 200 in 462ms
+web:dev:  GET /api/platform/tenants/2156/documents 200 in 513ms
+web:dev: [ELIFECYCLE] Command failed with exit code 143.
+web#dev:  ERROR  command (C:\Users\jsi6724\Desktop\Projects\rag-chatbot-poc\apps\web) C:\Users\jsi6724\AppData\Roaming\npm\pnpm.cmd run dev exited (143)
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    29m52.353s 
+Failed:    web#dev
+
+ ERROR  run failed: command  exited (143)
+[ELIFECYCLE] Command failed with exit code 143.
