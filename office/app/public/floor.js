@@ -10,7 +10,7 @@ export const ROOMS = [
   { id: 'product', name: 'Product', gates: 'Gates 1–2 · idea, requirements', members: ['ivy', 'rhea'] },
   { id: 'design', name: 'Design studio', gates: 'Gates 3–4 · UX, visual design', members: ['uma', 'vera'] },
   { id: 'engineering', name: 'Engineering', gates: 'Gates 5–6 · architecture, build', members: ['theo', 'finn'] },
-  { id: 'front', name: 'Front office', gates: 'Intake · the record', members: ['george'] },
+  { id: 'front', name: 'Front office', gates: 'Intake · the record · what is pending', members: ['george', 'todd'] },
   { id: 'review', name: 'Review', gates: 'Gate 7 · QA, security, legal', members: ['quinn', 'sage', 'lex'] },
 ];
 
