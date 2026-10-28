@@ -678,7 +678,7 @@ export function check() {
       // Measured 2026-10-28 (office-app Phase 5): with CRLF endings Claude
       // Code silently drops an agent whose description holds ": " (seven of
       // ten: "--agent 'ivy' not found"); .gitattributes keeps them LF.
-      if (readFileSync(agentFile(n), 'utf8').includes('\r\n')) problems.push(`.claude/agents/${n}.md has CRLF line endings: Claude Code does not load it (.gitattributes says eol=lf)`);
+      if (readFileSync(agentFile(n), 'utf8').includes('\r\n')) problems.push(`.claude/agents/${n}.md has CRLF line endings: Claude Code drops such an agent when its description holds ": " (.gitattributes says eol=lf)`);
       const fm = parseFrontmatter(text);
       if (!fm) problems.push(`.claude/agents/${n}.md has no frontmatter`);
       else {

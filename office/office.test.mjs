@@ -516,12 +516,15 @@ describe('the lock, the session index, the snapshot (plan/office-app.md Phase 1)
     assert.deepEqual(s.problems, check());
   });
 
-  test('a CRLF checkout still passes check (core.autocrlf)', () => {
+  test('a CRLF checkout of the skill and a board still passes check; a CRLF AGENT file is reported', () => {
     organization();
-    for (const f of [join(repo, '.claude', 'skills', ORGANIZATION_SKILL, 'SKILL.md'), join(repo, '.claude', 'agents', 'ivy.md'), join(repo, 'office', 'employees', 'ivy', 'board.md')]) {
+    for (const f of [join(repo, '.claude', 'skills', ORGANIZATION_SKILL, 'SKILL.md'), join(repo, 'office', 'employees', 'ivy', 'board.md')]) {
       writeFileSync(f, readFileSync(f, 'utf8').replace(/\r?\n/g, '\r\n'));
     }
     assert.deepEqual(check(), []);
+    const agent = join(repo, '.claude', 'agents', 'ivy.md');
+    writeFileSync(agent, readFileSync(agent, 'utf8').replace(/\r?\n/g, '\r\n'));
+    assert.ok(check().some((p) => p.includes('ivy.md has CRLF line endings')));
   });
 });
 
