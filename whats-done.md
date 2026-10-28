@@ -10176,3 +10176,30 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Full lane (`analytics`):** Ivy APPROVE scoped (1.06 USD); Rhea 25 FRs, 24 ACs (1.11); the user APPROVE at gate 2 (GA4, defaults), recorded by `gate --by user` with the words; Lex advice, no gate (1.30); Uma ux DONE (1.86); Vera design DONE, `mock.html` (2.14); Theo `plan/analytics.md`, 805 lines, eight phases, SUBMITTED, D-151 proposed, R-63 (3.19); Sage CONCERNS, three MEDIUM (the CSP breaks the PDF proof viewer; GA can follow a guest into staff screens by client navigation; `?ref=` and per-property settings), two LOW (1.92). Full lane so far 12.58 USD.
 - **Found:** with Context7 unauthenticated, every GA4 fact in the legal advice and the plan is [unverified] (R-63); the requirements fell behind the gates after them (five unread messages in Rhea's inbox asking for changes); the gate command prints the idea's rung ("→ Approved") after a gate that does not pass, which Theo and Sage each read as a possible approval; Theo took D-151, which plan/ai-employees.md had reserved for the office (the office's moved to D-152).
 - **Then:** round 2 for gate 5 (Rhea folds the messages into an "Amendments after gate 2" section and writes no new gate; Theo answers Sage's concerns by id; Sage re-reviews); the user approves or revises gate 5.
+
+## 2026-10-28 · The office app: the AI employees on a page (D-153, plan/office-app.md Phases 0–6)
+
+- **Asked:** "create a plan to make the office runnable on a web app and has a ui. i can talk to ai employees via chat. each employees have task board. create a animated office with depart partition and put employee on the room partition sitting on their desk with their laptop", "skip the questions", "please follow your recommendations", "implement all the phase defined on the plan".
+- **Built on `feat/office-app`** (a worktree, so Finn's `fix/deps-upgrade` run was not disturbed):
+  - **Phase 0:** the CLI contract as George, 1.37 USD. `--resume` keeps the id; `text_delta` events arrive; a refusal is an `is_error` `tool_result` plus a `permission_denials` row; a killed turn has no `result`.
+  - **Phase 1:** `withLock()` around every `office.mjs` writer, `sessions.json` (per-turn log), `snapshot()`, CRLF read as LF.
+  - **Phase 2:** `office/app/server.mjs`: the token, Host and Origin checks, SSE, the spawn, Stop, the queue, the cap.
+  - **Phases 3–4:** `public/` (floor.js, panel.js, office.js, text.js, office.css).
+  - **Phase 5:** one real day.
+  - **Phase 6:** this record, D-153, R-65.
+- **Observed:**
+  - `office.test.mjs` 25/25: 40 distinct ids from two racing processes; a stale lock taken; CRLF agents reported.
+  - `server.test.mjs` 15/15 on a fake claude: 401, 403 by Origin, Host and missing Origin; the stream in order; `--resume` passed; no bypass flag; 402 then `overCap`; Stop leaves no fake alive; the tester queued behind the builder; a transcript read back.
+  - `text.test.mjs` 3/3.
+  - The walk 16/16 three times: axe 0 on the chat, board, note dialog, inbox, floor light and dark, and the phone sheet; no CSP or script error; reduced motion leaves 0 running animations.
+  - Phase 5 8/8 (`plan/office-app/phase5.md`).
+- **Bugs the walk caught, fixed before the commit:**
+  - two overlapping loads flew a handoff's plane twice; loads now run one at a time;
+  - a redraw's focus-restore fought a tab's own focus;
+  - white initials on yellow failed contrast;
+  - a missing transcript returned 404 to the page;
+  - the CSP refused `style` attributes, so style goes through the CSSOM;
+  - my own regex lost its backslash (`/s+/` stripped the letter s), and a test caught it.
+- **Found:** with `core.autocrlf`, Claude Code silently drops every agent whose description holds `": "` (7 of 10, "`--agent 'ivy' not found`"). `.gitattributes` keeps them LF, and `check` names a CRLF agent. Master has no `.gitattributes` until this branch merges; its working copy is LF today.
+- **Spent:** about 4.3 USD of real `claude`: Phase 0 1.37; Phase 5 run 1 0.97 and run 2 1.67; the debug turn 0.31.
+- **Not done:** no commit on master and no merge (the user's hand). The browser bubble for an over-cap turn is a `<dialog>`, tested by axe and the walk, not by a person.

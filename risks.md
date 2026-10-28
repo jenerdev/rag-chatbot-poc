@@ -1094,3 +1094,30 @@ or take guest data with them: D-077, § 8 q3); slots are still a script
 `book-for-me-harbor` are date-driven flips and `leak-2`'s control a model
 flip on an identical prompt, all three recorded in the plan's Phase 0 and
 Phase 6 and none of them this plan's to fix.
+
+## R-65 · The office app is a local door to agents that write files · **Found 2026-10-28 (D-153); mitigated, not closed**
+
+**The risk:** `pnpm office` can start `claude --agent finn`, which writes
+code and runs `pnpm`, at the cost of the user's subscription.
+
+**What stands in the way:**
+- it listens on 127.0.0.1 only;
+- a 32-byte token, set as an HttpOnly, SameSite=Strict cookie from the
+  printed URL;
+- Host and Origin must be 127.0.0.1 or localhost on its port, which stops
+  DNS rebinding and cross-site POSTs;
+- a POST must carry an Origin;
+- its own CSP, `default-src 'self'`;
+- every turn runs under the employee's guard hook and `--allowedTools`,
+  never a bypass;
+- the daily cap asks before money goes over it.
+
+**What it does not cover:**
+- another program running as the user on this machine can read the
+  printed token from the terminal, or the process's environment;
+- a browser extension with access to every site can read the page;
+- the token lasts as long as the server.
+
+**Closed only by:** never running it on a shared machine, and never
+binding it elsewhere (a change to the listen address is a change to this
+risk).

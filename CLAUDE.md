@@ -453,6 +453,21 @@
 > tradeoff items (the session as a prop, one SQL read for the frame) are
 > listed in D-149, not done, pending a measurement on the deploy.
 >
+> **The AI employees have an office you can open** since 2026-10-28 (D-153,
+> [`plan/office-app.md`](./plan/office-app.md), Phases 0–6).
+> - **`pnpm office` serves a page on 127.0.0.1**, with a token, never
+>   deployed (R-65).
+> - **The floor:** five rooms (Product, Design studio, Engineering, Front
+>   office, Review), each employee a seated SVG figure at a desk with a
+>   laptop.
+> - **A click opens Chat, Board and Inbox.** A chat IS
+>   `claude --agent <name> -p --resume <id>`, under the charter and the
+>   guard.
+> - **`office.mjs` stays the ONE writer**, now under one lock.
+>   `snapshot()` feeds the page.
+> - **The agent files must stay LF** (`.gitattributes`): with CRLF,
+>   Claude Code drops seven of the ten.
+>
 > **Tenants `northwind` and `harbor` were hard-deleted** on 2026-10-20, by
 > the user's choice (`tenant:remove --yes`). Only `villa` and `alteza`
 > remain. `pnpm eval`, both isolation suites and every harbor walk need
@@ -685,6 +700,8 @@ pnpm --filter @rag/db super:remove -- <email>             # effective on their N
 pnpm --filter @rag/db super:list
 pnpm --filter @rag/db tenant:archive -- <slug> [--undo]   # a 404 everywhere, reversible; the platform form does this too
 pnpm --filter @rag/db tenant:remove -- <slug> --yes       # HARD delete: prints 13 counts, cascades, sweeps the photo bucket. CLI only, on purpose (D-077)
+pnpm office                     # the AI employees' office in a browser (D-153): prints http://127.0.0.1:4600/?token=…; each chat is a real claude --agent turn and costs money (OFFICE_DAILY_USD caps a day, default 10)
+pnpm office:test                # 43 tests of the office and its app, on a fake claude, nothing spent; plan/office-app-walk.mjs is the browser walk (16 checks, AXE=…)
 ```
 
 ## The rules you will be tempted to break

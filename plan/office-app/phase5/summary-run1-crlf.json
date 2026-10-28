@@ -1,0 +1,24 @@
+{
+  "George answers; the page's cost is the result's total_cost_usd; the session is indexed": {
+    "usd": 0.30565960000000003,
+    "seconds": 5,
+    "reply": "This office is a team of AI employees: I keep the project's memory and do the intake, and nine roles work under me, from the Idea Strategist through the Full-Stack Engineer and QA to the Security and "
+  },
+  "a second turn resumes the SAME session and remembers it": {
+    "usd": 0.3243878,
+    "reply": "What this office is for."
+  },
+  "over the 0.5 USD cap the page is asked first (402), then Ivy answers with overCap": "FAILED: Cannot read properties of undefined (reading 'usd')",
+  "a refusal forced on Theo: the real guard's sentence in the stream, the desk refused": "FAILED: no refused tool_result",
+  "Stop during a Bash call: the turn ends stopped and no child is left": "FAILED: timed out",
+  "the past chat reads back from Claude Code's own transcript": {
+    "messages": 4,
+    "first": "Phase 5 of plan/office-app.md. Without using any tool, in one sentence: what is "
+  },
+  "the terminal continues the page's chat: claude --resume <id>": {
+    "usd": 0.3379804,
+    "reply": "\"Phase 5 of plan/office-app.md. Without using any tool, in one sentence: what is this office for?\""
+  },
+  "nothing under apps/ or packages/ of this repo changed": true,
+  "spent_through_the_page_usd": 0.63
+}

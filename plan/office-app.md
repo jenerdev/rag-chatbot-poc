@@ -22,7 +22,7 @@
 > Written 2026-10-28 by the user's request, without questions ("skip the
 > questions, just write the plan"): every choice the user did not make is
 > marked **my call** in § 7, with the default that stands if unanswered.
-> **Status: written, not started; § 7 answered 2026-10-28** (the user:
+> **Status: complete, 2026-10-28** (D-153, R-65): Phases 0–6 done, the walk 16/16 three runs, Phase 5 8/8 with the real claude; evidence in `plan/office-app/`. **§ 7 answered 2026-10-28** (the user:
 > "if there are questions. please follow your recommendations": every
 > default stands). Nothing in the product changes.
 >
