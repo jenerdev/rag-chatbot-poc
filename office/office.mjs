@@ -24,7 +24,7 @@
 // temporary one); OFFICE_NOW fixes "now" (ISO) for the same reason.
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -164,7 +164,10 @@ const stamp = () => { const d = now(); return `${today()} ${pad(d.getHours())}:$
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const writeJson = (file, value) => writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-const readText = (file) => readFileSync(file, 'utf8');
+// With core.autocrlf a Windows checkout turns every LF into CRLF, and
+// `check`'s verbatim comparisons (the skill, the charters) would fail on a
+// fresh clone (found in the office-app worktree, 2026-10-28). Read as LF.
+const readText = (file) => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 
 export const roster = () =>
   existsSync(join(office(), 'employees')) ? readdirSync(join(office(), 'employees'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort() : [];
@@ -195,6 +198,37 @@ const clean = (s, what) => {
   if (/ · /.test(v)) throw new Error(`${what} cannot contain " · " (the line's separator)`);
   return v;
 };
+
+// ---------------------------------------------------------------- the lock (plan/office-app.md Rule 6)
+
+// Every writer reads a file, changes it and writes it back, and the sequence
+// is one file for the whole office. Two employees finishing in the same
+// second, or the office app and a terminal, would both read T-013 and both
+// write T-014. So every exported writer runs under ONE lock: a directory,
+// because mkdir is atomic on every platform and needs no dependency. It is
+// re-entrant (a writer that calls a writer does not wait for itself), and a
+// lock older than LOCK_STALE_MS belongs to a process that died holding it.
+const lockDir = () => join(office(), '.lock');
+export const LOCK_WAIT_MS = 5000;
+export const LOCK_STALE_MS = 30000;
+let lockDepth = 0;
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export function withLock(fn) {
+  if (lockDepth > 0) { lockDepth++; try { return fn(); } finally { lockDepth--; } }
+  const started = Date.now();
+  for (;;) {
+    try { mkdirSync(lockDir()); break; } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let age = 0; try { age = Date.now() - statSync(lockDir()).mtimeMs; } catch { continue; }
+      if (age > LOCK_STALE_MS) { try { rmSync(lockDir(), { recursive: true, force: true }); } catch {} continue; }
+      if (Date.now() - started > LOCK_WAIT_MS) throw new Error(`the office is busy: another writer has held office/.lock for ${Math.round(age / 1000)} s (try again)`);
+      sleepSync(25);
+    }
+  }
+  lockDepth = 1;
+  try { return fn(); } finally { lockDepth = 0; rmSync(lockDir(), { recursive: true, force: true }); }
+}
+const locked = (fn) => (...args) => withLock(() => fn(...args));
 
 // ---------------------------------------------------------------- the board
 
@@ -241,7 +275,7 @@ const loadBoard = (name) => {
 };
 const saveBoard = (name, board) => writeFileSync(boardFile(name), renderBoard(board, name));
 
-export function taskAdd({ to, from, title, why, doing = false, idea }) {
+function taskAddUnlocked({ to, from, title, why, doing = false, idea }) {
   mustBeEmployee(to, '--to'); mustBeSender(from);
   // Everything is checked and the board is read BEFORE the sequence is
   // bumped: a refused task must not consume an id.
@@ -262,7 +296,7 @@ export function findTask(id) {
   return null;
 }
 
-export function taskMove(id, to, { note } = {}) {
+function taskMoveUnlocked(id, to, { note } = {}) {
   if (!['doing', 'done', 'dropped'].includes(to)) throw new Error(`a task moves to doing, done or dropped, not "${to}"`);
   const found = findTask(id);
   if (!found) throw new Error(`no task ${id} on any board`);
@@ -312,7 +346,7 @@ const loadInbox = (name) => {
   return messages;
 };
 
-export function msg({ to, from, text }) {
+function msgUnlocked({ to, from, text }) {
   mustBeEmployee(to, '--to'); mustBeSender(from);
   const body = clean(text, 'the text');
   const messages = loadInbox(to);
@@ -322,7 +356,7 @@ export function msg({ to, from, text }) {
   return { ...message, to };
 }
 
-export function inbox(name, { ack, ackAll = false } = {}) {
+function inboxUnlocked(name, { ack, ackAll = false } = {}) {
   mustBeEmployee(name, 'the name');
   const messages = loadInbox(name);
   if (ack || ackAll) {
@@ -406,7 +440,7 @@ export function statusOf(idea, boards = null) {
 
 const SLUG = /^[a-z][a-z0-9-]*$/;
 
-export function ideaAdd({ slug, title, from, lane = 'full' }) {
+function ideaAddUnlocked({ slug, title, from, lane = 'full' }) {
   if (!SLUG.test(slug ?? '')) throw new Error('a slug is lowercase letters, digits and dashes');
   if (!LANES.includes(lane)) throw new Error(`--lane is full or short, not "${lane}"`);
   mustBeSender(from);
@@ -419,7 +453,7 @@ export function ideaAdd({ slug, title, from, lane = 'full' }) {
   return idea;
 }
 
-export function gate({ slug, gate: name, by, verdict, file, note, override = false }) {
+function gateUnlocked({ slug, gate: name, by, verdict, file, note, override = false }) {
   const spec = GATES[name];
   if (!spec) throw new Error(`a gate is one of ${GATE_ORDER.join(', ')}, not "${name}"`);
   const ideas = loadPipeline();
@@ -516,7 +550,7 @@ const agentTemplate = ({ name, title, role, model, colour, kind, tools, skills }
   return [...front, ...body].join('\n');
 };
 
-export function hire({ name, title, role, colour = 'blue', model = 'inherit', pronouns = 'they/them', guard: kind = 'read-only', tools = [], skills = [] }) {
+function hireUnlocked({ name, title, role, colour = 'blue', model = 'inherit', pronouns = 'they/them', guard: kind = 'read-only', tools = [], skills = [] }) {
   if (!/^[a-z][a-z0-9-]*$/.test(name ?? '')) throw new Error('a name is lowercase letters, digits and dashes');
   if (!title?.trim()) throw new Error('a title is required');
   if (!ROLES[role]) throw new Error(`--role is one of ${Object.keys(ROLES).join(', ')}`);
@@ -580,7 +614,7 @@ function fillCharter(name, employees) {
   return file;
 }
 
-export function organization() {
+function organizationUnlocked() {
   const { shared, employees } = organizationSections();
   const changed = [];
   mkdirSync(dirname(organizationSkill()), { recursive: true });
@@ -598,7 +632,7 @@ export function organization() {
 // digests were built from. George's other digests are hers to write.
 const HEADING = /^## ((?:D|R)-\d+) · (.+?) · \*\*(.+?)\*\*/;
 
-export function index(name = 'george') {
+function indexUnlocked(name = 'george') {
   mustBeEmployee(name, 'the name');
   const notes = join(employeeDir(name), 'notes');
   mkdirSync(notes, { recursive: true });
@@ -704,6 +738,63 @@ export function check() {
   if (names.length && !JSON.stringify(settings.hooks ?? {}).includes(GUARD_COMMAND)) problems.push(`employees exist (${names.join(', ')}) and .claude/settings.json has no guard mirror (Rule 1)`);
   return problems;
 }
+
+// ---------------------------------------------------------------- the session index (plan/office-app.md § 3.1)
+
+// One line per chat an employee has had through the office app: its
+// Claude Code session id, when it started, its first words as a title, how
+// many turns and what they cost. No transcript: Claude Code keeps that in
+// ~/.claude/projects/, and two copies would disagree.
+const sessionsFile = (name) => join(employeeDir(name), 'sessions.json');
+export function sessions(name) {
+  mustBeEmployee(name, 'the name');
+  return existsSync(sessionsFile(name)) ? readJson(sessionsFile(name)) : [];
+}
+function sessionTurnUnlocked(name, { id, title, usd = 0 }) {
+  mustBeEmployee(name, 'the name');
+  if (!/^[0-9a-f-]{36}$/.test(id ?? '')) throw new Error(`a session id is a uuid, not "${id}"`);
+  const list = sessions(name);
+  const at = now().toISOString();
+  const s = list.find((x) => x.id === id);
+  // `log` is one { at, usd } per turn, so "spent today" (office-app Rule 5)
+  // is a sum of today's turns, not of whole sessions that began yesterday.
+  if (s) { s.turns += 1; s.usd = Math.round((s.usd + usd) * 1e6) / 1e6; s.last = at; (s.log ??= []).push({ at, usd }); }
+  else list.push({ id, started: at, title: (title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '(untitled)', turns: 1, usd: Math.round(usd * 1e6) / 1e6, last: at, log: [{ at, usd }] });
+  writeJson(sessionsFile(name), list);
+  return list.find((x) => x.id === id);
+}
+
+// ---------------------------------------------------------------- the snapshot (plan/office-app.md Rule 3)
+
+// The whole office as JSON, parsed by the same parsers `check` uses, so the
+// page cannot show a board the files do not hold. A board or inbox that
+// does not parse is reported in `problems`, never guessed.
+export function snapshot() {
+  const employees = roster().map((name) => {
+    const p = profile(name);
+    const b = existsSync(boardFile(name)) ? parseBoard(readText(boardFile(name))) : { board: Object.fromEntries(SECTIONS.map((s) => [s, []])), problems: [] };
+    const i = existsSync(inboxFile(name)) ? parseInbox(readText(inboxFile(name))) : { messages: [], problems: [] };
+    return {
+      name, title: p.title, role: p.role, pronouns: p.pronouns, colour: p.colour, colourHex: COLOURS[p.colour] ?? COLOURS.blue,
+      guard: p.guard ?? null, board: b.board, inbox: i.messages, unread: i.messages.filter((m) => !m.read).length,
+      sessions: existsSync(sessionsFile(name)) ? readJson(sessionsFile(name)) : [],
+    };
+  });
+  const boards = employees.map((e) => ({ name: e.name, board: e.board }));
+  const ideas = existsSync(pipelineFile()) ? loadPipeline().map((i) => ({ ...i, status: statusOf(i, boards) })) : [];
+  return { employees, ideas, sections: SECTIONS, ladder: LADDER, problems: check() };
+}
+
+export const hire = locked(hireUnlocked);
+export const taskAdd = locked(taskAddUnlocked);
+export const taskMove = locked(taskMoveUnlocked);
+export const msg = locked(msgUnlocked);
+export const inbox = locked(inboxUnlocked);
+export const ideaAdd = locked(ideaAddUnlocked);
+export const gate = locked(gateUnlocked);
+export const organization = locked(organizationUnlocked);
+export const index = locked(indexUnlocked);
+export const sessionTurn = locked(sessionTurnUnlocked);
 
 // ---------------------------------------------------------------- the command line
 

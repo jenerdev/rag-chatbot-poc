@@ -15,7 +15,7 @@ import { beforeEach, afterEach, describe, test } from 'node:test';
 
 import {
   check, gate, guardKind, hire, ideaAdd, inbox, index, msg, organization, parseBoard, parseFrontmatter, parsePipeline, pipeline, renderBoard, renderPipeline,
-  taskAdd, taskList, taskMove, REQUIRED_PLUGINS, GUARD_COMMAND, SECTIONS, ORG_BEGIN, ORG_END, ORG_READ_LINE, ORGANIZATION_SKILL,
+  taskAdd, taskList, taskMove, REQUIRED_PLUGINS, GUARD_COMMAND, SECTIONS, ORG_BEGIN, ORG_END, ORG_READ_LINE, ORGANIZATION_SKILL, withLock, sessions, sessionTurn, snapshot, LOCK_STALE_MS,
 } from './office.mjs';
 import { guardOf, judge } from './hooks/guard.mjs';
 
@@ -456,3 +456,77 @@ describe('the guard', () => {
     assert.equal(run({ agent_type: 'george', tool_name: 'Bash', tool_input: { command: 'pnpm test' }, cwd: repo }).status, 2);
   });
 });
+
+describe('the lock, the session index, the snapshot (plan/office-app.md Phase 1)', () => {
+  const script = resolve('office/office.mjs');
+  beforeEach(() => { george(); ivy(); });
+
+  test('two processes adding 20 tasks each at once end with 40 distinct ids', () => {
+    const body = 'for (let i = 0; i < 20; i++) m.taskAdd({ to: "ivy", from: "george", title: "t" + process.argv[1] + i, why: "race" });';
+    const runner = join(repo, 'race.mjs');
+    writeFileSync(runner, `import * as m from ${JSON.stringify(pathToFileURL(script).href)}; ${body}`);
+    const { spawn } = require_child();
+    return Promise.all(['a', 'b'].map((tag) => new Promise((done, fail) => {
+      const c = spawn(process.execPath, [runner, tag], { env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+      let err = ''; c.stderr.on('data', (d) => (err += d));
+      c.on('close', (code) => (code === 0 ? done() : fail(new Error(err))));
+    }))).then(() => {
+      const ids = parseBoard(readFileSync(join(repo, 'office', 'employees', 'ivy', 'board.md'), 'utf8')).board.inbox.map((x) => x.id);
+      assert.equal(ids.length, 40);
+      assert.equal(new Set(ids).size, 40, 'no id twice');
+      assert.equal(JSON.parse(readFileSync(join(repo, 'office', 'sequence.json'), 'utf8')).task, 40);
+      assert.ok(!existsSync(join(repo, 'office', '.lock')), 'the lock is released');
+    });
+  });
+
+  test('a stale lock is taken; a fresh one held by another makes a writer wait, then refuse in words', () => {
+    const lock = join(repo, 'office', '.lock');
+    mkdirSync(lock);
+    const old = new Date(Date.now() - LOCK_STALE_MS - 1000);
+    require_fs().utimesSync(lock, old, old);
+    assert.equal(taskAdd({ to: 'ivy', from: 'george', title: 'after a stale lock', why: 'x' }).id, 'T-001');
+    assert.ok(!existsSync(lock));
+    assert.equal(withLock(() => withLock(() => 'nested')), 'nested', 're-entrant');
+  });
+
+  test('the session index: a first turn, a second, a bad id refused; the guard keeps sessions.json the script\'s', () => {
+    const id = '0f9c2a7e-1b2c-4d5e-8f90-123456789abc';
+    sessionTurn('ivy', { id, title: 'What is   owed\non analytics?', usd: 0.25 });
+    const s = sessionTurn('ivy', { id, usd: 0.5 });
+    assert.deepEqual([s.turns, s.usd, s.title], [2, 0.75, 'What is owed on analytics?']);
+    assert.equal(sessions('ivy').length, 1);
+    assert.throws(() => sessionTurn('ivy', { id: '../x' }), /uuid/);
+    assert.throws(() => sessions('nobody'), /no employee/);
+    const reason = judge({ tool_name: 'Write', tool_input: { file_path: 'office/employees/ivy/sessions.json' }, cwd: repo, agent_type: 'ivy' }, guardKind('author:product'), repo);
+    assert.match(reason, /only office.mjs writes/);
+    assert.match(judge({ tool_name: 'Write', tool_input: { file_path: 'office/.lock/x' }, cwd: repo, agent_type: 'finn' }, guardKind('builder'), repo), /only office.mjs/);
+  });
+
+  test('snapshot() is what the files hold, parsed by the same parsers check uses', () => {
+    organization();
+    ideaAdd({ slug: 'office-app', title: 'The office as a page', from: 'user', lane: 'short' });
+    taskAdd({ to: 'ivy', from: 'george', title: 'read it', why: 'because', idea: 'office-app' });
+    msg({ to: 'ivy', from: 'george', text: 'hello; with a semicolon' });
+    const s = snapshot();
+    assert.deepEqual(s.employees.map((e) => e.name), ['george', 'ivy']);
+    const ivyRow = s.employees.find((e) => e.name === 'ivy');
+    assert.deepEqual([ivyRow.title, ivyRow.colourHex, ivyRow.unread, ivyRow.board.inbox[0].title, ivyRow.guard.kind], ['Idea Strategist', '#ca8a04', 1, 'read it', 'author:product']);
+    assert.equal(s.ideas[0].status, 'Approved');
+    assert.deepEqual(s.sections, SECTIONS);
+    assert.deepEqual(s.problems, check());
+  });
+
+  test('a CRLF checkout still passes check (core.autocrlf)', () => {
+    organization();
+    for (const f of [join(repo, '.claude', 'skills', ORGANIZATION_SKILL, 'SKILL.md'), join(repo, '.claude', 'agents', 'ivy.md'), join(repo, 'office', 'employees', 'ivy', 'board.md')]) {
+      writeFileSync(f, readFileSync(f, 'utf8').replace(/\r?\n/g, '\r\n'));
+    }
+    assert.deepEqual(check(), []);
+  });
+});
+
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const require_ = createRequire(import.meta.url);
+function require_child() { return require_('node:child_process'); }
+function require_fs() { return require_('node:fs'); }
