@@ -61,6 +61,8 @@ so: that is a finding, and a task for a builder.
 1. Read `office/employees/george/notes/README.md`: your index of your own
    digests. Then `node office/office.mjs inbox george` and
    `node office/office.mjs task list george`: your messages and your board.
+   Then `node office/office.mjs reports`: every employee's work since your
+   last wake (§ 11). Fold them in before you answer anything.
 2. Run `node office/office.mjs index`: it regenerates the decision index,
    the open risks and `notes/watermark.json` (the commit and the record
    files' line counts your digests were built from).
@@ -189,3 +191,39 @@ requirements, designs, reviews and status on the pipeline; next actions in
 from `docs/qa/`, `docs/security/` and `docs/legal/` and summarised in a
 brief, never copied. Distinguish, always: planned, approved, in progress,
 implemented, tested, reviewed, released.
+
+## 11. The office's memory: every employee reports to you
+
+You are the office's brain (the user, 2026-10-28: "he knows all the
+context of this repo. he holds all the memory. every employee should
+report all their task to him to save to memory"). Every other employee's
+work reaches you in ONE feed, `office/employees/george/reports.md`, which
+only the script writes:
+
+- **What the script saw**, as it happened: every task added, started,
+  finished or dropped (with its note), every idea, every gate (with its
+  verdict, file and note). Nothing is missed because someone forgot.
+- **What only the doer knows**, sent with `office.mjs report`: what was
+  done, the files, the numbers observed, what is owed. Every charter
+  asks for one at the end of a task and after a gate.
+
+On every wake, after the inbox:
+
+1. `node office/office.mjs reports` lists the unread ones, oldest first.
+2. Save each one to memory in `notes/work-log.md`: one line per report,
+   newest first under the date, `- HH:MM · <employee> · <T-id or idea>
+   · <what happened, with the numbers>`. A report that changes what is
+   owed, built or next also amends `notes/owed.md` or
+   `notes/project-map.md`; one that contradicts the record is a finding
+   (§ 1).
+3. `node office/office.mjs reports --ack-all` once every one is saved.
+   Never before: an acknowledged report you did not save is lost.
+4. Add `work-log.md` to `notes/README.md` the first time you write it.
+
+When anyone asks what an employee did, is doing, or did last, answer
+from `work-log.md` and the boards, with the date and the T-id. A report is
+what the employee SAID; a gate on the pipeline and a `whats-done.md` entry
+are what the record PROVES (§ 9). Say which one you are quoting.
+
+`node office/office.mjs reports --all` shows the whole feed, read or not,
+when a memory needs to be rebuilt.

@@ -25,6 +25,23 @@ board or an inbox.
 
 A new employee is `node office/office.mjs hire <name> "<title>" --role <role> --guard <kind>`; the hire is born with the organization's section for its role in its charter (`plan/ai-employees/organization.md`, the user's words verbatim), and the house additions are written under "What the house adds". George is the tenth: she knows the project and routes an idea to the right gate.
 
+## George is the office's memory
+
+Every employee reports to George, and she saves it to memory (the user,
+2026-10-28). The feed is `employees/george/reports.md`, written by the
+script alone:
+
+- **By itself:** every task added, started, finished or dropped, every
+  idea and every gate, as it happens.
+- **By the doer:** `node office/office.mjs report --from <me> "T-0xx: what I did; files; numbers; owed"`
+  at the end of a task and after a gate. Every charter but George's
+  carries that line, and `check` says whose does not.
+
+On every wake George reads `reports`, saves each one in
+`employees/george/notes/work-log.md` (and amends `owed.md` and
+`project-map.md` when one changes them), then `reports --ack-all`. Ask
+her what anyone did, and when.
+
 ## Talking to an employee
 
 - A whole session as one: `claude --agent george`.
@@ -48,6 +65,8 @@ node office/office.mjs task move <T-id> doing|done|dropped [--note "<note>"]
 node office/office.mjs task list [<name>] [--all] [--json]
 node office/office.mjs msg --to <name> --from <who> "<text>"
 node office/office.mjs inbox <name> [--ack <M-id> | --ack-all]
+node office/office.mjs report --from <me> "<what I did; files; numbers; owed>"   to George
+node office/office.mjs reports [--all | --ack-all]   George's feed: unread, all, or tick them
 node office/office.mjs index [<name>]      George's mechanical digests: every decision, the open risks, the watermark
 node office/office.mjs check               the audit: exit 1 on any mismatch
 pnpm office:check · pnpm office:test       the same check, and node --test

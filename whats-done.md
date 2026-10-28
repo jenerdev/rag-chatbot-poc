@@ -10223,3 +10223,22 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Found:** with `core.autocrlf`, Claude Code silently drops every agent whose description holds `": "` (7 of 10, "`--agent 'ivy' not found`"). `.gitattributes` keeps them LF, and `check` names a CRLF agent. Master has no `.gitattributes` until this branch merges; its working copy is LF today.
 - **Spent:** about 4.3 USD of real `claude`: Phase 0 1.37; Phase 5 run 1 0.97 and run 2 1.67; the debug turn 0.31.
 - **Not done:** no commit on master and no merge (the user's hand). The browser bubble for an over-cap turn is a `<dialog>`, tested by axe and the walk, not by a person.
+
+## 2026-10-28 · George is the office's memory: every employee reports to her
+
+- **Asked:** "please make George as the brain, he knows all the context of this repo. he holds all the memory. every employee should report all their task to him to save to memory."
+- **What:**
+  - `office/office.mjs`: `MEMORY = 'george'` and ONE feed, `office/employees/george/reports.md` (`parseReports` / `renderReports`, one line shape: `- [ ] <date time> · from <who> · task|idea|gate|report · <text>`). `taskAdd`, `taskMove`, `ideaAdd` and `gate` append a report as they write, so nothing depends on an employee remembering; George's own work is not reported to her. `report --from <me> "…"` is the doer's line (what was done, the files, the numbers, what is owed); `reports [--all | --ack-all]` is George's read.
+  - `REPORT_LINE` in every charter but George's (ten agent files; `hire` writes it), and `check` names a charter without it, the way it does `ORG_READ_LINE`.
+  - George's charter: wake step 1 reads `reports`; § 11 says how a report is saved (`notes/work-log.md`, newest first; `owed.md` and `project-map.md` amended when one changes them), when to tick them (only after saving), and that a report is what an employee SAID while a gate and a `whats-done.md` entry are what the record PROVES.
+  - `office/hooks/guard.mjs`: `reports.md` joins the files only the script writes.
+- **Observed:** `node --test office/office.test.mjs office/app/server.test.mjs office/app/text.test.mjs` 48/48 (43 + 5 new: the auto reports, `report` and `--ack-all`, the charter line in `check`, no George, the guard); one run in five failed `server.test.mjs`'s watcher-burst count (2 !== 1), the timing flake seen before this change. `node office/office.mjs check` green, 11 employees.
+- **Why a feed and not the inbox:** every task move in the office would otherwise land among George's real messages; a separate feed keeps the inbox for questions and lets her tick the reports in one step once saved.
+- **Not done:** the office page does not show the feed (George's panel shows her inbox only); George's first wake with reports is unrun (it spends). Not committed.
+
+## 2026-10-28 · The office's chats show no shell commands
+
+- **Asked:** "for all that chats. please dont include the bash commands on the bot response".
+- **What:** `office/app/server.mjs`: `HIDDEN_TOOLS = new Set(['Bash'])`. `slim()` marks such a call `hidden` with no summary; the turn's loop sends neither the call nor its result to the page, and the desk's state reads "running a command", never the command; `readTranscript()` leaves them out of a past chat. A hidden call still counts as refused when the guard refuses it. Read, Write, Edit, Grep and Glob lines are unchanged.
+- **Observed:** office tests 48/48 on two of three runs; the third failed the known watcher-burst flake. New checks: `slim` on a Bash call; the live slow turn (the fake's Bash `pnpm test`) shows "running a command" and the string `pnpm test` appears in no event; a transcript with a Bash call still reads back with one tool.
+- Not committed.

@@ -56,6 +56,12 @@ export function toolSummary(name, input = {}, repo = '') {
 }
 const resultText = (c) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => x.text ?? '').join('') : JSON.stringify(c ?? ''));
 
+// Tools whose calls never reach a chat, live or in a past one: the user,
+// 2026-10-28, "please dont include the bash commands on the bot response".
+// A hidden call still sets the desk's state ("running a command", never the
+// command) and still counts as a refusal when the guard refuses it.
+export const HIDDEN_TOOLS = new Set(['Bash']);
+
 // One stream-json event (plan/office-app/phase0.md) → the few kinds the
 // page draws. Everything else is dropped: the page never sees raw events.
 export function slim(e, repo) {
@@ -64,7 +70,7 @@ export function slim(e, repo) {
   if (e.type === 'stream_event' && e.event?.type === 'message_start') return [{ kind: 'message' }];
   if (e.type === 'assistant' && Array.isArray(e.message?.content)) {
     return e.message.content.flatMap((c) => c.type === 'text' ? [{ kind: 'text', text: c.text }]
-      : c.type === 'tool_use' ? [{ kind: 'tool', id: c.id, name: c.name, summary: toolSummary(c.name, c.input, repo) }] : []);
+      : c.type === 'tool_use' ? [HIDDEN_TOOLS.has(c.name) ? { kind: 'tool', id: c.id, name: c.name, summary: '', hidden: true } : { kind: 'tool', id: c.id, name: c.name, summary: toolSummary(c.name, c.input, repo) }] : []);
   }
   if (e.type === 'user' && Array.isArray(e.message?.content)) {
     return e.message.content.filter((c) => c.type === 'tool_result').map((c) => {
@@ -101,7 +107,7 @@ export function readTranscript(text, repo) {
       if (!last || last.role !== 'assistant') { last = { role: 'assistant', text: '', tools: [] }; out.push(last); }
       for (const c of content) {
         if (c.type === 'text') last.text += (last.text ? '\n\n' : '') + c.text;
-        if (c.type === 'tool_use') { const t = { id: c.id, name: c.name, summary: toolSummary(c.name, c.input, repo) }; tools.set(c.id, t); last.tools.push(t); }
+        if (c.type === 'tool_use' && !HIDDEN_TOOLS.has(c.name)) { const t = { id: c.id, name: c.name, summary: toolSummary(c.name, c.input, repo) }; tools.set(c.id, t); last.tools.push(t); }
       }
     }
   }
@@ -155,6 +161,7 @@ export function startOffice({ port = Number(process.env.OFFICE_PORT ?? 4600), to
     send('chat', { name, turn, item: { kind: 'user', text } });
     pushState();
     let buffer = '';
+    const hidden = new Set(); // this turn's HIDDEN_TOOLS calls: their results stay off the page too
     child.stdout.on('data', (chunk) => {
       buffer += chunk;
       let i;
@@ -164,9 +171,11 @@ export function startOffice({ port = Number(process.env.OFFICE_PORT ?? 4600), to
         let e; try { e = JSON.parse(line); } catch { continue; }
         for (const item of slim(e, repo)) {
           if (item.kind === 'init') r.session = item.session;
-          if (item.kind === 'tool') { r.tool = `${item.name}${item.summary ? ` ${item.summary}` : ''}`.slice(0, 80); pushState(); }
+          if (item.kind === 'tool') { r.tool = item.hidden ? 'running a command' : `${item.name}${item.summary ? ` ${item.summary}` : ''}`.slice(0, 80); pushState(); }
           if (item.kind === 'tool_result' && item.refused) r.refused = true;
           if (item.kind === 'result') r.result = item;
+          if (item.hidden) { hidden.add(item.id); continue; }
+          if (item.kind === 'tool_result' && hidden.has(item.id)) continue;
           send('chat', { name, turn, item });
         }
       }

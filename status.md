@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**George is the office's memory (2026-10-28, on `feat/george-memory`, not committed):** every employee reports to George. `office/employees/george/reports.md` is ONE feed only the script writes: every task added, started, finished or dropped, every idea and every gate, reported as it happens, plus `office.mjs report --from <me> "…"`, the doer's own line, which every charter but George's now asks for at the end of a task and after a gate (`REPORT_LINE`, required by `check`). George's charter § 11: on every wake `reports`, save each to `notes/work-log.md` (amend `owed.md` and `project-map.md` when one changes them), then `reports --ack-all`. The guard keeps `reports.md` the script's. Tests 48/48 (5 new; `server.test.mjs`'s watcher-burst test flaked once in five runs, as before); `office:check` green, 11 employees. Also Todd, the Task Tracker (read-only: what is pending, whose, what next), hired 2026-10-28. **Next:** your commit and merge; then George's first wake folds the first reports.
+
 **Dependencies upgraded (2026-10-28, T-013 deps-upgrade, D-022 amended, R-64, done; Quinn's browser pass owed):** next 15.5.25 → 15.5.28 (the critical GHSA-2464-fhr4-w9xw and the high GHSA-p3m5-59mp-jv5r), sharp 0.35.4 → 0.35.5, zod 3.25.76 → 4.6.7. Zod is a MAJOR because 3.x has no fix for GHSA-mrhx-c7xc-m3w5. `schemas.ts` moved to the zod 4 API with zod 3's words kept (`typeError`, `failedWith`, `v3Words`). The first message was identical on a 32,673-input corpus, and five lists gained a cap so zod 4 refuses an over-long one before parsing it (a million rooms: 2,000,001 issues, 1,136 ms, +379 MB → 1 issue, 2 ms). `pnpm audit --prod` 11 (1 critical, 6 high, 4 moderate) → 5 (3 high, 2 moderate), all next's pinned postcss 8.4.31, build-time only (R-64). Tests 804 → 810 (web 249), typecheck 13/13, build green on 15.5.28, the bundle grep 0, verify 243/243 (run 3; runs 1–2 `fetch failed`), rooms 57/57 (run 2), villa's tool text byte-identical; northwind's and harbor's baselines cannot run (tenants deleted). T-005's "Bookings tab" wording fixed in the same turn. Not committed. **Next:** Quinn, gate 7 on deps-upgrade (a browser pass: the booking page, the platform form, the room icon); then the user's commit and deploy, before analytics Phase 0.
 
 **The office app (2026-10-28, done on `feat/office-app`, D-153):** `pnpm office`: the AI employees on a page at 127.0.0.1. Five rooms, each employee at a desk; Chat (a real `claude --agent` turn), Board and Inbox per employee ([`plan/office-app.md`](./plan/office-app.md), Phases 0–6). Tests 43/43; the walk 16/16 three runs; Phase 5 8/8 with the real claude. Found: CRLF agent files are silently dropped by Claude Code (seven of ten), and `.gitattributes` now keeps them LF. **Next:** merge `fix/deps-upgrade` first, then `feat/office-app` (your hand); `office-ui-status.md` in the repo root says what is owed.
@@ -1888,6 +1890,15 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-10-28 — The office's chats show no shell commands (feat/george-memory)
+- **Did:** `HIDDEN_TOOLS` (Bash) in `office/app/server.mjs`: no call, no result, no past-chat line; the desk says "running a command".
+- **Observed:** office tests 48/48 (one known flake in three runs).
+
+### 2026-10-28 — George is the office's memory (feat/george-memory)
+- **Did:** `reports.md`, auto-reports in `taskAdd`, `taskMove`, `ideaAdd`, `gate`; `report` and `reports` commands; `REPORT_LINE` in ten charters and in `hire`; `check` requires it; George's § 11; the guard; the README.
+- **Observed:** office tests 48/48 (one known flake in five runs); `office:check` green.
+- **Next:** the user's commit and merge.
 
 ### 2026-10-28 — Dependencies upgraded: next 15.5.28, sharp 0.35.5, zod 4.6.7 (Finn, T-013; T-005 too)
 - **Did:** the three bumps in `apps/web/package.json`; `schemas.ts` on the zod 4 API with zod 3's words (`typeError`, `failedWith`, `v3Words`) and a cap on every list; six tests in `schemas.test.ts`; D-022 amended; R-64; the "Bookings tab" wording (T-005) in CLAUDE.md, decisions.md, plan/free-guests.md, status.md.

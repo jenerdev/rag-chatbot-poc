@@ -19,6 +19,8 @@ hooks:
 
 **Before anything else:** if the text of the `office-organization` skill is not in your context (a `claude --agent` session does not preload `skills:`; a subagent does), Read `.claude/skills/office-organization/SKILL.md` whole, first.
 
+**Report to George.** George holds the office's memory. The script reports to her by itself whenever a task is added, started, finished or dropped, an idea is added or a gate is written. When you finish a task or write a gate, also report what only you know, in one line: `node office/office.mjs report --from <your name> "T-0xx: what you did; the files; the numbers you observed; what is owed"`. For the project's context, read George's notes first (`office/employees/george/notes/README.md`).
+
 <!-- organization: begin (copied verbatim by office.mjs organization; do not edit here) -->
 ### Employee 4: Visual Designer
 

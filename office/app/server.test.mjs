@@ -190,7 +190,10 @@ describe('a chat (Rule 2) and money (Rule 5)', () => {
   test('Stop kills the turn and leaves no process; a second builder turn is queued behind the first', async () => {
     const sse = listen();
     assert.equal((await call('POST', '/api/employees/finn/chat', { body: { text: 'slow build', overCap: true } })).status, 202);
-    await sse.until((ev) => items(ev, 'finn').some((i) => i.kind === 'tool'));
+    // The slow fake runs Bash: the desk says so, the chat shows no command (HIDDEN_TOOLS).
+    await sse.until((ev) => ev.some((e) => e.event === 'state' && e.data.states?.finn?.tool === 'running a command'));
+    assert.ok(!items(sse.events, 'finn').some((i) => i.kind === 'tool'), 'no Bash line in the chat');
+    assert.ok(!JSON.stringify(sse.events).includes('pnpm test'), 'the command reaches the page nowhere');
     const q = await call('POST', '/api/employees/quinn/chat', { body: { text: 'test it', overCap: true } });
     assert.deepEqual(q.json, { queued: true, behind: 'finn' });
     assert.equal((await call('POST', '/api/employees/finn/chat', { body: { text: 'again', overCap: true } })).status, 409);
@@ -218,8 +221,8 @@ describe('a chat (Rule 2) and money (Rule 5)', () => {
     mkdirSync(join(projects, 'C--repo'), { recursive: true });
     writeFileSync(join(projects, 'C--repo', `${session}.jsonl`), [
       { type: 'user', message: { content: 'hello office' } },
-      { type: 'assistant', message: { content: [{ type: 'text', text: 'Hi.' }, { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: join(repo, 'status.md') } }] } },
-      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'status' }] } },
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'Hi.' }, { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: join(repo, 'status.md') } }, { type: 'tool_use', id: 't2', name: 'Bash', input: { command: 'git log -1' } }] } },
+      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'status' }, { type: 'tool_result', tool_use_id: 't2', content: 'cad5db1' }] } },
       { type: 'assistant', message: { content: [{ type: 'text', text: 'Done.' }] } },
     ].map((e) => JSON.stringify(e)).join('\n'));
     const r = await call('GET', `/api/employees/ivy/sessions/${session}`);
@@ -234,6 +237,7 @@ describe('pure parts', () => {
     assert.deepEqual(slim({ type: 'system', subtype: 'hook_started' }, '/r'), []);
     assert.deepEqual(slim({ type: 'result', total_cost_usd: 0.5, is_error: false, result: 'ok', duration_ms: 2100 }, '/r'), [{ kind: 'result', usd: 0.5, error: false, text: 'ok', limit: false, seconds: 2 }]);
     assert.equal(toolSummary('Bash', { command: 'git   log\n-1' }), 'git log -1');
+    assert.deepEqual(slim({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'b', name: 'Bash', input: { command: 'git log' } }] } }, '/r'), [{ kind: 'tool', id: 'b', name: 'Bash', summary: '', hidden: true }]);
     assert.equal(toolSummary('Read', { file_path: join('/r', 'a', 'b.md') }, '/r'), 'a/b.md');
     assert.deepEqual(readTranscript('not json\n{"type":"user","message":{"content":"<command-name>x</command-name>"}}', '/r'), []);
   });

@@ -6,6 +6,8 @@
 //   node office/office.mjs task list [<name>] [--all] [--json]
 //   node office/office.mjs msg --to <name> --from <who> "<text>"
 //   node office/office.mjs inbox <name> [--ack <M-id> | --ack-all]
+//   node office/office.mjs report --from <name> "<what I did; files; numbers; owed>"   to George, the office's memory
+//   node office/office.mjs reports [--all | --ack-all]   George's feed: the unread, every one, or tick them all
 //   node office/office.mjs index [<name>]        George's mechanical digests (decisions, open risks, the watermark)
 //   node office/office.mjs idea add <slug> "<title>" --from <who> [--lane full|short]
 //   node office/office.mjs gate <slug> <gate> --by <name> --verdict <V> [--file <path>] [--note "…"] [--override]
@@ -285,6 +287,7 @@ function taskAddUnlocked({ to, from, title, why, doing = false, idea }) {
   const task = { id: nextId('task'), date: today(), from, ...fields };
   board[doing ? 'doing' : 'inbox'].push(task);
   saveBoard(to, board);
+  autoReport(from, 'task', `${task.id} to ${to}${doing ? ' (doing)' : ''}: ${task.title}; why: ${task.why}`);
   return { ...task, to, section: doing ? 'doing' : 'inbox' };
 }
 
@@ -306,6 +309,7 @@ function taskMoveUnlocked(id, to, { note } = {}) {
   if (to === 'doing') board.doing.push(task);
   else board[to].push({ ...task, closedAs: to, closedOn: today(), note: clean(note, `--note (a task is ${to} with a note, D-096's rule for the office)`) });
   saveBoard(name, board);
+  autoReport(name, 'task', `${task.id} ${section} → ${to}: ${task.title}${to === 'doing' ? '' : `; note: ${board[to].at(-1).note}`}`);
   return { ...task, name, from: section, to };
 }
 
@@ -366,6 +370,71 @@ function inboxUnlocked(name, { ack, ackAll = false } = {}) {
     writeFileSync(inboxFile(name), renderInbox(messages, name));
   }
   return messages;
+}
+
+// ---------------------------------------------------------------- the reports (George's memory)
+
+// George is the office's memory (the user, 2026-10-28: "every employee
+// should report all their task to him to save to memory"). ONE feed, hers
+// alone: every task added, started, finished or dropped, every idea and
+// every gate, written by the script as it happens, so no work is missed
+// because someone forgot; and every `report` an employee sends with what
+// only the doer knows. She folds the unread ones into her notes on every
+// wake, then ticks them. No id: a report is never answered or named.
+export const MEMORY = 'george';
+export const REPORT_LINE = "**Report to George.** George holds the office's memory. The script reports to her by itself whenever a task is added, started, finished or dropped, an idea is added or a gate is written. When you finish a task or write a gate, also report what only you know, in one line: `node office/office.mjs report --from <your name> \"T-0xx: what you did; the files; the numbers you observed; what is owed\"`. For the project's context, read George's notes first (`office/employees/george/notes/README.md`).";
+export const REPORT_KINDS = ['task', 'idea', 'gate', 'report'];
+const REPORT = /^- \[( |x)\] (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) · from (\S+) · (task|idea|gate|report) · (.*)$/;
+const reportsFile = () => join(employeeDir(MEMORY), 'reports.md');
+
+export function parseReports(text) {
+  const reports = []; const problems = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith('- ')) continue;
+    const m = REPORT.exec(line);
+    if (!m) { problems.push(`a line that is not a report: ${line}`); continue; }
+    reports.push({ read: m[1] === 'x', at: m[2], from: m[3], kind: m[4], text: m[5] });
+  }
+  return { reports, problems };
+}
+
+const renderReports = (reports) =>
+  [`# ${MEMORY}'s reports`, '', "The office's memory feed. Appended by `node office/office.mjs` alone (tasks, ideas and gates as they happen, and `report`), ticked by `reports --ack-all` once folded into the notes. Newest last.", '',
+    ...reports.map((r) => `- [${r.read ? 'x' : ' '}] ${r.at} · from ${r.from} · ${r.kind} · ${r.text}`), ''].join('\n');
+
+const loadReports = () => {
+  if (!existsSync(reportsFile())) return [];
+  const { reports, problems } = parseReports(readText(reportsFile()));
+  if (problems.length) throw new Error(`${MEMORY}'s reports do not parse: ${problems[0]}`);
+  return reports;
+};
+
+// What the script saw. Silent when the office has no George yet, and when
+// the doer is George herself: she knows what she did.
+function autoReport(from, kind, text) {
+  if (from === MEMORY || !roster().includes(MEMORY)) return;
+  const reports = loadReports();
+  reports.push({ read: false, at: stamp(), from, kind, text: text.replace(/\s+/g, ' ').trim() });
+  writeFileSync(reportsFile(), renderReports(reports));
+}
+
+function reportUnlocked({ from, text }) {
+  mustBeEmployee(MEMORY, 'the memory keeper');
+  mustBeSender(from);
+  if (from === MEMORY) throw new Error(`${MEMORY} keeps the memory: she writes her notes, not a report to herself`);
+  const body = clean(text, 'the report');
+  const reports = loadReports();
+  const r = { read: false, at: stamp(), from, kind: 'report', text: body };
+  reports.push(r);
+  writeFileSync(reportsFile(), renderReports(reports));
+  return r;
+}
+
+function reportsUnlocked({ ackAll = false } = {}) {
+  mustBeEmployee(MEMORY, 'the memory keeper');
+  const reports = loadReports();
+  if (ackAll) { for (const r of reports) r.read = true; writeFileSync(reportsFile(), renderReports(reports)); }
+  return reports;
 }
 
 // ---------------------------------------------------------------- the pipeline (Rule 10)
@@ -450,6 +519,7 @@ function ideaAddUnlocked({ slug, title, from, lane = 'full' }) {
   idea.status = statusOf(idea, []);
   ideas.push(idea);
   savePipeline(ideas);
+  autoReport(from, 'idea', `${slug} added (${lane} lane): ${idea.title}`);
   return idea;
 }
 
@@ -475,6 +545,7 @@ function gateUnlocked({ slug, gate: name, by, verdict, file, note, override = fa
   idea.gates.push(line);
   idea.status = statusOf(idea);
   savePipeline(ideas);
+  autoReport(by, 'gate', `${slug} ${name} ${verdict}${file ? `; file: ${file}` : ''}${line.note ? `; note: ${line.note}` : ''}${line.override ? '; override' : ''} → ${idea.status}`);
   return { ...line, slug, status: idea.status };
 }
 
@@ -545,8 +616,8 @@ const agentTemplate = ({ name, title, role, model, colour, kind, tools, skills }
     '---',
   ];
   const body = role === 'project-intelligence'
-    ? ['', `# ${name} — ${title}`, '', ORG_READ_LINE, '', '<!-- the charter: replace this line (plan/ai-employees.md § 3.2 is George\'s) -->', '']
-    : ['', `# ${name} — ${title}`, '', ORG_READ_LINE, '', ORG_BEGIN, `<!-- run \`node office/office.mjs organization\` to fill this -->`, ORG_END, '', '## What the house adds', '', '<!-- plan/ai-employees.md § 4: the deliverable, the gate, the hand-off, the rules by number, the plugins, what is refused -->', ''];
+    ? ['', `# ${name} — ${title}`, '', ORG_READ_LINE, '', ...(name === MEMORY ? [] : [REPORT_LINE, '']), '<!-- the charter: replace this line (plan/ai-employees.md § 3.2 is George\'s) -->', '']
+    : ['', `# ${name} — ${title}`, '', ORG_READ_LINE, '', ...(name === MEMORY ? [] : [REPORT_LINE, '']), ORG_BEGIN, `<!-- run \`node office/office.mjs organization\` to fill this -->`, ORG_END, '', '## What the house adds', '', '<!-- plan/ai-employees.md § 4: the deliverable, the gate, the hand-off, the rules by number, the plugins, what is refused -->', ''];
   return [...front, ...body].join('\n');
 };
 
@@ -564,6 +635,7 @@ function hireUnlocked({ name, title, role, colour = 'blue', model = 'inherit', p
   writeFileSync(join(employeeDir(name), 'avatar.svg'), avatarSvg(name, title, colour));
   saveBoard(name, Object.fromEntries(SECTIONS.map((s) => [s, []])));
   writeFileSync(inboxFile(name), renderInbox([], name));
+  if (name === MEMORY) writeFileSync(reportsFile(), renderReports([]));
   writeFileSync(join(employeeDir(name), 'notes', 'README.md'), `# ${name}'s notes\n\nWhat each file here holds, read first on every wake. Nothing yet.\n`);
   writeFileSync(agentFile(name), agentTemplate({ name, title, role, model, colour, kind, tools, skills: preload }));
   // A hire is born with the organization's section in its charter (Rule 12).
@@ -688,6 +760,7 @@ export function check() {
         if (fm.keys.includes('memory')) problems.push(`${n} has memory: (it grants Write and Edit outside the guard)`);
         if (fm.keys.includes('isolation')) problems.push(`${n} has isolation: (a worktree would swallow the notes)`);
         if (skillExists && !(fm.lists.skills ?? []).includes(ORGANIZATION_SKILL)) problems.push(`${n} does not preload the ${ORGANIZATION_SKILL} skill (Rule 12)`);
+        if (n !== MEMORY && names.includes(MEMORY) && !text.includes(REPORT_LINE)) problems.push(`${n}'s charter does not carry the line that reports to ${MEMORY}`);
         if (skillExists && !text.includes(ORG_READ_LINE)) problems.push(`${n}'s charter does not open with the line that reads the ${ORGANIZATION_SKILL} skill under --agent`);
         const kind = p.guard?.kind ?? '';
         if (EXPLICIT_TOOLS(kind)) {
@@ -714,6 +787,7 @@ export function check() {
         if (t.from !== 'user' && !names.includes(t.from)) problems.push(`${t.id} is from "${t.from}", who does not work here`);
       }
     }
+    if (n === MEMORY && existsSync(reportsFile())) for (const x of parseReports(readText(reportsFile())).problems) problems.push(`${n}'s reports: ${x}`);
     if (existsSync(join(dir, 'inbox.md'))) {
       const { messages, problems: ip } = parseInbox(readText(join(dir, 'inbox.md')));
       for (const x of ip) problems.push(`${n}'s inbox: ${x}`);
@@ -799,6 +873,8 @@ export const gate = locked(gateUnlocked);
 export const organization = locked(organizationUnlocked);
 export const index = locked(indexUnlocked);
 export const sessionTurn = locked(sessionTurnUnlocked);
+export const report = locked(reportUnlocked);
+export const reports = locked(reportsUnlocked);
 
 // ---------------------------------------------------------------- the command line
 
@@ -837,6 +913,12 @@ export function main(argv) {
       const l = inbox(rest[0], { ack: typeof flags.ack === 'string' ? flags.ack : undefined, ackAll: flags['ack-all'] === true });
       return l.length ? l.map((m) => `${m.read ? '[x]' : '[ ]'} ${m.id} · ${m.at} · from ${m.from} · ${m.text}`).join('\n') : `${rest[0]}'s inbox is empty`;
     }
+    case 'report': { const r = report({ from: flags.from, text: rest[0] }); return `reported to ${MEMORY} from ${r.from}`; }
+    case 'reports': {
+      const l = reports({ ackAll: flags['ack-all'] === true });
+      const shown = flags.all === true ? l : l.filter((r) => !r.read || flags['ack-all'] === true);
+      return shown.length ? shown.map((r) => `${r.read ? '[x]' : '[ ]'} ${r.at} · from ${r.from} · ${r.kind} · ${r.text}`).join('\n') : 'no unread reports';
+    }
     case 'index': { const r = index(rest[0]); return `indexed ${r.decisions} decisions and ${r.open} open risks of ${r.risks}; watermark at ${r.commit ?? '(no git)'}`; }
     case 'idea': {
       if (rest[0] !== 'add') throw new Error('idea add <slug> "<title>" --from <who> [--lane full|short]');
@@ -850,7 +932,7 @@ export function main(argv) {
     case 'pipeline': { const p = pipeline(rest[0]); return flags.json === true ? JSON.stringify(p, null, 2) : pipelineWords(p); }
     case 'organization': { const r = organization(); return r.changed.length ? `copied the organization into: ${r.changed.join(', ')}` : `the skill and ${r.employees.length} sections are already verbatim`; }
     case 'check': { const problems = check(); if (problems.length) { process.exitCode = 1; return problems.map((p) => `✘ ${p}`).join('\n'); } return `✔ the office is consistent: ${roster().length} employee(s), ${REQUIRED_PLUGINS.length} plugins enabled, ${pipeline().length} idea(s) on the pipeline`; }
-    default: throw new Error('office.mjs hire | task | msg | inbox | index | idea | gate | pipeline | organization | check');
+    default: throw new Error('office.mjs hire | task | msg | inbox | report | reports | index | idea | gate | pipeline | organization | check');
   }
 }
 

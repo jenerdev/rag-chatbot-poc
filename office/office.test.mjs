@@ -15,7 +15,7 @@ import { beforeEach, afterEach, describe, test } from 'node:test';
 
 import {
   check, gate, guardKind, hire, ideaAdd, inbox, index, msg, organization, parseBoard, parseFrontmatter, parsePipeline, pipeline, renderBoard, renderPipeline,
-  taskAdd, taskList, taskMove, REQUIRED_PLUGINS, GUARD_COMMAND, SECTIONS, ORG_BEGIN, ORG_END, ORG_READ_LINE, ORGANIZATION_SKILL, withLock, sessions, sessionTurn, snapshot, LOCK_STALE_MS,
+  taskAdd, taskList, taskMove, report, reports, REPORT_LINE, REQUIRED_PLUGINS, GUARD_COMMAND, SECTIONS, ORG_BEGIN, ORG_END, ORG_READ_LINE, ORGANIZATION_SKILL, withLock, sessions, sessionTurn, snapshot, LOCK_STALE_MS,
 } from './office.mjs';
 import { guardOf, judge } from './hooks/guard.mjs';
 
@@ -181,6 +181,67 @@ describe('the inbox', () => {
     assert.deepEqual(inbox('george').map((x) => x.read), [true, true]);
     assert.ok(readFileSync(join(repo, 'office', 'employees', 'george', 'inbox.md'), 'utf8').includes('- [x] M-002 · 2026-10-27 09:12 · from user · and this'));
     assert.deepEqual(check(), []);
+  });
+});
+
+describe('the reports (George, the office\'s memory)', () => {
+  const feed = () => readFileSync(join(repo, 'office', 'employees', 'george', 'reports.md'), 'utf8');
+
+  test('the script reports every task, idea and gate by itself; George\'s own work is not reported to her', () => {
+    george(); ivy(); finn(); organization();
+    assert.deepEqual(reports(), [], 'George is born with an empty feed');
+    taskAdd({ to: 'finn', from: 'george', title: 'Pin the region', why: 'D-149' });
+    assert.deepEqual(reports(), [], 'George assigned it: she knows');
+    const t = taskAdd({ to: 'ivy', from: 'finn', title: 'Read the plan', why: 'gate 1', doing: true });
+    taskMove(t.id, 'done', { note: 'read; 3 questions' });
+    ideaAdd({ slug: 'office-app', title: 'The office as a page', from: 'ivy', lane: 'short' });
+    gate({ slug: 'office-app', gate: 'implementation', by: 'finn', verdict: 'DONE', file: 'whats-done.md', note: 'tests 43/43' });
+    assert.deepEqual(reports().map((r) => [r.from, r.kind, r.text]), [
+      ['finn', 'task', 'T-002 to ivy (doing): Read the plan; why: gate 1'],
+      ['ivy', 'task', 'T-002 doing → done: Read the plan; note: read; 3 questions'],
+      ['ivy', 'idea', 'office-app added (short lane): The office as a page'],
+      ['finn', 'gate', 'office-app implementation DONE; file: whats-done.md; note: tests 43/43 → Implemented'],
+    ]);
+    assert.ok(feed().includes('- [ ] 2026-10-27 09:12 · from finn · gate · office-app implementation DONE'));
+    assert.deepEqual(check(), []);
+  });
+
+  test('report sends what only the doer knows; --ack-all ticks them once saved', () => {
+    george(); finn(); organization();
+    const r = report({ from: 'finn', text: 'T-013: next 15.5.28; schemas.ts; tests 810/810; owed the release gate' });
+    assert.equal(r.kind, 'report'); assert.equal(r.at, '2026-10-27 09:12');
+    report({ from: 'user', text: 'merged and pushed cad5db1' });
+    assert.deepEqual(reports().map((x) => x.read), [false, false]);
+    reports({ ackAll: true });
+    assert.deepEqual(reports().map((x) => x.read), [true, true]);
+    assert.ok(feed().includes('- [x] 2026-10-27 09:12 · from user · report · merged and pushed cad5db1'));
+    assert.throws(() => report({ from: 'george', text: 'x' }), /keeps the memory/);
+    assert.throws(() => report({ from: 'nobody', text: 'x' }), /no employee "nobody"/);
+    assert.throws(() => report({ from: 'finn', text: 'two\nlines' }), /one line/);
+  });
+
+  test('every charter but George\'s carries the report line, and check says whose does not', () => {
+    george(); ivy(); organization();
+    assert.ok(readFileSync(join(repo, '.claude', 'agents', 'ivy.md'), 'utf8').includes(REPORT_LINE));
+    assert.ok(!readFileSync(join(repo, '.claude', 'agents', 'george.md'), 'utf8').includes(REPORT_LINE));
+    const f = join(repo, '.claude', 'agents', 'ivy.md');
+    writeFileSync(f, readFileSync(f, 'utf8').replace(REPORT_LINE, ''));
+    assert.deepEqual(check(), ['ivy\'s charter does not carry the line that reports to george']);
+    writeFileSync(join(repo, 'office', 'employees', 'george', 'reports.md'), '# x\n\n- not a report\n');
+    assert.ok(check().includes('george\'s reports: a line that is not a report: - not a report'));
+  });
+
+  test('an office with no George yet reports nothing and refuses a report in words', () => {
+    finn();
+    taskAdd({ to: 'finn', from: 'user', title: 'x', why: 'y' });
+    assert.throws(() => report({ from: 'finn', text: 'x' }), /no employee "george"/);
+  });
+
+  test('the guard keeps reports.md the script\'s', () => {
+    for (const [who, kind] of [['finn', 'builder'], ['george', 'read-only']]) {
+      const write = judge({ tool_name: 'Write', tool_input: { file_path: 'office/employees/george/reports.md' }, cwd: repo, agent_type: who }, guardKind(kind), repo);
+      assert.match(write ?? '', /only office\.mjs writes/, who);
+    }
   });
 });
 

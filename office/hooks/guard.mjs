@@ -52,7 +52,7 @@ const GIT_DANGER = [
   [/--exec|--upload-pack|--receive-pack|(^|\s)-c(\s|$)/, 'an option that runs a program'],
 ];
 // The files the script alone writes (Rules 3, 4, 10), for every kind.
-const SCRIPT_ONLY = /^office\/(employees\/[^/]+\/((board|inbox)\.md|sessions\.json)|pipeline\.md|sequence\.json|\.lock(\/.*)?)$/;
+const SCRIPT_ONLY = /^office\/(employees\/[^/]+\/((board|inbox|reports)\.md|sessions\.json)|pipeline\.md|sequence\.json|\.lock(\/.*)?)$/;
 
 export const slash = (p) => p.replace(/\\/g, '/');
 
