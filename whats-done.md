@@ -10242,3 +10242,18 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **What:** `office/app/server.mjs`: `HIDDEN_TOOLS = new Set(['Bash'])`. `slim()` marks such a call `hidden` with no summary; the turn's loop sends neither the call nor its result to the page, and the desk's state reads "running a command", never the command; `readTranscript()` leaves them out of a past chat. A hidden call still counts as refused when the guard refuses it. Read, Write, Edit, Grep and Glob lines are unchanged.
 - **Observed:** office tests 48/48 on two of three runs; the third failed the known watcher-burst flake. New checks: `slim` on a Bash call; the live slow turn (the fake's Bash `pnpm test`) shows "running a command" and the string `pnpm test` appears in no event; a transcript with a Bash call still reads back with one tool.
 - Not committed.
+
+## 2026-11-03 · pnpm installed; `pnpm dev` builds the packages first
+
+- **Asked:** "pnpm run dev. not working" (Yarn 1.22 answered: `"packageManager": "yarn@pnpm@12.5.1"`).
+- **What:** pnpm was not installed on the machine, so Yarn ran instead and could not read a `pnpm@` field. `npm install -g pnpm@12.5.1` (the version `package.json` names); `pnpm install --frozen-lockfile` (+6 −38, the tree matched to the lockfile). No project file changed.
+- **Then** ("3 guests + undefined children (free)" on Manage booking): `packages/bookings/dist/guest.js` was from 2026-10-21, before D-147, so `free` never reached the screen. Every package rebuilt; `turbo.json`'s `dev` now `dependsOn: ["^build"]` (a dry run lists each package's build before `web#dev`), because no package has a watcher and `dev` served whatever `dist/` was last built.
+- **Then** (Manage booking, "Overnight" wrapped alone onto a second line): the room line is stacked, the name over "Overnight · 6 guests + 2 children (free)" (`manage-booking.tsx`, `.manage-room-*` in `screens.css`). Typecheck clean; not seen in a browser by me.
+
+## 2026-11-03 · The extra-guest fee says how many guests (D-154)
+
+- **Asked:** the number of extra guests in the price breakdown on Manage booking, the booking page and the admin page.
+- **What:** `schema-extra-guest-count.sql` (the 46th file, APPLIED): `bookings.extra_guests`, backfilled, kept by `bookings_compute_extra_guests` beside the fee from the same `unit_quote()` row; `guest_stay()` with `price.extra_guest_count`; schema-free-guests.sql's `guest_stay()` guarded on the column (trap 20). `RequestLine.extraGuests` from the quote (`priceStay()`), the stored row (`stay-detail.ts`) and, for the receipt, `unit_quote()` once per (unit, guests). `extraGuestsWords()` in `lib/party-words.ts`, drawn by `StayLines` (booking page, staff form, S-15) and Manage booking.
+- **Observed:** dry run then apply; the catalog shows the column, the trigger and `extra_guest_count` in `guest_stay()`; 0 rows null after the backfill (each of the 25 reproduced its stored fee exactly). rooms 58/58 (new 24c: quoted 1, stored 1, kept 1 through a direct write of 9, 4 guests stores 2 at 50000). web tests 251 (two new for the words), typecheck 13/13. verify 241/243: the two FAILs are check 27 (`roles: bookings cannot be switched off while a booking is live` and its twin), whose probe bookings are dated 2026-10-01/02 and so are no longer live on 2026-11-03: a dated fixture, not this change.
+- **Trap avoided:** replacing `bookings_compute_during()` a sixth time (traps 20, 25); working the count out on read from a standard staff can edit later.
+- **Not done:** no browser look; not committed.

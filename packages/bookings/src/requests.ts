@@ -267,6 +267,7 @@ export async function priceStay(tenant: BookingTenant, request: ParsedRequest): 
         guests,
         free: freeGuests,
         basePrice: q.base_price,
+        extraGuests: q.extra_guests,
         extraGuestPrice: q.extra_guest_price,
         surcharge: q.surcharge,
         discount: 0,
@@ -401,6 +402,31 @@ export async function requestBooking(
   if (unitsError) throw new Error(`Could not load units: ${unitsError.message}`);
   const idByName = new Map(units.map((u) => [u.name, u.id]));
 
+  // D-154: how many guests each row's fee is for. request_booking() returns
+  // the stored fee but not the count (its return type is left alone: it has a
+  // consent wrapper and four older guarded definitions), and a chat token
+  // cannot read the bookings it just wrote. unit_quote() is the function the
+  // trigger stored the count from; the count depends on the unit and its
+  // guests only, so one call per (unit, guests) on its first night. A row
+  // with no fee is 0 without asking.
+  const extraByParty = new Map<string, number | null>();
+  for (const r of data) {
+    const key = `${r.unit}|${r.guests}`;
+    if (r.extra_guest_price === 0 || extraByParty.has(key)) continue;
+    const unitId = idByName.get(r.unit);
+    const { data: q } =
+      unitId === undefined
+        ? { data: null }
+        : await tenant.db.rpc('unit_quote', {
+            p_tenant_id: tenant.id,
+            p_unit_id: unitId,
+            p_slot_id: request.slotId,
+            p_date: r.booked_date,
+            p_guests: r.guests,
+          });
+    extraByParty.set(key, q?.[0]?.extra_guests ?? null);
+  }
+
   const lines: RequestLine[] = data.map((r) => ({
     date: r.booked_date,
     unitId: idByName.get(r.unit) ?? 0,
@@ -408,6 +434,7 @@ export async function requestBooking(
     guests: r.guests,
     free: r.free ?? 0,
     basePrice: r.base_price,
+    extraGuests: r.extra_guest_price === 0 ? 0 : (extraByParty.get(`${r.unit}|${r.guests}`) ?? null),
     extraGuestPrice: r.extra_guest_price,
     surcharge: r.surcharge,
     discount: r.discount ?? 0,

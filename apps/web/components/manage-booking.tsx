@@ -32,7 +32,7 @@ import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import { timeLeft } from '@/lib/countdown';
 import { centavosToInput, formatMoney } from '@/lib/money';
-import { partyWords } from '@/lib/party-words';
+import { extraGuestsWords, partyWords } from '@/lib/party-words';
 import { resizeImage } from '@/lib/resize-image';
 import type { NavFeatures } from '@/lib/nav-items';
 
@@ -298,10 +298,14 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
                 {stay.rooms.map((r) => (
                   <li key={`${r.unit}-${r.slot}-${r.guests}`}>
                     <Icon name="bed" size={16} />
-                    <span className="grow">
-                      {r.unit} <span className="muted">· {r.slot}</span>
+                    {/* Stacked, not three items on one row: on a phone the slot wrapped
+                        alone onto a second line ("Familia ·" / "Overnight"). */}
+                    <span className="grow manage-room-text">
+                      <span className="manage-room-name">{r.unit}</span>
+                      <span className="small muted">
+                        {r.slot} · {partyWords(r.guests, r.free)}
+                      </span>
                     </span>
-                    <span className="small muted">{partyWords(r.guests, r.free)}</span>
                   </li>
                 ))}
               </ul>
@@ -312,7 +316,7 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
                     {p.extraGuests || p.surcharge || p.discount ? (
                       <>
                         {p.base !== null && <Line label="Rate" amount={p.base} currency={stay.currency} />}
-                        {!!p.extraGuests && <Line label="Extra guests" amount={p.extraGuests} currency={stay.currency} />}
+                        {!!p.extraGuests && <Line label={extraGuestsWords(p.extraGuestCount, stay.nights)} amount={p.extraGuests} currency={stay.currency} />}
                         {!!p.surcharge && <Line label="Holiday surcharge" amount={p.surcharge} currency={stay.currency} />}
                         {!!p.discount && <Line label="Promo discount" amount={-p.discount} currency={stay.currency} discount />}
                       </>

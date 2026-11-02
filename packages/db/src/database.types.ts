@@ -712,6 +712,8 @@ export interface Database {
           /** the rate part and the extra-guest part of `price` (schema-extra-guests.sql); null likewise */
           base_price: number | null;
           extra_guest_price: number | null;
+          /** schema-extra-guest-count.sql (D-154): how many guests extra_guest_price is for, from the same unit_quote() row; null when unknown */
+          extra_guests: number | null;
           /** shared by the rows of one multi-room booking (plan § 2.5) */
           group_id: string | null;
           /** schema-customer-booking.sql § 4 — the calendar's part of `price`; null likewise */
@@ -753,6 +755,8 @@ export interface Database {
           price?: never;
           base_price?: never;
           extra_guest_price?: never;
+          /** set by bookings_compute_extra_guests beside the fee, which overwrites anything supplied (D-154) */
+          extra_guests?: never;
           surcharge?: never;
           group_id?: string | null;
           /** web rows come from request_booking() only; staff inserts leave the default */
@@ -785,6 +789,8 @@ export interface Database {
           price?: never;
           base_price?: never;
           extra_guest_price?: never;
+          /** set by bookings_compute_extra_guests beside the fee, which overwrites anything supplied (D-154) */
+          extra_guests?: never;
           surcharge?: never;
           group_id?: string | null;
           /** web rows come from request_booking() only; staff inserts leave the default */

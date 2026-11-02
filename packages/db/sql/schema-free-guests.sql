@@ -438,6 +438,13 @@ grant execute on function public.request_booking_with_consent(bigint, bigint, bi
 
 -- 5. guest_stay(): each room line carries 'free' too, so the guest sees
 --    their own party on Manage booking. The rest is schema-stay-outcome.sql's.
+-- GUARDED (D-154, 2026-11-03): schema-extra-guest-count.sql replaces this
+-- with price.extra_guest_count. Once that file has run, re-running THIS file
+-- must not put a body without it back, so the definition is skipped (trap 20).
+do $guard$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'extra_guests') then
+    execute $ddl$
 create or replace function public.guest_stay(p_tenant_id bigint, p_reference text, p_contact text)
 returns jsonb
 language plpgsql
@@ -534,6 +541,10 @@ begin
   return v_out;
 end;
 $$;
+$ddl$;
+  end if;
+end
+$guard$;
 
 commit;
 

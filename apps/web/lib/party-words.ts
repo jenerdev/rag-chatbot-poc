@@ -14,6 +14,17 @@ export function partyWords(guests: number, free: number): string {
   return `${paying} + ${free} ${free === 1 ? 'child' : 'children'} (free)`;
 }
 
+/**
+ * D-154: the extra-guest fee's label in a price breakdown. "2 extra guests"
+ * for a night; "2 extra guests × 3 nights" for a whole stay (Manage booking);
+ * "Extra guests" when the count is unknown (a row priced before it was stored).
+ */
+export function extraGuestsWords(count: number | null, nights = 1): string {
+  if (count === null || count <= 0) return 'Extra guests';
+  const guests = `${count} extra ${count === 1 ? 'guest' : 'guests'}`;
+  return nights > 1 ? `${guests} × ${nights} nights` : guests;
+}
+
 /** The rule, one sentence; null when the tenant has none. */
 export function freeGuestsWords(freeUpToAge: number | null): string | null {
   if (freeUpToAge === null) return null;

@@ -427,6 +427,16 @@
 >   change villa's bookings config while its DPA is unsigned: the gate
 >   fires on the upsert (R-62).
 >
+> **The extra-guest fee says how many guests** since 2026-11-03 (D-154):
+> "2 extra guests" in every price breakdown (`extraGuestsWords()`,
+> `lib/party-words.ts`). The count is `unit_quote()`'s `extra_guests`, and a
+> booking STORES it, `bookings.extra_guests` (`sql/schema-extra-guest-count.sql`,
+> the 46th file), set by `bookings_compute_extra_guests`, a companion that
+> fires right after `bookings_compute_during` with its keep test, never a
+> sixth copy of that trigger. `guest_stay()` carries `price.extra_guest_count`
+> (schema-free-guests' copy is guarded). `pnpm dev` builds the packages first
+> (`turbo.json`): a stale `dist/` once printed "undefined children".
+>
 > **Every page says which build it is** since 2026-10-26 (D-148): "Build
 > cd1c21a · 2026-10-26", the short commit and the build date, worked out
 > ONCE in `next.config.mjs` (Vercel's `VERCEL_GIT_COMMIT_SHA`, or git on a

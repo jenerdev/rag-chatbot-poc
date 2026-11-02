@@ -5066,3 +5066,37 @@ office with depart partition").
 **Rests on:**
 - R-65 (the local door);
 - the stream-json shape of Claude Code 2.1.312 (Phase 0 recorded it).
+
+## D-154 · A price breakdown says how many extra guests its fee is for, and a booking stores that count · **Added 2026-11-03**
+
+**Asked:** "on the extra guest price breakdown. number of extra guest should be shown. on manage booking and also on booking page. and on admin page".
+
+**Decided:**
+- **The count is `unit_quote()`'s `extra_guests`**, the column it always
+  returned beside the fee and no reader used. Nothing in TypeScript
+  subtracts a standard from a party (extra-guests Rule 1).
+- **A stored booking keeps it:** `bookings.extra_guests`
+  (`sql/schema-extra-guest-count.sql`, the 46th file), not worked out on read
+  from the unit's CURRENT standard capacity, which staff may change after the
+  stay was priced. Null = unknown; the screen then names the fee alone.
+- **A companion trigger, not a sixth `bookings_compute_during()`:**
+  `bookings_compute_extra_guests` fires right after it (BEFORE triggers run
+  in name order) with its keep test word for word, so the count always
+  matches the `extra_guest_price` beside it, and a direct write is ignored.
+  Five definitions of the price trigger in five files is trap 20 and 25's
+  ground; one more copy was the risk this avoids.
+- **`request_booking()` is not changed.** The receipt asks `unit_quote()`
+  once per (unit, guests): its return type has a consent wrapper and four
+  guarded older definitions behind it, and a chat token cannot read back the
+  rows it wrote.
+- **`guest_stay()` gains `price.extra_guest_count`**, a night's extra guests
+  over every room, null when unknown or uneven; schema-free-guests.sql's
+  definition is GUARDED on the new column (trap 20).
+- **ONE wording,** `extraGuestsWords()` in `apps/web/lib/party-words.ts`:
+  "2 extra guests" a night (the booking page, the staff form, S-15), "2 extra
+  guests × 3 nights" for a stay (Manage booking), "Extra guests" unknown.
+
+**Backfill:** all 25 rows; each count reproduced its stored fee exactly from
+the unit's current standard and rate (18 with a fee, 7 without), none null.
+
+**Unchanged:** every price, the tool's text and result, the prompt.
