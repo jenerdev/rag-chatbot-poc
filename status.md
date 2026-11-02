@@ -56,6 +56,19 @@
 
 ## ▶ Next up (do this next)
 
+**Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
+1. fix `packages/bookings/src/guest.test.ts:44` (master is red since D-154 `8215020`; it expects no `extraGuestCount`);
+2. security headers in `next.config.mjs`;
+3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
+4. rate limits on login, password reset and `book/quote`, and the change-door lockout;
+5. a generic 500 body;
+6. OpenAI timeouts, abort and `max_tokens`;
+7. CI;
+8. a new production Supabase project with a migration ledger;
+9. the legal texts (a lawyer).
+
+Then P1 (guest email, lost-reference recovery, cron jobs, staging with the fixture tenants so the battery and isolation suites run, monitoring, the phone booking flow, villa's rate editor, revocable sessions). The "Not verified" list at the end of the report is the user's dashboards and devices.
+
 **No form button is disabled for a gap (2026-11-03, D-155, done, not committed, on `feat/extra-guest-count`):** every form's submit / Continue stays on; a click with something missing says the first gap in red beside the button and takes the person to the field (`components/missing-note.tsx`, `lib/missing.ts`). Seen working on villa's booking page; web 254, typecheck clean. **Owed:** a look at the staff forms (Holidays, Promos, Slots, Rooms, the staff booking form, a stay's note and move); the axe pass (`plan/ui-refresh-a11y.mjs`); your commit.
 
 **The extra-guest count (2026-11-03, D-154, done, not committed):** the price breakdown says "2 extra guests" on the booking page, the staff form and S-15, and "2 extra guests × 3 nights" on Manage booking; `bookings.extra_guests` is stored beside the fee by `bookings_compute_extra_guests` (`schema-extra-guest-count.sql`, the 46th file, APPLIED, 25 rows backfilled exactly). rooms 58/58, web 251, typecheck 13/13. Also today: pnpm installed, `dev` builds the packages first, Manage booking's room line stacked. **Owed:** a browser look at the three breakdowns; verify 241/243 because check 27's probe bookings (2026-10-01/02) are no longer live, a fixture to re-date; your commit.
