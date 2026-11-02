@@ -33,6 +33,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice, type Notice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
@@ -144,12 +145,19 @@ function TypeRooms({
   const offered = room.rooms.filter((r) => r.active).length;
   const base = `/accommodations/${room.id}/rooms`;
 
+  // D-155: Add room and Save stay on. An empty name is said and shown; an
+  // unchanged one simply closes the editor, nothing to send.
+  const addGate = useMissingGate();
+  const addMissing = firstMissing([[newName.trim() === '', 'Name the room first.', `new-room-${room.id}`]]);
+
   const add = (event: React.FormEvent) => {
     event.preventDefault();
+    if (addGate.blocked(addMissing)) return;
     const name = newName.trim();
     void run(async () => {
       await call(base, { method: 'POST', body: JSON.stringify({ name }) });
       setNewName('');
+      addGate.reset();
       return `Added ${name} to ${room.name}.`;
     });
   };
@@ -157,6 +165,10 @@ function TypeRooms({
   const rename = (event: React.FormEvent, id: number, before: string) => {
     event.preventDefault();
     const name = editName.trim();
+    if (name === before) {
+      setEditing(null);
+      return;
+    }
     void run(async () => {
       await call(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
       setEditing(null);
@@ -211,7 +223,7 @@ function TypeRooms({
             {editing === r.id ? (
               <form onSubmit={(event) => rename(event, r.id, r.name)}>
                 <input type="text" aria-label={`New name for ${r.name}`} required maxLength={80} value={editName} onChange={(e) => setEditName(e.target.value)} />
-                <button type="submit" className="sm primary" disabled={busy || editName.trim() === '' || editName.trim() === r.name}>
+                <button type="submit" className="sm primary" disabled={busy}>
                   Save
                 </button>
                 <button type="button" className="sm" disabled={busy} onClick={() => setEditing(null)}>
@@ -268,9 +280,10 @@ function TypeRooms({
             onChange={(e) => setNewName(e.target.value)}
           />
         </div>
-        <button type="submit" disabled={busy || newName.trim() === ''}>
+        <button type="submit" disabled={busy}>
           <Icon name="plus" size={16} /> Add room
         </button>
+        <MissingNote missing={addMissing} tried={addGate.tried} quiet />
       </form>
     </div>
   );
@@ -328,8 +341,15 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
     [onChanged, onNotice, setBusy],
   );
 
+  // D-155: Save details / Save rates stay on; with nothing changed a click says so.
+  const detailsGate = useMissingGate();
+  const detailsMissing = firstMissing([[!detailsDirty, 'Nothing has changed yet.']]);
+  const ratesGate = useMissingGate();
+  const ratesMissing = firstMissing([[!ratesDirty, 'Nothing has changed yet.']]);
+
   const saveDetails = (event: React.FormEvent) => {
     event.preventDefault();
+    if (detailsGate.blocked(detailsMissing)) return;
     void run(async () => {
       const extraPersonRate = extraRate.trim() === '' ? null : parseMoneyInput(extraRate);
       if (extraRate.trim() !== '' && extraPersonRate === null) {
@@ -351,6 +371,7 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
 
   const saveRates = (event: React.FormEvent) => {
     event.preventDefault();
+    if (ratesGate.blocked(ratesMissing)) return;
     void run(async () => {
       const payload = [];
       for (const slot of setup.slots) {
@@ -516,7 +537,8 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             <textarea id={`description-${room.id}`} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
           <div className="form-footer room-section-foot">
-            <button type="submit" className={detailsDirty ? 'primary' : undefined} disabled={busy || !detailsDirty}>
+            <MissingNote missing={detailsMissing} tried={detailsGate.tried} quiet />
+            <button type="submit" className={detailsDirty ? 'primary' : undefined} disabled={busy}>
               Save details
             </button>
           </div>
@@ -558,7 +580,8 @@ function RoomCard({ room, setup, call, busy, setBusy, onNotice, onChanged, limit
             ))}
           </div>
           <div className="form-footer room-section-foot">
-            <button type="submit" className={ratesDirty ? 'primary' : undefined} disabled={busy || !ratesDirty}>
+            <MissingNote missing={ratesMissing} tried={ratesGate.tried} quiet />
+            <button type="submit" className={ratesDirty ? 'primary' : undefined} disabled={busy}>
               Save rates
             </button>
           </div>
@@ -710,6 +733,9 @@ export function AccommodationsScreen({
 
   // The new-room form, in a drawer.
   const [name, setName] = useState('');
+  // D-155: Add room stays on; a click with no name says so and shows the field.
+  const typeGate = useMissingGate();
+  const typeMissing = firstMissing([[name.trim() === '', 'Give it a name.', 'new-name']]);
   const [capacity, setCapacity] = useState('');
   // The rest of a new room, each optional: left empty, @rag/bookings' default
   // (roomDefaults, from the server page). The fee is typed in pesos.
@@ -774,6 +800,7 @@ export function AccommodationsScreen({
 
   const addRoom = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (typeGate.blocked(typeMissing)) return;
     setNotice(null);
     setBusy(true);
     try {
@@ -931,12 +958,12 @@ export function AccommodationsScreen({
             )}
             <div className="drawer-footer">
               <div className="drawer-footer-total">
-                <span className="small muted">{name.trim() === '' ? 'Give it a name' : 'It is offered once it has a rate.'}</span>
+                <MissingNote missing={typeMissing} tried={typeGate.tried} idle="It is offered once it has a rate." />
               </div>
               <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || name.trim() === ''}>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                 {busy ? 'Adding…' : 'Add room'}
               </button>
             </div>

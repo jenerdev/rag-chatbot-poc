@@ -28,11 +28,12 @@ import { instantLabel } from '@/components/booking-page';
 import { CopyButton } from '@/components/copy-button';
 import { ProofThumb, proofKind } from '@/components/proof-viewer';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import { timeLeft } from '@/lib/countdown';
 import { centavosToInput, formatMoney } from '@/lib/money';
-import { partyWords } from '@/lib/party-words';
+import { extraGuestsWords, partyWords } from '@/lib/party-words';
 import { resizeImage } from '@/lib/resize-image';
 import type { NavFeatures } from '@/lib/nav-items';
 
@@ -173,6 +174,12 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
   const [code, setCode] = useState(() => referenceCode(initialReference, referencePrefix));
   const reference = fullReference(referencePrefix, code);
   const [contact, setContact] = useState('');
+  // D-155: Look up stays on; a click with a gap says it and shows the field.
+  const lookGate = useMissingGate();
+  const lookMissing = firstMissing([
+    [!reference.trim(), 'Enter your booking reference.', 'reference'],
+    [!contact.trim(), 'Enter the email or mobile number you booked with.', 'contact'],
+  ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stay, setStay] = useState<Found | null>(null);
@@ -298,10 +305,14 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
                 {stay.rooms.map((r) => (
                   <li key={`${r.unit}-${r.slot}-${r.guests}`}>
                     <Icon name="bed" size={16} />
-                    <span className="grow">
-                      {r.unit} <span className="muted">· {r.slot}</span>
+                    {/* Stacked, not three items on one row: on a phone the slot wrapped
+                        alone onto a second line ("Familia ·" / "Overnight"). */}
+                    <span className="grow manage-room-text">
+                      <span className="manage-room-name">{r.unit}</span>
+                      <span className="small muted">
+                        {r.slot} · {partyWords(r.guests, r.free)}
+                      </span>
                     </span>
-                    <span className="small muted">{partyWords(r.guests, r.free)}</span>
                   </li>
                 ))}
               </ul>
@@ -312,7 +323,7 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
                     {p.extraGuests || p.surcharge || p.discount ? (
                       <>
                         {p.base !== null && <Line label="Rate" amount={p.base} currency={stay.currency} />}
-                        {!!p.extraGuests && <Line label="Extra guests" amount={p.extraGuests} currency={stay.currency} />}
+                        {!!p.extraGuests && <Line label={extraGuestsWords(p.extraGuestCount, stay.nights)} amount={p.extraGuests} currency={stay.currency} />}
                         {!!p.surcharge && <Line label="Holiday surcharge" amount={p.surcharge} currency={stay.currency} />}
                         {!!p.discount && <Line label="Promo discount" amount={-p.discount} currency={stay.currency} discount />}
                       </>
@@ -372,7 +383,13 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
             See its status, pay for it, or ask to move or cancel it. Enter your booking reference and the email address or mobile
             number you booked with.
           </p>
-          <form onSubmit={lookUp} noValidate>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!lookGate.blocked(lookMissing)) void lookUp();
+            }}
+            noValidate
+          >
             <div className="field">
               <label htmlFor="reference">Booking reference</label>
               {/* The prefix is the tenant's and fixed (D-144): drawn, read to a screen reader as the
@@ -413,7 +430,8 @@ export function ManageBookingScreen({ slug, businessName, assistantName, logoUrl
               </div>
             )}
             <div className="form-footer">
-              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || !reference.trim() || !contact.trim()}>
+              <MissingNote missing={lookMissing} tried={lookGate.tried} quiet />
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                 <Icon name="search" size={16} /> {busy ? 'Looking up…' : 'Look up booking'}
               </button>
             </div>
@@ -512,13 +530,21 @@ function PaymentPanel({
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
   const [sending, setSending] = useState(false);
+  // D-155: Send stays on; a click with a gap says it and shows the field.
+  const gate = useMissingGate();
+  const proofMissing = firstMissing([
+    [!method, 'Choose how you paid.', 'pay-method'],
+    [!amount.trim(), 'Enter the amount you paid.', 'pay-amount'],
+    [!paidOn, 'Choose the date you paid.', 'pay-date'],
+    [!file, 'Choose a photo or PDF of your proof of payment.', 'pay-file'],
+  ]);
   const [error, setError] = useState<string | null>(null);
 
   if (pay.status === 'not_tracked') return null;
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (!file) return;
+    if (gate.blocked(proofMissing) || !file) return;
     setSending(true);
     setError(null);
     try {
@@ -707,7 +733,8 @@ function PaymentPanel({
               </div>
             )}
             <div className="form-footer">
-              <button type="submit" className="primary" aria-busy={sending || undefined} disabled={sending || !file || !amount.trim() || !method}>
+              <MissingNote missing={proofMissing} tried={gate.tried} quiet />
+              <button type="submit" className="primary" aria-busy={sending || undefined} disabled={sending}>
                 {sending ? 'Sending…' : 'Send proof of payment'}
               </button>
             </div>
@@ -764,6 +791,13 @@ function ChangePanel({
   const [quote, setQuote] = useState<{ quotedPrice?: number; quotedDifference?: number; refundDue?: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // D-155: See the price and Ask to move stay on; a click with a gap says it.
+  const gate = useMissingGate();
+  const dateMissing = firstMissing([[!newCheckIn, 'Choose the new check-in date.', 'new-check-in']]);
+  const changeMissing =
+    mode === 'reschedule'
+      ? (dateMissing ?? firstMissing([[quote?.quotedPrice === undefined, 'Press See the price first, to check the new dates.', 'see-price']]))
+      : null;
 
   if (!open && !stay.change.canCancel && !stay.change.canReschedule && !(last && last.status === 'rejected')) {
     return null;
@@ -831,6 +865,7 @@ function ChangePanel({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            if (gate.blocked(changeMissing)) return;
             const sent = await call('change', { kind: mode, newCheckIn: mode === 'reschedule' ? newCheckIn : null, reason: reason || null, dryRun: false });
             if (sent) onChanged();
           }}
@@ -849,7 +884,15 @@ function ChangePanel({
               </div>
               <div className="field">
                 <span className="small muted">Same rooms, nights and guests.</span>
-                <button type="button" disabled={busy || !newCheckIn} onClick={async () => setQuote(await call('change', { kind: 'reschedule', newCheckIn, dryRun: true }))}>
+                <button
+                  type="button"
+                  id="see-price"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (gate.blocked(dateMissing)) return;
+                    setQuote(await call('change', { kind: 'reschedule', newCheckIn, dryRun: true }));
+                  }}
+                >
                   See the price
                 </button>
               </div>
@@ -877,7 +920,8 @@ function ChangePanel({
             <button type="button" disabled={busy} onClick={() => { setMode('none'); setError(null); }}>
               Back
             </button>
-            <button type="submit" className="primary" disabled={busy || (mode === 'reschedule' && quote?.quotedPrice === undefined)}>
+            <MissingNote missing={changeMissing} tried={gate.tried} quiet />
+            <button type="submit" className="primary" disabled={busy}>
               {mode === 'cancel' ? 'Ask to cancel' : 'Ask to move'}
             </button>
           </div>

@@ -475,6 +475,12 @@ export interface RequestLine {
   /** D-147: free guests (children up to the tenant's age) in the room that night; in no price */
   free: number;
   basePrice: number;
+  /**
+   * D-154: how many guests `extraGuestPrice` is for: unit_quote()'s
+   * extra_guests on a quote, the stored bookings.extra_guests on a row. Null
+   * when unknown; a screen then names the fee without a number.
+   */
+  extraGuests: number | null;
   extraGuestPrice: number;
   surcharge: number;
   /** centavos, this night's share of the promo (D-097): a fixed amount on the first line, a percentage on each; 0 without one */

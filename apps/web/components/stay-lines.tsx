@@ -5,6 +5,7 @@
 
 import type { RequestQuote } from '@rag/bookings';
 import { formatMoney } from '@/lib/money';
+import { extraGuestsWords } from '@/lib/party-words';
 
 /** "Fri". Formatted as UTC because the date string has no zone; it is a calendar date. */
 function weekday(date: string): string {
@@ -58,7 +59,7 @@ export function StayLines({
                 </div>
                 {l.extraGuestPrice > 0 && (
                   <div className="quote-line quote-sub">
-                    <span>Extra guests</span>
+                    <span>{extraGuestsWords(l.extraGuests)}</span>
                     <span>+{formatMoney(l.extraGuestPrice, currency)}</span>
                   </div>
                 )}

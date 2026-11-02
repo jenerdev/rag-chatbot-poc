@@ -33,7 +33,15 @@ export interface GuestStay {
   /** `free` (D-147): the children who stay free, counted apart from `guests` */
   rooms: { unit: string; slot: string; guests: number; free: number }[];
   /** sums of the stored rows; null for rows priced before prices were stored */
-  price: { base: number | null; extraGuests: number | null; surcharge: number | null; discount: number | null; total: number | null };
+  price: {
+    base: number | null;
+    extraGuests: number | null;
+    /** D-154: the extra guests a NIGHT, every room together; null when unknown */
+    extraGuestCount: number | null;
+    surcharge: number | null;
+    discount: number | null;
+    total: number | null;
+  };
   timezone: string;
   currency: string;
   /** Phase 5: pay by then, or the stay expires; null = no deadline */
@@ -183,6 +191,11 @@ export function parseGuestStay(raw: unknown): GuestStay | null {
     price: {
       base: amount(price.base, 'price.base'),
       extraGuests: amount(price.extra_guests, 'price.extra_guests'),
+      // Absent before schema-extra-guest-count.sql has run: unknown.
+      extraGuestCount:
+        price.extra_guest_count === undefined || price.extra_guest_count === null
+          ? null
+          : count(price.extra_guest_count, 'price.extra_guest_count'),
       surcharge: amount(price.surcharge, 'price.surcharge'),
       discount: amount(price.discount, 'price.discount'),
       total: amount(price.total, 'price.total'),

@@ -104,7 +104,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
 
   const { data: all, error } = await tenant.db
     .from('bookings')
-    .select('id, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, free_guests, notes, decision_note, promo_id, discount, price, base_price, extra_guest_price, surcharge, created_at')
+    .select('id, unit_id, room_id, slot_id, booked_date, during, held, held_until, status, source, guest_name, guest_phone, guest_email, guest_count, free_guests, notes, decision_note, promo_id, discount, price, base_price, extra_guests, extra_guest_price, surcharge, created_at')
     .eq('tenant_id', tenant.id)
     .eq('group_id', groupId)
     .order('booked_date')
@@ -200,6 +200,7 @@ export async function stayDetail(tenant: BookingTenant, reference: string, userI
       guests: r.guest_count ?? 0,
       free: r.free_guests ?? 0,
       basePrice: r.base_price ?? r.price ?? 0,
+      extraGuests: r.extra_guests ?? null,
       extraGuestPrice: r.extra_guest_price ?? 0,
       surcharge: r.surcharge ?? 0,
       discount: r.discount ?? 0,

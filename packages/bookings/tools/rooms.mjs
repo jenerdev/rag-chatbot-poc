@@ -492,6 +492,23 @@ try {
       'extra guests: 3 guests stored and listed as 350000 + 25000 = 375000',
       `${row?.basePrice} + ${row?.extraGuestPrice} = ${row?.price}; group total ${booked.total}; listed ${listed?.basePrice}+${listed?.extraGuestPrice}`,
     );
+    // 24c. D-154: the COUNT beside the fee. The quote says 1 extra guest for 3;
+    //      the stored row says 1 (bookings_compute_extra_guests, from the same
+    //      unit_quote()); an edit that moves nothing keeps it, even a direct
+    //      write of the column; 4 guests re-prices to 2.
+    const q3 = await quote(probe, { unitId: quad.id, guestCount: 3, slotId: night.id, date: MONDAY });
+    const read = async () => (await probe.db.from('bookings').select('extra_guests, extra_guest_price').eq('tenant_id', probe.id).eq('id', row.id).single()).data;
+    const stored = await read();
+    await probe.db.from('bookings').update({ notes: 'count kept', extra_guests: 9 }).eq('tenant_id', probe.id).eq('id', row.id);
+    const kept = await read();
+    await probe.db.from('bookings').update({ guest_count: 4 }).eq('tenant_id', probe.id).eq('id', row.id);
+    const four = await read();
+    check(
+      q3.lines[0]?.extraGuests === 1 && stored?.extra_guests === 1 && kept?.extra_guests === 1
+        && four?.extra_guests === 2 && four?.extra_guest_price === 50000,
+      'extra guests: the count beside the fee: quoted 1, stored 1, kept on an edit (a direct write ignored), 4 guests stores 2',
+      `quote ${q3.lines[0]?.extraGuests} · stored ${stored?.extra_guests} · kept ${kept?.extra_guests} · four ${four?.extra_guests} (${four?.extra_guest_price})`,
+    );
   }
   {
     const noCount = await thrown(() => createBookings(probe, { unitId: quad.id, slotId: night.id, date: TUESDAY, guestName: 'x' }));

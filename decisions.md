@@ -5066,3 +5066,75 @@ office with depart partition").
 **Rests on:**
 - R-65 (the local door);
 - the stream-json shape of Claude Code 2.1.312 (Phase 0 recorded it).
+
+## D-154 · A price breakdown says how many extra guests its fee is for, and a booking stores that count · **Added 2026-11-03**
+
+**Asked:** "on the extra guest price breakdown. number of extra guest should be shown. on manage booking and also on booking page. and on admin page".
+
+**Decided:**
+- **The count is `unit_quote()`'s `extra_guests`**, the column it always
+  returned beside the fee and no reader used. Nothing in TypeScript
+  subtracts a standard from a party (extra-guests Rule 1).
+- **A stored booking keeps it:** `bookings.extra_guests`
+  (`sql/schema-extra-guest-count.sql`, the 46th file), not worked out on read
+  from the unit's CURRENT standard capacity, which staff may change after the
+  stay was priced. Null = unknown; the screen then names the fee alone.
+- **A companion trigger, not a sixth `bookings_compute_during()`:**
+  `bookings_compute_extra_guests` fires right after it (BEFORE triggers run
+  in name order) with its keep test word for word, so the count always
+  matches the `extra_guest_price` beside it, and a direct write is ignored.
+  Five definitions of the price trigger in five files is trap 20 and 25's
+  ground; one more copy was the risk this avoids.
+- **`request_booking()` is not changed.** The receipt asks `unit_quote()`
+  once per (unit, guests): its return type has a consent wrapper and four
+  guarded older definitions behind it, and a chat token cannot read back the
+  rows it wrote.
+- **`guest_stay()` gains `price.extra_guest_count`**, a night's extra guests
+  over every room, null when unknown or uneven; schema-free-guests.sql's
+  definition is GUARDED on the new column (trap 20).
+- **ONE wording,** `extraGuestsWords()` in `apps/web/lib/party-words.ts`:
+  "2 extra guests" a night (the booking page, the staff form, S-15), "2 extra
+  guests × 3 nights" for a stay (Manage booking), "Extra guests" unknown.
+
+**Backfill:** all 25 rows; each count reproduced its stored fee exactly from
+the unit's current standard and rate (18 with a fee, 7 without), none null.
+
+**Unchanged:** every price, the tool's text and result, the prompt.
+
+## D-155 · A form's button is never disabled because the form is incomplete · **Added 2026-11-03**
+
+**Asked:** "please improve the uX experience on every form. when submitting form. next or continue or submit button should not be disabled. what is happening is user is finding what else is missing why button is disabled."
+
+**Decided:**
+- **The button stays on.** A click with something missing sends nothing,
+  says the FIRST gap in the danger tone beside the button (`role="alert"`,
+  so it is announced), focuses that field, scrolls it into view and draws it
+  with `aria-invalid` until it is edited. The note follows the person: the
+  next gap as they fill fields, the form's idle hint when none is left.
+- **ONE pair:** `useMissingGate()` and `<MissingNote>` in
+  `components/missing-note.tsx`; the gap as data, `firstMissing()` in
+  `lib/missing.ts` (pure, tested). Every form lists its checks in fill order
+  with the id of the field each one names.
+- **Native checks stay.** A form without `noValidate` still gets the
+  browser's own message on an empty `required` field (DateField its own
+  words, D-143); the gate covers what the browser cannot see (a whitespace
+  note, a quote not back yet, an unchanged room, a consent box on the review
+  step). The required note in the confirm dialog dropped `required` for
+  `aria-required`, because a note of spaces passed the browser's check.
+- **Still disabled, on purpose:** while the request is in flight (no double
+  submit); Confirm on a clashing stay (trap 21, a guard, not a gap);
+  navigation and permissions (calendar arrows, step pills, the payment
+  settings a role may not change, a room taken on those nights); the chat's
+  Send with nothing typed (a chat box, no field to point at).
+- **Where:** the booking page (Continue and Send request), the staff booking
+  form, Holidays (save and copy), Promos, Slots, Knowledge base (staff and
+  platform), Rooms (add a type, add or rename a room, Save details, Save
+  rates: an unchanged rename just closes; nothing changed says so), the
+  stay page's note and move, the proof review's three buttons, every
+  note-required confirm dialog, Members, staff login and password reset,
+  Manage booking (look up, proof of payment, See the price, Ask to move).
+
+**Measured:** web tests 254 (3 new, `missing.test.ts`), typecheck clean; on
+villa's booking page in a browser, Continue enabled, a click with the name
+empty said "Enter your name and mobile number." as an alert and focused
+`#name` with `aria-invalid="true"`.

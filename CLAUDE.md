@@ -427,6 +427,16 @@
 >   change villa's bookings config while its DPA is unsigned: the gate
 >   fires on the upsert (R-62).
 >
+> **The extra-guest fee says how many guests** since 2026-11-03 (D-154):
+> "2 extra guests" in every price breakdown (`extraGuestsWords()`,
+> `lib/party-words.ts`). The count is `unit_quote()`'s `extra_guests`, and a
+> booking STORES it, `bookings.extra_guests` (`sql/schema-extra-guest-count.sql`,
+> the 46th file), set by `bookings_compute_extra_guests`, a companion that
+> fires right after `bookings_compute_during` with its keep test, never a
+> sixth copy of that trigger. `guest_stay()` carries `price.extra_guest_count`
+> (schema-free-guests' copy is guarded). `pnpm dev` builds the packages first
+> (`turbo.json`): a stale `dist/` once printed "undefined children".
+>
 > **Every page says which build it is** since 2026-10-26 (D-148): "Build
 > cd1c21a · 2026-10-26", the short commit and the build date, worked out
 > ONCE in `next.config.mjs` (Vercel's `VERCEL_GIT_COMMIT_SHA`, or git on a
@@ -1055,6 +1065,12 @@ All are expanded in `risks.md`.
   screen every field is `--text-touch` (16px) or iOS zooms the page on
   focus; the rule is in `base.css` AFTER the field rule, and a new
   field-like control that sets its own font-size joins its selector list.
+- A submit / Continue button is NEVER disabled because the form is
+  incomplete (D-155): `useMissingGate()` + `<MissingNote>`
+  (`components/missing-note.tsx`, `firstMissing()` in `lib/missing.ts`).
+  A click with a gap says it as an alert and focuses the field. Disable a
+  button only while its request is in flight, or when it is a guard (trap
+  21). A new form lists its gaps in fill order, each with its field's id.
 - Feedback (D-102): an action's result is a toast (`useNotice()`), a
   standing fact a `.notice` banner; a list shows `LoadState` until its rows
   arrive and `EmptyState` when there are none; a reason is a `Tip` or

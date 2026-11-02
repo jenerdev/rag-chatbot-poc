@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { freeFieldLabel, freeGuestsWords, partyWords } from './party-words';
+import { extraGuestsWords, freeFieldLabel, freeGuestsWords, partyWords } from './party-words';
 
 // D-147: the same strings packages/bookings/src/validate.test.ts pins for the
 // package's copies (freeGuestsWords, partyWords), so the two cannot drift.
@@ -16,5 +16,20 @@ describe('party-words (D-147)', () => {
     expect(freeGuestsWords(0)).toBe('Infants under 1 stay free.');
     expect(freeFieldLabel(3)).toBe('Children aged 3 and below');
     expect(freeFieldLabel(0)).toBe('Infants under 1');
+  });
+});
+
+// D-154: the extra-guest fee names how many guests it is for.
+describe('extraGuestsWords (D-154)', () => {
+  it('counts the extra guests, a night or a stay', () => {
+    expect(extraGuestsWords(1)).toBe('1 extra guest');
+    expect(extraGuestsWords(2)).toBe('2 extra guests');
+    expect(extraGuestsWords(2, 1)).toBe('2 extra guests');
+    expect(extraGuestsWords(2, 3)).toBe('2 extra guests × 3 nights');
+  });
+  it('names the fee alone when the count is unknown', () => {
+    expect(extraGuestsWords(null)).toBe('Extra guests');
+    expect(extraGuestsWords(null, 3)).toBe('Extra guests');
+    expect(extraGuestsWords(0)).toBe('Extra guests');
   });
 });

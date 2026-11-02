@@ -21,6 +21,7 @@ import type { StayDetail } from '@rag/bookings';
 import { ProofThumb, proofKind } from '@/components/proof-viewer';
 import { CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { QuickNotes } from '@/components/quick-notes';
 import { centavosToInput, formatMoney } from '@/lib/money';
 import { quickNotes } from '@/lib/quick-notes';
@@ -74,21 +75,20 @@ export function ReviewProof({
   const money = (n: number) => formatMoney(n, stay.currency);
   const pending = stay.status === 'pending';
 
-  // Why the main button is not ready, in words; null when it is.
+  // What the main button still needs, in words; null when it is ready. The
+  // buttons stay on (D-155): a click with a gap says it and shows the field.
   const missing =
     mode === 'verify'
-      ? amount.trim() === ''
-        ? 'Enter the amount you found'
-        : !checked
-          ? 'Tick the box once you have seen the money'
-          : note.trim() === ''
-            ? 'Write a note'
-            : null
-      : reason.trim() === ''
-        ? 'Write the reason the guest will read'
-        : null;
+      ? firstMissing([
+          [amount.trim() === '', 'Enter the amount you found.', 'verified-amount'],
+          [!checked, 'Tick the box once you have seen the money.', 'money-seen'],
+          [note.trim() === '', 'Write a note.', 'review-note'],
+        ])
+      : firstMissing([[reason.trim() === '', 'Write the reason the guest will read.', 'reject-reason']]);
+  const gate = useMissingGate();
 
   const decide = (action: 'verify' | 'reject', confirm = false) =>
+    !gate.blocked(missing) &&
     onDecide(
       action === 'verify'
         ? {
@@ -220,7 +220,7 @@ export function ReviewProof({
             <p className="hint">Prefilled with what the guest says. Change it if the account shows a different amount.</p>
           </div>
           <label className={`option-card${checked ? ' picked' : ''}`}>
-            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+            <input type="checkbox" id="money-seen" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
             <span className="room-pick-text">
               <span className="room-pick-name">I checked the account and the money is there</span>
               <span className="small muted">A screenshot proves nothing by itself.</span>
@@ -253,7 +253,7 @@ export function ReviewProof({
       <div className="drawer-footer">
         <div className="drawer-footer-total">
           {missing ? (
-            <span className="small muted">{missing}</span>
+            <MissingNote missing={missing} tried={gate.tried} />
           ) : mode === 'verify' ? (
             <span className="small muted">
               <Icon name="check" size={14} /> Ready to verify
@@ -268,17 +268,17 @@ export function ReviewProof({
         {mode === 'verify' ? (
           <>
             {/* Verify and confirm does both in one transaction; offered only while the stay waits. */}
-            <button type="button" className={pending ? '' : 'primary'} disabled={busy || missing !== null} onClick={() => decide('verify')}>
+            <button type="button" className={pending ? '' : 'primary'} disabled={busy} onClick={() => decide('verify')}>
               Verify
             </button>
             {pending && (
-              <button type="button" className="primary" disabled={busy || missing !== null} onClick={() => decide('verify', true)}>
+              <button type="button" className="primary" disabled={busy} onClick={() => decide('verify', true)}>
                 Verify and confirm
               </button>
             )}
           </>
         ) : (
-          <button type="button" className="danger solid" disabled={busy || missing !== null} onClick={() => decide('reject')}>
+          <button type="button" className="danger solid" disabled={busy} onClick={() => decide('reject')}>
             Reject proof
           </button>
         )}
