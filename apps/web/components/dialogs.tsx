@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
 import { QuickNotes } from './quick-notes';
+import { MissingNote, firstMissing, useMissingGate } from './missing-note';
 
 export interface Question {
   title: string;
@@ -56,6 +57,9 @@ function ConfirmDialog({ title, body, noteLabel, noteRequired, quickNotes, actio
   const [note, setNote] = useState('');
   const titleId = useId();
   const noteId = useId();
+  // D-155: the action button stays on; a click with no note says so and shows the field.
+  const gate = useMissingGate();
+  const noteMissing = firstMissing([[!!noteRequired && note.trim() === '', `Write a ${(noteLabel ?? 'note').toLowerCase()} first.`, noteId]]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -84,7 +88,7 @@ function ConfirmDialog({ title, body, noteLabel, noteRequired, quickNotes, actio
         className="dialog-inner"
         onSubmit={(event) => {
           event.preventDefault();
-          if (noteRequired && note.trim() === '') return;
+          if (gate.blocked(noteMissing)) return;
           finish(note.trim());
         }}
       >
@@ -96,14 +100,20 @@ function ConfirmDialog({ title, body, noteLabel, noteRequired, quickNotes, actio
               {noteLabel} <span className="muted">{noteRequired ? '(required)' : '(optional)'}</span>
             </label>
             {quickNotes && <QuickNotes options={quickNotes} value={note} onPick={setNote} danger={danger} />}
-            <textarea id={noteId} rows={3} autoFocus required={noteRequired} value={note} onChange={(event) => setNote(event.target.value)} />
+            {/* No `required`: the browser's bubble would answer first, and a note of spaces passes it. The gate says it. */}
+            <textarea id={noteId} rows={3} autoFocus aria-required={noteRequired || undefined} value={note} onChange={(event) => setNote(event.target.value)} />
           </div>
+        )}
+        {gate.tried && noteMissing && (
+          <p className="dialog-missing">
+            <MissingNote missing={noteMissing} tried={gate.tried} />
+          </p>
         )}
         <div className="dialog-actions">
           <button type="button" onClick={() => finish(null)}>
             {backLabel}
           </button>
-          <button type="submit" className={danger ? 'danger solid' : 'primary'} autoFocus={!noteLabel} disabled={noteRequired && note.trim() === ''}>
+          <button type="submit" className={danger ? 'danger solid' : 'primary'} autoFocus={!noteLabel}>
             {actionLabel}
           </button>
         </div>

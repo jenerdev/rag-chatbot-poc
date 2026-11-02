@@ -34,6 +34,7 @@ import { fetchRole } from '@/components/tenant-nav';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { StaffFrame } from '@/components/staff-frame';
@@ -124,6 +125,8 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
   const [surcharge, setSurcharge] = useState('');
   // Copying last year's fixed dates.
   const [ticked, setTicked] = useState<string[]>([]);
+  const gate = useMissingGate();
+  const copyGate = useMissingGate();
   const [toYear, setToYear] = useState('');
 
   const unauthorized = useCallback(() => {
@@ -196,6 +199,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (gate.blocked(formMissing)) return;
     setNotice(null);
     // A closed date has no surcharge; the field is disabled for it.
     const amount = kind === 'closed' || surcharge.trim() === '' ? 0 : parseMoneyInput(surcharge);
@@ -258,6 +262,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
   }
 
   async function copy() {
+    if (copyGate.blocked(copyMissing)) return;
     setNotice(null);
     setBusy(true);
     let response: Response | null = null;
@@ -335,6 +340,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
         setLabel('');
         setSurcharge('');
         setKind('holiday');
+        gate.reset();
         setFormOpen(true);
       }}
     >
@@ -352,7 +358,11 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
   }
   // What the form will save, read back; what it still needs; whether it replaces a listed date.
   const listed = (upcoming ?? []).find((d) => d.day === day) ?? null;
-  const formMissing = day === '' ? 'Choose the date' : label.trim() === '' ? 'Give it a name' : null;
+  const formMissing = firstMissing([
+    [day === '', 'Choose the date.', 'day'],
+    [label.trim() === '', 'Give it a name.', 'label'],
+  ]);
+  const copyMissing = firstMissing([[ticked.length === 0, 'Tick at least one date to copy.']]);
   const amountText = kind !== 'closed' && surcharge.trim() !== '' && parseMoneyInput(surcharge) ? formatMoney(parseMoneyInput(surcharge)!, setup.currency) : null;
   const summary =
     day === ''
@@ -452,12 +462,12 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
             )}
             <div className="drawer-footer">
               <div className="drawer-footer-total">
-                <span className="small muted">{formMissing ?? (listed ? 'Saving replaces the listed date.' : 'Ready to save.')}</span>
+                <MissingNote missing={formMissing} tried={gate.tried} idle={listed ? 'Saving replaces the listed date.' : 'Ready to save.'} />
               </div>
               <button type="button" disabled={busy} onClick={() => setFormOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                 {busy ? 'Saving…' : listed ? 'Save changes' : 'Add date'}
               </button>
             </div>
@@ -501,6 +511,7 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
                             setLabel(d.label);
                             setSurcharge(d.surcharge ? centavosToInput(d.surcharge) : '');
                             setNotice(null);
+                            gate.reset();
                             setFormOpen(true);
                           }}
                         >
@@ -544,7 +555,8 @@ export function HolidaysScreen({ slug, businessName, logoUrl, nav }: HolidaysScr
                 <label htmlFor="to-year">To year</label>
                 <input type="number" id="to-year" min={2000} max={2100} value={toYear} onChange={(e) => setToYear(e.target.value)} />
               </div>
-              <button type="button" className="primary" disabled={busy || ticked.length === 0} onClick={copy}>
+              <MissingNote missing={copyMissing} tried={copyGate.tried} quiet />
+              <button type="button" className="primary" disabled={busy} onClick={copy}>
                 Copy {ticked.length || ''} date{ticked.length === 1 ? '' : 's'}
               </button>
             </div>

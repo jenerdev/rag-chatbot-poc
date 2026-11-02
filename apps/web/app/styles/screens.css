@@ -333,7 +333,8 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 /* Under each step: Back on the left, what is missing and Continue on the right. */
 .step-footer { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line); justify-content: flex-end; }
 .step-footer > button:first-child:not(.primary) { margin-right: auto; }
-.step-missing { font-size: var(--text-sm); color: var(--muted); }
+.step-missing { font-size: var(--text-sm); }
+.step-missing:not(.missing-note-alert) { color: var(--muted); }
 .step-recap { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 10px var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--text-sm); }
 .step-recap .icon { color: var(--muted); flex: none; }
 @media (max-width: 560px) {

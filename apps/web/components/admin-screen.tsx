@@ -42,6 +42,7 @@ import { ROLE_LABELS, can, isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog, type Question } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { ListSearch } from '@/components/list-search';
@@ -291,6 +292,8 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
   // The document the form is editing, or null when it is adding a new one.
   const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const gate = useMissingGate();
+  const resetGate = gate.reset;
   const [query, setQuery] = useState('');
   // How many questions the documents could not answer (S-4's open list), for
   // the callout that sends staff there. null until read, or when unreadable.
@@ -373,7 +376,8 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
     setTitle('');
     setSource('');
     setContent('');
-  }, []);
+    resetGate();
+  }, [resetGate]);
 
   // Edit: fetch the document's full original text (the list carries none of
   // it) and load it into the same form that adds documents.
@@ -468,14 +472,11 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
     [deferredContent, previewOpen],
   );
   // What the Add button still needs, in words; null when it is ready.
-  const formMissing =
-    title.trim() === ''
-      ? 'Add a title'
-      : length === 0
-        ? 'Add the content'
-        : length > MAX_CONTENT_LENGTH
-          ? `${(length - MAX_CONTENT_LENGTH).toLocaleString()} characters over the limit`
-          : null;
+  const formMissing = firstMissing([
+    [title.trim() === '', 'Add a title.', 'title'],
+    [length === 0, 'Add the content.', 'content'],
+    [length > MAX_CONTENT_LENGTH, `${(length - MAX_CONTENT_LENGTH).toLocaleString()} characters over the limit.`, 'content'],
+  ]);
 
   // "Load a text file": a .txt or .md file's text into Content (and its name
   // into an empty Title), read in this browser; nothing is uploaded.
@@ -550,7 +551,17 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
 
         {canWrite && (
         <Drawer open={formOpen} title={editing ? `Edit “${editing.title}”` : 'Add a document'} onClose={closeForm}>
-          <form onSubmit={submit} className="doc-form">
+          <form
+            onSubmit={(event) => {
+              // D-155: the button stays on; a gap is said and its field shown instead.
+              if (gate.blocked(formMissing)) {
+                event.preventDefault();
+                return;
+              }
+              void submit(event);
+            }}
+            className="doc-form"
+          >
             <p className="small muted doc-form-intro">
               The assistant answers only from what is written here. One topic per document, in plain sentences, works best.
             </p>
@@ -660,14 +671,16 @@ export function AdminScreen({ slug, businessName, logoUrl, nav }: AdminScreenPro
 
             <div className="drawer-footer">
               <div className="drawer-footer-total">
-                <span className="small muted">
-                  {submitting ? 'Reading it into the knowledge base… this can take a few seconds.' : (formMissing ?? (editing ? 'Saving replaces the old version.' : 'Ready to add.'))}
-                </span>
+                {submitting ? (
+                  <span className="small muted">Reading it into the knowledge base… this can take a few seconds.</span>
+                ) : (
+                  <MissingNote missing={formMissing} tried={gate.tried} idle={editing ? 'Saving replaces the old version.' : 'Ready to add.'} />
+                )}
               </div>
               <button type="button" disabled={submitting} onClick={closeForm}>
                 Cancel
               </button>
-              <button type="submit" className="primary" aria-busy={submitting || undefined} disabled={submitting || formMissing !== null}>
+              <button type="submit" className="primary" aria-busy={submitting || undefined} disabled={submitting}>
                 {/* Genuinely slow for a long document: the OpenAI embeddings
                     call is synchronous and there is no background job (mvp.md). */}
                 {submitting ? 'Saving…' : editing ? 'Save changes' : 'Add to knowledge base'}

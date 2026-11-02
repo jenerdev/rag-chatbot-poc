@@ -340,6 +340,12 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   flex-wrap: wrap;
 }
 .estimate { font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* D-155: what a form still needs, beside its (never disabled) button. Muted
+   as a hint; the danger tone, with its icon, once a click found the gap. */
+.missing-note { font-size: var(--text-sm); }
+.missing-note-alert { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--danger); font-weight: 600; }
+.missing-note-alert .icon { flex: none; }
+.dialog-missing, .auth-missing { margin: 0 0 var(--space-3); }
 /* Keeps Cancel beside Save when editing, instead of centred by space-between. */
 .form-footer .estimate { margin-right: auto; }
 

@@ -37,6 +37,7 @@ import { parsePercentInput, percentToInput } from '@/lib/percent';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { CopyText } from '@/components/copy-button';
 import { Tip } from '@/components/tooltip';
 import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
@@ -115,6 +116,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const gate = useMissingGate();
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
@@ -202,6 +204,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (gate.blocked(formMissing)) return;
     const value = draft.kind === 'fixed' ? parseMoneyInput(draft.value) : parsePercentInput(draft.value);
     if (value === null || value === 0) {
       setNotice({
@@ -253,6 +256,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
     });
     setWithCode(p.code !== null);
     setNotice(null);
+    gate.reset();
     setFormOpen(true);
   }
 
@@ -295,20 +299,14 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
 
   // The form read back, and what it still needs.
   const parsedValue = draft.value.trim() === '' ? null : draft.kind === 'fixed' ? parseMoneyInput(draft.value) : parsePercentInput(draft.value);
-  const formMissing =
-    draft.name.trim() === ''
-      ? 'Give it a name'
-      : !parsedValue
-        ? draft.kind === 'fixed'
-          ? 'Enter the amount off'
-          : 'Enter the percentage off'
-        : draft.validFrom === '' || draft.validTo === ''
-          ? 'Choose the dates'
-          : draft.validTo < draft.validFrom
-            ? 'The end date is before the start'
-            : withCode && draft.code.trim() === ''
-              ? 'Type the code guests will enter'
-              : null;
+  const formMissing = firstMissing([
+    [draft.name.trim() === '', 'Give it a name.', 'promo-name'],
+    [!parsedValue, draft.kind === 'fixed' ? 'Enter the amount off.' : 'Enter the percentage off.', 'promo-value'],
+    [draft.validFrom === '', 'Choose the start date.', 'promo-from'],
+    [draft.validTo === '', 'Choose the end date.', 'promo-to'],
+    [draft.validTo < draft.validFrom, 'The end date is before the start.', 'promo-to'],
+    [withCode && draft.code.trim() === '', 'Type the code guests will enter.', 'promo-code'],
+  ]);
   const summary =
     parsedValue && draft.validFrom && draft.validTo && draft.validTo >= draft.validFrom
       ? `${draft.kind === 'fixed' ? `${formatMoney(parsedValue, currency)} off` : `${percentToInput(parsedValue)} % off`} stays from ${draft.validFrom.slice(0, 4) === draft.validTo.slice(0, 4) ? short(draft.validFrom) : short(draft.validFrom, true)} to ${short(draft.validTo, true)}, ${
@@ -397,6 +395,7 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
           setWithCode(false);
         }
         setNotice(null);
+        gate.reset();
         setFormOpen(true);
       }}
     >
@@ -506,12 +505,12 @@ export function PromosScreen({ slug, businessName, logoUrl, nav, currency }: Pro
             )}
             <div className="drawer-footer">
               <div className="drawer-footer-total">
-                <span className="small muted">{formMissing ?? (draft.id === null ? 'Ready to add.' : 'Future bookings get the change.')}</span>
+                <MissingNote missing={formMissing} tried={gate.tried} idle={draft.id === null ? 'Ready to add.' : 'Future bookings get the change.'} />
               </div>
               <button type="button" disabled={busy} onClick={closeForm}>
                 Cancel
               </button>
-              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                 {busy ? 'Saving…' : draft.id === null ? 'Add promo' : 'Save'}
               </button>
             </div>

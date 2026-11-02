@@ -33,6 +33,7 @@ import { isRole, type Role } from '@/lib/permissions';
 import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { Bone, EmptyState, LOADING, LoadState, failed, type Load } from '@/components/load-state';
 import { dayWords, slotEnd } from '@/lib/slot-span';
@@ -110,6 +111,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
   const [loadState, setLoadState] = useState<Load>(LOADING);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const gate = useMissingGate();
   const [formOpen, setFormOpen] = useState(false);
   const { notice, setNotice } = useNotice(formOpen);
   const { ask, dialog } = useConfirmDialog();
@@ -183,6 +185,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (gate.blocked(formMissing)) return;
     const minutes = Number(draft.hours || 0) * 60 + Number(draft.minutes || 0);
     if (!Number.isInteger(minutes) || minutes <= 0) {
       setNotice({ message: 'The length is whole hours and minutes, more than zero.', kind: 'error' });
@@ -215,6 +218,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
       nightly: slot.nightly,
     });
     setNotice(null);
+    gate.reset();
     setFormOpen(true);
   }
 
@@ -225,7 +229,11 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
   // The form read back: the length in minutes and when it ends; what is still missing.
   const draftMinutes = Number(draft.hours || 0) * 60 + Number(draft.minutes || 0);
   const draftEnd = slotEnd(draft.startTime, draftMinutes);
-  const formMissing = draft.name.trim() === '' ? 'Add a name' : draft.startTime === '' ? 'Set the start time' : !(draftMinutes > 0) ? 'Set how long it lasts' : null;
+  const formMissing = firstMissing([
+    [draft.name.trim() === '', 'Add a name.', 'slot-name'],
+    [draft.startTime === '', 'Set the start time.', 'slot-start'],
+    [!(draftMinutes > 0), 'Set how long it lasts.', 'slot-hours'],
+  ]);
 
   const frame = { slug, businessName, logoUrl, features: nav, current: 'slots' as const, title: 'Slots', session: { auth, role, onLogout: logout } };
 
@@ -260,6 +268,7 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
       onClick={() => {
         if (draft.id !== null) setDraft(EMPTY);
         setNotice(null);
+        gate.reset();
         setFormOpen(true);
       }}
     >
@@ -332,14 +341,16 @@ export function SlotsScreen({ slug, businessName, logoUrl, nav }: SlotsScreenPro
             )}
             <div className="drawer-footer">
               <div className="drawer-footer-total">
-                <span className="small muted">
-                  {formMissing ?? (draft.id === null ? 'A new slot is offered once its rates are set.' : 'Bookings already made keep their times.')}
-                </span>
+                <MissingNote
+                  missing={formMissing}
+                  tried={gate.tried}
+                  idle={draft.id === null ? 'A new slot is offered once its rates are set.' : 'Bookings already made keep their times.'}
+                />
               </div>
               <button type="button" disabled={busy} onClick={closeForm}>
                 Cancel
               </button>
-              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || formMissing !== null}>
+              <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
                 {busy ? 'Saving…' : draft.id === null ? 'Add slot' : 'Save'}
               </button>
             </div>

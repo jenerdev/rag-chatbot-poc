@@ -23,7 +23,9 @@ import { DateField } from './date-field';
 // review step only, so nothing is sent before the guest has seen it all.
 // Every step stays MOUNTED, hidden when not current, so going back keeps
 // what was typed. A step is reachable once every step before it is
-// complete; Continue says what is missing instead of only greying out.
+// complete; Continue says what is missing instead of only greying out, and
+// is never disabled (D-155): a click with a gap says it as an alert and
+// takes the guest to the field.
 // While a price is being asked, the summary shows a placeholder, never the
 // last price, which may no longer be true. The promo field opens on request,
 // at the review. The receipt leads with the reference, copyable.
@@ -38,6 +40,7 @@ import type { NavFeatures } from '@/lib/nav-items';
 import { formatMoney } from '@/lib/money';
 import { MAX_FREE_GUESTS, freeFieldLabel, freeGuestsWords, partyWords } from '@/lib/party-words';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate, type Missing } from '@/components/missing-note';
 import { StayLines } from '@/components/stay-lines';
 import { Bone } from '@/components/load-state';
 import { Lightbox, useLightbox } from '@/components/lightbox';
@@ -210,6 +213,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   const [website, setWebsite] = useState('');
   // D-129: unticked until the guest ticks it; the route and the database both need it.
   const [consent, setConsent] = useState(false);
+  const gate = useMissingGate();
   // D-097: a promo code, sent with the quote (which says whether it applies,
   // in words) and with the request (which resolves it again under the lock).
   const [promoCode, setPromoCode] = useState('');
@@ -305,9 +309,10 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     event.preventDefault();
     // Enter in a field submits the form: before the review, that is Continue.
     if (step < 3) {
-      if (missing[step] === '') go(step + 1);
+      if (!gate.blocked(stepMissing(step))) go(step + 1);
       return;
     }
+    if (gate.blocked(sendMissing)) return;
     setError(null);
     setSending(true);
     try {
@@ -510,7 +515,6 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     );
   }
 
-  const canSend = !sending && !!quote.quote && quote.quote.available && !!name && !!phone && !!email && consent;
 
   // What each step still needs, in words; '' when it is complete. The
   // server checks all of it again; this only decides when Continue is on.
@@ -537,12 +541,39 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     !name.trim() || !phone.trim() ? 'Enter your name and mobile number.' : !emailOk ? 'Enter a valid email address.' : '',
     '',
   ];
+  // D-155: the field each step's gap is in, so Continue (never disabled now)
+  // can take the guest to it. A per-room party's first incomplete room is
+  // `guests-<unit>-<n>`, its n counted among the rooms of that type.
+  const gapRoom = rooms.findIndex((r) => !(Number.isInteger(r.guests) && r.guests > 0));
+  const gapRoomField =
+    gapRoom === -1
+      ? undefined
+      : perRoom
+        ? `guests-${rooms[gapRoom]!.unitId}-${rooms.slice(0, gapRoom).filter((r) => r.unitId === rooms[gapRoom]!.unitId).length}`
+        : 'guests';
+  const missingField: (string | undefined)[] = [
+    !checkIn || checkIn < page.today || checkIn > page.lastDate || closedInStay ? 'check-in' : !nightsValid ? 'nights' : undefined,
+    !roomsComplete ? (rooms.length === 0 ? undefined : (gapRoomField ?? (perRoom ? undefined : 'free-guests'))) : undefined,
+    !name.trim() ? 'name' : !phone.trim() ? 'phone' : !emailOk ? 'email' : undefined,
+    undefined,
+  ];
+  const stepMissing = (i: number): Missing | null => (missing[i] ? { message: missing[i]!, field: missingField[i] } : null);
+  // Send: what the review step still needs. The earlier steps' gaps cannot be
+  // here (Continue would not have let the guest in), but the quote can be
+  // loading or taken meanwhile, and the consent box is on this step.
+  const sendMissing = firstMissing([
+    [!quote.quote, 'One moment: the price is still loading.'],
+    [!!quote.quote && !quote.quote.available, 'A night in this stay is already booked.'],
+    [!name || !phone || !email, 'Enter your name, mobile number and email.'],
+    [!consent, 'Tick the box to agree to the Privacy Policy and Terms.', 'book-consent'],
+  ]);
   // The furthest step the guest may open: the first one still incomplete.
   const furthest = missing.findIndex((m) => m !== '');
   const reachable = (i: number) => furthest === -1 || i <= furthest;
   const go = (i: number) => {
     if (!reachable(i)) return;
     moved.current = true;
+    gate.reset();
     setStep(i);
   };
 
@@ -558,13 +589,10 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
       )}
       {i < STEPS.length - 1 && (
         <>
-          {missing[i] && (
-            <span className="step-missing" aria-live="polite">
-              {missing[i]}
-            </span>
-          )}
+          {/* D-155: Continue is never disabled; a click with a gap says it as an alert and shows the field. */}
+          <MissingNote missing={stepMissing(i)} tried={gate.tried} className="step-missing" />
           {/* A submit button, so Enter in a field moves on too: send() turns a submit before the review into Continue. */}
-          <button type="submit" className="primary" disabled={missing[i] !== ''}>
+          <button type="submit" className="primary">
             Continue <Icon name="chevron-right" size={16} />
           </button>
         </>
@@ -826,6 +854,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                   {i === 0 && u.rooms > 1 && wanted.length === 1 && roomsField}
                                   <CountField
                                     label="Guests"
+                                    id={`guests-${u.id}-${i}`}
                                     min={1}
                                     max={u.capacity ?? undefined}
                                     aria-label={wanted.length > 1 ? `Guests in ${u.name}, room ${i + 1}` : `Guests in ${u.name}`}
@@ -1047,7 +1076,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                     .
                   </span>
                 </label>
-                <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={!canSend}>
+                <MissingNote missing={sendMissing} tried={gate.tried} quiet />
+                <button type="submit" className="primary book-send" aria-busy={sending || undefined} disabled={sending}>
                   {sending ? 'Sending…' : 'Send request'}
                 </button>
               </>

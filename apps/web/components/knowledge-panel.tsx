@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { MAX_CONTENT_LENGTH } from '@/lib/limits';
 
@@ -63,6 +64,12 @@ export function KnowledgePanel({
   const [source, setSource] = useState('');
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
+  // D-155: Add document stays on; a click with a gap says it and shows the field.
+  const gate = useMissingGate();
+  const addMissing = firstMissing([
+    [!title.trim(), 'Add a title.', 'kb-title'],
+    [!content.trim(), 'Add the content.', 'kb-content'],
+  ]);
   const { ask, dialog } = useConfirmDialog();
 
   const load = useCallback(async () => {
@@ -81,6 +88,7 @@ export function KnowledgePanel({
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
+    if (gate.blocked(addMissing)) return;
     setBusy(true);
     let response: Response | null = null;
     try {
@@ -94,6 +102,7 @@ export function KnowledgePanel({
       const added: { chunkCount?: number } = await response.json();
       onMessage(`Added "${title.trim()}"${typeof added.chunkCount === 'number' ? `: ${added.chunkCount} chunks` : ''}.`, 'ok');
       setTitle('');
+      gate.reset();
       setSource('');
       setContent('');
       void load();
@@ -205,7 +214,8 @@ export function KnowledgePanel({
                 <Icon name="file" size={14} /> Read a file
               </span>
             </label>
-            <button type="submit" className="primary" disabled={busy || !title.trim() || !content.trim()} aria-busy={busy || undefined}>
+            <MissingNote missing={addMissing} tried={gate.tried} quiet />
+            <button type="submit" className="primary" disabled={busy} aria-busy={busy || undefined}>
               {busy ? 'Adding…' : 'Add document'}
             </button>
           </div>

@@ -56,6 +56,8 @@
 
 ## ▶ Next up (do this next)
 
+**No form button is disabled for a gap (2026-11-03, D-155, done, not committed, on `feat/extra-guest-count`):** every form's submit / Continue stays on; a click with something missing says the first gap in red beside the button and takes the person to the field (`components/missing-note.tsx`, `lib/missing.ts`). Seen working on villa's booking page; web 254, typecheck clean. **Owed:** a look at the staff forms (Holidays, Promos, Slots, Rooms, the staff booking form, a stay's note and move); the axe pass (`plan/ui-refresh-a11y.mjs`); your commit.
+
 **The extra-guest count (2026-11-03, D-154, done, not committed):** the price breakdown says "2 extra guests" on the booking page, the staff form and S-15, and "2 extra guests × 3 nights" on Manage booking; `bookings.extra_guests` is stored beside the fee by `bookings_compute_extra_guests` (`schema-extra-guest-count.sql`, the 46th file, APPLIED, 25 rows backfilled exactly). rooms 58/58, web 251, typecheck 13/13. Also today: pnpm installed, `dev` builds the packages first, Manage booking's room line stacked. **Owed:** a browser look at the three breakdowns; verify 241/243 because check 27's probe bookings (2026-10-01/02) are no longer live, a fixture to re-date; your commit.
 
 **George is the office's memory (2026-10-28, on `feat/george-memory`, not committed):** every employee reports to George. `office/employees/george/reports.md` is ONE feed only the script writes: every task added, started, finished or dropped, every idea and every gate, reported as it happens, plus `office.mjs report --from <me> "…"`, the doer's own line, which every charter but George's now asks for at the end of a task and after a gate (`REPORT_LINE`, required by `check`). George's charter § 11: on every wake `reports`, save each to `notes/work-log.md` (amend `owed.md` and `project-map.md` when one changes them), then `reports --ack-all`. The guard keeps `reports.md` the script's. Tests 48/48 (5 new; `server.test.mjs`'s watcher-burst test flaked once in five runs, as before); `office:check` green, 11 employees. Also Todd, the Task Tracker (read-only: what is pending, whose, what next), hired 2026-10-28. **Next:** your commit and merge; then George's first wake folds the first reports.
@@ -1892,6 +1894,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-03 — No form button is disabled for a gap (D-155)
+- **Did:** `useMissingGate()` / `<MissingNote>` / `firstMissing()`; every submit and Continue button that was disabled while a field was empty now stays on and, clicked, says the first gap as an alert and focuses the field (booking page, staff form, Holidays, Promos, Slots, Knowledge base ×2, Rooms ×5, stay note and move, proof review, confirm dialogs, Members, login, password reset, Manage booking ×4).
+- **Observed:** web 254 (3 new), typecheck clean; villa's booking page in a browser: Continue enabled, the click said "Enter your name and mobile number." (role alert) and focused `#name` (aria-invalid).
+- **Next:** your look at the staff forms; `plan/ui-refresh-a11y.mjs` (axe) before merging; commit.
 
 ### 2026-11-03 — pnpm, a stale dist, and the extra-guest count (D-154)
 - **Did:** pnpm 12.5.1 installed (it was missing; Yarn ran instead); `turbo.json` `dev` dependsOn `^build` (a stale `dist/` printed "undefined children"); Manage booking's room line stacked; D-154: `bookings.extra_guests` (`schema-extra-guest-count.sql`, the 46th, applied), `guest_stay()` with `extra_guest_count`, "2 extra guests" in every price breakdown.

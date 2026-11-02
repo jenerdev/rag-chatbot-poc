@@ -1065,6 +1065,12 @@ All are expanded in `risks.md`.
   screen every field is `--text-touch` (16px) or iOS zooms the page on
   focus; the rule is in `base.css` AFTER the field rule, and a new
   field-like control that sets its own font-size joins its selector list.
+- A submit / Continue button is NEVER disabled because the form is
+  incomplete (D-155): `useMissingGate()` + `<MissingNote>`
+  (`components/missing-note.tsx`, `firstMissing()` in `lib/missing.ts`).
+  A click with a gap says it as an alert and focuses the field. Disable a
+  button only while its request is in flight, or when it is a guard (trap
+  21). A new form lists its gaps in fill order, each with its field's id.
 - Feedback (D-102): an action's result is a toast (`useNotice()`), a
   standing fact a `.notice` banner; a list shows `LoadState` until its rows
   arrive and `EmptyState` when there are none; a reason is a `Tip` or

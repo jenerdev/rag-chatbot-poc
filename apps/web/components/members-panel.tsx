@@ -21,6 +21,7 @@ import type { Member } from '@rag/pipeline';
 import { describeFailure } from '@/components/admin-login';
 import { useConfirmDialog } from '@/components/dialogs';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { Bone, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { useNotice } from '@/components/toast';
@@ -74,6 +75,9 @@ export function MembersPanel({
   // No drawer here: the add form is one field, and its refusal is a toast like every other.
   const { setNotice } = useNotice();
   const [email, setEmail] = useState('');
+  // D-155: Add member stays on; a click with no email says so and shows the field.
+  const gate = useMissingGate();
+  const addMissing = firstMissing([[email.trim() === '', 'Enter the email of the account to add.', 'member-email']]);
   const [role, setRole] = useState<Role>('staff');
   const [busy, setBusy] = useState(false);
 
@@ -119,7 +123,11 @@ export function MembersPanel({
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
-    if (await write('POST', { email: email.trim(), role }, `Added ${email.trim()} as ${ROLE_LABELS[role].toLowerCase()}.`)) setEmail('');
+    if (gate.blocked(addMissing)) return;
+    if (await write('POST', { email: email.trim(), role }, `Added ${email.trim()} as ${ROLE_LABELS[role].toLowerCase()}.`)) {
+      setEmail('');
+      gate.reset();
+    }
   }
 
   const isMember = selfUserId ? members?.some((m) => m.userId === selfUserId) : true;
@@ -217,10 +225,14 @@ export function MembersPanel({
           </div>
         </div>
         <div className="form-footer">
-          <span className="small muted">
-            The account must already exist. A new one is invited from the command line: <code>member:add</code>.
-          </span>
-          <button type="submit" className="primary" disabled={busy || email.trim() === ''}>
+          {gate.tried && addMissing ? (
+            <MissingNote missing={addMissing} tried />
+          ) : (
+            <span className="small muted">
+              The account must already exist. A new one is invited from the command line: <code>member:add</code>.
+            </span>
+          )}
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Saving…' : 'Add member'}
           </button>
         </div>

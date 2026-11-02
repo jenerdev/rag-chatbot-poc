@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './icons';
+import { MissingNote, firstMissing, useMissingGate } from './missing-note';
 
 /** The server's own error message if there is one, else the status line, else "is the server running?". */
 export async function describeFailure(error: Error, response: Response | null): Promise<string> {
@@ -133,6 +134,8 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // D-155: Log in / Send reset link stay on; a click with a gap says it and shows the field.
+  const gate = useMissingGate();
 
   const post = useCallback(
     async (path: string, body: object): Promise<Response> => {
@@ -182,6 +185,10 @@ export function LoginForm({
 
   const emailId = useId();
   const passwordId = useId();
+  const loginMissing = firstMissing([
+    [email.trim() === '', 'Enter your email.', emailId],
+    [mode === 'login' && password === '', 'Enter your password.', passwordId],
+  ]);
 
   if (info) {
     // The reset email is on its way: one sentence and the way back, no form.
@@ -207,7 +214,15 @@ export function LoginForm({
           ? (intro ?? <>Log in with your staff account for this workspace. No account yet? Ask an owner of this workspace to add you.</>)
           : 'We will email you a link to set a new password. It expires in an hour.'}
       </p>
-      <form onSubmit={submit}>
+      <form
+        onSubmit={(event) => {
+          if (gate.blocked(loginMissing)) {
+            event.preventDefault();
+            return;
+          }
+          void submit(event);
+        }}
+      >
         <div className="field">
           <label htmlFor={emailId}>Email</label>
           <input
@@ -229,12 +244,12 @@ export function LoginForm({
           </div>
         )}
         <FormError message={error} />
-        <button
-          type="submit"
-          className="primary auth-wide"
-          aria-busy={busy || undefined}
-          disabled={busy || email === '' || (mode === 'login' && password === '')}
-        >
+        {gate.tried && loginMissing && (
+          <p className="auth-missing">
+            <MissingNote missing={loginMissing} tried />
+          </p>
+        )}
+        <button type="submit" className="primary auth-wide" aria-busy={busy || undefined} disabled={busy}>
           {busy ? (mode === 'login' ? 'Logging in…' : 'Sending…') : mode === 'login' ? 'Log in' : 'Send reset link'}
         </button>
         <div className="auth-switch">

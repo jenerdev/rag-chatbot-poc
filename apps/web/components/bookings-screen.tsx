@@ -55,6 +55,7 @@ import { MAX_FREE_GUESTS, freeFieldLabel, partyWords } from '@/lib/party-words';
 import { Drawer } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Bone, EmptyState, LOADING, LoadState, boneRows, failed, type Load } from '@/components/load-state';
 import { StayLines } from '@/components/stay-lines';
 import { CountField, PartyRow } from '@/components/count-field';
@@ -513,19 +514,22 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
     if (picked.length === 0 || picked.some((r) => r.guestCount === null)) return null;
     return picked.map((r) => ({ unitId: r.unitId, guests: r.guestCount as number, free: r.free }));
   }, [chosenRooms, freeCount, guestCount, perRoom, unitId]);
-  // Why Book is not ready yet, in words, instead of a silently disabled button.
-  const missing =
-    slotId === null
-      ? 'Choose a slot'
-      : !date
-        ? 'Choose a date'
-        : perRoom && chosenRooms.length === 0
-          ? 'Choose a room'
-          : stayRooms === null
-            ? perRoom
-              ? 'Enter the guests for each room'
-              : 'Enter the number of guests'
-            : null;
+  // Why Book is not ready yet, in words; Book is never disabled for it
+  // (D-155): a click says it as an alert and shows the field.
+  const missing = firstMissing([
+    [slotId === null, 'Choose a slot.', 'slot'],
+    [!date, 'Choose a date.', 'date'],
+    [perRoom && chosenRooms.length === 0, 'Choose a room.'],
+    [stayRooms === null, perRoom ? 'Enter the guests for each room.' : 'Enter the number of guests.', perRoom ? undefined : 'guest-count'],
+  ]);
+  // Then the price: Book needs the server's quote back (D-111).
+  const bookMissing =
+    missing ??
+    firstMissing([
+      [quotePending, 'One moment: the price is still loading.'],
+      [quote.quote === null, quote.message ?? 'Fix the stay to see a price.'],
+    ]);
+  const gate = useMissingGate();
   // A day slot is one date; a nightly one takes a number of nights.
   const nightly = setup?.slots.find((s) => s.id === slotId)?.nightly ?? false;
   const nightCount = nightly && nights !== '' ? Number(nights) : 1;
@@ -668,7 +672,14 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
 
   const frame = { slug, businessName, logoUrl, features: nav, current: 'bookings' as const, title: 'Bookings', session: { auth, role, onLogout: logout } };
   const newBooking = (
-    <button type="button" className="primary" onClick={() => setFormOpen(true)}>
+    <button
+      type="button"
+      className="primary"
+      onClick={() => {
+        gate.reset();
+        setFormOpen(true);
+      }}
+    >
       <Icon name="plus" size={16} /> New booking
     </button>
   );
@@ -796,7 +807,16 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
           {/* Three sections in the order a booking is taken: when, who, anything
               else. The price depends on the first, so it comes first. The footer
               stays in view with the server's total and the one Book button. */}
-          <form onSubmit={book} className="booking-form">
+          <form
+            onSubmit={(event) => {
+              if (gate.blocked(bookMissing)) {
+                event.preventDefault();
+                return;
+              }
+              void book(event);
+            }}
+            className="booking-form"
+          >
             <fieldset className="form-section">
               <legend>Stay</legend>
               <div className="field-row">
@@ -1093,7 +1113,7 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
               ) : quote.message ? (
                 <div className="quote error">{quote.message}</div>
               ) : (
-                <p className="small muted">{missing ?? 'The price appears here.'}</p>
+                <p className="small muted">{missing?.message ?? 'The price appears here.'}</p>
               )}
             </section>
 
@@ -1112,7 +1132,11 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                     <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>
                   </>
                 ) : (
-                  <span className="small muted">{quotePending ? 'Getting the price…' : (missing ?? (quote.message ? 'Fix the stay to see a price' : ''))}</span>
+                  <MissingNote
+                    missing={bookMissing}
+                    tried={gate.tried}
+                    idle={quotePending ? 'Getting the price…' : quote.message ? 'Fix the stay to see a price' : null}
+                  />
                 )}
               </div>
               <button type="button" onClick={() => setFormOpen(false)}>
@@ -1122,8 +1146,9 @@ export function BookingsScreen({ slug, businessName, logoUrl, nav }: BookingsScr
                 type="submit"
                 className="primary"
                 // Every unit needs its guests, and a quote must have come back
-                // (D-111). The server checks everything again.
-                disabled={busy || slotId === null || stayRooms === null || quote.quote === null || quotePending}
+                // (D-111): bookMissing says which, on the click (D-155). The
+                // server checks everything again.
+                disabled={busy}
               >
                 {busy ? 'Saving…' : 'Book'}
               </button>

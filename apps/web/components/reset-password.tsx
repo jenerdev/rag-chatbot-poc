@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { FormError, PasswordInput, describeFailure } from './admin-login';
 import { Icon } from './icons';
+import { MissingNote, firstMissing, useMissingGate } from './missing-note';
 
 /** The server's rule too (the password route refuses fewer). */
 const MIN_PASSWORD = 8;
@@ -46,6 +47,8 @@ export function ResetPassword({ api, loginHref }: { api: string; loginHref: stri
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // D-155: Set password stays on; a click with a gap says it and shows the field.
+  const gate = useMissingGate();
 
   useEffect(() => {
     setLink(readLink());
@@ -111,11 +114,23 @@ export function ResetPassword({ api, loginHref }: { api: string; loginHref: stri
 
   const longEnough = password.length >= MIN_PASSWORD;
   const matches = again !== '' && again === password;
+  const setMissing = firstMissing([
+    [!longEnough, `Use at least ${MIN_PASSWORD} characters.`, 'new-password'],
+    [!matches, 'Type the same password again to confirm it.', 'new-password-again'],
+  ]);
   return (
     <section className="card auth-card">
       <h2>Set a password</h2>
       <p className="auth-intro">Choose the password you will log in with.</p>
-      <form onSubmit={submit}>
+      <form
+        onSubmit={(event) => {
+          if (gate.blocked(setMissing)) {
+            event.preventDefault();
+            return;
+          }
+          void submit(event);
+        }}
+      >
         <div className="field">
           <label htmlFor="new-password">New password</label>
           <PasswordInput
@@ -146,12 +161,12 @@ export function ResetPassword({ api, loginHref }: { api: string; loginHref: stri
           </p>
         </div>
         <FormError message={error} />
-        <button
-          type="submit"
-          className="primary auth-wide"
-          aria-busy={busy || undefined}
-          disabled={busy || !longEnough || !matches}
-        >
+        {gate.tried && setMissing && (
+          <p className="auth-missing">
+            <MissingNote missing={setMissing} tried />
+          </p>
+        )}
+        <button type="submit" className="primary auth-wide" aria-busy={busy || undefined} disabled={busy}>
           {busy ? 'Saving…' : 'Set password'}
         </button>
       </form>

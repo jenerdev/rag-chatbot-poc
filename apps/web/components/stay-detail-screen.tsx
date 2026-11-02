@@ -32,6 +32,7 @@ import { Drawer, useConfirmDialog } from '@/components/dialogs';
 import { useNotice } from '@/components/toast';
 import { CopyButton, CopyText } from '@/components/copy-button';
 import { Icon } from '@/components/icons';
+import { MissingNote, firstMissing, useMissingGate } from '@/components/missing-note';
 import { Tip } from '@/components/tooltip';
 import { StayLines } from '@/components/stay-lines';
 import { ReviewProof, type ReviewDecision } from '@/components/review-proof';
@@ -221,8 +222,16 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
   const [refundOpen, setRefundOpen] = useState(false);
   const [refund, setRefund] = useState({ amount: '', method: '', note: '' });
   const [noteDraft, setNoteDraft] = useState('');
+  // D-155: Add note and Move stay on; a click with a gap says it and shows the field.
+  const noteGate = useMissingGate();
+  const noteMissing = firstMissing([[noteDraft.trim() === '', 'Write the note first.', 'stay-note-body']]);
+  const moveGate = useMissingGate();
   // D-133: the Move drawer: the booking whose room moves, the type's rooms, the choice and why.
   const [moving, setMoving] = useState<{ bookingId: number; from: string; options: MoveOptions | null; roomId: number | null; note: string } | null>(null);
+  const moveMissing = firstMissing([
+    [moving !== null && moving.roomId === null, 'Choose the room it moves to.'],
+    [moving !== null && moving.note.trim() === '', 'Say why it moves.', 'move-note'],
+  ]);
   const { notice, setNotice } = useNotice(reviewing !== null || refundOpen || moving !== null);
 
   const unauthorized = useCallback(() => {
@@ -425,8 +434,11 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
 
   async function addNote(event: React.FormEvent) {
     event.preventDefault();
-    if (stay === null || stay === 'missing' || noteDraft.trim() === '') return;
-    if (await write('POST', `/bookings/stay/${encodeURIComponent(stay.reference)}/notes`, { body: noteDraft }, 'Note added.')) setNoteDraft('');
+    if (stay === null || stay === 'missing' || noteGate.blocked(noteMissing)) return;
+    if (await write('POST', `/bookings/stay/${encodeURIComponent(stay.reference)}/notes`, { body: noteDraft }, 'Note added.')) {
+      setNoteDraft('');
+      noteGate.reset();
+    }
   }
 
   async function deleteNote(id: number) {
@@ -441,6 +453,7 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
   async function openMove(bookingId: number, from: string) {
     setNotice(null);
     setMoving({ bookingId, from, options: null, roomId: null, note: '' });
+    moveGate.reset();
     const response = await fetch(`${api}/bookings/${bookingId}/room`).catch(() => null);
     if (!response?.ok) {
       setMoving(null);
@@ -453,7 +466,8 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
 
   async function submitMove(event: React.FormEvent) {
     event.preventDefault();
-    if (!moving || moving.roomId === null) return;
+    if (!moving || moveGate.blocked(moveMissing)) return;
+    if (moving.roomId === null) return;
     const to = moving.options?.rooms.find((r) => r.id === moving.roomId)?.name ?? 'the other room';
     if (await write('PATCH', `/bookings/${moving.bookingId}/room`, { roomId: moving.roomId, note: moving.note }, `Moved from ${moving.from} to ${to}.`)) setMoving(null);
   }
@@ -716,8 +730,8 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
                   onChange={(e) => setNoteDraft(e.target.value)}
                 />
                 <div className="stay-note-form-foot">
-                  <span className="small muted">Only staff see notes.</span>
-                  <button type="submit" className="primary sm" disabled={busy || noteDraft.trim() === ''}>
+                  <MissingNote missing={noteMissing} tried={noteGate.tried} quiet idle="Only staff see notes." />
+                  <button type="submit" className="primary sm" disabled={busy}>
                     <Icon name="plus" size={14} /> Add note
                   </button>
                 </div>
@@ -924,7 +938,8 @@ export function StayDetailScreen({ slug, reference, businessName, logoUrl, nav, 
                 <input id="move-note" required maxLength={500} placeholder="Guest asked for the room by the pool" value={moving.note} onChange={(e) => setMoving({ ...moving, note: e.target.value })} />
               </div>
               <div className="form-footer">
-                <button type="submit" className="primary" disabled={busy || moving.roomId === null || moving.note.trim() === ''}>
+                <MissingNote missing={moveMissing} tried={moveGate.tried} quiet />
+                <button type="submit" className="primary" disabled={busy}>
                   Move
                 </button>
               </div>
