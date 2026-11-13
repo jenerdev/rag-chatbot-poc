@@ -37,6 +37,7 @@ import { BrandHeader } from '@/components/brand-header';
 import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
+import { bookingTerms } from '@/lib/booking-terms';
 import { formatMoney } from '@/lib/money';
 import { MAX_FREE_GUESTS, freeFieldLabel, freeGuestsWords, partyWords } from '@/lib/party-words';
 import { Icon } from '@/components/icons';
@@ -1042,6 +1043,19 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                   </button>
                 </div>
               </div>
+              {/* D-175 (audit E-4): the terms this request is sent on, BEFORE Send:
+                  paying, an unpaid request, the dates, cancelling, changing dates. */}
+              <section className="review-terms" aria-labelledby="terms-title">
+                <h3 id="terms-title">Before you send</h3>
+                <dl className="terms-list">
+                  {bookingTerms(page.payment, businessName, page.currency).map((t) => (
+                    <div key={t.title}>
+                      <dt>{t.title}</dt>
+                      <dd>{t.text}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
               {promoOpen ? (
                 <div className="field promo-field">
                   <label htmlFor="promo-code">

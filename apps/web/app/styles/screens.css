@@ -389,6 +389,12 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .room-pick-price { display: block; margin-top: var(--space-1); font-size: var(--text-sm); }
 .room-pick-price strong { font-size: var(--text-base); }
 .room-pick-taken { color: var(--danger); }
+/* D-175 (audit E-4): the Review step's terms, before Send. */
+.review-terms { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.review-terms h3 { font-size: var(--text-base); margin: 0 0 var(--space-3); }
+.terms-list { display: grid; gap: var(--space-3); margin: 0; }
+.terms-list dt { font-size: var(--text-sm); font-weight: 600; }
+.terms-list dd { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--muted); }
 .summary-note { margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--muted); text-align: center; }
 
 /* While a price is asked: three shimmering bars, never the last price. */

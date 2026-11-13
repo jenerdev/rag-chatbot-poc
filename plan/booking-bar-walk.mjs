@@ -9,7 +9,8 @@
 //    bottom with the total and "See price".
 // 3. "See price" brings the summary card into view, and the bar steps aside.
 // 4. Back at the top, the bar is back.
-// 5. The Review step: the bar shows the total and "Send request".
+// 5. The Review step: the bar shows the total and "Send request"; 5b. the
+//    terms (paying, an unpaid request, the dates, cancelling, changing dates).
 // 6. The bar's Send with the consent box unticked sends nothing: the box is
 //    focused, the gap is said, and the bar is out of the way.
 // 7. At 1280 px there is no bar (the summary sits beside the form).
@@ -99,6 +100,12 @@ try {
   check(review?.display === 'flex' && /^Total ₱[\d,]+\.\d{2}/.test(review.text) && review.button === 'Send request',
     '5. the Review step: the bar shows the total and "Send request"', JSON.stringify(review));
   await page.shot(join(SHOTS, '3-review-390.png'));
+
+  // 5b. D-175 (audit E-4): the terms, on the Review step, before Send.
+  const terms = await page.eval("[...document.querySelectorAll('.review-terms dt')].map((dt) => dt.textContent.trim() + ': ' + dt.nextElementSibling.textContent.trim())");
+  console.log('      terms: ' + terms.join(' | '));
+  check(terms.length >= 4 && terms.some((t) => /^Paying: /.test(t)) && terms.some((t) => /^Cancelling: /.test(t)) && terms.some((t) => /^Changing dates: /.test(t)),
+    '5b. the Review step says the terms before Send: paying, cancelling, changing dates', `${terms.length} lines`);
 
   // 6.
   await page.click('.book-bar button');

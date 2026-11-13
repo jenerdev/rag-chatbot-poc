@@ -10422,3 +10422,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** a guest choosing between six rooms could not compare them without picking each one and scrolling down to the summary.
 - **Observed:** walk 4/4 on alteza, the card's price equal to the quote's, screenshots in `plan/room-cards-price/`.
 - **Not done:** axe and a real phone (end of the E batch); not committed.
+
+## 2026-11-14 · The terms before Send (D-175; audit E-4)
+- **Asked:** the audit's E-4: payment and refund terms appeared only after a request was sent.
+- **What:** `paymentFlow()` exposes the fee rule, refund tiers and reschedule cutoff; `apps/web/lib/booking-terms.ts` and its tests; "Before you send" on the Review step.
+- **Why it matters:** a guest agrees to these by sending; learning after that the deposit is due in 24 hours, or that a cancellation refunds nothing, is how disputes start.
+- **Observed:** the five lines on villa's Review step in Chrome; tests 13/13.
+- **Surfaced:** both tenants have no refund tiers configured, so the page now says plainly that nothing is refunded; the user should set their real policy.
+- **Not done:** not committed.

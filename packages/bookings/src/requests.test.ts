@@ -164,7 +164,7 @@ describe('paymentFlow', () => {
   it('reads the deposit, the two windows and the hold', () => {
     expect(
       paymentFlow({ payments: { methods: [], fee: { kind: 'percent', value: 3000 }, pay_within_hours: 24, review_within_hours: 12, hold: 'on_proof' } }),
-    ).toEqual({ deposit: true, payWithinHours: 24, reviewWithinHours: 12, hold: 'on_proof' });
+    ).toEqual({ deposit: true, payWithinHours: 24, reviewWithinHours: 12, hold: 'on_proof', fee: { kind: 'percent', hundredths: 3000 }, cancellation: [], rescheduleUntilDaysBefore: null });
   });
   it('the full price, no windows, no hold, when they are absent or odd', () => {
     expect(paymentFlow({ payments: { methods: [], fee: { kind: 'full' }, pay_within_hours: 0, hold: 'sometimes' } })).toEqual({
@@ -172,7 +172,25 @@ describe('paymentFlow', () => {
       payWithinHours: null,
       reviewWithinHours: null,
       hold: 'none',
+      fee: { kind: 'full' },
+      cancellation: [],
+      rescheduleUntilDaysBefore: null,
     });
+  });
+  it('D-175: a fixed deposit, the refund tiers (most days first, odd ones dropped) and the reschedule cutoff', () => {
+    const flow = paymentFlow({
+      payments: {
+        methods: [],
+        fee: { kind: 'fixed', value: 200000 },
+        cancellation: [{ days_before: 2, refund_percent: 50 }, { days_before: 7, refund_percent: 100 }, { days_before: 3.5, refund_percent: 10 }, { days_before: 1, refund_percent: 101 }],
+        reschedule_until_days_before: 3,
+      },
+    });
+    expect(flow?.fee).toEqual({ kind: 'fixed', amount: 200000 });
+    expect(flow?.cancellation).toEqual([{ daysBefore: 7, refundPercent: 100 }, { daysBefore: 2, refundPercent: 50 }]);
+    expect(flow?.rescheduleUntilDaysBefore).toBe(3);
+    // A fee the validator would refuse falls back to the full price, never to "no payment".
+    expect(paymentFlow({ payments: { methods: [], fee: { kind: 'percent', value: 20000 } } })?.fee).toEqual({ kind: 'full' });
   });
 });
 

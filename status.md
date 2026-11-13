@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The terms before Send (D-175; audit E-4)
+- **Did:** `paymentFlow()` (`@rag/bookings`) also returns the fee RULE (full, fixed centavos, percent in hundredths), the refund tiers (most days first) and the reschedule cutoff; `apps/web/lib/booking-terms.ts` (`bookingTerms()`, `cancellationWords()`, 7 tests) turns them into words; the Review step shows "Before you send" (Paying, If it is not paid, Your dates, Cancelling, Changing dates) above the promo, the consent box and Send.
+- **Observed** on `pnpm dev`, villa: booking-bar walk 8/8 with 5b: "Paying: The full price within 24 hours of sending this request… · If it is not paid: … the request expires and the dates go to others · Your dates: Nothing is held until … confirms · Cancelling: Cancelling does not refund what you paid · Changing dates: Contact Villa Amihan Private Resort"; bookings tests 33 (1 new), web tests, typecheck 13/13.
+- **⚠ For the user:** villa and alteza have NO refund tiers and NO reschedule cutoff in their config, so the page now truthfully says a cancellation refunds nothing and dates are changed by contacting the resort. If that is not their policy, set `payments.cancellation` and `payments.reschedule_until_days_before`.
+- **Next:** E-5 (after sending, "Save this reference").
+
 ### 2026-11-14 — Room cards say the price and what is left (D-174; audit E-3)
 - **Did:** `roomChoices()` (`@rag/bookings`, requests.ts) over ONE `check_room_availability()` read: each type's lowest night `day_price` (unit_quote()'s, a holiday in) and fewest `rooms_free`; the slot, date window and nights checked by `parseRequest()`, a closed night refused as in a quote. Open route `POST book/rooms`, on the quote's allowance (D-162). The booking page fetches it when the slot and dates change (per-room tenants) and each card says "₱4,800.00 a night" ("From …" over several nights, "for the Day Use" for a day slot), "1 of 2 left" for a type of several rooms, "Taken on these dates" at 0; the Rooms count's cap uses it too. `plan/room-cards-price-walk.mjs`, shots in `plan/room-cards-price/`.
 - **Observed** on `pnpm dev`, alteza at 390: walk 4/4 (six cards with "₱X a night", Casa Uno "2 of 2 left"; Casa Uno picked, the quote's line ₱4,800.00 = the card's; two nights "From ₱X a night"; nothing sent); the route refused a date past alteza's 20-day window in the request's words; tests and typecheck 13/13.

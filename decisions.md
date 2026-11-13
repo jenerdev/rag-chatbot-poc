@@ -5807,3 +5807,36 @@ picked; two nights "From …"; nothing sent. The route refused a date past
 alteza's 20-day window in the request's own words. Tests and typecheck 13/13.
 
 ---
+
+## D-175 · The Review step says the terms before Send, from the tenant's own policy · **Added 2026-11-14**
+
+**Asked:** the audit's E-4: the deposit, the pay-by window, what happens if
+unpaid and the refund policy were said only after sending.
+
+**Decided:**
+- **`paymentFlow()`** returns, beside the deposit flag, the windows and the
+  hold, the fee as its RULE (`full`, `fixed` in centavos, `percent` in
+  hundredths of a percent, checked as the validator checks it), the refund
+  tiers most days first, and the reschedule cutoff.
+- **`bookingTerms()`** (`apps/web/lib/booking-terms.ts`, pure, tested) says
+  them: "The full price within 24 hours of sending this request", "A deposit
+  of 30% of the price" (never an amount worked out on the screen: that is
+  `stay_required()`'s, on Manage booking), the expiry, the hold, each refund
+  tier ("7 days or more before check-in: everything you paid back. 2 to 6
+  days: 50%… Less than 2 days: nothing back"), and how to change dates.
+- **Every line is what the database does:** no tiers means `change_terms()`
+  refunds 0%, so the page says "Cancelling does not refund what you paid";
+  no cutoff means Manage booking takes no date change, so it says to
+  contact the resort.
+- **Where:** a "Before you send" list on the Review step, above the promo,
+  the consent box and Send.
+
+**Measured:** the booking-bar walk's 5b on villa reads the five lines
+(quoted in status.md); paymentFlow tests 33 (the tiers sorted, odd ones
+dropped, an invalid fee falls back to the full price); booking-terms 7.
+
+**Raised to the user:** villa and alteza have no refund tiers and no
+reschedule cutoff, so their guests are now told, correctly, that a
+cancellation refunds nothing.
+
+---

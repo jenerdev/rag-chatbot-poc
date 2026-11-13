@@ -460,6 +460,17 @@ export interface PaymentFlow {
   reviewWithinHours: number | null;
   /** D-106: when the dates are held for the guest */
   hold: 'none' | 'on_proof' | 'on_request';
+  /**
+   * D-175 (audit E-4): what must be paid, as the RULE the tenant set, never an
+   * amount worked out on a screen: the full price, a fixed deposit in
+   * centavos, or a percentage in hundredths of a percent (3000 = 30%).
+   * stay_required() works out the amount; Manage booking shows it.
+   */
+  fee: { kind: 'full' } | { kind: 'fixed'; amount: number } | { kind: 'percent'; hundredths: number };
+  /** D-175: refund tiers, most days first; empty = a cancellation refunds nothing (change_terms()) */
+  cancellation: { daysBefore: number; refundPercent: number }[];
+  /** D-175: date changes may be asked for until this many days before check-in; null = not on Manage booking */
+  rescheduleUntilDaysBefore: number | null;
 }
 
 /** One unit on one night of a request or a quote. */
