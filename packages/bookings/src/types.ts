@@ -491,6 +491,23 @@ export interface RequestLine {
   holiday: string | null;
 }
 
+/**
+ * D-174 (audit E-3): what each room type costs and how many are free for a
+ * stay, BEFORE the guest picks one: the booking page's room cards. Every
+ * figure is the database's: `fromPrice` is the lowest night's day_price
+ * (unit_quote()'s price for the slot, a holiday's surcharge in, D-083) and
+ * `free` the fewest free rooms over the nights. Read-only; nothing is held.
+ */
+export interface RoomChoice {
+  unitId: number;
+  /** the lowest night's price for the slot, in centavos; null when a night has none */
+  fromPrice: number | null;
+  /** the fewest rooms of this type free on any night of the stay */
+  free: number;
+  /** the type's active rooms */
+  roomsTotal: number;
+}
+
 /** A price for a stay before it is requested. Read-only; nothing is held. */
 export interface RequestQuote {
   slotId: number;

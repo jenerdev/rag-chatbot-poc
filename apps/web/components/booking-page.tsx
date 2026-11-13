@@ -32,7 +32,7 @@ import { DateField } from './date-field';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
+import type { BookingPage, RequestQuote, RequestReceipt, RoomChoice } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
@@ -292,6 +292,37 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
       clearTimeout(timer);
     };
   }, [api, checkIn, nightCount, nightsValid, promoCode, rooms, roomsComplete, slotId]);
+
+  // D-174 (audit E-3): each room type's price and free rooms for the chosen
+  // slot and dates, from the database (book/rooms), BEFORE a room is picked:
+  // the cards say "From ₱X a night" and "1 of 2 left". Per-room tenants only.
+  const [choices, setChoices] = useState<Map<number, RoomChoice> | null>(null);
+  useEffect(() => {
+    if (!perRoom || !checkIn || !nightsValid) {
+      setChoices(null);
+      return;
+    }
+    let stale = false;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${api}/book/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotId, checkIn, nights: nightCount }),
+        });
+        const body = (await response.json().catch(() => null)) as { rooms?: RoomChoice[] } | null;
+        if (stale) return;
+        // A refusal (a closed night, the window) is the quote's to say; the cards just go without.
+        setChoices(response.ok && body?.rooms ? new Map(body.rooms.map((c) => [c.unitId, c])) : null);
+      } catch {
+        if (!stale) setChoices(null);
+      }
+    }, 300);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [api, checkIn, nightCount, nightsValid, perRoom, slotId]);
 
   useEffect(() => {
     if (!moved.current) return;
@@ -789,7 +820,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                       // D-133: up to the type's rooms, and, once the quote has
                       // counted them for these nights, up to the free ones. The
                       // server refuses more anyway (request_booking()).
-                      const free = quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
+                      const choice = choices?.get(u.id) ?? null;
+                      const free = choice?.free ?? quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
                       const cap = Math.max(1, free === null ? u.rooms : Math.min(u.rooms, free));
                       // How many of this type (count-field.tsx): drawn once, on the first row or on its own.
                       const roomsField = (
@@ -851,9 +883,19 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                   </>
                                 ) : null}
                               </span>
-                              {u.rooms > 1 && free !== null && (
-                                <span className="room-pick-meta">{free === 0 ? `None of ${u.rooms} left` : `${free} of ${u.rooms} left`}</span>
+                              {choice?.fromPrice != null && (
+                                <span className="room-pick-price">
+                                  {/* One night is exact; several may differ (a weekend, a holiday), so the lowest is "From". */}
+                                  {nightCount > 1 ? 'From ' : ''}
+                                  <strong>{formatMoney(choice.fromPrice, page.currency)}</strong>
+                                  {slot.nightly ? ' a night' : ` for the ${slot.name}`}
+                                </span>
                               )}
+                              {free === 0 ? (
+                                <span className="room-pick-meta room-pick-taken">Taken on these dates</span>
+                              ) : u.rooms > 1 && free !== null ? (
+                                <span className="room-pick-meta">{`${free} of ${u.rooms} left`}</span>
+                              ) : null}
                               {u.description && <span className="room-description">{u.description}</span>}
                             </span>
                           </label>

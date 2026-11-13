@@ -97,7 +97,7 @@ export {
 } from './accommodations.js';
 export { addImage, listImages, moveImage, removeImage, roomPhotos, setImageOrder, unitPhotos } from './images.js';
 export { createPromo, deletePromo, listPromos, retirePromo, updatePromo } from './promos.js';
-export { bookingPage, cancelStay, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking } from './requests.js';
+export { bookingPage, cancelStay, confirmRequest, declineRequest, hasBookingPage, listRequests, quoteRequest, requestBooking, roomChoices } from './requests.js';
 export { createStaffStay, quoteStaffStay, type NewStaffStay } from './staff-stay.js';
 export { stayDetail, type StayDetail } from './stay-detail.js';
 export { addStayNote, deleteStayNote, listStayNotes, MAX_STAY_NOTE, type StayNote } from './stay-notes.js';
@@ -166,6 +166,7 @@ export type {
   RateSummary,
   RequestLine,
   RequestQuote,
+  RoomChoice,
   RequestReceipt,
   RateKind,
   RoomAvailability,

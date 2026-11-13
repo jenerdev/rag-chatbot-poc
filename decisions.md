@@ -5777,3 +5777,33 @@ sent (see status.md); web tests 294; typecheck clean.
 **Owed:** the axe pass at the end of the E batch; a real phone.
 
 ---
+
+## D-174 · A room card says its price and what is left for the chosen dates, from the database · **Added 2026-11-14**
+
+**Asked:** the audit's E-3: room cards carry no price; show "from ₱X / night"
+and "N left" for the chosen date.
+
+**Decided:**
+- **`roomChoices()`** (`@rag/bookings`): for a slot, a check-in and nights,
+  each active type's `fromPrice`, the LOWEST night's `day_price` from
+  `check_room_availability()` (unit_quote()'s own price for the slot with a
+  holiday's surcharge in, D-083), and `free`, the fewest `rooms_free` over
+  the nights; the request's own rules (`parseRequest()`) check the slot, the
+  date window and the nights, and a closed night is refused as a quote is.
+  A screen adds nothing up (customer-booking Rule 3): it shows these
+  figures as they come.
+- **`POST /api/t/<slug>/book/rooms`**, open like `book/quote`, read-only,
+  spending from the SAME allowance (D-162).
+- **The cards** (per-room tenants): "₱4,800.00 a night" for one night, "From
+  ₱4,400.00 a night" for several (they may differ: a weekend, a holiday),
+  "₱X for the Day Use" for a day slot; "1 of 2 left" for a type of several
+  rooms; "Taken on these dates" at none. The Rooms count's cap uses the same
+  count, so it is right before the first quote too.
+
+**Measured** on `pnpm dev`, alteza at 390 px:
+`plan/room-cards-price-walk.mjs` 4/4: every card priced, Casa Uno "2 of 2
+left"; the card's ₱4,800.00 equal to the quote's line once Casa Uno was
+picked; two nights "From …"; nothing sent. The route refused a date past
+alteza's 20-day window in the request's own words. Tests and typecheck 13/13.
+
+---

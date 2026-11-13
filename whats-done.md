@@ -10415,3 +10415,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 7/7 in Chrome at 390 px (and 390×560), screenshots in `plan/booking-bar/`; the gate still refuses a missing consent and sends nothing.
 - **Caught by looking:** the first version showed an empty bar on step 1 over the Continue button; the screenshot showed it, and the bar now waits for a price.
 - **Not done:** axe and a real phone (end of the batch); not committed.
+
+## 2026-11-14 · Room cards say the price and what is left (D-174; audit E-3)
+- **Asked:** the audit's E-3: room cards carried no price.
+- **What:** `roomChoices()` in `@rag/bookings`; the open route `book/rooms`; the booking page's cards; `plan/room-cards-price-walk.mjs`.
+- **Why it matters:** a guest choosing between six rooms could not compare them without picking each one and scrolling down to the summary.
+- **Observed:** walk 4/4 on alteza, the card's price equal to the quote's, screenshots in `plan/room-cards-price/`.
+- **Not done:** axe and a real phone (end of the E batch); not committed.

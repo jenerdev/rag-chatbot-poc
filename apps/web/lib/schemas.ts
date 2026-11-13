@@ -240,6 +240,13 @@ const requestRoom = z.object({
 });
 
 /** A price for a stay, before sending it. */
+/** D-174: the room cards' read: a slot, a check-in, nights. The rules are roomChoices()'s (parseRequest()). */
+export const bookRoomsSchema = z.object({
+  slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
+  checkIn: z.string(typeError('Choose a date', 'Choose a date')),
+  nights: z.number(typeError(undefined, 'Nights must be a number')).optional(),
+});
+
 export const bookQuoteSchema = z.object({
   slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
   // The cap (GHSA-mrhx-c7xc-m3w5: zod 4 refuses an over-long list before it

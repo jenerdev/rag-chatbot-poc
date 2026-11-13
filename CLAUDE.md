@@ -676,6 +676,8 @@ pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-doors-limit-walk.mjs)   # 3 HTTP checks (D-162): book/quote 60 then 429; the change doors' misses count toward the lockout; a made-up reference, its rows removed
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/sessions-walk.mjs)   # 3 HTTP checks (D-163): a copied staff cookie dies on logout and on a new password, the platform's too, 4 h; throwaway users, no email
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/same-origin-walk.mjs)   # 5 checks (D-164): a foreign Origin 403, form content types 415, our own page's fetch 200 in Chrome, a foreign page's post refused; nothing written
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/booking-bar-walk.mjs)   # 7 checks (D-173): the booking page's bar on a phone; nothing sent; shots in plan/booking-bar/
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/room-cards-price-walk.mjs [slug])   # 4 checks (D-174): the room cards' price and rooms left, the price = the quote's; alteza; nothing sent
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
