@@ -56,6 +56,21 @@
 
 ## ▶ Next up (do this next)
 
+> **⚠ OWED, DO NOT FORGET (the user asked, 2026-11-14): the FULL `pnpm eval`.**
+> The battery has not run since northwind and harbor were hard-deleted
+> (2026-10-20). Audit **S-9** (documents marked as data in the prompt; strip
+> `--- END CONTEXT ---` from chunks; the unanswered pre-fill as a quote) was
+> SKIPPED because it edits `buildPrompt()`, and rule 1 says no prompt edit
+> without the full battery. Before S-9, or any prompt, `language.ts` or
+> `dates.ts` change:
+> 1. ask the user to rebuild the test tenants from `fixtures/`
+>    (northwind.json; harbor.json, harbor-units.json, harbor-bookings.json;
+>    `member:operator` for each) — they declined on 2026-10-20 and deferred
+>    again on 2026-11-14;
+> 2. run `pnpm eval` once BEFORE the change (today's baseline: 59/61 was the
+>    last expected, CLAUDE.md rule 1), then make S-9, then run it again;
+> 3. also the two isolation suites, which need the same tenants.
+
 **Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
 1. ~~fix `packages/bookings/src/guest.test.ts:44`~~ done 2026-11-14 (tests 13/13);
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
