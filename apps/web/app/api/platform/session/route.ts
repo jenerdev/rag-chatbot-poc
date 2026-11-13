@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PLATFORM_LOGIN_FAILED, checkPlatformLogin, clearPlatformCookie, notePlatformSession, readPlatformSession, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
+import { PLATFORM_LOGIN_FAILED, allowPlatformAuth, checkPlatformLogin, clearPlatformCookie, notePlatformSession, readPlatformSession, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
+import { AUTH_LIMITED, clientIp } from '@/lib/rate-limit';
 import { badRequest, withRoute } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
 
@@ -20,6 +21,10 @@ export const dynamic = 'force-dynamic';
 export const POST = withRoute(async (request: Request) => {
   const parsed = adminLoginSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // Audit S-2 (D-157): per address and per account, before Supabase Auth.
+  if (!(await allowPlatformAuth('login', clientIp(request), parsed.data.email))) {
+    return NextResponse.json({ error: AUTH_LIMITED }, { status: 429 });
+  }
 
   const userId = await checkPlatformLogin(parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: PLATFORM_LOGIN_FAILED }, { status: 401 });

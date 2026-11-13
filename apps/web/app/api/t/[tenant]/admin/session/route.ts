@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { LOGIN_FAILED, checkStaffLogin, clearSessionCookie, noteSession, readSession, requireAdmin, setSessionCookie } from '@/lib/admin-auth';
+import { AUTH_LIMITED, allowAuth, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -20,6 +21,12 @@ export const dynamic = 'force-dynamic';
 export const POST = withTenantRoute(async (request, { tenant }) => {
   const parsed = adminLoginSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // Audit S-2 (D-157): per address and per account, BEFORE the password
+  // reaches Supabase Auth, whose own limit counts this server's address and
+  // so would lock out every member at once.
+  if (!(await allowAuth(tenant, 'login', clientIp(request), parsed.data.email))) {
+    return NextResponse.json({ error: AUTH_LIMITED }, { status: 429 });
+  }
 
   const userId = await checkStaffLogin(tenant, parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: LOGIN_FAILED }, { status: 401 });

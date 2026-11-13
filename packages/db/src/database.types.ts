@@ -1239,6 +1239,11 @@ export interface Database {
         Args: { p_tenant_id: number; p_key: string; p_max: number; p_window_seconds: number };
         Returns: boolean;
       };
+      /** schema-platform-rate-limit.sql (D-157): the platform login's and reset's count, no tenant, callable with the publishable key; the key must be 'platform-(login|reset)|<sha256 hex>' */
+      platform_rate_allow: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number };
+        Returns: boolean;
+      };
       /** schema-audit-log.sql (D-138): a login, logout or proof_opened row for the token's user; refuses a token with no user */
       audit_note: {
         Args: { p_tenant_id: number | null; p_action: string; p_subject?: string | null };

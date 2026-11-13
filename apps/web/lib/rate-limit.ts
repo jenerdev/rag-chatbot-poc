@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { TenantContext } from '@rag/pipeline';
 
 // The per-IP limit on the open routes: the booking request, the Manage
@@ -42,6 +43,72 @@ export const CHAT_REQUESTS_PER_WINDOW = 30;
  * rotating addresses meets (R-53, § 7 q2). Policy.
  */
 export const TENANT_CEILING_PER_WINDOW = 600;
+
+/**
+ * Audit S-2 (D-157): the sign-in and "Forgot password?" doors, staff and
+ * platform. Two counts per call, both in the same window: this ADDRESS, and
+ * this ACCOUNT (the email, hashed), so a guesser spread over many addresses
+ * still meets the account's ceiling. The account count is also a lockout an
+ * attacker can cause, for one email at a time and ten minutes at most; that
+ * is the price of the ceiling, and the person can still reset. Policy.
+ */
+export const LOGIN_PER_ADDRESS = 10;
+export const LOGIN_PER_ACCOUNT = 10;
+/** A reset sends an email: fewer, because each one spends the sender's quota (R-21). */
+export const RESET_PER_ADDRESS = 5;
+export const RESET_PER_ACCOUNT = 3;
+
+/** The one sentence a refused sign-in or reset gets. It says nothing about whether the account exists. */
+export const AUTH_LIMITED = 'Too many attempts. Please wait a few minutes and try again.';
+
+export type AuthScope = 'login' | 'reset';
+
+const AUTH_LIMITS: Record<AuthScope, { address: number; account: number }> = {
+  login: { address: LOGIN_PER_ADDRESS, account: LOGIN_PER_ACCOUNT },
+  reset: { address: RESET_PER_ADDRESS, account: RESET_PER_ACCOUNT },
+};
+
+/**
+ * sha256 hex of a value: an email (or, on the platform, an address) is
+ * counted, never stored. The email is trimmed and lower-cased first, so
+ * "Ann@x.com" and "ann@x.com " are one account, as Supabase Auth treats them.
+ */
+export function hashed(value: string): string {
+  return createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
+}
+
+/** The two keys of one tenant sign-in or reset: the address, then the account. */
+export function tenantAuthKeys(tenantId: number, scope: AuthScope, ip: string, email: string): [string, string] {
+  return [`${scope}|${tenantId}|ip|${ip}`, `${scope}|${tenantId}|acct|${hashed(email)}`];
+}
+
+/**
+ * The two keys of one platform sign-in or reset. Only hashes, in the shape
+ * platform_rate_allow() accepts (schema-platform-rate-limit.sql): that
+ * function is callable with the publishable key, so the table holds nothing
+ * a caller could read back as an address or an email.
+ */
+export function platformAuthKeys(scope: AuthScope, ip: string, email: string): [string, string] {
+  return [`platform-${scope}|${hashed(`ip|${ip}`)}`, `platform-${scope}|${hashed(`acct|${email}`)}`];
+}
+
+/** The limits of a scope, for both doors. */
+export function authLimits(scope: AuthScope): { address: number; account: number } {
+  return AUTH_LIMITS[scope];
+}
+
+/**
+ * A tenant's sign-in or reset: the address first, then the account, on the
+ * tenant's chat token (rate_allow(), wall 2 as everywhere). The account is
+ * counted only when the address was inside, so one noisy address does not
+ * spend a real person's allowance. Throws when the database does not answer.
+ */
+export async function allowAuth(tenant: Limited, scope: AuthScope, ip: string, email: string): Promise<boolean> {
+  const [address, account] = tenantAuthKeys(tenant.id, scope, ip, email);
+  const limits = authLimits(scope);
+  if (!(await allow(tenant, address, limits.address))) return false;
+  return allow(tenant, account, limits.account);
+}
 
 /**
  * The caller's IP: the first X-Forwarded-For entry, which Vercel sets, or

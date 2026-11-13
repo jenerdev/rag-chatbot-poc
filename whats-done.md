@@ -10273,3 +10273,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** `plan/security-headers-walk.mjs` 29/29 against `next start`. The first run showed two things a template would have hidden: `upgrade-insecure-requests` breaks `next start` on http://localhost (removed), and zod 4's eval probe raised a violation on `/platform` (jitless). Framing check: Chrome logged "Framing 'http://localhost:3000/' violates … \"frame-ancestors 'none'\"" for S-3 and `/platform`.
 - **Trap avoided:** headers() runs at build on Vercel; `SUPABASE_URL` must be present then, or the proof PDF frame fails closed.
 - **Not done:** the proof PDF iframe, Read aloud and the signed-in platform under the CSP; not committed.
+
+## 2026-11-14 · Login and reset are rate limited (D-157; audit B-4 / S-2)
+- **Asked:** the next audit finding: no limit on staff and super-user login or password reset.
+- **What:** `allowAuth()` and the key builders in `apps/web/lib/rate-limit.ts` (6 new tests); the staff session and password-reset routes call it before Supabase Auth; `packages/db/sql/schema-platform-rate-limit.sql` (the 47th, applied) gives the platform's two doors `platform_rate_allow()` on the publishable key, called by `allowPlatformAuth()` in `lib/platform-auth.ts`; verify 229b–229e; `plan/auth-rate-limit-walk.mjs`.
+- **Why it matters:** password guessing had no ceiling, and because Supabase counts the SERVER's address, one attacker could trip its limit and lock every member out, or burn the email quota with resets.
+- **Observed:** walk 5/5 (staff 401×10 → 429 from one address; platform 401×10 → 429 for one account across eleven addresses; reset 200×3 → 429; rate_windows count 11; no clear text in the platform table); verify's new 4 pass (245/247 overall, check 27's dates as before); the security-headers walk's real login still passes.
+- **Trap avoided:** the platform function is callable by anyone holding the publishable key, so it takes only hashed keys of one shape and bounded numbers; a direct call can only count, exactly as the route would.
+- **Not done:** failed logins in the audit log; Supabase's own limit (dashboard); not committed.

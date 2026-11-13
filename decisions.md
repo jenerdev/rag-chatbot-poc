@@ -5185,3 +5185,44 @@ origin framing S-3 and `/platform` was refused ("violates … frame-ancestors
 blob audio, the platform signed in, a real push.
 
 ---
+
+## D-157 · Sign-in and "Forgot password?" are limited per address AND per account · **Added 2026-11-14**
+
+**Asked:** the next audit finding, "No rate limit on staff and super-user
+login or on password reset" (B-4 / S-2).
+
+**Decided:**
+- **Two counts per call, before Supabase Auth sees the password:** this
+  address, then this account (the email, trimmed, lower-cased and sha256'd:
+  counted, never stored). The account is counted only when the address was
+  inside, so one noisy address does not spend a real person's allowance.
+  Login 10 + 10 per 10 minutes; reset 5 + 3 (each reset is an email on a
+  capped sender, R-21). Policy, one constant each in `lib/rate-limit.ts`.
+- **The cost, accepted:** the account count is a lockout an attacker can
+  cause, for one email and ten minutes at a time. Without it, a guesser
+  rotating addresses has no ceiling.
+- **Tenant doors** use `rate_allow()` (D-137) on the chat token, keys
+  `login|<tenant>|ip|<ip>` and `login|<tenant>|acct|<hash>` (and `reset|…`).
+- **Platform doors** have no tenant and no token before a login, so
+  `schema-platform-rate-limit.sql` (the 47th file) adds
+  `platform_rate_windows` (no grant to any role) and
+  `platform_rate_allow()`, a definer callable with the publishable key. It
+  accepts only `platform-(login|reset)|<sha256 hex>` and bounded numbers,
+  so a direct call can do nothing the route does not: the table holds
+  hashes alone (the address is hashed too), and it sweeps itself.
+- **One sentence** for every refusal, 429: "Too many attempts. Please wait a
+  few minutes and try again." It says nothing about whether the account
+  exists.
+- **Not done:** failed logins in the audit log (`audit_note()` needs a user
+  to name; Supabase's auth log records them); Supabase's own limit still
+  counts the server's address (MANUAL, the dashboard).
+
+**Measured:** web 269 (6 new), typecheck clean; verify 229b–229e (3 in and
+the 4th out with one row at count 4; a free-text key, another scope, a 10 s
+window and max 0 are 22023 and store nothing; anon and a chat token 42501
+on the table; the sweep); `plan/auth-rate-limit-walk.mjs` 5/5 on `next
+start`: staff login 401×10 then 429 from one address, platform login 401×10
+then 429 for one account from eleven addresses, staff reset 200×3 then 429,
+the address key at count 11, no email or address in clear.
+
+---

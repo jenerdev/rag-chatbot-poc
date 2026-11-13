@@ -1,8 +1,9 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { platformClient, signInStaff } from '@rag/db';
+import { anonClient, platformClient, signInStaff } from '@rag/db';
 import type { DbClient } from '@rag/db';
 import { signSessionPayload, verifySessionPayload } from './admin-auth';
+import { WINDOW_SECONDS, authLimits, platformAuthKeys, type AuthScope } from './rate-limit';
 import { withRoute } from './route';
 
 // The platform session: the super user's (plan/tenant-management.md § 2.1, § 4.2).
@@ -71,6 +72,25 @@ export async function requirePlatform(request: Request): Promise<PlatformContext
 }
 
 /** Email + password, then the platform_admins row. The user id, or null for every failure alike. */
+/**
+ * Audit S-2 (D-157): the platform's sign-in or reset, counted per address
+ * and per account like a tenant's (lib/rate-limit.ts), through
+ * platform_rate_allow() on the publishable key: before a login there is no
+ * token to call it with. Throws when the database does not answer (never
+ * fail-open, D-137).
+ */
+export async function allowPlatformAuth(scope: AuthScope, ip: string, email: string): Promise<boolean> {
+  const db = anonClient();
+  const limits = authLimits(scope);
+  const [address, account] = platformAuthKeys(scope, ip, email);
+  for (const [key, max] of [[address, limits.address], [account, limits.account]] as const) {
+    const { data, error } = await db.rpc('platform_rate_allow', { p_key: key, p_max: max, p_window_seconds: WINDOW_SECONDS });
+    if (error) throw new Error(`platform_rate_allow: ${error.message}`);
+    if (data !== true) return false;
+  }
+  return true;
+}
+
 export async function checkPlatformLogin(email: string, password: string): Promise<string | null> {
   const userId = await signInStaff(email, password);
   if (!userId) return null;

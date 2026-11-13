@@ -60,7 +60,7 @@
 1. fix `packages/bookings/src/guest.test.ts:44` (master is red since D-154 `8215020`; it expects no `extraGuestCount`);
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
 3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
-4. rate limits on login, password reset and `book/quote`, and the change-door lockout;
+4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
 5. a generic 500 body;
 6. OpenAI timeouts, abort and `max_tokens`;
 7. CI;
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — Login and reset rate limits (D-157; audit B-4 / S-2)
+- **Did:** `allowAuth()` (lib/rate-limit.ts) on staff login and reset, per address then per account (email hashed), through `rate_allow()`; `schema-platform-rate-limit.sql` (the 47th, applied) with `platform_rate_allow()` on the publishable key for the platform's login and reset (`allowPlatformAuth()`); 429 "Too many attempts. Please wait a few minutes and try again."
+- **Observed:** web 269 (6 new), typecheck 13/13; verify 245/247 (229b–e new, all pass; the two fails are check 27's passed fixture dates, as before); `plan/auth-rate-limit-walk.mjs` 5/5 on `next start`; security-headers walk 29/29 again (a real login still passes).
+- **Next:** item 5, a generic 500 body (S-3); item 1 (`guest.test.ts`) still owed; the Supabase-side limit (MANUAL); failed logins in the audit log (open).
 
 ### 2026-11-14 — Security headers (D-156; audit B-2 / S-1)
 - **Did:** `apps/web/lib/security-headers.mjs` applied by `next.config.mjs` `headers()` (CSP with `frame-ancestors 'none'`, X-Frame-Options, HSTS, nosniff, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, zod `jitless`.

@@ -4743,6 +4743,86 @@ async function notificationChecks() {
   }
 }
 
+// 229b–229e. The platform's sign-in and reset count (schema-platform-rate-limit.sql,
+//            audit S-2, D-157): platform_rate_allow() on the publishable key
+//            alone, no tenant, only hashed keys, and the table unreadable.
+{
+  const anon = anonClient();
+  const keys = [];
+  try {
+    const hex = () => randomBytes(32).toString('hex');
+    const call = (key, max = 3, window = 600) => anon.rpc('platform_rate_allow', { p_key: key, p_max: max, p_window_seconds: window });
+
+    // 229b. Three in, the fourth out, ONE row with count 4 (the positive twin: the count is real).
+    {
+      const key = `platform-login|${hex()}`;
+      keys.push(key);
+      const verdicts = [];
+      let firstError = null;
+      for (let i = 0; i < 4; i++) {
+        const { data, error } = await call(key);
+        firstError ??= error;
+        verdicts.push(data);
+      }
+      const { data: stored } = await supabase.from('platform_rate_windows').select('count').eq('key', key);
+      check(
+        !firstError && verdicts.join() === 'true,true,true,false' && stored?.length === 1 && stored[0].count === 4,
+        'platform rate limit: the publishable key alone is inside for 3 calls and refused on the 4th; one row, count 4',
+        firstError?.message ?? `verdicts ${verdicts.join()} · rows ${stored?.length} · count ${stored?.[0]?.count}`,
+      );
+    }
+
+    // 229c. Only the shape the server makes: an email in the key, another
+    //       scope, or an out-of-bounds window is refused, and leaves no row.
+    {
+      const bad = [
+        await call('platform-login|ann@example.com'),
+        await call(`chat|${hex()}`),
+        await call(`platform-reset|${hex()}`, 3, 10),
+        await call(`platform-reset|${hex()}`, 0),
+      ];
+      const { count } = await supabase.from('platform_rate_windows').select('key', { count: 'exact', head: true }).like('key', '%@%');
+      check(
+        bad.every((r) => r.error?.code === '22023' && r.data == null) && count === 0,
+        'platform rate limit: a free-text key, another scope, a 10 s window or max 0 is invalid_parameter_value and stores nothing',
+        bad.map((r) => r.error?.code ?? `data ${r.data}`).join(' · '),
+      );
+    }
+
+    // 229d. No role reads the table: anon and a chat token get an error or
+    //       nothing, while the service client sees 229b's row.
+    {
+      const viaAnon = await anon.from('platform_rate_windows').select('key');
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const viaChat = await asToken(chatToken(villaRow.id)).from('platform_rate_windows').select('key');
+      const { data: all } = await supabase.from('platform_rate_windows').select('key').in('key', keys);
+      check(
+        (!!viaAnon.error || (viaAnon.data ?? []).length === 0) && (!!viaChat.error || (viaChat.data ?? []).length === 0) && (all ?? []).length === 1,
+        'platform rate limit: anon and a chat token read nothing from platform_rate_windows; the service client sees the row',
+        `anon ${viaAnon.error?.code ?? viaAnon.data?.length} · chat ${viaChat.error?.code ?? viaChat.data?.length} · service ${all?.length}`,
+      );
+    }
+
+    // 229e. The sweep: a window aged three windows is gone after any call.
+    {
+      const key = `platform-reset|${hex()}`;
+      keys.push(key);
+      const old = new Date(Date.now() - 3 * 600 * 1000).toISOString();
+      const seeded = await supabase.from('platform_rate_windows').insert({ key, window_start: old, count: 99 });
+      if (seeded.error) throw new Error(`seed: ${seeded.error.message}`);
+      const fresh = `platform-reset|${hex()}`;
+      keys.push(fresh);
+      const { error } = await call(fresh);
+      const { data: after } = await supabase.from('platform_rate_windows').select('key').eq('key', key);
+      check(!error && (after ?? []).length === 0, 'platform rate limit: a window aged three windows is swept by the next call', error?.message ?? `rows ${after?.length}`);
+    }
+  } catch (error) {
+    check(false, 'platform rate limit: setup', error.message);
+  } finally {
+    if (keys.length) await supabase.from('platform_rate_windows').delete().in('key', keys);
+  }
+}
+
 // 230–241. The audit log (schema-audit-log.sql, plan/audit-log.md Phase 2,
 //          D-138): Postgres writes it, no token writes it, each wall holds
 //          alone, and the read function refuses the wrong caller itself.
