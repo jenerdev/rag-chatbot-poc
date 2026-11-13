@@ -10400,3 +10400,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** a request that hides its size could make the server buffer much more than the limit; off Vercel nothing else would stop it.
 - **Observed:** tests 3/3; a chunked upload refused 411 on `pnpm dev`, a normal one unaffected.
 - **Not done:** not committed.
+
+## 2026-11-14 · No known vulnerabilities in production dependencies (D-172; audit S-15)
+- **Asked:** the audit's S-15 (postcss advisories under next); the user chose a pnpm override.
+- **What:** two overrides in `pnpm-workspace.yaml`; the lockfile.
+- **Why it matters:** the build ran a CSS tool with known path-traversal and denial-of-service advisories; CI's audit can now be raised from "critical" to "high" with nothing failing.
+- **Observed:** audit clean, tests, typecheck and build green, 29/29 pages and screens in a browser, all on a scratch build.
+- **Owed by the user:** `pnpm install` and a dev restart. Not committed.

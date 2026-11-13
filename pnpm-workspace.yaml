@@ -10,3 +10,12 @@ packages:
 # it does reaches the running app.
 allowBuilds:
   esbuild: true
+
+# Audit S-15 (D-172): Next 15 pins postcss 8.4.31, which has three high and
+# two moderate advisories (build-time CSS only, R-64); no 15.x release moves
+# it, Next 16 ships 8.5.23. This forces next's postcss to the fixed version,
+# a minor bump of a build tool. Remove it once next itself ships >= 8.5.23.
+overrides:
+  'next>postcss': 8.5.23
+  # postcss 8.5.23 allows source-map-js ^1.2.1; 1.2.1 has a high advisory, 1.2.2 fixes it.
+  'postcss>source-map-js': 1.2.2

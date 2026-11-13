@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — No known vulnerabilities in production dependencies (D-172; audit S-15)
+- **Did:** `pnpm-workspace.yaml` overrides: `next>postcss: 8.5.23` and `postcss>source-map-js: 1.2.2`; the lockfile changes those two packages only. Next stays 15.5.28 (no 15.x ships the fix; 16.4.6 does).
+- **Observed** in a scratch worktree (the user's `pnpm dev` untouched): `pnpm audit --prod` 5 → "No known vulnerabilities found"; typecheck 13/13; tests 13/13; build 7/7; on that build (port 3100) the built CSS 52 KB with the theme tokens, and the security-headers walk 29/29 (21 pages, the 12 staff screens signed in).
+- **YOURS:** run `pnpm install` in the repo and restart `pnpm dev` when convenient (the lockfile changed; I did not swap packages under the running server).
+- **Next:** S-17 (signups off, the Supabase dashboard); S-9 with the eval.
+
 ### 2026-11-14 — Uploads are sized before they are read (D-171; audit S-16)
 - **Did:** `apps/web/lib/upload-size.ts` (`declaredSizeRefusal()`, 3 tests): a missing or unreadable Content-Length is 411, a declared one over the limit + 64 KiB is refused in the route's own words (400, as the screens expect), both before `formData()`. Used by the four upload routes: voice (which had no declared check), the payment proof, room photos, brand images.
 - **Observed:** tests 3/3, typecheck clean; on `pnpm dev`, the proof route: a chunked upload with no Content-Length 411 "Send the file with its size…"; a normal multipart upload passed the size check and met the usual 404 for a made-up reference (its miss row removed).

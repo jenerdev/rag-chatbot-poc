@@ -5725,3 +5725,28 @@ upload with 411 and passed a normal multipart one through to its 404 for an
 unknown reference.
 
 ---
+
+## D-172 · postcss and source-map-js are pinned to their fixed versions by pnpm overrides · **Added 2026-11-14**
+
+**Asked:** the audit's S-15: `pnpm audit --prod` reported 3 high and 2
+moderate advisories, all in `postcss` 8.4.31 (and its `source-map-js`
+1.2.1), pinned by `next` 15.
+
+**Found:** no Next 15 release moves it (15.5.29, 2026-11-03, still pins
+8.4.31); Next 16.4.6 ships 8.5.23. The packages are build-time only (CSS),
+not reachable from a request (R-64). The user chose an override over the
+Next 16 upgrade or waiting.
+
+**Decided:** `pnpm-workspace.yaml` (where pnpm 12 keeps its settings):
+`overrides: { 'next>postcss': 8.5.23, 'postcss>source-map-js': 1.2.2 }`.
+The second was needed because postcss 8.5.23's range still allows the
+vulnerable 1.2.1, which the lockfile kept. Remove both once `next` itself
+ships postcss >= 8.5.23 (or on the move to Next 16).
+
+**Measured** in a scratch worktree: the lockfile changes those two packages
+only; `pnpm audit --prod` "No known vulnerabilities found" (was 5);
+typecheck, tests 13/13, build 7/7; on that build, the built CSS 52 KB with
+its tokens and the security-headers walk 29/29 in Chrome (21 pages, the 12
+staff screens signed in).
+
+---
