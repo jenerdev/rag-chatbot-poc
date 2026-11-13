@@ -10347,3 +10347,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 5/5, including a real browser: our own page 200, a foreign page's credentialed post refused 403 in the network log; tests and typecheck 13/13.
 - **Trap avoided:** a missing Origin is not refused, or every walk, curl and server-side call would break; a CSRF needs a browser, and browsers send it.
 - **Not done:** a POST seen on the deployment; not committed.
+
+## 2026-11-14 · The client IP is believed only where it can be (D-165; audit S-8)
+- **Asked:** the audit's S-8: every per-IP limit reads a header the client can write.
+- **What:** `apps/web/lib/rate-limit.ts` `clientIpFrom()` and `clientIp()`; 4 tests; `CLIENT_IP_HEADER` in `.env.example` and `env.ts`.
+- **Why it matters:** off Vercel, changing X-Forwarded-For on each request made every limit (chat spend, bookings, logins, guest lookups, quotes) a fresh allowance each time.
+- **Observed:** a production build on port 3100 in a scratch worktree: 61 forged addresses became ONE count and the 61st was refused; with the header configured, real addresses counted apart and forged ones not at all. The user's dev server was not touched (trap 16).
+- **Trap hit and read correctly:** a fixed window boundary split a 61-request run 4 + 57 and looked like a missed limit; the rows said why. Rerun inside one window: 60 then 429.
+- **Not done:** the forged-header check on Vercel itself; not committed.

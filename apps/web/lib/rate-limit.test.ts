@@ -5,6 +5,7 @@ import {
   allowSpend,
   CHAT_REQUESTS_PER_WINDOW,
   clientIp,
+  clientIpFrom,
   hashed,
   LOGIN_PER_ACCOUNT,
   LOGIN_PER_ADDRESS,
@@ -140,5 +141,27 @@ describe('allowAuth', () => {
   it('is false when the account is over, and throws on a database error', async () => {
     await expect(allowAuth(fakeTenant([true, false]).tenant, 'login', '1.2.3.4', 'a@x.com')).resolves.toBe(false);
     await expect(allowAuth(fakeTenant([new Error('down')]).tenant, 'reset', '1.2.3.4', 'a@x.com')).rejects.toThrow(/down/);
+  });
+});
+
+// Audit S-8 (D-165): which header is believed, by where the app runs.
+describe('clientIpFrom', () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+  const forged = h({ 'x-forwarded-for': '6.6.6.6, 10.0.0.1', 'x-real-ip': '203.0.113.7' });
+
+  it('on Vercel, is the first X-Forwarded-For entry (Vercel writes it from the connection)', () => {
+    expect(clientIpFrom(h({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }), { onVercel: true, production: true })).toBe('203.0.113.9');
+  });
+  it('in development, trusts it as sent, for the walks; "local" with none', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: false })).toBe('6.6.6.6');
+    expect(clientIpFrom(h({}), { onVercel: false, production: false })).toBe('local');
+  });
+  it('self-hosted in production, believes ONLY the configured header, never X-Forwarded-For', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: true, trustedHeader: 'x-real-ip' })).toBe('203.0.113.7');
+    expect(clientIpFrom(h({ 'x-forwarded-for': '6.6.6.6' }), { onVercel: false, production: true, trustedHeader: 'x-real-ip' })).toBe('unknown');
+  });
+  it('self-hosted in production with nothing configured, is ONE shared "unknown" (fails closed)', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: true })).toBe('unknown');
+    expect(clientIpFrom(h({ 'x-forwarded-for': '1.1.1.1' }), { onVercel: false, production: true })).toBe('unknown');
   });
 });

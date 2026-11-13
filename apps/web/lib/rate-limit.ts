@@ -122,15 +122,47 @@ export async function allowAuth(tenant: Limited, scope: AuthScope, ip: string, e
 }
 
 /**
- * The caller's IP: the first X-Forwarded-For entry, which Vercel sets, or
- * "local" when there is none (pnpm dev). A client can send its own
- * X-Forwarded-For; behind Vercel the platform's value comes first. Locally it
- * is trusted as sent, which only matters for testing this limit: a walk
- * sends a fresh address per run, because the count now outlives the process.
+ * The caller's IP, for every per-IP limit (audit S-8, D-165). Which header
+ * may be believed depends on what stands in front of the app, because a
+ * client can send ANY header it likes:
+ *
+ *   - on Vercel (VERCEL=1): the first X-Forwarded-For entry. Vercel fills
+ *     that header from the TCP connection and drops what the client sent,
+ *     when Vercel is the outermost edge (its "Request headers" docs).
+ *   - in development (NODE_ENV not production): the same header, trusted as
+ *     sent, because the walks send a fresh address per run (the counts
+ *     outlive the process, D-137); "local" with none.
+ *   - anywhere else in production (a self-hosted `next start`): ONLY the
+ *     header named by CLIENT_IP_HEADER, which the proxy in front sets (e.g.
+ *     nginx's x-real-ip). Without it, every caller is "unknown": one shared
+ *     count. That fails CLOSED (the limits are stricter, never bypassed);
+ *     trusting X-Forwarded-For there would let anyone dodge every limit by
+ *     changing the header on each request.
  */
+export function clientIpFrom(
+  headers: Headers,
+  where: { onVercel: boolean; production: boolean; trustedHeader?: string | undefined },
+): string {
+  const first = (value: string | null) => value?.split(',')[0]?.trim() || null;
+  if (where.onVercel || !where.production) return first(headers.get('x-forwarded-for')) ?? 'local';
+  if (where.trustedHeader) return first(headers.get(where.trustedHeader)) ?? 'unknown';
+  return 'unknown';
+}
+
+let warnedUntrusted = false;
+
+/** clientIpFrom() for this request, on this deployment's own environment. */
 export function clientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || 'local';
+  const where = {
+    onVercel: process.env.VERCEL === '1',
+    production: process.env.NODE_ENV === 'production',
+    trustedHeader: process.env.CLIENT_IP_HEADER?.trim().toLowerCase() || undefined,
+  };
+  if (where.production && !where.onVercel && !where.trustedHeader && !warnedUntrusted) {
+    warnedUntrusted = true;
+    console.warn('[rate-limit] not on Vercel and CLIENT_IP_HEADER is unset: every caller shares ONE per-IP count. Set it to the header your proxy writes (e.g. x-real-ip).');
+  }
+  return clientIpFrom(request.headers, where);
 }
 
 /** The one thing allow() needs from a tenant: its id (wall 1) and its token's client (wall 2). */

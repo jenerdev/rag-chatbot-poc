@@ -35,6 +35,9 @@ const REQUIRED = [
   // sidebar says so; the in-app badges and chime still work. The private JWK
   // is a secret like TENANT_SIGNING_JWK, read in ONE function, vapidKeys()
   // in @rag/push. `pnpm --filter @rag/push vapid` prints a new pair.
+  // OPTIONAL too (D-165): CLIENT_IP_HEADER, the header a self-hosted proxy
+  // writes the visitor's IP into. Ignored on Vercel; unset elsewhere in
+  // production, every visitor shares one per-IP count (lib/rate-limit.ts).
 ] as const;
 
 const missing = REQUIRED.filter((name) => !process.env[name]);

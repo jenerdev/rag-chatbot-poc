@@ -1042,7 +1042,7 @@ All are expanded in `risks.md`.
   honeypot field, the per-IP window (ONE count in Postgres since D-137,
   `rate_allow()`; the chat, the Manage doors and the voice routes share it,
   and the OpenAI routes add a per-tenant ceiling), and the per-contact
-  limit in SQL. A probe of a limit sends a fresh `X-Forwarded-For` per run.
+  limit in SQL. A probe of a limit sends a fresh `X-Forwarded-For` per run. Which header is believed is `clientIpFrom()`'s (D-165): Vercel's X-Forwarded-For, the same as sent in development, and self-hosted in production only `CLIENT_IP_HEADER` (unset = one shared count), so a walk against a local `next start` sets `CLIENT_IP_HEADER=x-forwarded-for`.
 - Money is bigint **centavos**, and every price is `unit_quote()`'s: a
   quote before, the stored rows after. A screen never adds up a total; a
   receipt's total is the sum of what was STORED (customer-booking Rule 3).

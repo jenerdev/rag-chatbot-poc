@@ -1908,6 +1908,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The client IP is believed only where it can be (D-165; audit S-8)
+- **Did:** `clientIpFrom()` (pure, 4 new tests) behind `clientIp()` in `apps/web/lib/rate-limit.ts`: on Vercel the first X-Forwarded-For entry (Vercel writes it from the connection and drops the client's, per its Request headers docs); in development the same, as sent (the walks); self-hosted in production ONLY the header named by `CLIENT_IP_HEADER`, or one shared `unknown` count with a one-time warning. `.env.example` and `env.ts` document it.
+- **Observed** on a production build of a scratch worktree on port 3100 (the user's `pnpm dev` untouched): no setting, 61 quotes from 61 forged X-Forwarded-For → ONE key `quote|3|unknown` = 61, 60×200 then 429, and the warning once; `CLIENT_IP_HEADER=x-real-ip`: 61 different real IPs → 61 keys, all 200; one real IP with 61 forged X-Forwarded-For → 60×200 then 429, counted on the real IP, no forged key. (A first run crossed a 10-minute window boundary, 4 + 57; rerun inside one window.) Rows removed. Rate-limit tests 19/19, typecheck clean.
+- **Owed:** one forged X-Forwarded-For against the real Vercel deployment.
+- **Note:** walks against a LOCAL `next start` now need `CLIENT_IP_HEADER=x-forwarded-for`.
+- **Next:** S-9 (documents as data in the prompt; this one needs `pnpm eval`, which needs the deleted tenants).
+
 ### 2026-11-14 — State changes only from our own pages (D-164; audit S-7)
 - **Did:** `apps/web/lib/same-origin.ts` (`crossOriginRefusal()`, `requestHost()`, 7 tests), run first in `withRoute()`: a POST/PUT/PATCH/DELETE whose `Origin` is not this host is 403; a `text/plain` or urlencoded body is 415. No Origin (curl, walks, servers) goes on to the route. `plan/same-origin-walk.mjs`.
 - **Observed** on `pnpm dev`: walk 5/5 (another site 403; a sibling subdomain on the staff login 403; text/plain and urlencoded 415; the booking page's own fetch in Chrome 200; a foreign page's credentialed post sent and answered 403 in the network log); tests and typecheck 13/13.

@@ -5497,3 +5497,38 @@ network log, not only CORS). Tests 13/13 (7 new), typecheck 13/13.
 **Owed:** one browser POST on the deployment, to see the Host Vercel passes.
 
 ---
+
+## D-165 · The visitor's IP is read only from a header that cannot be forged where the app runs · **Added 2026-11-14** (amends D-137)
+
+**Asked:** the audit's S-8: the client IP is the first `X-Forwarded-For`
+entry, which a client can write.
+
+**Found:** on Vercel that is right. Vercel's "Request headers" docs: it fills
+X-Forwarded-For from the TCP connection and drops what the client sent, when
+Vercel is the outermost edge (the deploy target, D-150). Anywhere else, a
+self-hosted `next start` in production believed a header the client chose,
+so every per-IP limit (the chat, booking, Manage booking, voice, login and
+reset, the quote) could be dodged by changing it per request.
+
+**Decided:** `clientIpFrom(headers, where)` (pure, tested) behind
+`clientIp()`:
+- **on Vercel** (`VERCEL=1`): the first X-Forwarded-For entry, as before;
+- **in development**: the same, trusted as sent, because the walks send a
+  fresh address per run (the counts outlive the process, D-137);
+- **self-hosted in production**: ONLY the header named by
+  `CLIENT_IP_HEADER` (what the proxy in front writes, e.g. x-real-ip);
+  unset, every visitor is ONE `unknown` count, with a one-time warning in
+  the log. It fails CLOSED: stricter limits, never bypassed ones.
+- A Cloudflare-in-front-of-Vercel setup would make the proxy's IP the
+  visitor's (Vercel's docs); not this deployment, recorded for later.
+
+**Measured** on a production build in a scratch worktree, port 3100: no
+setting, 61 quotes with 61 forged X-Forwarded-For counted as ONE key
+`quote|3|unknown` = 61, 60 answered and the 61st 429, the warning printed
+once; with `CLIENT_IP_HEADER=x-real-ip`, 61 different real IPs were 61 keys
+and all answered, and one real IP with 61 forged X-Forwarded-For was 60
+answered and the 61st 429, counted on the real IP alone. Tests 19/19.
+
+**Owed:** a forged X-Forwarded-For against the Vercel deployment itself.
+
+---
