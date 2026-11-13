@@ -5269,3 +5269,52 @@ and platform routes) still says Postgres's words; the staff login's "Is
 `pnpm dev` running?" when the server is unreachable.
 
 ---
+
+## D-159 · Every OpenAI call has a time limit, stops with the tab, and an answer has an output cap · **Added 2026-11-14**
+
+**Asked:** the next audit finding, "OpenAI calls have no timeout and no
+output cap" (B-5).
+
+**Decided:**
+- **Time limits** in `@rag/openai`, one constant each, overridable per call
+  (`timeoutMs`): `embed` 20 s, `chat` 60 s, `chatStream` 90 s for the WHOLE
+  stream, headers to `[DONE]`. Policy, not measurement: far above a normal
+  call, below a platform's function limit. The voice calls had theirs
+  (D-134).
+- **The caller's signal** (`signal`) is combined with the timeout
+  (`AbortSignal.any`), so the browser leaving ends the fetch AND the body
+  read: OpenAI stops generating. The chat route passes `request.signal` in
+  both deliveries; before, its `closed` flag only stopped our own writes.
+- **What an abort is:** the caller's signal wins the tie, 499 ("the client
+  went away"); a timeout is 504. Both carry what streamed as `partial`, so
+  the pipeline's existing catch saves it as "[…answer interrupted]" (D-115's
+  `interrupted` kind) and the route's map makes it a 502 (D-158).
+- **The answer's cap**, `ANSWER_MAX_TOKENS = 1000` in
+  `packages/rag/src/constants.ts`, MEASURED: the longest of 370 stored
+  replies was 1,303 characters (a Taglish week of availability, about
+  350-450 tokens), the median 192. Sent on every ANSWER call (the four in
+  `answer.ts`, through `answerLimits()`); the rewriter keeps
+  `REWRITE_MAX_TOKENS`.
+- **A reply the cap cut off is not an answer** (`failOnLength`): a stream
+  ends with `[DONE]` either way, and only `finish_reason: "length"` says it
+  was cut. It fails with its text as `partial`, like a dropped stream
+  (R-3's shape), rather than being saved as whole. The rewriter does not set
+  it: its one line may be cut and still be a query.
+- **No prompt or tool text changed:** the three baselines are untouched, so
+  rule 1's battery is not owed for this.
+
+**Measured:** openai tests 26 (6 new, on a fetch that honours the signal:
+an abort mid-stream is 499 with partial "Yes, "; a stalled stream is 504
+with its partial; chat and embed time out as 504; `max_tokens: 1000` is sent
+and a `length` reply refused with its text; a cut reply without
+`failOnLength` is kept and no `max_tokens` is sent unasked); pipeline 376;
+web 275; typecheck 13/13.
+
+**Seen live** (after OpenAI's 401 "Your API key has expired" and a new
+key, villa on `pnpm dev`): a documents answer (the cook, the deposit, an
+extension) streamed 116 deltas to `done` under the cap; the same question
+with the connection closed after its first delta was stored as `Yes,
+[…answer interrupted]` (26 characters; the whole reply was about 600), so
+the read and the model call stopped with the tab.
+
+---

@@ -13,6 +13,7 @@ import {
   assistantToolCallMessage,
   chat,
   chatStream,
+  embed,
   speak,
   toolResultMessage,
   transcribe,
@@ -342,5 +343,91 @@ describe('voice: transcribe() and speak()', () => {
     fetchMock.mockClear();
     await expect(speak('  ', { voice: 'alloy' })).rejects.toThrow('nothing to say');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// D-159 (audit B-5): time limits, the caller's abort, and the output cap.
+/**
+ * A fetch that behaves like the real one under a signal: it answers with one
+ * text delta, then holds the stream open; aborting the signal errors the
+ * pending fetch or the open body with the signal's reason.
+ */
+function hangingFetch(firstChunk: string | null) {
+  return (_url: string, init: { signal: AbortSignal }) =>
+    new Promise<Response>((resolve, reject) => {
+      const { signal } = init;
+      if (firstChunk === null) {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        return;
+      }
+      const encoder = new TextEncoder();
+      resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(encoder.encode(firstChunk));
+              signal.addEventListener('abort', () => controller.error(signal.reason), { once: true });
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'text/event-stream' } },
+        ),
+      );
+    });
+}
+
+describe('time limits and the abort (D-159)', () => {
+  it('a closed tab ends the stream as 499, carrying what had streamed', async () => {
+    fetchMock.mockImplementation(hangingFetch(textDelta('Yes, ')));
+    const controller = new AbortController();
+    const onDelta = vi.fn(() => controller.abort());
+    const error = await chatStream(MESSAGES, onDelta, { signal: controller.signal }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OpenAIError);
+    expect((error as OpenAIError).status).toBe(499);
+    expect((error as OpenAIError).partial).toBe('Yes, ');
+    expect(fetchMock.mock.calls[0]![1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('a stream that stops sending is a 504 after its time limit, with its partial', async () => {
+    fetchMock.mockImplementation(hangingFetch(textDelta('The pool ')));
+    const error = await chatStream(MESSAGES, vi.fn(), { timeoutMs: 50 }).catch((e: unknown) => e);
+    expect((error as OpenAIError).status).toBe(504);
+    expect((error as OpenAIError).message).toMatch(/stream took longer than/);
+    expect((error as OpenAIError).partial).toBe('The pool ');
+  });
+
+  it('chat and embed time out too, as 504', async () => {
+    fetchMock.mockImplementation(hangingFetch(null));
+    const chatError = await chat(MESSAGES, { timeoutMs: 50 }).catch((e: unknown) => e);
+    expect((chatError as OpenAIError).status).toBe(504);
+    vi.stubEnv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small');
+    const embedError = await embed(['hello'], { timeoutMs: 50 }).catch((e: unknown) => e);
+    expect((embedError as OpenAIError).status).toBe(504);
+    expect((embedError as OpenAIError).message).toMatch(/embedding took longer than/);
+  });
+
+  it('sends max_tokens on a stream when asked, and refuses a reply the cap cut off', async () => {
+    const cut = event({ choices: [{ delta: { content: 'Day 1, Day 2' }, finish_reason: 'length' }] });
+    fetchMock.mockResolvedValue(streamedResponse([cut, USAGE, DONE]));
+    const error = await chatStream(MESSAGES, vi.fn(), { maxTokens: 1000, failOnLength: true }).catch((e: unknown) => e);
+    expect(sentBody().max_tokens).toBe(1000);
+    expect((error as OpenAIError).status).toBe(502);
+    expect((error as OpenAIError).message).toMatch(/max_tokens \(1000\)/);
+    expect((error as OpenAIError).partial).toBe('Day 1, Day 2');
+  });
+
+  it('keeps a cut reply when failOnLength is not set (the rewriter), and sends no max_tokens unasked', async () => {
+    const cut = event({ choices: [{ delta: { content: 'pool hours' }, finish_reason: 'length' }] });
+    fetchMock.mockResolvedValue(streamedResponse([cut, DONE]));
+    await expect(chatStream(MESSAGES, vi.fn())).resolves.toBe('pool hours');
+    expect(sentBody()).not.toHaveProperty('max_tokens');
+  });
+
+  it('chat refuses a reply the cap cut off, with its text', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'Half an' }, finish_reason: 'length' }], usage: { prompt_tokens: 1, completion_tokens: 1 } }), { status: 200 }),
+    );
+    const error = await chat(MESSAGES, { maxTokens: 1000, failOnLength: true }).catch((e: unknown) => e);
+    expect((error as OpenAIError).status).toBe(502);
+    expect((error as OpenAIError).partial).toBe('Half an');
   });
 });

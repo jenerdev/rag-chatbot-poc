@@ -51,7 +51,7 @@
 - ~~No security headers (clickjacking is possible on staff and platform screens).~~ **Fixed 2026-11-14** (D-156): `lib/security-headers.mjs`, `plan/security-headers-walk.mjs` 29/29.
 - ~~No rate limit on staff and super-user login or on password reset.~~ **Fixed 2026-11-14** (D-157): per address and per account, `plan/auth-rate-limit-walk.mjs` 5/5. Failed logins are still not in the audit log (no user to name); the Supabase-side limit is still MANUAL.
 - ~~Internal Postgres and OpenAI error text is sent to anonymous visitors.~~ **Fixed 2026-11-14** (D-158): a fixed sentence and a ref, the detail in the server log.
-- OpenAI calls have no timeout and no output cap.
+- ~~OpenAI calls have no timeout and no output cap.~~ **Fixed 2026-11-14** (D-159): timeouts, abort on disconnect, `max_tokens` 1000 on answers; unit-tested and seen live (an answer under the cap; a closed tab saved `Yes, […answer interrupted]`). The OpenAI spend cap is still MANUAL.
 
 **2. A data-integrity bug.** Approving a guest's reschedule drops their free children and their promo discount, so the stay is silently re-priced upward. Verified at `schema-manage-booking.sql:1541`.
 
@@ -83,7 +83,7 @@ None of this is a sign of a weak codebase. Most of it is already listed honestly
 | B-2 | ~~No security headers: no CSP, `frame-ancestors`/X-Frame-Options, HSTS, nosniff or Referrer-Policy; `X-Powered-By` sent~~ | High | **FIXED 2026-11-14** (D-156) | `apps/web/next.config.mjs` (no `headers()`), no `middleware.ts` |
 | B-3 | Approving a reschedule drops `free_guests` and `promo_id`; the stay is re-priced without its discount and the child disappears | High | VERIFIED | `packages/db/sql/schema-manage-booking.sql:1541-1546` (`decide_change()`) |
 | B-4 | ~~No rate limit on staff or platform login, nor on password reset.~~ Supabase's own limit counts the SERVER's IP, so one attacker can lock out every staff member or burn the email quota | High | **FIXED 2026-11-14** (code, D-157); Supabase side MANUAL | `app/api/t/[tenant]/admin/session/route.ts`, `app/api/platform/session/route.ts`, both `password-reset/route.ts` |
-| B-5 | OpenAI `embed`, `chat` and `chatStream` have no timeout; a closed tab does not abort generation; answers have no `max_tokens` | High | VERIFIED | `packages/openai/src/index.ts:256,310,441`; `chat/route.ts:98-101` |
+| B-5 | ~~OpenAI `embed`, `chat` and `chatStream` have no timeout; a closed tab does not abort generation; answers have no `max_tokens`~~ | High | **FIXED 2026-11-14** (D-159) | `packages/openai/src/index.ts:256,310,441`; `chat/route.ts:98-101` |
 | B-6 | ~~Internal error text (Postgres, PostgREST, OpenAI) returned to clients on every 500, including the open guest routes and the chat stream~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `apps/web/lib/route.ts:64-66`; `chat/route.ts:120-122` |
 | B-7 | No CI: no typecheck, tests, service-import check or audit on push; no branch protection; no release tags, so the documented rollback is on paper only | High | VERIFIED | no `.github/` |
 | B-8 | One Supabase project serves dev, test data and "production"; no migration ledger or runner; 46 files pasted by hand, some unsafe to re-run (traps 20, 25) | High | VERIFIED (process); prod state MANUAL | `release-process.md`; no `schema_migrations` |
@@ -205,7 +205,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 - [ ] Release tags (`v1.0.0`) and a written rollback: Vercel "promote previous deployment" plus the additive-SQL rule.
 - [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
 - [ ] Rate limits: ~~login, password reset~~ (S-2, done 2026-11-14, D-157), `book/quote`; the change-door lockout (S-4, S-5).
-- [ ] OpenAI: request timeouts, abort on disconnect, `max_tokens` on answers (B-5).
+- [ ] ~~OpenAI: request timeouts, abort on disconnect, `max_tokens` on answers (B-5).~~ Done 2026-11-14 (D-159).
 - [ ] Fix `decide_change()` (B-3), with a rooms check for a rescheduled stay carrying a free child and a promo.
 - [ ] Redact the visitor's question in the `[rewrite]` log line (`packages/rag/src/retrieve.ts:87`).
 - [ ] `.playwright-mcp/` in `.gitignore`; a `.vercelignore` for `plan/`, `office/` and `docs/`.
@@ -248,7 +248,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 | 2 | ~~Security headers + `poweredByHeader: false` (S-1)~~ done 2026-11-14 | S |
 | 3 | ~~Rate limits on staff and platform login and on password reset~~ done 2026-11-14; audit failed logins (S-2) still open | S–M |
 | 4 | ~~Generic 500/502 body in production; keep the detail in server logs (S-3)~~ done 2026-11-14 | S |
-| 5 | OpenAI timeouts, abort on disconnect, `max_tokens`; OpenAI spend cap (B-5) | S |
+| 5 | ~~OpenAI timeouts, abort on disconnect, `max_tokens`~~ done 2026-11-14; OpenAI spend cap (B-5) still MANUAL | S |
 | 6 | `decide_change()` keeps `free_guests` and `promo_id`, with a test (B-3) | S |
 | 7 | Change-door lockout and `book/quote` rate limit (S-4, S-5) | S |
 | 8 | CI with branch protection (B-7) | S–M |

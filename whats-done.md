@@ -10289,3 +10289,13 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** with an invalid key on `next start`, JSON 502 "…(ref 63e78b68)" + `x-request-id`, the stream's error event the same, the log `[error] 502 ref 63e78b68: OpenAI rejected the API key …`; 401/400/404 bodies unchanged; web 275.
 - **Trap avoided:** OpenAI's 401 and 429 used to pass through as themselves, so the browser was told IT was unauthenticated or rate limited; the chat client then blamed OpenAI for our own chat limit's 429.
 - **Not done:** Postgres words in 4xx from `fromPostgrest()` (staff and platform only); not committed.
+
+## 2026-11-14 · OpenAI calls have time limits, stop with the tab, and answers have a cap (D-159; audit B-5)
+- **Asked:** the next audit finding: OpenAI calls had no timeout and no output cap.
+- **What:** `packages/openai/src/index.ts`: `EMBED_TIMEOUT_MS`, `CHAT_TIMEOUT_MS`, `STREAM_TIMEOUT_MS`, `callSignal()` (timeout + the caller's signal), `abortedAs()` (499 for the caller, 504 for a timeout, with `partial`), `maxTokens` / `failOnLength` on both chat calls; `packages/rag/src/constants.ts` `ANSWER_MAX_TOKENS = 1000`; `answer.ts` `answerLimits()` on the four answer calls and `signal` on both entry points; the chat route passes `request.signal`.
+- **Why it matters:** a hung OpenAI connection held a function until the platform killed it; a closed tab kept generating on our account; and an answer had no ceiling, so a confused or injected model could write at length for nothing.
+- **Observed:** openai 26 (6 new), pipeline 376, web 275, typecheck 13/13; the cap from 370 stored replies (longest 1,303 chars).
+- **Trap avoided:** a capped stream still ends with `[DONE]`; without reading `finish_reason` a cut answer would be saved as complete.
+- **Trap hit:** `next build` while the user's `pnpm dev` ran (trap 16): /t/villa answered 500 until they restarted it. Check port 3000 before building.
+- **Seen live** after a new OpenAI key (the old one had expired, 401): live on 2026-11-14 (new key, villa, `pnpm dev`): a documents answer (cook, deposit, extension) streamed 116 deltas to `done` under the cap; the same question with the connection closed after the first delta saved `Yes, […answer interrupted]` (26 chars, the whole reply ~600).
+- **Not done:** the OpenAI spend cap (dashboard); not committed.

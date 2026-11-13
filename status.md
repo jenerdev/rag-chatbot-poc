@@ -62,7 +62,7 @@
 3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
 4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
 5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
-6. OpenAI timeouts, abort and `max_tokens`;
+6. ~~OpenAI timeouts, abort and `max_tokens`~~ done 2026-11-14 (D-159, seen live);
 7. CI;
 8. a new production Supabase project with a migration ledger;
 9. the legal texts (a lawyer).
@@ -1907,6 +1907,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — OpenAI calls have time limits, stop with the tab, and answers have a cap (D-159; audit B-5)
+- **Did:** `@rag/openai`: `embed` 20 s, `chat` 60 s, `chatStream` 90 s (one signal, headers to [DONE]), each combined with the caller's `signal` (`AbortSignal.any`); a timeout is 504 and a closed tab 499, both carrying what streamed as `partial`; `maxTokens` + `failOnLength` on chat and chatStream. `@rag/pipeline`: `ANSWER_MAX_TOKENS = 1000` on every answer call (`answerLimits()`), `signal` on `answerQuestion` / `answerQuestionStream`; the chat route passes `request.signal`.
+- **Observed:** openai 26 (6 new: abort 499 with partial, stream/chat/embed timeouts 504, the cap sent and a cut reply refused, no cap unasked), pipeline 376, web 275, typecheck 13/13. The cap was measured: longest of 370 stored replies 1,303 chars (~350-450 tokens), median 192.
+- **Live:** the first try met OpenAI 401 "Your API key has expired"; the user set a new key. Then live on 2026-11-14 (new key, villa, `pnpm dev`): a documents answer (cook, deposit, extension) streamed 116 deltas to `done` under the cap; the same question with the connection closed after the first delta saved `Yes, […answer interrupted]` (26 chars, the whole reply ~600). Also: my `next build` broke the user's running `pnpm dev` (trap 16); they restarted it.
+- **Next:** item 7, CI; item 1 (`guest.test.ts`) still owed.
 
 ### 2026-11-14 — A failure tells the visitor nothing internal (D-158; audit B-6 / S-3)
 - **Did:** `lib/error-body.ts` (`errorBody()`, pure, 7 tests): a request status (400/401/403/404/409/429) keeps its words; anything else is a fixed sentence + `(ref <8 hex>)` and `X-Request-Id`, the real message in the log beside the ref; every OpenAI failure is a 502 with its own sentence; outside production the detail is appended. `route.ts` and the chat stream's `error` event both use it; `chat-stream.ts` lost its OpenAI/.env advice to visitors.

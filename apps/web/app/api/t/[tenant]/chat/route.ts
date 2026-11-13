@@ -60,6 +60,10 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
     tenant,
     conversationId: parsed.data.conversationId,
     message: parsed.data.message.trim(),
+    // D-159 (audit B-5): the browser leaving aborts the model call, in both
+    // deliveries. Before, `closed` only stopped OUR writes; OpenAI went on
+    // generating, and we paid for tokens nobody read.
+    signal: request.signal,
   };
 
   // D-140: the chunks a reply was built from reach a signed-in member with
@@ -95,8 +99,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
-      // The browser closing the tab should stop the pipeline. Without this we
-      // keep paying OpenAI for tokens nobody will ever read.
+      // The browser closing the tab: stop writing here. The model call itself
+      // is stopped by the same signal, passed in `args` (D-159).
       const onAbort = (): void => {
         closed = true;
       };
