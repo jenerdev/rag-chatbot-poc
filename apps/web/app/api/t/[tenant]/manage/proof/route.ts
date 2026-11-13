@@ -6,6 +6,7 @@ import { notifyAfter } from '@/lib/notify';
 import { parseMoneyInput } from '@/lib/money';
 import { allow, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
+import { declaredSizeRefusal } from '@/lib/upload-size';
 import { requireFeature } from '@/lib/feature-flags';
 import { withTenantRoute } from '@/lib/tenant';
 
@@ -33,10 +34,9 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   await requireApplication(tenant, 'bookings');
   await requireFeature(tenant, 'manage_booking');
 
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > MAX_PROOF_BYTES + 64 * 1024) {
-    return badRequest(`The file is too large; the limit is ${MAX_PROOF_BYTES / 1048576} MB.`);
-  }
+  // D-171 (audit S-16): a MISSING length is refused too, not read as 0.
+  const sizeRefused = declaredSizeRefusal(request.headers.get('content-length'), MAX_PROOF_BYTES, `The file is too large; the limit is ${MAX_PROOF_BYTES / 1048576} MB.`);
+  if (sizeRefused) return NextResponse.json({ error: sizeRefused.error }, { status: sizeRefused.status });
   if (!(await allow(tenant, `manage|${tenant.id}|${clientIp(request)}`))) {
     return NextResponse.json({ error: 'Too many attempts from here. Please try again in a few minutes.' }, { status: 429 });
   }

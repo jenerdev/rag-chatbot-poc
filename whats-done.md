@@ -10393,3 +10393,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** a reference is half of what Manage booking asks for; it should not come from a predictable generator, and a used one must be recognised where the unique rule actually lives.
 - **Observed:** 3,000 draws, all distinct, all 30 letters used evenly; rooms 58/58; verify unchanged.
 - **Not fixed, recorded:** a simultaneous draw of the same reference (~1 in 729 million per pair); not committed.
+
+## 2026-11-14 · Uploads are sized before they are read (D-171; audit S-16)
+- **Asked:** the audit's S-16: an upload without a Content-Length was read into memory before its size was checked.
+- **What:** `apps/web/lib/upload-size.ts` and its tests; the voice, proof, room-photo and brand-image routes call it first.
+- **Why it matters:** a request that hides its size could make the server buffer much more than the limit; off Vercel nothing else would stop it.
+- **Observed:** tests 3/3; a chunked upload refused 411 on `pnpm dev`, a normal one unaffected.
+- **Not done:** not committed.

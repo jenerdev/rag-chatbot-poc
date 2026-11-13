@@ -5699,3 +5699,29 @@ used, 529–638 times each against 600 expected; rooms 58/58; verify only
 check 27's dates.
 
 ---
+
+## D-171 · An upload is sized from its declared length before its body is read · **Added 2026-11-14**
+
+**Asked:** the audit's S-16: the upload size is checked after buffering
+when no Content-Length is sent.
+
+**Found:** the proof, room-photo and brand-image routes compared
+Content-Length with their limit but read a MISSING header as 0, and then
+buffered the whole body (`formData()`) before the file's own size was
+known; the voice route did not look at the header at all. A chunked body
+with no length could make the server hold far more than any limit (Vercel's
+4.5 MB request cap bounds it there; not on another host).
+
+**Decided:** `declaredSizeRefusal()` (`apps/web/lib/upload-size.ts`, pure,
+tested), called first by all four upload routes: a missing or unreadable
+length is 411 "Send the file with its size (a Content-Length header).", a
+declared one over the file limit plus a 64 KiB envelope is the route's own
+400 sentence, both before a byte of the body is read. A browser always sends
+the length of a FormData body, so no page of ours is refused; each file's
+real size and type are still checked after, as before.
+
+**Measured:** tests 3/3; on `pnpm dev`, the proof route answered a chunked
+upload with 411 and passed a normal multipart one through to its 404 for an
+unknown reference.
+
+---

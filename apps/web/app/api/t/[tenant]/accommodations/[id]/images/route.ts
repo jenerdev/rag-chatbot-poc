@@ -3,6 +3,7 @@ import { addImage, listImages, MAX_IMAGE_BYTES } from '@rag/bookings';
 import { requireAdmin } from '@/lib/admin-auth';
 import { requireApplication } from '@/lib/applications';
 import { badRequest, parseId } from '@/lib/route';
+import { declaredSizeRefusal } from '@/lib/upload-size';
 import { withTenantRoute } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
@@ -41,10 +42,9 @@ export const POST = withTenantRoute<{ id: string }>(async (request, { tenant, pa
   // Multipart adds a boundary and headers around the file, a few hundred
   // bytes; 64 KiB of slack is far more than that and far less than a second
   // photo.
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > MAX_IMAGE_BYTES + 64 * 1024) {
-    return badRequest(`The photo is too large; the limit is ${MAX_IMAGE_BYTES / 1048576} MB.`);
-  }
+  // D-171 (audit S-16): a MISSING length is refused too, not read as 0.
+  const sizeRefused = declaredSizeRefusal(request.headers.get('content-length'), MAX_IMAGE_BYTES, `The photo is too large; the limit is ${MAX_IMAGE_BYTES / 1048576} MB.`);
+  if (sizeRefused) return NextResponse.json({ error: sizeRefused.error }, { status: sizeRefused.status });
 
   const form = await request.formData().catch(() => null);
   const file = form?.get('file');

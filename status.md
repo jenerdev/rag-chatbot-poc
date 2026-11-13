@@ -1923,6 +1923,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — Uploads are sized before they are read (D-171; audit S-16)
+- **Did:** `apps/web/lib/upload-size.ts` (`declaredSizeRefusal()`, 3 tests): a missing or unreadable Content-Length is 411, a declared one over the limit + 64 KiB is refused in the route's own words (400, as the screens expect), both before `formData()`. Used by the four upload routes: voice (which had no declared check), the payment proof, room photos, brand images.
+- **Observed:** tests 3/3, typecheck clean; on `pnpm dev`, the proof route: a chunked upload with no Content-Length 411 "Send the file with its size…"; a normal multipart upload passed the size check and met the usual 404 for a made-up reference (its miss row removed).
+- **Next:** what is left of the security list is S-9 (deferred with the eval), S-15 (a `next` release with postcss ≥ 8.5.23) and S-17 (signups off, the dashboard).
+
 ### 2026-11-14 — Booking references from a cryptographic source (D-170; audit S-14)
 - **Did:** `schema-booking-reference.sql` (the 53rd, applied): `booking_reference()` draws its six letters from `extensions.gen_random_bytes()` with rejection sampling (bytes 240+ redrawn: every letter 1/30) and counts a reference as used when a booking OR a stay has it (the unique rule is on `stays`); the older definition in `schema-staff-requests.sql` is GUARDED on the new comment.
 - **Observed:** 3,000 draws for villa in the dry run and again after applying: shape `VIL-` + 6 of the alphabet, 3,000 distinct, all 30 letters, 529–638 each (600 expected); rooms 58/58; verify only check 27's dates. 0 orphan stays exist (`bookings_drop_empty_stays` already removes them).

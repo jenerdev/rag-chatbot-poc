@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MAX_BRAND_BYTES, uploadBrandImage } from '@rag/pipeline';
 import { withPlatformRoute } from '@/lib/platform-auth';
 import { badRequest, parseId } from '@/lib/route';
+import { declaredSizeRefusal } from '@/lib/upload-size';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,8 +23,9 @@ export const POST = withPlatformRoute<{ id: string }>(async (request, { platform
   const id = parseId(params.id);
   if (id === null) return badRequest('Invalid tenant id');
   // Multipart adds a boundary and headers, a few hundred bytes; 64 KiB of slack.
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > MAX_BRAND_BYTES + 64 * 1024) return badRequest(`The image is too large; the limit is ${MAX_BRAND_BYTES / 1048576} MB.`);
+  // D-171 (audit S-16): a MISSING length is refused too, not read as 0.
+  const sizeRefused = declaredSizeRefusal(request.headers.get('content-length'), MAX_BRAND_BYTES, `The image is too large; the limit is ${MAX_BRAND_BYTES / 1048576} MB.`);
+  if (sizeRefused) return NextResponse.json({ error: sizeRefused.error }, { status: sizeRefused.status });
   const form = await request.formData().catch(() => null);
   const file = form?.get('file');
   const kind = form?.get('kind');

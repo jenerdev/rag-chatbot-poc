@@ -4,6 +4,7 @@ import { voiceVocabulary } from '@rag/pipeline';
 import { requireFeature } from '@/lib/feature-flags';
 import { allowSpend, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
+import { declaredSizeRefusal } from '@/lib/upload-size';
 import { withTenantRoute } from '@/lib/tenant';
 import { MAX_AUDIO_BYTES, sniffAudio, transcriptionHint, VOICE_REQUESTS_PER_WINDOW } from '@/lib/voice';
 
@@ -31,6 +32,10 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
   if (!(await allowSpend(tenant, 'voice-in', clientIp(request), VOICE_REQUESTS_PER_WINDOW))) {
     return NextResponse.json({ error: 'Too many voice questions from here. Please type, or try again in a few minutes.' }, { status: 429 });
   }
+
+  // D-171 (audit S-16): the declared length, before the body is buffered.
+  const sizeRefused = declaredSizeRefusal(request.headers.get('content-length'), MAX_AUDIO_BYTES, `That recording is too long. Keep a question under ${MAX_AUDIO_BYTES / 1024 / 1024} MB.`);
+  if (sizeRefused) return NextResponse.json({ error: sizeRefused.error }, { status: sizeRefused.status });
 
   const form = await request.formData().catch(() => null);
   const file = form?.get('audio');
