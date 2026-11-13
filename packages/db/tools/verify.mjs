@@ -1251,7 +1251,8 @@ async function customerBookingChecks() {
     const staff = asToken(staffToken(bookId, userId));
     const chat = asToken(chatToken(bookId));
     const request = (client, overrides = {}) =>
-      client.rpc('request_booking', {
+      client.rpc('request_booking_with_consent', {
+        p_consent_version: '1', // D-168: only the wrapper is callable; a fresh probe is '1'
         p_tenant_id: bookId,
         p_slot_id: slot.Overnight,
         p_unit_ids: [unit.id],
@@ -1262,6 +1263,7 @@ async function customerBookingChecks() {
         p_phone: '0917 123 4567',
         p_email: 'probe@example.com',
         p_notes: null,
+        p_promo_code: null, // the wrapper has no default for it (PostgREST matches by names)
         ...overrides,
       });
     const rowsOf = async () =>
@@ -1500,8 +1502,8 @@ async function customerBookingChecks() {
         const nights = ov?.nightly ? 2 : 1;
         const subtotal = (r) => (r.base_price ?? 0) + (r.extra_guest_price ?? 0) + (r.surcharge ?? 0);
         const request = (checkIn, n, code) =>
-          chat.rpc('request_booking', {
-            p_tenant_id: bookId, p_slot_id: slot.Overnight, p_unit_ids: [unit.id], p_guests: [2], p_check_in: checkIn, p_nights: nights,
+          chat.rpc('request_booking_with_consent', {
+            p_consent_version: '1', p_tenant_id: bookId, p_slot_id: slot.Overnight, p_unit_ids: [unit.id], p_guests: [2], p_check_in: checkIn, p_nights: nights,
             p_name: 'Promo Guest', p_phone: `0917000010${n}`, p_email: `promo${n}@example.com`, p_notes: null, p_promo_code: code,
           });
 
@@ -3476,9 +3478,9 @@ async function notificationChecks() {
     // 175. A web request, two rooms for two nights: ONE outbox row, the stay's
     //      reference, its first night, 2 nights. A staff stay: none.
     const request = async (day, email) => {
-      const { data, error } = await chat.rpc('request_booking', {
-        p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.A, unit.B], p_guests: [1, 1], p_check_in: day, p_nights: 2,
-        p_name: 'Notify Probe', p_phone: '0918 222 3333', p_email: email, p_notes: null,
+      const { data, error } = await chat.rpc('request_booking_with_consent', {
+        p_consent_version: '1', p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.A, unit.B], p_guests: [1, 1], p_check_in: day, p_nights: 2,
+        p_name: 'Notify Probe', p_phone: '0918 222 3333', p_email: email, p_notes: null, p_promo_code: null,
       });
       if (error) throw new Error(`request_booking: ${error.message}`);
       return data[0].reference;
@@ -3867,9 +3869,9 @@ async function notificationChecks() {
       superDb.from('tenant_features').upsert({ tenant_id: probe, feature, enabled }, { onConflict: 'tenant_id,feature' }).select('feature');
     // On the chat token, the real door: the event log then names a guest, which is what queues a notice.
     const request = (day) =>
-      chatDb.rpc('request_booking', {
-        p_tenant_id: probe, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: day, p_nights: 1,
-        p_name: 'Feature Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `feat-${randomUUID()}@example.com`, p_notes: null,
+      chatDb.rpc('request_booking_with_consent', {
+        p_consent_version: '1', p_tenant_id: probe, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: day, p_nights: 1,
+        p_name: 'Feature Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `feat-${randomUUID()}@example.com`, p_notes: null, p_promo_code: null,
       });
     const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
     const outbox = async () => (await supabase.from('notification_outbox').select('id', { count: 'exact', head: true }).eq('tenant_id', probe)).count;
@@ -4143,8 +4145,8 @@ async function notificationChecks() {
       const withConsent = webRef ? await stayOf(webRef) : null;
       const without = plain.data?.[0]?.reference ? await stayOf(plain.data[0].reference) : null;
       check(
-        !app.error && old.error?.code === '23514' && !current.error && withConsent?.consent_version === '3' && !!withConsent?.consented_at && !plain.error && without?.consent_version === null,
-        'legal: an old policy version is refused (23514); the current one books and the stay records "3" and when; plain request_booking() records none',
+        !app.error && old.error?.code === '23514' && !current.error && withConsent?.consent_version === '3' && !!withConsent?.consented_at && plain.error?.code === '42501' && without === null,
+        'legal: an old policy version is refused (23514); the current one books and the stay records "3" and when; plain request_booking() on a token is refused (42501, D-168)',
         `old ${old.error?.code ?? 'BOOKED'} · current ${current.error?.message ?? webRef} → ${JSON.stringify(withConsent)} · plain ${plain.error?.message ?? 'ok'} → ${without?.consent_version}`,
       );
     }
@@ -4572,8 +4574,8 @@ async function notificationChecks() {
       return `${plain.data?.[0]?.status ?? plain.error?.message}|${r ? `${r.status} ${r.rooms_free}/${r.rooms_total}` : priced.error?.message}`;
     };
     let phone = 0;
-    const request = (day, nights, units) => chat.rpc('request_booking', {
-      p_tenant_id: probe, p_slot_id: night, p_unit_ids: units, p_guests: units.map(() => 2), p_check_in: day, p_nights: nights,
+    const request = (day, nights, units) => chat.rpc('request_booking_with_consent', {
+      p_consent_version: '1', p_tenant_id: probe, p_slot_id: night, p_unit_ids: units, p_guests: units.map(() => 2), p_check_in: day, p_nights: nights,
       p_name: 'Counts Guest', p_phone: `0917${String(1000000 + ++phone)}`, p_email: `counts${phone}@example.com`, p_notes: null, p_promo_code: null,
     });
     const groupRows = (reference) => supabase.from('bookings').select('room_id, booked_date').eq('tenant_id', probe).eq('reference', reference).order('booked_date').order('room_id');

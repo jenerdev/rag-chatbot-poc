@@ -1923,6 +1923,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — A web booking always carries consent (D-168; audit S-12)
+- **Did:** `schema-consent-only.sql` (the 52nd, applied): `request_booking()` revoked from `authenticated` (and public, anon), kept for `service_role`, marked by a comment; its grant in `schema-free-guests.sql` is GUARDED on that marker. `requestBooking()` always calls `request_booking_with_consent()`, `consentVersion` now required. rooms and the isolation suite request with the tenant's version; verify's helpers use the wrapper, 202 now expects the plain call refused.
+- **Observed:** execute for `authenticated` true → false, the wrapper still true, service_role true. First verify run after applying: 18 FAILS of my own making: the wrapper's `p_promo_code` has no default and PostgREST matches functions by the argument NAMES sent, so helpers that left it out found no function (PGRST202); plus one direct call missed. Fixed; then verify: only check 27's dates; 202 "plain … refused (42501)"; "the only way in: chat insert 42501 · anon 42501"; rooms 58/58; tests and typecheck 13/13.
+- **Next:** S-13 (the reset link's redirect built from the request Host).
+
 ### 2026-11-14 — A token updates only a booking's status and decision note (D-167; audit S-11)
 - **Did:** `schema-booking-columns.sql` (the 51st, applied): `revoke update on bookings from anon, authenticated; grant update (status, decision_note) to authenticated`. Every other change to a booking already runs in a definer that logs it (checked in the catalog: all 8 functions that UPDATE bookings are definers). rooms 24c's trigger test now writes through the service client; rooms 41 proves both walls (token 42501, direct 23P01); verify 229l new.
 - **Observed:** before 30 columns writable by a token, after 2; verify 229l PASS (an OWNER token: guest_name, guest_phone, guest_email, notes, held, source, price, room_id all 42501; status + decision_note fine), the only fails check 27's dates; rooms 58/58; manage-booking-phase6-walk 4/4 over HTTP.

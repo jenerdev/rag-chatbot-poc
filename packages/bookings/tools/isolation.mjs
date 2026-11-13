@@ -82,12 +82,23 @@ import {
   removeAllDevices,
   removeDevice,
   removeImage,
-  requestBooking,
+  requestBooking as requestBookingWithConsent,
   setCalendarDay,
   setImageOrder,
   setRates,
   updateAccommodation,
 } from '../dist/index.js';
+
+// D-168: every request carries the tenant's current policy version, as the
+// booking page's does (request_booking() alone is not callable by a token).
+const policyVersions = new Map();
+const requestBooking = async (tenant, input) => {
+  if (!policyVersions.has(tenant.id)) {
+    const { data } = await supabase.from('tenants').select('policy_version').eq('id', tenant.id).single();
+    policyVersions.set(tenant.id, data?.policy_version ?? '1');
+  }
+  return requestBookingWithConsent(tenant, { consentVersion: policyVersions.get(tenant.id), ...input });
+};
 
 let failures = 0;
 const check = (ok, label, detail = '') => {

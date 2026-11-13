@@ -10371,3 +10371,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** 30 writable columns → 2; verify 229l, rooms 58/58, the Manage booking walk 4/4.
 - **Trap avoided:** a column grant would break any INVOKER function or trigger that updates other booking rows; the catalog showed all eight are definers before anything was applied.
 - **Not done:** not committed.
+
+## 2026-11-14 · A web booking always carries consent (D-168; audit S-12)
+- **Asked:** the audit's S-12: the booking function was callable without the consent wrapper.
+- **What:** `packages/db/sql/schema-consent-only.sql` (the 52nd, applied) and the guard in `schema-free-guests.sql`; `requestBooking()` always through the wrapper; rooms, isolation and verify adjusted.
+- **Why it matters:** the Data Privacy Act groundwork (D-130) records which policy version a guest agreed to; a booking made around the wrapper would have had none. Now Postgres refuses it.
+- **Observed:** execute revoked from tokens, kept for the wrapper and service_role; verify (only check 27's dates) and rooms 58/58 after the fix below.
+- **Trap hit:** PostgREST matches a function by the argument names sent; the wrapper's `p_promo_code` has no default, so 18 checks that left it out hit PGRST202 until every caller sent it.
+- **Not done:** not committed.

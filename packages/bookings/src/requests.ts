@@ -345,7 +345,8 @@ export async function requestBooking(
      * refuses a version that is not the tenant's current one and records the
      * consent on the stay. The booking page always gives it; the tools do not.
      */
-    consentVersion?: string;
+    /** The policy version the guest agreed to (D-130); request_booking_with_consent() refuses any other. */
+    consentVersion: string;
   },
 ): Promise<RequestReceipt> {
   const config = await requireConfig(tenant);
@@ -379,10 +380,10 @@ export async function requestBooking(
     p_notes: request.notes,
     p_promo_code: promoCode,
   };
-  const { data, error } =
-    input.consentVersion === undefined
-      ? await tenant.db.rpc('request_booking', args)
-      : await tenant.db.rpc('request_booking_with_consent', { ...args, p_consent_version: input.consentVersion });
+  // D-168 (audit S-12): always the consent wrapper. request_booking() is
+  // not callable by a token any more, so a request without the policy
+  // version the guest agreed to cannot be made at all.
+  const { data, error } = await tenant.db.rpc('request_booking_with_consent', { ...args, p_consent_version: input.consentVersion });
   if (error) throw requestError(error);
   if (!data || data.length === 0) throw new Error('The request was saved but nothing came back');
 

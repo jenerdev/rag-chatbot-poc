@@ -825,7 +825,10 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    Rule 2). **A customer never supplies one either:** `request_booking()`
    takes `p_tenant_id` from the route (wall 1) and refuses one that is not
    the token's (wall 2); a chat token has no insert policy on `bookings`, so
-   that function is the only way in (D-071).
+   that function is the only way in (D-071), and since D-168 a token reaches
+   it ONLY through `request_booking_with_consent()` (the current policy
+   version, recorded on the stay); `request_booking()` itself is the
+   wrapper's and `service_role`'s alone.
 7. **A tool result carries nothing the chat user may not see.** It goes into a
    prompt, and a prompt-injected model can recite it. `check_availability`
    returns `date, unit, slot, status` and nothing else, and rows are mapped
@@ -879,7 +882,7 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
    is `security invoker`, so it reads under the token's own RLS, and it
    refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a
-   stranger, and it can write `pending` rows only.
+   stranger, and it can write `pending` rows only, through its consent wrapper (D-168).
 
 ## Traps that will actually cost you time
 

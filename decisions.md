@@ -5607,3 +5607,39 @@ walls: a token's raw room_id 42501, a direct one 23P01);
 manage-booking-phase6-walk 4/4 over HTTP.
 
 ---
+
+## D-168 · A web booking reaches the database only through the consent wrapper · **Added 2026-11-14** (amends D-071, D-130)
+
+**Asked:** the audit's S-12: `request_booking()` is callable without the
+consent wrapper.
+
+**Found:** the booking page always used `request_booking_with_consent()`
+(D-130: the tenant's CURRENT policy version, recorded on the stay). But
+`request_booking()`, the function the wrapper calls, was still executable by
+`authenticated`, so a chat token could book with no consent recorded. Only
+the test suites (rooms, isolation, verify) called it so; `requestBooking()`
+did when no version was passed.
+
+**Decided:**
+- **`schema-consent-only.sql`, the 52nd file:** `request_booking()` revoked
+  from public, anon and authenticated; `service_role` keeps it for tools; a
+  comment marks it, and the grant to `authenticated` in
+  `schema-free-guests.sql` is guarded on that marker (trap 20). The wrapper
+  is a definer and runs as the owner, so it still calls it.
+- **`requestBooking()`** always calls the wrapper; `consentVersion` is
+  required by its type, so no caller can leave it out.
+- **The suites** request with the tenant's version (a fresh probe's is the
+  column default, '1'); check 202 now expects the plain call refused.
+
+**Measured:** execute for `authenticated`: true before, false after; the
+wrapper and `service_role` true. verify: 202 "plain request_booking() on a
+token is refused (42501)", "the only way in: chat insert 42501 · anon
+42501", and every request_booking check through the wrapper; rooms 58/58;
+tests and typecheck 13/13.
+
+**Learned:** the first run after applying failed 18 checks: the wrapper's
+`p_promo_code` has no default (`request_booking()`'s had one), and PostgREST
+picks a function by the NAMES of the arguments sent, so a call without it
+matched no function (PGRST202). Every helper now sends it.
+
+---

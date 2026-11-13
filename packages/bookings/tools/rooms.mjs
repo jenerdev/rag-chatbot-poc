@@ -41,7 +41,7 @@ import {
   listRequests,
   quoteRequest,
   removeCalendarDay,
-  requestBooking,
+  requestBooking as requestBookingWithConsent,
   guestStay,
   setCalendarDay,
   checkRoomAvailability,
@@ -75,6 +75,10 @@ import {
   setRates,
   updateAccommodation,
 } from '../dist/index.js';
+
+// D-168: the booking page always sends the policy version the guest agreed
+// to; so does every request here. A fresh probe's policy_version is '1'.
+const requestBooking = (tenant, input) => requestBookingWithConsent(tenant, { consentVersion: '1', ...input });
 
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -849,7 +853,7 @@ try {
     //      first (Phase 1).
     {
       const before = (await listBookings(probe, { from: THU, to: FRI })).length;
-      const direct = await chat.db.rpc('request_booking', {
+      const direct = await chat.db.rpc('request_booking_with_consent', { p_consent_version: '1',
         p_tenant_id: probe.id, p_slot_id: night.id, p_unit_ids: [hall.id], p_guests: [32], p_check_in: THU, p_nights: 2,
         p_name: 'Rooms Probe', p_phone: '09170009999', p_email: 'rooms-probe-9999@example.com', p_notes: null, p_promo_code: null,
       });
@@ -966,9 +970,9 @@ try {
       const quoteClosed = await thrown(() => quoteRequest(chat, stay({ checkIn: next(CLOSED, -1), nights: 2 })));
       const requestClosed = await thrown(() => requestBooking(chat, stay({ checkIn: CLOSED, nights: 1, ...contact(6) })));
       const raw = await code(() =>
-        chat.db.rpc('request_booking', {
+        chat.db.rpc('request_booking_with_consent', { p_consent_version: '1',
           p_tenant_id: probe.id, p_slot_id: night.id, p_unit_ids: [hall.id], p_guests: [32], p_check_in: CLOSED, p_nights: 1,
-          p_name: 'Rooms Probe', p_phone: '09170000007', p_email: 'rooms-probe-7@example.com', p_notes: null,
+          p_name: 'Rooms Probe', p_phone: '09170000007', p_email: 'rooms-probe-7@example.com', p_notes: null, p_promo_code: null,
         }),
       );
       const rows = await checkRoomAvailability(chat, { from: next(CLOSED, -1), to: next(CLOSED, 1), slot: 'Night' });
