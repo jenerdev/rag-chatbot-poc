@@ -21,6 +21,8 @@ export const POST = withTenantRoute(async (request) => {
   const parsed = setPasswordSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
 
-  await setPasswordWithToken(parsed.data.accessToken, parsed.data.password);
-  return NextResponse.json({ message: 'Password set. You can log in with it now.' });
+  // D-163: setting it also ends every session this person had, everywhere.
+  const { sessionsEnded } = await setPasswordWithToken(parsed.data.accessToken, parsed.data.password);
+  const ended = sessionsEnded ? ` ${sessionsEnded === 1 ? 'One open session was' : `${sessionsEnded} open sessions were`} signed out.` : '';
+  return NextResponse.json({ message: `Password set. You can log in with it now.${ended}` });
 });

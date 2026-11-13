@@ -674,6 +674,7 @@ pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/security-headers-walk.mjs)   # 29 checks of the security headers (D-156): the headers on 6 paths, no CSP violation on 21 pages (12 staff screens as a throwaway admin), framing refused; best on next start
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/auth-rate-limit-walk.mjs)   # 5 HTTP checks of the login and reset limits (D-157): per address, per account, the platform's hashed table; made-up accounts, no email sent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-doors-limit-walk.mjs)   # 3 HTTP checks (D-162): book/quote 60 then 429; the change doors' misses count toward the lockout; a made-up reference, its rows removed
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/sessions-walk.mjs)   # 3 HTTP checks (D-163): a copied staff cookie dies on logout and on a new password, the platform's too, 4 h; throwaway users, no email
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
@@ -862,7 +863,12 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    (any token of the tenant, each checking the token's tenant; a claimed
    row is consumed, so the claim cannot list devices twice); since D-137
    `rate_allow` (any token of the tenant, checking the token's tenant; the
-   ONE way to `rate_windows`, which no token reads); and
+   ONE way to `rate_windows`, which no token reads); since D-157
+   `platform_rate_allow` (callable with the publishable key, hashed keys of
+   one shape only); since D-163 `session_open`, `session_valid`,
+   `session_close`, `session_close_all` (any token WITH a user: each takes
+   the user from `auth.uid()`, never from an argument; `app_sessions` has
+   no policy); and
    trigger-only definers that no token can call (the stay row, the event
    log, the terms, the holds, `booking_events_notify`) (`booking_reference` also admits a direct session, `session_user
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it

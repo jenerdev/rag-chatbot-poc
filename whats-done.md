@@ -10331,3 +10331,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 3/3 (60 × 200 then 429; 5 misses then locked); the phase-6 Manage walk 4/4 (the right guest unaffected); tests and typecheck 13/13.
 - **Trap avoided:** a miss recorded inside a function that then RAISES is no miss at all: the raise rolls it back. Record a miss in a call that returns.
 - **Not done:** not committed.
+
+## 2026-11-14 · Sessions can be revoked (D-163; audit S-6)
+- **Asked:** the audit's S-6: a session cookie could not be revoked.
+- **What:** `packages/db/sql/schema-sessions.sql` (the 49th, applied); `apps/web/lib/admin-auth.ts` (`readSessionCookie`, `sessionLive`, `openStaffSession`, `closeStaffSession`; the five-part cookie) and `lib/platform-auth.ts` (the same, 4 hours); both session routes open and close rows; `setPasswordWithToken()` ends every session; verify 229f–229k; `plan/sessions-walk.mjs`.
+- **Why it matters:** before, logging out only cleared the cookie in one browser. A copy (a shared computer, a stolen laptop profile, a leaked header) stayed good for up to 12 hours, through a logout AND a password change, and the platform cookie reaches every tenant.
+- **Observed:** verify 6/6 new; the walk 3/3 (a replayed cookie 200 → 401 after logout while the other device stays 200; a new password ends the other device and says so; the platform the same, 4.00 h); 12 staff screens still load; tests and typecheck 13/13.
+- **Trap avoided:** the user is never an argument: every session function reads `auth.uid()` from the token, so a function callable by any signed-in token still cannot touch another person's sessions. And the reset link's access token is a real Supabase token for that user, so revoking needs no extra key.
+- **Not done:** an owner's "sign this member out" button; not committed.

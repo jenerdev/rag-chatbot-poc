@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { LOGIN_FAILED, checkStaffLogin, clearSessionCookie, noteSession, readSession, requireAdmin, setSessionCookie } from '@/lib/admin-auth';
+import { LOGIN_FAILED, checkStaffLogin, clearSessionCookie, closeStaffSession, noteSession, openStaffSession, readSessionCookie, requireAdmin, setSessionCookie } from '@/lib/admin-auth';
 import { AUTH_LIMITED, allowAuth, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
@@ -30,8 +30,9 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 
   const userId = await checkStaffLogin(tenant, parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: LOGIN_FAILED }, { status: 401 });
+  const sessionId = await openStaffSession(tenant, userId); // D-163: the row the cookie names
   await noteSession(tenant, userId, 'login'); // D-138
-  return setSessionCookie(NextResponse.json({ admin: true, tenant: tenant.slug }), tenant, userId);
+  return setSessionCookie(NextResponse.json({ admin: true, tenant: tenant.slug }), tenant, userId, sessionId);
 });
 
 /**
@@ -55,9 +56,16 @@ export const GET = withTenantRoute(async (request, { tenant }) => {
   }
 });
 
-/** Log out. It always succeeds, because clearing a cookie that is not there is not an error. A genuine session is noted first (D-138). */
+/**
+ * Log out. It always succeeds, because clearing a cookie that is not there is
+ * not an error. A genuine session is noted first (D-138), and its ROW is
+ * revoked (D-163), so a copy of this cookie stops working too.
+ */
 export const DELETE = withTenantRoute(async (request, { tenant }) => {
-  const userId = readSession(request, tenant);
-  if (userId) await noteSession(tenant, userId, 'logout');
+  const session = readSessionCookie(request, tenant);
+  if (session) {
+    await noteSession(tenant, session.userId, 'logout');
+    await closeStaffSession(tenant, session.userId, session.sessionId);
+  }
   return clearSessionCookie(NextResponse.json({ admin: false }), tenant);
 });

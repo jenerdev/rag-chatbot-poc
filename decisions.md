@@ -5417,3 +5417,48 @@ tenant: the right guest still quotes, asks, withdraws, and is approved.
 Tests 13/13; typecheck 13/13.
 
 ---
+
+## D-163 · A session is a row: logout and a new password end every copy of the cookie · **Added 2026-11-14** (amends D-028, D-040, D-076)
+
+**Asked:** the audit's S-6, "Sessions cannot be revoked".
+
+**Decided:**
+- **`app_sessions`** (`schema-sessions.sql`, the 49th file): one row per
+  login, its user, kind (`staff` with a tenant, `platform` without), end
+  and `revoked_at`. No policy, no grant: four definer functions only, and
+  each takes the USER from the token (`auth.uid()`), never an argument, so
+  no caller can open, test or end someone else's session. A chat token has
+  no `sub` and is refused or answered false.
+- **The cookie carries the session id inside the HMAC**
+  (`<slug>.<user>.<expiry>.<session>.<mac>`, `platform.<user>.<expiry>.<session>.<mac>`).
+  `requireAdmin()`, `sessionCan()` and `requirePlatform()` ask
+  `session_valid()` on the member's own token on every request: this id,
+  this user, live, this kind and THIS token's tenant. For staff it runs
+  beside `loadRoleOverrides()` (one round trip more in sequence, none for
+  the overrides).
+- **Logout** revokes this device's row (`session_close()`), so a copy of the
+  cookie dies with it; other devices stay signed in.
+- **A new password** revokes every row the person has, every tenant and the
+  platform (`session_close_all()`), called with the reset link's own
+  Supabase access token, whose `sub` is the user. If that call fails the
+  password is still set and the failure is logged; the route says how many
+  sessions it ended.
+- **The platform session is 4 hours** (was 12): its cookie reaches every
+  tenant. Staff stay at 12.
+- **Every older cookie is refused once** (it has one part fewer): everyone
+  logs in again, once.
+- **Not done:** an admin "sign this member out everywhere" button; the row
+  is swept a day after it ends, at that user's next login.
+
+**Measured:** verify 229f–229k (a staff session valid only on its own
+member's villa token, not a chat, another tenant's or a platform token;
+logout true then invalid then false; a chat token, a non-member, a staff
+token asking for a platform session refused 42501, 12 h + 1 s 22023; a
+platform session valid on its platform token only; `session_close_all()` =
+2; no token reads the table). `plan/sessions-walk.mjs` 3/3 on `pnpm dev`:
+two devices 200/200, after logout on A 401/200; a new password through the
+reset route, "One open session was signed out.", B 401; platform 200 then
+401 after logout, the cookie 4.00 h. The 12 staff screens of the
+security-headers walk still load signed in.
+
+---

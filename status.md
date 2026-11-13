@@ -1908,6 +1908,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — Sessions can be revoked (D-163; audit S-6)
+- **Did:** `schema-sessions.sql` (the 49th, applied): `app_sessions` and four definers (`session_open`, `session_valid`, `session_close`, `session_close_all`), each taking the user from `auth.uid()`. Staff and platform cookies carry the session id inside the HMAC; `requireAdmin()`, `sessionCan()` and `requirePlatform()` ask `session_valid()` on every request; logout revokes this device's row; a new password (`setPasswordWithToken()`) revokes every row with the link's own token. The platform session is 4 hours (was 12).
+- **Observed:** verify 229f–229k all PASS (valid only on its own user/kind/tenant; logout; refusals 42501 / 22023; platform; close_all = 2; no token reads the table); `plan/sessions-walk.mjs` 3/3 on `pnpm dev` (a copied cookie: 200 → 401 after logout, device B 200; a new password: B 401, "One open session was signed out."; platform 200 → 401, 4.00 h); security-headers walk: the 12 staff screens still load signed in; tests and typecheck 13/13.
+- **Note:** every cookie from before this change is refused once (one part fewer): everyone logs in again, once.
+- **Next:** the security list goes on: S-7 (Origin check and JSON content type).
+
 ### 2026-11-14 — The change doors count toward the lockout; price quotes are limited (D-162; audit S-4, S-5)
 - **Did:** `requestChange()` and `withdrawChange()` (`packages/bookings/src/changes.ts`) match the guest through `guestStay()` first, as `submitProof()` does; `book/quote` meets `allowSpend()`: 60 per address (`QUOTE_REQUESTS_PER_WINDOW`) and the 600 tenant ceiling, per 10 minutes. `plan/guest-doors-limit-walk.mjs`.
 - **Observed** on the user's `pnpm dev`: walk 3/3 (60 real quotes at 200 then 429 "Too many price checks…", count 61; five wrong-contact change/withdraw tries = five misses; the sixth is 404 and adds none: locked); `manage-booking-phase6-walk.mjs` 4/4 (a right guest still quotes, asks, withdraws, is approved); tests 13/13, typecheck 13/13.

@@ -4758,6 +4758,129 @@ async function notificationChecks() {
   }
 }
 
+// 229f–229k. Revocable sessions (schema-sessions.sql, audit S-6, D-163):
+//            a session row per login, valid only for its own user, kind and
+//            tenant; logout and a new password revoke; no token reads it.
+{
+  const users = [];
+  let superRow = false;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const make = async (label) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `verify-sessions-${label}-${randomBytes(4).toString('hex')}@example.com`, password: randomBytes(18).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(`user: ${error.message}`);
+      users.push(data.user.id);
+      return data.user.id;
+    };
+    const member = await make('member');
+    const m = await supabase.from('memberships').insert({ user_id: member, tenant_id: villaRow.id, role: 'staff' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const villaStaff = asToken(staffToken(villaRow.id, member));
+
+    // 229f. A member opens a staff session; it is valid on the member's own
+    //       villa token, and on nothing else: not a chat token, not the same
+    //       user's token for another tenant, not a platform token.
+    {
+      const open = await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const id = open.data;
+      const own = await villaStaff.rpc('session_valid', { p_id: id });
+      const chat = await asToken(chatToken(villaRow.id)).rpc('session_valid', { p_id: id });
+      const elsewhere = await asToken(staffToken(villaRow.id + 100000, member)).rpc('session_valid', { p_id: id });
+      const asPlatform = await asToken(platformToken(member)).rpc('session_valid', { p_id: id });
+      const { data: row } = await supabase.from('app_sessions').select('user_id, kind, tenant_id, revoked_at').eq('id', id ?? '00000000-0000-0000-0000-000000000000').single();
+      check(
+        !open.error && own.data === true && chat.data === false && elsewhere.data === false && asPlatform.data === false
+          && row?.user_id === member && row.kind === 'staff' && String(row.tenant_id) === String(villaRow.id) && row.revoked_at === null,
+        'sessions: a staff session is valid on its own member\'s villa token only (not a chat, another tenant\'s or a platform token)',
+        `${open.error?.message ?? 'opened'} · own ${own.data} · chat ${chat.data} · elsewhere ${elsewhere.data} · platform ${asPlatform.data} · row ${row?.kind}/${row?.tenant_id}`,
+      );
+
+      // 229g. Logout: closed once (true), then invalid; closing again is false.
+      const closed = await villaStaff.rpc('session_close', { p_id: id });
+      const after = await villaStaff.rpc('session_valid', { p_id: id });
+      const again = await villaStaff.rpc('session_close', { p_id: id });
+      check(
+        closed.data === true && after.data === false && again.data === false,
+        'sessions: logout revokes the row (true), the session is then invalid, and a second close is false',
+        `close ${closed.data} · valid ${after.data} · again ${again.data}`,
+      );
+    }
+
+    // 229h. Nobody opens a session for someone else, or a kind they are not:
+    //       a chat token (no sub) is refused, a non-member's villa token is
+    //       refused, a staff token cannot open a platform session, and a
+    //       lifetime past 12 hours is refused.
+    {
+      const stranger = await make('stranger');
+      const chatOpen = await asToken(chatToken(villaRow.id)).rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const nonMember = await asToken(staffToken(villaRow.id, stranger)).rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const wrongKind = await villaStaff.rpc('session_open', { p_kind: 'platform', p_seconds: 600 });
+      const tooLong = await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 43201 });
+      check(
+        chatOpen.error?.code === '42501' && nonMember.error?.code === '42501' && wrongKind.error?.code === '42501' && tooLong.error?.code === '22023',
+        'sessions: a chat token, a non-member, a staff token asking for a platform session (42501) and a 12 h + 1 s lifetime (22023) are refused',
+        `${chatOpen.error?.code} · ${nonMember.error?.code} · ${wrongKind.error?.code} · ${tooLong.error?.code}`,
+      );
+    }
+
+    // 229i. A super user's platform session: valid on the platform token,
+    //       not on the same user's tenant token.
+    {
+      const superUser = await make('super');
+      const s = await supabase.from('platform_admins').insert({ user_id: superUser });
+      if (s.error) throw new Error(`super: ${s.error.message}`);
+      superRow = superUser;
+      const platform = asToken(platformToken(superUser));
+      const open = await platform.rpc('session_open', { p_kind: 'platform', p_seconds: 600 });
+      const own = await platform.rpc('session_valid', { p_id: open.data });
+      const onTenant = await asToken(staffToken(villaRow.id, superUser)).rpc('session_valid', { p_id: open.data });
+      check(
+        !open.error && own.data === true && onTenant.data === false,
+        'sessions: a platform session is valid on the super user\'s platform token, not on a tenant token of the same user',
+        `${open.error?.message ?? 'opened'} · own ${own.data} · tenant ${onTenant.data}`,
+      );
+    }
+
+    // 229j. A new password: session_close_all() ends every live session of the
+    //       token's user (here two), and the count says so.
+    {
+      const a = (await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 })).data;
+      const b = (await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 })).data;
+      const all = await villaStaff.rpc('session_close_all');
+      const va = await villaStaff.rpc('session_valid', { p_id: a });
+      const vb = await villaStaff.rpc('session_valid', { p_id: b });
+      const noUser = await asToken(chatToken(villaRow.id)).rpc('session_close_all');
+      check(
+        all.data === 2 && va.data === false && vb.data === false && noUser.error?.code === '42501',
+        'sessions: session_close_all() revokes both live sessions (2) and a token with no user is refused',
+        `count ${all.data} · a ${va.data} · b ${vb.data} · chat ${noUser.error?.code}`,
+      );
+    }
+
+    // 229k. No token reads the table; the service client sees the rows.
+    {
+      const viaStaff = await villaStaff.from('app_sessions').select('id');
+      const viaAnon = await anonClient().from('app_sessions').select('id');
+      const { count } = await supabase.from('app_sessions').select('id', { count: 'exact', head: true }).in('user_id', users);
+      check(
+        (!!viaStaff.error || (viaStaff.data ?? []).length === 0) && (!!viaAnon.error || (viaAnon.data ?? []).length === 0) && (count ?? 0) >= 4,
+        'sessions: a staff token and anon read nothing from app_sessions; the service client sees the rows',
+        `staff ${viaStaff.error?.code ?? viaStaff.data?.length} · anon ${viaAnon.error?.code ?? viaAnon.data?.length} · service ${count}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'sessions: setup', error.message);
+  } finally {
+    if (superRow) await supabase.from('platform_admins').delete().eq('user_id', superRow);
+    for (const id of users) {
+      await supabase.from('memberships').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+      await supabase.from('audit_log').delete().eq('actor_user', id);
+      await supabase.from('audit_log').delete().eq('subject', id);
+    }
+  }
+}
+
 // 229b–229e. The platform's sign-in and reset count (schema-platform-rate-limit.sql,
 //            audit S-2, D-157): platform_rate_allow() on the publishable key
 //            alone, no tenant, only hashed keys, and the table unreadable.
