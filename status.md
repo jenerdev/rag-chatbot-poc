@@ -58,7 +58,7 @@
 
 **Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
 1. fix `packages/bookings/src/guest.test.ts:44` (master is red since D-154 `8215020`; it expects no `extraGuestCount`);
-2. security headers in `next.config.mjs`;
+2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
 3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
 4. rate limits on login, password reset and `book/quote`, and the change-door lockout;
 5. a generic 500 body;
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — Security headers (D-156; audit B-2 / S-1)
+- **Did:** `apps/web/lib/security-headers.mjs` applied by `next.config.mjs` `headers()` (CSP with `frame-ancestors 'none'`, X-Frame-Options, HSTS, nosniff, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, zod `jitless`.
+- **Observed:** web 263 (9 new), typecheck clean; `plan/security-headers-walk.mjs` 29/29 on `next start` (headers on 6 paths, no CSP violation on 21 pages incl. 12 staff screens signed in, framing refused).
+- **Next:** item 3, `decide_change()` keeps `free_guests` and `promo_id`; item 1 (`guest.test.ts`) is still owed; commit.
 
 ### 2026-11-03 — No form button is disabled for a gap (D-155)
 - **Did:** `useMissingGate()` / `<MissingNote>` / `firstMissing()`; every submit and Continue button that was disabled while a field was empty now stays on and, clicked, says the first gap as an alert and focuses the field (booking page, staff form, Holidays, Promos, Slots, Knowledge base ×2, Rooms ×5, stay note and move, proof review, confirm dialogs, Members, login, password reset, Manage booking ×4).

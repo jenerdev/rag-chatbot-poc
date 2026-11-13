@@ -5138,3 +5138,50 @@ the unit's current standard and rate (18 with a fee, 7 without), none null.
 villa's booking page in a browser, Continue enabled, a click with the name
 empty said "Enter your name and mobile number." as an alert and focused
 `#name` with `aria-invalid="true"`.
+
+## D-156 · Every response carries the security headers, from ONE file · **Added 2026-11-14**
+
+**Asked:** fix the production-readiness audit one finding at a time, starting
+with "No security headers (clickjacking is possible on staff and platform
+screens)" (B-2 / S-1).
+
+**Decided:**
+- **ONE file**, `apps/web/lib/security-headers.mjs` (pure, tested; a `.mjs`
+  because `next.config.mjs` imports it), applied to `/:path*` by
+  `headers()`; `poweredByHeader: false`.
+- **The clickjacking wall:** `frame-ancestors 'none'` and
+  `X-Frame-Options: DENY`. Nothing of ours is meant to be embedded.
+- **The CSP, measured, not copied:** `script-src 'self' 'unsafe-inline'`
+  (Next's inline flight scripts; nonces would need a middleware and make
+  every static page dynamic), `style-src 'unsafe-inline'` (the theme's
+  `style` attribute, D-030), `img-src https:` (a tenant's logo may be any
+  https URL), `media-src blob:` (Read aloud), `connect-src 'self'` (the
+  browser talks to nothing else), `frame-src` the Supabase project's
+  origin (the proof PDF on S-14), `object-src 'none'`, `base-uri` and
+  `form-action 'self'`. `next dev` adds `'unsafe-eval'` and `ws:`.
+- **No `upgrade-insecure-requests`:** under `next start` on
+  http://localhost it rewrote our own scripts to https and the page died;
+  every allowed source is `'self'` or https already, and HSTS covers
+  navigation.
+- **HSTS** two years with subdomains, no `preload` (a list we would have to
+  leave by hand); **nosniff**; **Referrer-Policy**
+  `strict-origin-when-cross-origin` (Manage booking's `?ref=` never leaves
+  in a Referer); **Permissions-Policy** `microphone=(self)` (D-134), no
+  camera, location, payment or USB.
+- **Zod runs `jitless`** (`lib/schemas.ts`): its `new Function` probe is
+  caught, but Chrome still reported an `eval` violation on `/platform`.
+- **Vercel:** `headers()` is evaluated at BUILD, so `SUPABASE_URL` must be
+  set for the build, or the proof PDF cannot be framed (fails closed).
+
+**Measured:** web 263 (9 new), typecheck clean; `plan/security-headers-walk.mjs`
+29/29 against `next start`: the six headers and no `X-Powered-By` on a public
+page, a staff page, `/platform`, an API route and `sw.js`; no CSP violation on
+9 signed-out pages (villa, alteza with photos, the landing page, the platform)
+and 12 villa staff screens signed in as a throwaway admin; a page on another
+origin framing S-3 and `/platform` was refused ("violates … frame-ancestors
+'none'").
+
+**Not measured:** the proof PDF in its iframe (no proof on villa), Read aloud's
+blob audio, the platform signed in, a real push.
+
+---

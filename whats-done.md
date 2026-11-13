@@ -10265,3 +10265,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Left disabled, on purpose:** in-flight requests; Confirm on a clash (trap 21); navigation, permissions, a taken room; the chat's empty Send.
 - **Observed:** web 254, typecheck clean; in a browser on villa's booking page, Continue enabled and the click said "Enter your name and mobile number." (alert) with `#name` focused and `aria-invalid="true"`; the page's only console error is the pre-existing `favicon.ico` 404.
 - **Not done:** the staff forms seen in a browser; the axe pass; not committed.
+
+## 2026-11-14 · Security headers on every response (D-156; audit B-2 / S-1)
+- **Asked:** fix the audit one by one, starting with the missing security headers.
+- **What:** `apps/web/lib/security-headers.mjs` (+ `.d.mts`, 9 tests) gives every page and route a measured CSP, `frame-ancestors 'none'` + `X-Frame-Options: DENY`, HSTS, nosniff, `Referrer-Policy`, `Permissions-Policy: microphone=(self)`; `next.config.mjs` applies it and drops `X-Powered-By`; `lib/schemas.ts` runs zod `jitless`.
+- **Why it matters:** a page on any domain could frame S-15 or `/platform` and steer a signed-in click onto Confirm, Verify payment or Archive tenant. The CSP is also the second wall behind React's escaping if model or tenant text ever reaches HTML.
+- **Observed:** `plan/security-headers-walk.mjs` 29/29 against `next start`. The first run showed two things a template would have hidden: `upgrade-insecure-requests` breaks `next start` on http://localhost (removed), and zod 4's eval probe raised a violation on `/platform` (jitless). Framing check: Chrome logged "Framing 'http://localhost:3000/' violates … \"frame-ancestors 'none'\"" for S-3 and `/platform`.
+- **Trap avoided:** headers() runs at build on Vercel; `SUPABASE_URL` must be present then, or the proof PDF frame fails closed.
+- **Not done:** the proof PDF iframe, Read aloud and the signed-in platform under the CSP; not committed.

@@ -1,4 +1,11 @@
 import { z } from 'zod';
+
+// Audit S-1: the CSP has no 'unsafe-eval' (lib/security-headers.mjs). Zod 4
+// probes `new Function` on first parse to decide whether to compile its
+// object parsers; the throw is caught, but Chrome still reports a
+// securitypolicyviolation (the platform tenant form imports this file).
+// jitless skips the probe and the compilation; our schemas are small.
+z.config({ jitless: true });
 import { MAX_WELCOME_TEXT_LENGTH } from './welcome-text';
 import { MAX_CONTENT_LENGTH, MAX_MESSAGE_LENGTH } from './limits';
 
