@@ -130,8 +130,8 @@ Already present and complete (for credit): booking lookup and management by the 
 | S-1 | ~~No security headers / CSP~~ | High | **FIXED 2026-11-14** (D-156) | `next.config.mjs` | Staff and platform screens can be framed: clickjacking on Confirm, Verify payment, Archive tenant. Any future XSS has no second wall | `headers()`: `frame-ancestors 'none'`, a measured CSP, HSTS, nosniff, `Referrer-Policy`, `Permissions-Policy: microphone=(self)`; `poweredByHeader: false` |
 | S-2 | ~~Login and reset not rate limited~~ | High | **FIXED 2026-11-14** (D-157; failed logins not audited) | session and password-reset routes | Password guessing; locking out all staff via Supabase's server-IP bucket; email-quota exhaustion | `allow()` per IP and per email-hash before sign-in and reset; audit failed logins |
 | S-3 | ~~Error messages leak internals~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `lib/route.ts:64`; chat stream | Schema mapping (constraint, function and column names); OpenAI key fragments in a 401 body | 500/502 → a fixed sentence plus a request id; log the detail on the server; map OpenAI 401 → 502 |
-| S-4 | Change-request door never counts toward the lockout | Medium | VERIFIED | `schema-manage-booking.sql:1363-1365, 1461-1463, 849-851` | Unlimited email/phone guesses against a known reference through `/manage/change` (per-IP limit only) | Have the route call `guest_stay()` first (as the proof door does), or record the miss outside the raising transaction |
-| S-5 | `book/quote` has no rate limit | Medium | VERIFIED | `app/api/t/[tenant]/book/quote/route.ts` | Promo-code discovery by dictionary; up to 70 `unit_quote()` calls per request | `allow()` with its own key and a per-tenant ceiling |
+| S-4 | ~~Change-request door never counts toward the lockout~~ | Medium | **FIXED 2026-11-14** (D-162) | `schema-manage-booking.sql:1363-1365, 1461-1463, 849-851` | Unlimited email/phone guesses against a known reference through `/manage/change` (per-IP limit only) | Have the route call `guest_stay()` first (as the proof door does), or record the miss outside the raising transaction |
+| S-5 | ~~`book/quote` has no rate limit~~ | Medium | **FIXED 2026-11-14** (D-162) | `app/api/t/[tenant]/book/quote/route.ts` | Promo-code discovery by dictionary; up to 70 `unit_quote()` calls per request | `allow()` with its own key and a per-tenant ceiling |
 | S-6 | Sessions cannot be revoked (12 h HMAC cookies, no server state) | Medium | VERIFIED | `lib/admin-auth.ts:50`, `lib/platform-auth.ts:31` | A copied cookie works for up to 12 h after logout or a password change. The platform cookie is cross-tenant | A per-user `session_epoch` checked on each request; shorter platform sessions |
 | S-7 | CSRF relies on SameSite=Lax only; JSON is parsed from any content type | Low-Medium | VERIFIED | `withRoute()` | Same-site attackers (a sibling subdomain once a custom domain exists) | Refuse a state-changing request whose `Origin` is not the app's; require `application/json` |
 | S-8 | Client IP is the first `X-Forwarded-For` entry | Low on Vercel / High elsewhere | VERIFIED (code), MANUAL (host) | `lib/rate-limit.ts` `clientIp()` | Off Vercel, every per-IP limit is bypassed by rotating the header | Use `x-vercel-forwarded-for`/`x-real-ip`; test a forged header on the deployment |
@@ -204,7 +204,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 - [ ] ~~GitHub Actions on every push and PR: `pnpm install --frozen-lockfile`, `pnpm typecheck` (includes the service-import check), `pnpm test`, `pnpm audit --prod --audit-level=critical`.~~ Done 2026-11-14 (D-160), plus the build and Rule 2's bundle grep. Protect `master` (B-7): still open, a GitHub setting.
 - [ ] Release tags (`v1.0.0`) and a written rollback: Vercel "promote previous deployment" plus the additive-SQL rule.
 - [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
-- [ ] Rate limits: ~~login, password reset~~ (S-2, done 2026-11-14, D-157), `book/quote`; the change-door lockout (S-4, S-5).
+- [x] ~~Rate limits: login, password reset (S-2, D-157), `book/quote`; the change-door lockout (S-4, S-5).~~ Done 2026-11-14 (D-157, D-162).
 - [ ] ~~OpenAI: request timeouts, abort on disconnect, `max_tokens` on answers (B-5).~~ Done 2026-11-14 (D-159).
 - [x] ~~Fix `decide_change()` (B-3), with a rooms check for a rescheduled stay carrying a free child and a promo.~~ Done 2026-11-14 (D-161): the free child is kept (verify 154b); the promo is not carried, by design (D-108).
 - [ ] Redact the visitor's question in the `[rewrite]` log line (`packages/rag/src/retrieve.ts:87`).
@@ -250,7 +250,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 | 4 | ~~Generic 500/502 body in production; keep the detail in server logs (S-3)~~ done 2026-11-14 | S |
 | 5 | ~~OpenAI timeouts, abort on disconnect, `max_tokens`~~ done 2026-11-14; OpenAI spend cap (B-5) still MANUAL | S |
 | 6 | ~~`decide_change()` keeps `free_guests`~~ done 2026-11-14 (D-161, verify 154b); `promo_id` by design (D-108) | S |
-| 7 | Change-door lockout and `book/quote` rate limit (S-4, S-5) | S |
+| 7 | ~~Change-door lockout and `book/quote` rate limit (S-4, S-5)~~ done 2026-11-14 (D-162) | S |
 | 8 | ~~CI~~ done 2026-11-14 (D-160); branch protection (B-7) still open | S–M |
 | 9 | A new production Supabase project with backups, the migration ledger and an in-order apply script, rehearsed on an empty project (B-8, B-14) | M |
 | 10 | Lawyer-reviewed privacy notice and terms; cross-border disclosure (B-11) | L (external) |

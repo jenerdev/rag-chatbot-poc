@@ -60,7 +60,7 @@
 1. ~~fix `packages/bookings/src/guest.test.ts:44`~~ done 2026-11-14 (tests 13/13);
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
 3. ~~`decide_change()` keeps `free_guests`~~ done 2026-11-14 (D-161, the 48th file applied, verify 154b); `promo_id` stays dropped by design (D-108, re-confirmed);
-4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
+4. ~~rate limits on login, password reset (D-157) and `book/quote`, and the change-door lockout~~ done 2026-11-14 (D-162);
 5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
 6. ~~OpenAI timeouts, abort and `max_tokens`~~ done 2026-11-14 (D-159, seen live);
 7. ~~CI~~ done 2026-11-14 (D-160, `.github/workflows/ci.yml`, not pushed; branch protection is yours, on GitHub);
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — The change doors count toward the lockout; price quotes are limited (D-162; audit S-4, S-5)
+- **Did:** `requestChange()` and `withdrawChange()` (`packages/bookings/src/changes.ts`) match the guest through `guestStay()` first, as `submitProof()` does; `book/quote` meets `allowSpend()`: 60 per address (`QUOTE_REQUESTS_PER_WINDOW`) and the 600 tenant ceiling, per 10 minutes. `plan/guest-doors-limit-walk.mjs`.
+- **Observed** on the user's `pnpm dev`: walk 3/3 (60 real quotes at 200 then 429 "Too many price checks…", count 61; five wrong-contact change/withdraw tries = five misses; the sixth is 404 and adds none: locked); `manage-booking-phase6-walk.mjs` 4/4 (a right guest still quotes, asks, withdraws, is approved); tests 13/13, typecheck 13/13.
+- **Next:** the P0 items left are the user's (production Supabase + migration ledger; the lawyer); then P1.
 
 ### 2026-11-14 — A rescheduled stay keeps its free child (D-161; audit B-3)
 - **Did:** `schema-reschedule-free-guests.sql` (the 48th, applied): `decide_change()` copies `free_guests` into the moved nights; the comment on the function is the marker, and `schema-manage-booking.sql`'s old definition is GUARDED on it (trap 20). The promo is still not carried: the user kept D-108 after being shown that the guest's move quote is priced without it.

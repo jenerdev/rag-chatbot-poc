@@ -10323,3 +10323,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Not a bug:** the promo. D-108 decided a move carries no promo, and the guest's quote is priced that way; the user kept it. Changing it would have meant changing the quote too, or charging a price the guest was never shown.
 - **Trap avoided:** trap 23's cousin: a column WITH a default is the one an old named-column insert forgets silently. Trap 20: the old definition is guarded, or re-running the older file puts the bug back.
 - **Not done:** not committed.
+
+## 2026-11-14 · The change doors count toward the lockout; price quotes are limited (D-162; audit S-4, S-5)
+- **Asked:** the last two code items of the audit's security list.
+- **What:** `packages/bookings/src/changes.ts`: `guestStay()` before `request_change()` / `withdraw_change()`; `apps/web/app/api/t/[tenant]/book/quote/route.ts`: `allowSpend()` with `QUOTE_REQUESTS_PER_WINDOW = 60` (`lib/rate-limit.ts`); `plan/guest-doors-limit-walk.mjs`.
+- **Why it matters:** the Manage booking lockout (5 misses an hour) had a back door: the change form, where a miss was rolled back with the error, so a stranger who knew a reference could guess emails and phones there without limit. And every price check on the open booking page ran up to 70 price calls with no limit at all, which also let anyone try promo codes by dictionary.
+- **Observed:** walk 3/3 (60 × 200 then 429; 5 misses then locked); the phase-6 Manage walk 4/4 (the right guest unaffected); tests and typecheck 13/13.
+- **Trap avoided:** a miss recorded inside a function that then RAISES is no miss at all: the raise rolls it back. Record a miss in a call that returns.
+- **Not done:** not committed.

@@ -5386,3 +5386,34 @@ the marker the new body survives, without it the old body returns. verify
 1,500.00, 500.00 owed).
 
 ---
+
+## D-162 · The change doors count toward the lockout, and price quotes are rate limited · **Added 2026-11-14**
+
+**Asked:** the audit's S-4 and S-5, after the user's go-ahead.
+
+**Decided:**
+- **S-4, the change doors:** `requestChange()` and `withdrawChange()` call
+  `guestStay()` first and return the lookup's one 404 on a miss, as
+  `submitProof()` always did. `request_change()` and `withdraw_change()`
+  RAISE on a miss, and a raise rolls back the miss `guest_group()` had
+  recorded, so these two doors never counted toward the 5-misses-an-hour
+  lockout (D-104): a known reference could be guessed at here for ever,
+  slowed only by the per-IP window. `guest_stay()` returns null instead of
+  raising, so its miss is kept; a locked reference is a miss too. The SQL
+  is unchanged; the extra read is one definer call per change request.
+- **S-5, `book/quote`:** `allowSpend(tenant, 'quote', ip, 60)`: 60 per
+  address per 10 minutes, then the tenant's 600 across addresses, before
+  any `unit_quote()`. The page re-asks 300 ms after each change, so a guest
+  makes 20 to 40; the ceiling is what a promo-code dictionary spread over
+  many addresses meets. One sentence, 429: "Too many price checks from
+  here. Please wait a few minutes and try again."
+
+**Measured** on `pnpm dev`: `plan/guest-doors-limit-walk.mjs` 3/3: 60 quotes
+at 200 and the 61st 429 (the window at 61); three change requests and two
+withdrawals with a wrong contact on a made-up reference left 5 misses (the
+code before this change left none), and the sixth try was the same 404 with
+no new miss (locked). `manage-booking-phase6-walk.mjs` 4/4 on a throwaway
+tenant: the right guest still quotes, asks, withdraws, and is approved.
+Tests 13/13; typecheck 13/13.
+
+---

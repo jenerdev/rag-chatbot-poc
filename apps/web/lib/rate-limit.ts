@@ -45,6 +45,17 @@ export const CHAT_REQUESTS_PER_WINDOW = 30;
 export const TENANT_CEILING_PER_WINDOW = 600;
 
 /**
+ * Audit S-5 (D-162): price quotes per IP per tenant per 10 minutes on the
+ * booking page (`book/quote`). The page re-asks 300 ms after each change, so
+ * a guest choosing dates, rooms and typing a promo code letter by letter
+ * makes 20 to 40; 60 leaves room for a second try. It also caps guessing
+ * promo codes by dictionary, with TENANT_CEILING_PER_WINDOW across
+ * addresses (allowSpend()), and each quote is up to 70 unit_quote() calls.
+ * Policy.
+ */
+export const QUOTE_REQUESTS_PER_WINDOW = 60;
+
+/**
  * Audit S-2 (D-157): the sign-in and "Forgot password?" doors, staff and
  * platform. Two counts per call, both in the same window: this ADDRESS, and
  * this ACCOUNT (the email, hashed), so a guesser spread over many addresses
@@ -142,7 +153,8 @@ export async function allow(tenant: Limited, key: string, max: number = MAX_REQU
 }
 
 /**
- * The two limits on a route that spends OpenAI money: this address's window
+ * The two limits on a route that spends OpenAI money (or, since D-162, the
+ * booking page's price quote, which is expensive and probes promo codes): this address's window
  * under `scope`, then the tenant's ceiling across every address. The ceiling
  * is bumped only when the address was inside, so a refused address does not
  * eat the tenant's allowance. One sentence for both: the visitor is told to

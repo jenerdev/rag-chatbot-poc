@@ -673,6 +673,7 @@ pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/audit-log-walk.mjs)   # 12 checks of S-18 and the platform's log on villa, HTTP and browser, shots in plan/audit-log/walk/; audit-log-a11y.mjs is axe over 16 states; needs pnpm dev
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/security-headers-walk.mjs)   # 29 checks of the security headers (D-156): the headers on 6 paths, no CSP violation on 21 pages (12 staff screens as a throwaway admin), framing refused; best on next start
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/auth-rate-limit-walk.mjs)   # 5 HTTP checks of the login and reset limits (D-157): per address, per account, the platform's hashed table; made-up accounts, no email sent
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-doors-limit-walk.mjs)   # 3 HTTP checks (D-162): book/quote 60 then 429; the change doors' misses count toward the lockout; a made-up reference, its rows removed
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
