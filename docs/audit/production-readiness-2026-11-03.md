@@ -79,7 +79,7 @@ None of this is a sign of a weak codebase. Most of it is already listed honestly
 
 | # | Issue | Severity | Status | Location |
 |---|---|---|---|---|
-| B-1 | `master` is red: `guest.test.ts` fails after D-154 (`extraGuestCount` added, test not updated); `pnpm test` exits 1 | High | VERIFIED | `packages/bookings/src/guest.test.ts:44` (introduced by `8215020`) |
+| B-1 | ~~`master` is red: `guest.test.ts` fails after D-154 (`extraGuestCount` added, test not updated); `pnpm test` exits 1~~ | High | **FIXED 2026-11-14** (the test updated; 13/13) | `packages/bookings/src/guest.test.ts:44` (introduced by `8215020`) |
 | B-2 | ~~No security headers: no CSP, `frame-ancestors`/X-Frame-Options, HSTS, nosniff or Referrer-Policy; `X-Powered-By` sent~~ | High | **FIXED 2026-11-14** (D-156) | `apps/web/next.config.mjs` (no `headers()`), no `middleware.ts` |
 | B-3 | Approving a reschedule drops `free_guests` and `promo_id`; the stay is re-priced without its discount and the child disappears | High | VERIFIED | `packages/db/sql/schema-manage-booking.sql:1541-1546` (`decide_change()`) |
 | B-4 | ~~No rate limit on staff or platform login, nor on password reset.~~ Supabase's own limit counts the SERVER's IP, so one attacker can lock out every staff member or burn the email quota | High | **FIXED 2026-11-14** (code, D-157); Supabase side MANUAL | `app/api/t/[tenant]/admin/session/route.ts`, `app/api/platform/session/route.ts`, both `password-reset/route.ts` |
@@ -200,7 +200,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 ## F. Production deployment checklist
 
 **Code and repository**
-- [ ] Fix `guest.test.ts` so `pnpm test` is green (B-1).
+- [x] ~~Fix `guest.test.ts` so `pnpm test` is green (B-1).~~ Done 2026-11-14.
 - [ ] ~~GitHub Actions on every push and PR: `pnpm install --frozen-lockfile`, `pnpm typecheck` (includes the service-import check), `pnpm test`, `pnpm audit --prod --audit-level=critical`.~~ Done 2026-11-14 (D-160), plus the build and Rule 2's bundle grep. Protect `master` (B-7): still open, a GitHub setting.
 - [ ] Release tags (`v1.0.0`) and a written rollback: Vercel "promote previous deployment" plus the additive-SQL rule.
 - [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
@@ -244,7 +244,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 
 | # | Action | Size |
 |---|---|---|
-| 1 | Fix the failing `guest.test.ts` (B-1) | S |
+| 1 | ~~Fix the failing `guest.test.ts` (B-1)~~ done 2026-11-14 | S |
 | 2 | ~~Security headers + `poweredByHeader: false` (S-1)~~ done 2026-11-14 | S |
 | 3 | ~~Rate limits on staff and platform login and on password reset~~ done 2026-11-14; audit failed logins (S-2) still open | S–M |
 | 4 | ~~Generic 500/502 body in production; keep the detail in server logs (S-3)~~ done 2026-11-14 | S |

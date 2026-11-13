@@ -10307,3 +10307,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** the same commands in a clean worktree with no `.env`: typecheck 13/13, tests 12/13 (only `guest.test.ts`, B-1), build 7/7, grep clean, audit exit 0 (3 high, 2 moderate, build-time postcss / source-map-js).
 - **Trap avoided:** without `--continue`, turbo stopped at the first failing package and 4 packages' tests never ran.
 - **Not done:** the first run on GitHub (not pushed); branch protection and tags (GitHub settings); the postcss bump; not committed.
+
+## 2026-11-14 · `pnpm test` is green again (audit B-1)
+- **Asked:** the audit's first item: `master` red since D-154 (`8215020`).
+- **What:** `packages/bookings/src/guest.test.ts`: the expectation gained `extraGuestCount: null`, and a new case reads a count that `guest_stay()` sends (2).
+- **Why it matters:** a red suite hides the next real failure behind a known one; with CI (D-160) it would have failed every push.
+- **Observed:** bookings 138/138; every package's tests 13/13.
+- **Trap avoided:** the fix was in the TEST, not the parser: an absent count from an older `guest_stay()` must stay null ("not known"), and changing the parser to 0 would have made the test pass by printing "0 extra guests" where nobody knows.

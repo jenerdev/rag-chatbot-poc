@@ -57,7 +57,7 @@
 ## ▶ Next up (do this next)
 
 **Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
-1. fix `packages/bookings/src/guest.test.ts:44` (master is red since D-154 `8215020`; it expects no `extraGuestCount`);
+1. ~~fix `packages/bookings/src/guest.test.ts:44`~~ done 2026-11-14 (tests 13/13);
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
 3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
 4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — `pnpm test` is green again (audit B-1)
+- **Did:** `packages/bookings/src/guest.test.ts`: the expected price now carries `extraGuestCount: null` (the fixture's `guest_stay()` sends no count, which the parser reads as "not known", never 0), and a new case reads a sent count (2). The parser (`guest.ts`) was right; only the test predated D-154.
+- **Observed:** bookings 138/138; `pnpm turbo test --continue` 13/13, so CI's test step (D-160) is green.
+- **Next:** push the branch so CI runs for the first time; protect `master` (GitHub settings); item 3, `decide_change()` keeps `free_guests` and `promo_id` (B-3).
 
 ### 2026-11-14 — CI (D-160; audit B-7)
 - **Did:** `.github/workflows/ci.yml`: on every push and PR, install `--frozen-lockfile`, `pnpm typecheck` (the service-import check first), `pnpm turbo test --continue`, `pnpm build` with no .env, Rule 2's bundle grep, `pnpm audit --prod --audit-level=critical`. Node 22, pnpm from `packageManager`.

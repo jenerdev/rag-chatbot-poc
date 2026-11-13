@@ -41,13 +41,21 @@ describe('parseGuestStay', () => {
     // D-147: 'free' absent from an older row is 0; present, it is kept.
     expect(stay.rooms).toEqual([{ unit: 'Garden Room', slot: 'Overnight', guests: 2, free: 0 }]);
     expect(parseGuestStay({ ...raw, rooms: [{ unit: 'Garden Room', slot: 'Overnight', guests: 2, free: 1 }] })!.rooms[0]!.free).toBe(1);
-    expect(stay.price).toEqual({ base: 400000, extraGuests: 0, surcharge: 50000, discount: 0, total: 450000 });
+    // D-154: no extra_guest_count from guest_stay() (a definition older than
+    // schema-extra-guest-count.sql) is null, "not known", never 0.
+    expect(stay.price).toEqual({ base: 400000, extraGuests: 0, extraGuestCount: null, surcharge: 50000, discount: 0, total: 450000 });
     expect(stay.payBy).toBe('2026-10-11T03:00:00+00:00');
     expect(stay.heldUntil).toBeNull();
   });
 
   it('is null for a miss, whatever the reason (the function returns null)', () => {
     expect(parseGuestStay(null)).toBeNull();
+  });
+
+  it('reads the extra-guest count when guest_stay() sends it (D-154)', () => {
+    const stay = parseGuestStay({ ...raw, price: { ...raw.price, extra_guests: 100000, extra_guest_count: 2, total: 550000 } })!;
+    expect(stay.price.extraGuestCount).toBe(2);
+    expect(stay.price.extraGuests).toBe(100000);
   });
 
   it('keeps an unpriced old row as null amounts, not 0', () => {
