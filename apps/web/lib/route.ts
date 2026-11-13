@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { OpenAIError } from '@rag/openai';
 import { assertEnv } from './env';
 import { errorBody, newRequestId } from './error-body';
+import { crossOriginRefusal, requestHost } from './same-origin';
 
 // Errors -> status codes, in exactly one place.
 //
@@ -49,6 +50,10 @@ export function withRoute<Context>(
   handler: (request: Request, context: Context) => Promise<Response>,
 ): (request: Request, context: Context) => Promise<Response> {
   return async (request, context) => {
+    // Audit S-7 (D-164): a state-changing request from another origin, or in
+    // a plain form's content type, is refused before the handler runs.
+    const refused = crossOriginRefusal(request.method, request.headers.get('origin'), request.headers.get('content-type'), requestHost(request));
+    if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
     try {
       // Config first: a missing key should be one clear sentence, not a 401
       // twenty minutes later while debugging something else (architecture.md § 8).

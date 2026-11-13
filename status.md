@@ -1908,6 +1908,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — State changes only from our own pages (D-164; audit S-7)
+- **Did:** `apps/web/lib/same-origin.ts` (`crossOriginRefusal()`, `requestHost()`, 7 tests), run first in `withRoute()`: a POST/PUT/PATCH/DELETE whose `Origin` is not this host is 403; a `text/plain` or urlencoded body is 415. No Origin (curl, walks, servers) goes on to the route. `plan/same-origin-walk.mjs`.
+- **Observed** on `pnpm dev`: walk 5/5 (another site 403; a sibling subdomain on the staff login 403; text/plain and urlencoded 415; the booking page's own fetch in Chrome 200; a foreign page's credentialed post sent and answered 403 in the network log); tests and typecheck 13/13.
+- **Owed on the deploy:** one browser POST there (the Host header Vercel passes is the domain the page came from; check it once).
+- **Next:** S-8, the client IP behind Vercel.
+
 ### 2026-11-14 — Sessions can be revoked (D-163; audit S-6)
 - **Did:** `schema-sessions.sql` (the 49th, applied): `app_sessions` and four definers (`session_open`, `session_valid`, `session_close`, `session_close_all`), each taking the user from `auth.uid()`. Staff and platform cookies carry the session id inside the HMAC; `requireAdmin()`, `sessionCan()` and `requirePlatform()` ask `session_valid()` on every request; logout revokes this device's row; a new password (`setPasswordWithToken()`) revokes every row with the link's own token. The platform session is 4 hours (was 12).
 - **Observed:** verify 229f–229k all PASS (valid only on its own user/kind/tenant; logout; refusals 42501 / 22023; platform; close_all = 2; no token reads the table); `plan/sessions-walk.mjs` 3/3 on `pnpm dev` (a copied cookie: 200 → 401 after logout, device B 200; a new password: B 401, "One open session was signed out."; platform 200 → 401, 4.00 h); security-headers walk: the 12 staff screens still load signed in; tests and typecheck 13/13.

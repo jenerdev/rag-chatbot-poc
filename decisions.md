@@ -5462,3 +5462,38 @@ reset route, "One open session was signed out.", B 401; platform 200 then
 security-headers walk still load signed in.
 
 ---
+
+## D-164 · A request that changes something must come from this site, as JSON or multipart · **Added 2026-11-14**
+
+**Asked:** the audit's S-7: CSRF relied on SameSite=Lax alone, and JSON was
+parsed from any content type.
+
+**Decided:**
+- **ONE pure function, `crossOriginRefusal()`** (`apps/web/lib/same-origin.ts`,
+  tested), run FIRST in `withRoute()`, so every handler (tenant, platform,
+  open) has it and none can forget it (rule 3).
+- **Origin:** on any method but GET, HEAD and OPTIONS, an `Origin` header
+  whose host is not this request's `Host` is 403, "This request did not come
+  from this site, so it was refused."; `null` and an unparseable one too. A
+  sibling subdomain is a different host, which is exactly the case SameSite
+  missed (a sibling is the same SITE, so the cookie went along).
+- **No Origin is let through** to the route's own checks: browsers send one
+  on every state-changing request, so its absence means curl, a walk or a
+  server, with no victim's cookie jar to ride.
+- **Content type:** `text/plain` and `application/x-www-form-urlencoded`, the
+  two a plain HTML form sends without a CORS preflight, are 415 "Send this
+  request as JSON." Every page of ours sends JSON or `multipart/form-data`
+  (the uploads, voice; checked: no `sendBeacon`, no bare string body).
+- **No server actions exist** (`'use server'` appears nowhere), so route
+  handlers are the only way in.
+
+**Measured** on `pnpm dev`: `plan/same-origin-walk.mjs` 5/5: `Origin:
+https://evil.example` on book/quote 403 with the sentence; `http://staff.localhost:3000`
+on the staff login 403; text/plain with our own Origin 415, urlencoded 415;
+in Chrome, the booking page's own fetch of book/quote 200; a page on
+127.0.0.1 posting `no-cors` with credentials was sent and answered 403 (the
+network log, not only CORS). Tests 13/13 (7 new), typecheck 13/13.
+
+**Owed:** one browser POST on the deployment, to see the Host Vercel passes.
+
+---

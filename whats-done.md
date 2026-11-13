@@ -10339,3 +10339,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** verify 6/6 new; the walk 3/3 (a replayed cookie 200 → 401 after logout while the other device stays 200; a new password ends the other device and says so; the platform the same, 4.00 h); 12 staff screens still load; tests and typecheck 13/13.
 - **Trap avoided:** the user is never an argument: every session function reads `auth.uid()` from the token, so a function callable by any signed-in token still cannot touch another person's sessions. And the reset link's access token is a real Supabase token for that user, so revoking needs no extra key.
 - **Not done:** an owner's "sign this member out" button; not committed.
+
+## 2026-11-14 · State changes only from our own pages (D-164; audit S-7)
+- **Asked:** the audit's S-7: CSRF relied on SameSite=Lax alone; JSON was parsed from any content type.
+- **What:** `apps/web/lib/same-origin.ts` and its 7 tests; `withRoute()` (`lib/route.ts`) runs it before anything else; `plan/same-origin-walk.mjs`.
+- **Why it matters:** SameSite stops a cross-SITE post, but a sibling subdomain is the same site, so once the app shares a custom domain with anything else, that page could post to a staff route with the staff cookie. And a plain HTML form could send a JSON-shaped body as text/plain, which the routes parsed.
+- **Observed:** walk 5/5, including a real browser: our own page 200, a foreign page's credentialed post refused 403 in the network log; tests and typecheck 13/13.
+- **Trap avoided:** a missing Origin is not refused, or every walk, curl and server-side call would break; a CSRF needs a browser, and browsers send it.
+- **Not done:** a POST seen on the deployment; not committed.
