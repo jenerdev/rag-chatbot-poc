@@ -160,6 +160,14 @@ create trigger booking_events_notify after insert on public.booking_events
 --    The keys are useless without the VAPID private key, and a claimed row
 --    is consumed, so the function cannot be used to list subscriptions.
 
+-- GUARDED (D-166, 2026-11-14): schema-notify-drain.sql replaces this with a
+-- body that demands the drain's own token, and marks it with a comment. Once
+-- that file has run, re-running THIS file must not open it to every token of
+-- the tenant again (CLAUDE.md trap 20).
+do $guard$
+begin
+  if coalesce(obj_description(to_regprocedure('public.notify_claim(bigint)'), 'pg_proc'), '') not like 'schema-notify-drain.sql%' then
+    execute $ddl$
 create or replace function public.notify_claim(p_tenant_id bigint)
 returns table (outbox_id bigint, kind text, reference text, first_night date, nights int,
                subscription_id bigint, endpoint text, p256dh text, auth text)
@@ -213,6 +221,11 @@ begin
       and (o.kind in ('request', 'change') or (o.kind = 'proof' and m.role in ('owner', 'admin'))));
 end;
 $$;
+
+$ddl$;
+  end if;
+end;
+$guard$;
 revoke all on function public.notify_claim(bigint) from public, anon;
 grant execute on function public.notify_claim(bigint) to authenticated;
 
@@ -225,6 +238,14 @@ grant execute on function public.notify_claim(bigint) to authenticated;
 --    An outbox row whose recipients all answered ok or gone is sent. Only
 --    rows of the token's tenant that are claimed are touched.
 
+-- GUARDED (D-166, 2026-11-14): schema-notify-drain.sql replaces this with a
+-- body that demands the drain's own token, and marks it with a comment. Once
+-- that file has run, re-running THIS file must not open it to every token of
+-- the tenant again (CLAUDE.md trap 20).
+do $guard$
+begin
+  if coalesce(obj_description(to_regprocedure('public.notify_done(jsonb)'), 'pg_proc'), '') not like 'schema-notify-drain.sql%' then
+    execute $ddl$
 create or replace function public.notify_done(p_results jsonb)
 returns void
 language plpgsql
@@ -268,6 +289,11 @@ begin
   where o.id = agg.outbox_id and o.tenant_id = v_tenant and o.claimed_at is not null and o.sent_at is null;
 end;
 $$;
+
+$ddl$;
+  end if;
+end;
+$guard$;
 revoke all on function public.notify_done(jsonb) from public, anon;
 grant execute on function public.notify_done(jsonb) to authenticated;
 

@@ -10355,3 +10355,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** a production build on port 3100 in a scratch worktree: 61 forged addresses became ONE count and the 61st was refused; with the header configured, real addresses counted apart and forged ones not at all. The user's dev server was not touched (trap 16).
 - **Trap hit and read correctly:** a fixed window boundary split a 61-request run 4 + 57 and looked like a missed limit; the rows said why. Rerun inside one window: 60 then 429.
 - **Not done:** the forged-header check on Vercel itself; not committed.
+
+## 2026-11-14 · Only the drain can drain (D-166; audit S-10)
+- **Asked:** the audit's S-10, after the user asked what it meant ("drain" is emptying the notification queue; a "chat token" is the server's per-request pass, not an AI token).
+- **What:** `packages/db/src/tenant-client.ts` (`notifier` shape, `notifierClient()`); `apps/web/lib/notify.ts` drains on it; `packages/db/sql/schema-notify-drain.sql` (the 50th, applied); the old definitions guarded; verify 176–181 moved and 181b added; bookings isolation 31c–e moved.
+- **Why it matters:** with a leaked guest-request token, someone could have silenced staff phones for new bookings and payment proofs, or switched their devices off, without any trace in the app.
+- **Observed:** verify's notify checks all pass, 181b refuses chat, staff and owner tokens; the app's real drain took a re-queued row live and the row was restored.
+- **Trap hit:** a one-character slice bug in the generator turned `revoke` into `evoke` in the old file; the diff showed it, the file was restored from git and regenerated before anything ran.
+- **Not done:** the isolation suite run (needs northwind); not committed.

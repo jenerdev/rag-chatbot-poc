@@ -844,6 +844,10 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    Chat tokens carry **no `sub`**. Staff tokens carry the user and
    `app_admin`, and Postgres's `app_role()` reads the `memberships` row for
    that tenant on every write: the ROLE is never a claim (D-075).
+   Notifier tokens (D-166, `mintTenantToken({ tenantId, notifier: true })`,
+   only through `notifierClient()`) carry a tenant, NO `sub` and
+   `app_notifier`: the notification drain's, and the only token
+   `notify_claim` and `notify_done` accept.
    **A second shape since tenant management (D-076):** `mintPlatformToken()`,
    in the same file, mints `{ sub, app_super }` with NO tenant, still
    `authenticated`, still five minutes, still no role parameter; with no
@@ -861,7 +865,7 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    `record_refund`, `set_payment_settings`, `decide_change` (owners and
    admins, each asking `app_is_admin()`), `expire_due_stays` (staff or
    service_role); since D-116 two more, `notify_claim` and `notify_done`
-   (any token of the tenant, each checking the token's tenant; a claimed
+   (since D-166 the drain's NOTIFIER token only, each checking the token's tenant; a claimed
    row is consumed, so the claim cannot list devices twice); since D-137
    `rate_allow` (any token of the tenant, checking the token's tenant; the
    ONE way to `rate_windows`, which no token reads); since D-157

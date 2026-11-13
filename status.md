@@ -1923,6 +1923,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — Only the drain can drain (D-166; audit S-10)
+- **Did:** a third token shape, the NOTIFIER (`mintTenantToken({ tenantId, notifier: true })`: a tenant, no user, `app_notifier`), minted only by `notifierClient()`; `notifyAfter()` drains on it whoever calls; `schema-notify-drain.sql` (the 50th, applied) makes `notify_claim()` and `notify_done()` refuse every other token; their older definitions in `schema-notifications.sql` are GUARDED on the new file's comment (trap 20). verify 176–181 moved to the notifier token, 181b new; bookings isolation 31c–e moved too (not run: needs northwind, see the eval block above).
+- **Observed:** verify: every notify check PASS, 181b "chat 42501/42501 · staff 42501/42501 · owner 42501/42501 · devices 1/1 · unsent true"; the only fails are check 27's dates. Live on `pnpm dev`: villa's latest sent outbox row re-queued, the staff attention poll's drain took it (attempts 1, marked sent: no device), row restored exactly. Tests and typecheck 13/13.
+- **Next:** S-11 (staff edits of guest details leave no log).
+
 ### 2026-11-14 — The client IP is believed only where it can be (D-165; audit S-8)
 - **Did:** `clientIpFrom()` (pure, 4 new tests) behind `clientIp()` in `apps/web/lib/rate-limit.ts`: on Vercel the first X-Forwarded-For entry (Vercel writes it from the connection and drops the client's, per its Request headers docs); in development the same, as sent (the walks); self-hosted in production ONLY the header named by `CLIENT_IP_HEADER`, or one shared `unknown` count with a one-time warning. `.env.example` and `env.ts` document it.
 - **Observed** on a production build of a scratch worktree on port 3100 (the user's `pnpm dev` untouched): no setting, 61 quotes from 61 forged X-Forwarded-For → ONE key `quote|3|unknown` = 61, 60×200 then 429, and the warning once; `CLIENT_IP_HEADER=x-real-ip`: 61 different real IPs → 61 keys, all 200; one real IP with 61 forged X-Forwarded-For → 60×200 then 429, counted on the real IP, no forged key. (A first run crossed a 10-minute window boundary, 4 + 57; rerun inside one window.) Rows removed. Rate-limit tests 19/19, typecheck clean.

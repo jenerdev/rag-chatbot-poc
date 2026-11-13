@@ -5532,3 +5532,46 @@ answered and the 61st 429, counted on the real IP alone. Tests 19/19.
 **Owed:** a forged X-Forwarded-For against the Vercel deployment itself.
 
 ---
+
+## D-166 · The notification drain runs on a token of its own, and only it can drain · **Added 2026-11-14** (amends D-116, D-039)
+
+**Asked:** the audit's S-10: a chat token can drain the push outbox and
+delete push subscriptions.
+
+**Found:** the drain (D-116) runs on the server right after a guest's
+request, on that request's chat token, so `notify_claim()` and
+`notify_done()` accepted ANY token of the tenant. A leaked chat token (they
+never leave the server and live 5 minutes) could claim the queue so no
+staff phone rang (a claim is retried after 5 minutes, dropped after 5
+attempts) and report devices "gone", deleting staff subscriptions. It could
+read no guest data: the outbox carries none (D-116), and the device keys are
+useless without the VAPID private key.
+
+**Decided:**
+- **A third token shape, the notifier:** `mintTenantToken({ tenantId,
+  notifier: true })`: a tenant, NO `sub`, the claim `app_notifier`; never
+  with a user or `admin` (the minter refuses the mix). Still
+  `authenticated`, still 5 minutes, still no role parameter (D-039's
+  rules). Minted only by `notifierClient()` in `@rag/db`.
+- **`notifyAfter()` always drains on it**, whether a guest route or the
+  staff poll called it; `drainNotifications()` is unchanged (it uses the db
+  it is handed).
+- **`schema-notify-drain.sql`, the 50th file:** both functions with their
+  bodies unchanged plus one check, `app_notifier` or 42501 "only the
+  notification drain may call this"; a comment on each is the marker the
+  GUARD on their older definitions in `schema-notifications.sql` reads
+  (trap 20).
+- **What the notifier can otherwise do is a chat token's:** it reads what
+  any token of the tenant reads, and nothing more.
+
+**Measured:** verify 176–181 on the notifier token (the drain of another
+tenant refused 42501; the request to both devices; a proof to the owner
+only; gone deletes, retry releases; another tenant's drain changes nothing)
+and 181b (chat, staff and OWNER tokens: 42501 on both functions; the device
+and the unsent row stay). Live on `pnpm dev`: a re-queued villa outbox row
+was taken by the app's own drain after the staff attention poll (attempts 1,
+marked sent: villa has no device), then restored exactly. The bookings
+isolation suite's 31c–e were moved to notifier tokens but not run (it needs
+northwind; owed with the full eval).
+
+---

@@ -3426,12 +3426,15 @@ async function notificationChecks() {
     const owner = asToken(staffToken(probe.id, ownerId));
     const staff = asToken(staffToken(probe.id, staffId));
     const chat = asToken(chatToken(probe.id));
+    // D-166 (audit S-10): the drain's own token, the only one notify_claim()
+    // and notify_done() accept (tenant, no user, app_notifier).
+    const drain = asToken(mintTenantToken({ tenantId: probe.id, notifier: true }));
     const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
 
     const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
     const endpoint = (who) => `https://fcm.googleapis.com/fcm/send/verify-${who}-${randomUUID()}`;
     const outbox = async () => (await supabase.from('notification_outbox').select('id, kind, reference, first_night, nights, claimed_at, sent_at').eq('tenant_id', probe.id).order('id')).data ?? [];
-    const claim = async (client = owner, tenantId = probe.id) => client.rpc('notify_claim', { p_tenant_id: tenantId });
+    const claim = async (client = drain, tenantId = probe.id) => client.rpc('notify_claim', { p_tenant_id: tenantId });
 
     // 173. A member adds their own device (user_id filled from the token);
     //      naming another member, another tenant, or a bad endpoint is refused.
@@ -3501,32 +3504,32 @@ async function notificationChecks() {
       const subs = await chat.from('push_subscriptions').select('id');
       const box = await chat.from('notification_outbox').select('id');
       const staffBox = await owner.from('notification_outbox').select('id');
-      const foreign = await claim(chat, villaRow.id);
+      const foreign = await claim(drain, villaRow.id);
       const serviceSubs = await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id);
       check(
         (subs.data ?? []).length === 0 && (box.data ?? []).length === 0 && (staffBox.data ?? []).length === 1 && foreign.error?.code === '42501'
           && serviceSubs.data?.length === 2 && (await outbox()).length === 1,
-        "notify: a chat token reads 0 devices and 0 outbox rows, staff their 1 outbox row (service sees 2 and 1); notify_claim on another tenant is 42501",
+        "notify: a chat token reads 0 devices and 0 outbox rows, staff their 1 outbox row (service sees 2 and 1); notify_claim by the drain of another tenant is 42501",
         `chat subs ${subs.error?.code ?? (subs.data ?? []).length} · chat outbox ${box.error?.code ?? (box.data ?? []).length} · staff outbox ${staffBox.error?.code ?? (staffBox.data ?? []).length} · foreign ${foreign.error?.code}`,
       );
     }
 
-    // 177. The claim, on a CHAT token (the guest's request runs the drain):
+    // 177. The claim, on the DRAIN's token (D-166; it was the chat token):
     //      the request goes to both members' devices, with nothing but the
     //      named fields; a second claim returns nothing (claimed).
     {
-      const first = await claim(chat);
-      const second = await claim(chat);
+      const first = await claim(drain);
+      const second = await claim(drain);
       const rows = first.data ?? [];
       check(
         !first.error && rows.length === 2 && new Set(rows.map((r) => r.subscription_id)).size === 2 && rows.every((r) => r.kind === 'request' && r.reference === webRef)
           && Object.keys(rows[0]).sort().join() === 'auth,endpoint,first_night,kind,nights,outbox_id,p256dh,reference,subscription_id'
           && !second.error && (second.data ?? []).length === 0,
-        'notify: a chat token claims the request for both devices (named fields only); a second claim gets nothing',
+        'notify: the drain claims the request for both devices (named fields only); a second claim gets nothing',
         `first ${first.error?.message ?? rows.length} · second ${second.error?.message ?? (second.data ?? []).length}`,
       );
       // ok from both: sent.
-      const done = await chat.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const done = await drain.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
       const box = (await outbox())[0];
       const subs = await supabase.from('push_subscriptions').select('last_ok_at').eq('tenant_id', probe.id);
       check(
@@ -3547,33 +3550,33 @@ async function notificationChecks() {
         p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_proof_path: proofPath, p_method: 'GCash',
         p_claimed_amount: 100000, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
       });
-      const rows = (await claim(staff)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const box = (await outbox()).filter((r) => r.kind === 'proof');
       check(
         !pay.error && box.length === 1 && rows.length === 1 && rows[0].kind === 'proof' && rows[0].subscription_id === ownerSub,
         "notify: a guest's proof is one outbox row, claimed for the owner's device only (staff has no payments:write)",
         `pay ${pay.error?.message ?? 'ok'} · proof rows ${box.length} · recipients ${rows.map((r) => (r.subscription_id === ownerSub ? 'owner' : 'staff')).join(',')}`,
       );
-      await staff.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      await drain.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
     }
 
     // 179. A change request reaches both; "gone" deletes that device, "retry"
     //      releases the row, which the next claim takes again (owner only now).
     {
       const asked = await chat.rpc('request_change', { p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_kind: 'cancel', p_new_check_in: null, p_reason: 'Probe', p_dry_run: false });
-      const rows = (await claim(owner)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const results = rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: r.subscription_id === staffSub ? 'gone' : 'retry' }));
-      const done = await owner.rpc('notify_done', { p_results: results });
+      const done = await drain.rpc('notify_done', { p_results: results });
       const staffGone = (await supabase.from('push_subscriptions').select('id').eq('id', staffSub)).data?.length === 0;
       const box = (await outbox()).find((r) => r.kind === 'change');
-      const again = (await claim(owner)).data ?? [];
+      const again = (await claim(drain)).data ?? [];
       check(
         !asked.error && rows.length === 2 && rows.every((r) => r.kind === 'change') && !done.error && staffGone
           && box?.sent_at === null && box?.claimed_at === null && again.length === 1 && again[0].subscription_id === ownerSub,
         'notify: a change request reaches both; gone deletes that device, retry releases the row and the next claim takes it again',
         `asked ${asked.error?.message ?? 'ok'} · first ${rows.length} · staff device deleted ${staffGone} · released ${box?.claimed_at === null} · again ${again.length}`,
       );
-      await owner.rpc('notify_done', { p_results: again.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      await drain.rpc('notify_done', { p_results: again.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
     }
 
     // 180. A device that chose only proofs is not told of requests; a row
@@ -3582,7 +3585,7 @@ async function notificationChecks() {
       await supabase.from('push_subscriptions').delete().eq('id', ownerSub);
       const picky = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('picky'), kinds: ['proof'], ...KEYS }).select('id').single();
       const ref = await request('2027-07-05', 'notify.second@example.com');
-      const rows = (await claim(owner)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const box = (await outbox()).find((r) => r.reference === ref);
       check(
         !picky.error && rows.length === 0 && box?.kind === 'request' && box.sent_at !== null,
@@ -3596,13 +3599,31 @@ async function notificationChecks() {
     {
       const ref = await request('2027-08-02', 'notify.third@example.com');
       await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('again'), ...KEYS });
-      const rows = (await claim(owner)).data ?? [];
-      const forged = await asToken(chatToken(villaRow.id)).rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const rows = (await claim(drain)).data ?? [];
+      const forged = await asToken(mintTenantToken({ tenantId: villaRow.id, notifier: true })).rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
       const box = (await outbox()).find((r) => r.reference === ref);
       check(
         rows.length === 1 && !forged.error && box?.sent_at === null,
-        "notify: another tenant's token calling notify_done changes nothing here (the row stays unsent)",
+        "notify: another tenant's drain calling notify_done changes nothing here (the row stays unsent)",
         `claimed ${rows.length} · forged ${forged.error?.code ?? 'no error'} · sent ${box?.sent_at !== null}`,
+      );
+
+      // 181b. D-166 (audit S-10): nobody but the drain. A chat token, a staff
+      //       token and an OWNER's token are refused by both functions
+      //       (42501), and the refused done leaves the row unsent and the
+      //       device in place.
+      const tries = [];
+      for (const [who, client] of [['chat', chat], ['staff', staff], ['owner', owner]]) {
+        const c = await client.rpc('notify_claim', { p_tenant_id: probe.id });
+        const d = await client.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'gone' })) });
+        tries.push(`${who} ${c.error?.code ?? 'claimed'}/${d.error?.code ?? 'done'}`);
+      }
+      const stillThere = (await supabase.from('push_subscriptions').select('id').in('id', rows.map((r) => r.subscription_id))).data?.length ?? 0;
+      const stillUnsent = (await outbox()).find((r) => r.reference === ref)?.sent_at === null;
+      check(
+        tries.every((t) => t.endsWith('42501/42501')) && stillThere === rows.length && rows.length === 1 && stillUnsent,
+        'notify: a chat, staff or owner token is refused by notify_claim and notify_done (42501); the device and the unsent row stay',
+        `${tries.join(' · ')} · devices ${stillThere}/${rows.length} · unsent ${stillUnsent}`,
       );
     }
 
