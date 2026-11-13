@@ -1923,6 +1923,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — A token updates only a booking's status and decision note (D-167; audit S-11)
+- **Did:** `schema-booking-columns.sql` (the 51st, applied): `revoke update on bookings from anon, authenticated; grant update (status, decision_note) to authenticated`. Every other change to a booking already runs in a definer that logs it (checked in the catalog: all 8 functions that UPDATE bookings are definers). rooms 24c's trigger test now writes through the service client; rooms 41 proves both walls (token 42501, direct 23P01); verify 229l new.
+- **Observed:** before 30 columns writable by a token, after 2; verify 229l PASS (an OWNER token: guest_name, guest_phone, guest_email, notes, held, source, price, room_id all 42501; status + decision_note fine), the only fails check 27's dates; rooms 58/58; manage-booking-phase6-walk 4/4 over HTTP.
+- **Next:** S-12 (`request_booking()` callable without the consent wrapper).
+
 ### 2026-11-14 — Only the drain can drain (D-166; audit S-10)
 - **Did:** a third token shape, the NOTIFIER (`mintTenantToken({ tenantId, notifier: true })`: a tenant, no user, `app_notifier`), minted only by `notifierClient()`; `notifyAfter()` drains on it whoever calls; `schema-notify-drain.sql` (the 50th, applied) makes `notify_claim()` and `notify_done()` refuse every other token; their older definitions in `schema-notifications.sql` are GUARDED on the new file's comment (trap 20). verify 176–181 moved to the notifier token, 181b new; bookings isolation 31c–e moved too (not run: needs northwind, see the eval block above).
 - **Observed:** verify: every notify check PASS, 181b "chat 42501/42501 · staff 42501/42501 · owner 42501/42501 · devices 1/1 · unsent true"; the only fails are check 27's dates. Live on `pnpm dev`: villa's latest sent outbox row re-queued, the staff attention poll's drain took it (attempts 1, marked sent: no device), row restored exactly. Tests and typecheck 13/13.

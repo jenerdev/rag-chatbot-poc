@@ -495,13 +495,15 @@ try {
     // 24c. D-154: the COUNT beside the fee. The quote says 1 extra guest for 3;
     //      the stored row says 1 (bookings_compute_extra_guests, from the same
     //      unit_quote()); an edit that moves nothing keeps it, even a direct
-    //      write of the column; 4 guests re-prices to 2.
+    //      write of the column; 4 guests re-prices to 2. Since D-167 a token
+    //      may not write these columns at all, so the direct writes that test
+    //      the TRIGGER go through the service client.
     const q3 = await quote(probe, { unitId: quad.id, guestCount: 3, slotId: night.id, date: MONDAY });
     const read = async () => (await probe.db.from('bookings').select('extra_guests, extra_guest_price').eq('tenant_id', probe.id).eq('id', row.id).single()).data;
     const stored = await read();
-    await probe.db.from('bookings').update({ notes: 'count kept', extra_guests: 9 }).eq('tenant_id', probe.id).eq('id', row.id);
+    await supabase.from('bookings').update({ notes: 'count kept', extra_guests: 9 }).eq('tenant_id', probe.id).eq('id', row.id);
     const kept = await read();
-    await probe.db.from('bookings').update({ guest_count: 4 }).eq('tenant_id', probe.id).eq('id', row.id);
+    await supabase.from('bookings').update({ guest_count: 4 }).eq('tenant_id', probe.id).eq('id', row.id);
     const four = await read();
     check(
       q3.lines[0]?.extraGuests === 1 && stored?.extra_guests === 1 && kept?.extra_guests === 1
@@ -1147,11 +1149,15 @@ try {
     const [pending] = await put([{ booked_date: N3, room_id: one.id, status: 'pending' }]);
     await put([{ booked_date: N3, room_id: two.id }]);
     const viaPackage = await thrown(() => moveStay(probe, pending.id, two.id, 'onto a confirmed room'));
+    // Two walls since D-167: a staff token may not write room_id at all
+    // (42501, the column grant), and a direct write that gets past that (the
+    // service client) still meets the per-room constraint (23P01).
     const raw = await probe.db.from('bookings').update({ room_id: two.id }).eq('tenant_id', probe.id).eq('id', pending.id).select('id');
+    const direct = await supabase.from('bookings').update({ room_id: two.id }).eq('tenant_id', probe.id).eq('id', pending.id).select('id');
     check(
-      viaPackage instanceof BookingConflictError && raw.error?.code === '23P01',
-      'room moves: a pending booking is not moved onto a room confirmed that night, through moveStay() (409) or a raw update (23P01)',
-      `package ${described(viaPackage)} · raw ${raw.error?.code ?? 'MOVED'} ${raw.error?.message ?? ''}`,
+      viaPackage instanceof BookingConflictError && raw.error?.code === '42501' && direct.error?.code === '23P01',
+      'room moves: a pending booking is not moved onto a room confirmed that night: moveStay() 409, a token\'s raw update 42501 (D-167), a direct one 23P01',
+      `package ${described(viaPackage)} · token ${raw.error?.code ?? 'MOVED'} · direct ${direct.error?.code ?? 'MOVED'} ${direct.error?.message ?? ''}`,
     );
 
     // 42. The Rooms screen's calls (D-133, Phase 4): a type's rooms are

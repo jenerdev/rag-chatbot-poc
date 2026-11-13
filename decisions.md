@@ -5575,3 +5575,35 @@ isolation suite's 31c–e were moved to notifier tokens but not run (it needs
 northwind; owed with the full eval).
 
 ---
+
+## D-167 · A token may update only a booking's status and decision note · **Added 2026-11-14**
+
+**Asked:** the audit's S-11: staff updates to `guest_*`, `notes`, `held` and
+`source` leave no log (bookings are outside the audit log, D-138, and keep
+`booking_events`).
+
+**Found:** the app updates exactly two columns of `bookings` on a token:
+`status` and `decision_note` (confirm, decline, cancel; every one an event).
+Every other change runs in a SECURITY DEFINER function that writes its own
+event: the catalog lists eight functions that UPDATE bookings
+(`decide_change`, `move_room`, `hold_stay`, `release_stay`,
+`expire_due_stays`, `review_payment`, `remove_guest_details`, the
+hold-release trigger), all definers. Yet the row policy let a staff token
+write any of 30 columns directly, unlogged.
+
+**Decided:** `schema-booking-columns.sql` (the 51st file): `revoke update on
+bookings from anon, authenticated` and `grant update (status, decision_note)
+to authenticated`. Definers run as the owner and BEFORE triggers that change
+the row being written are not privilege-checked, so nothing that the app
+does changes. A future staff edit of another column needs a definer that
+logs it (CLAUDE.md, Conventions).
+
+**Measured:** column privileges for `authenticated`, 30 before, 2 after.
+verify 229l: an OWNER token updating guest_name, guest_phone, guest_email,
+notes, held, source, price or room_id is 42501 (the privilege is checked
+before rows are found), status with decision_note is not. rooms 58/58 (24c
+writes its trigger test through the service client now; 41 proves both
+walls: a token's raw room_id 42501, a direct one 23P01);
+manage-booking-phase6-walk 4/4 over HTTP.
+
+---

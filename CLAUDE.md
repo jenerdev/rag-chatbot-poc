@@ -1020,6 +1020,10 @@ All are expanded in `risks.md`.
   Booking limits live in `packages/bookings/src/constants.ts`, beside the code
   that enforces them. A limit the browser needs too (the photo limits) reaches
   the Client Component as a prop from its server page, never as a copy.
+- A token may UPDATE only `status` and `decision_note` of a booking (D-167,
+  `schema-booking-columns.sql`). Any other staff edit of a booking goes through
+  a definer function that writes its own `booking_events` row; never widen the
+  grant without a log.
 - Money is bigint **centavos** everywhere; it becomes text once, for a person
   (`lib/money.ts`, and `money()` in the tool result).
 - Validate at the route boundary, throw in the pipeline, map errors to status

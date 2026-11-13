@@ -4902,6 +4902,47 @@ async function notificationChecks() {
   }
 }
 
+// 229l. A token updates only `status` and `decision_note` of a booking
+//       (schema-booking-columns.sql, audit S-11, D-167). The privilege is
+//       checked before any row is looked for, so a filter that matches no
+//       row still shows it: every other column is 42501 for a member of
+//       villa, the two allowed ones are not (their real use, confirm and
+//       cancel, is checked by 77-92, 154 and rooms).
+{
+  let member = null;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const { data, error } = await supabase.auth.admin.createUser({ email: `verify-columns-${randomBytes(4).toString('hex')}@example.com`, password: randomBytes(18).toString('base64url'), email_confirm: true });
+    if (error) throw new Error(`user: ${error.message}`);
+    member = data.user.id;
+    const m = await supabase.from('memberships').insert({ user_id: member, tenant_id: villaRow.id, role: 'owner' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const owner = asToken(staffToken(villaRow.id, member));
+    const tryUpdate = (patch) => owner.from('bookings').update(patch).eq('tenant_id', villaRow.id).eq('id', -1);
+    const forbidden = [
+      { guest_name: 'x' }, { guest_phone: '09170000000' }, { guest_email: 'x@example.com' },
+      { notes: 'x' }, { held: true }, { source: 'web' }, { price: 1 }, { room_id: 1 },
+    ];
+    const refused = [];
+    for (const patch of forbidden) refused.push(`${Object.keys(patch)[0]} ${(await tryUpdate(patch)).error?.code ?? 'ALLOWED'}`);
+    const allowed = await tryUpdate({ status: 'cancelled', decision_note: 'probe' });
+    check(
+      refused.every((r) => r.endsWith('42501')) && !allowed.error,
+      'booking columns: even an OWNER token may update only status and decision_note; the guest details, notes, held, source, price and room are 42501',
+      `${refused.join(' · ')} · status+note ${allowed.error?.code ?? 'ok'}`,
+    );
+  } catch (error) {
+    check(false, 'booking columns: setup', error.message);
+  } finally {
+    if (member) {
+      await supabase.from('memberships').delete().eq('user_id', member);
+      await supabase.auth.admin.deleteUser(member);
+      await supabase.from('audit_log').delete().eq('actor_user', member);
+      await supabase.from('audit_log').delete().eq('subject', member);
+    }
+  }
+}
+
 // 229b–229e. The platform's sign-in and reset count (schema-platform-rate-limit.sql,
 //            audit S-2, D-157): platform_rate_allow() on the publishable key
 //            alone, no tenant, only hashed keys, and the table unreadable.

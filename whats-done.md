@@ -10363,3 +10363,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** verify's notify checks all pass, 181b refuses chat, staff and owner tokens; the app's real drain took a re-queued row live and the row was restored.
 - **Trap hit:** a one-character slice bug in the generator turned `revoke` into `evoke` in the old file; the diff showed it, the file was restored from git and regenerated before anything ran.
 - **Not done:** the isolation suite run (needs northwind); not committed.
+
+## 2026-11-14 · A token updates only a booking's status and decision note (D-167; audit S-11)
+- **Asked:** the audit's S-11: unlogged staff edits of a booking's guest details, notes, hold and source.
+- **What:** `packages/db/sql/schema-booking-columns.sql` (the 51st, applied); rooms 24c and 41 adjusted; verify 229l.
+- **Why it matters:** no screen edited those columns, but a staff token used directly could change a guest's phone number or email with no trace. Now Postgres refuses it, for every role, owners included.
+- **Observed:** 30 writable columns → 2; verify 229l, rooms 58/58, the Manage booking walk 4/4.
+- **Trap avoided:** a column grant would break any INVOKER function or trigger that updates other booking rows; the catalog showed all eight are definers before anything was applied.
+- **Not done:** not committed.
