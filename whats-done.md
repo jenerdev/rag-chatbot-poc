@@ -10386,3 +10386,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** the link carries the recovery token; it must only ever point at this site. Before, only Supabase's allowlist stood in the way.
 - **Observed:** tests 5/5; both routes 200 on `pnpm dev`.
 - **Not done:** the allowlist check in the Supabase dashboard (the user's); not committed.
+
+## 2026-11-14 · Booking references from a cryptographic source (D-170; audit S-14)
+- **Asked:** the audit's S-14: references from `random()`; a collision gives a 500.
+- **What:** `packages/db/sql/schema-booking-reference.sql` (the 53rd, applied); the old definition guarded.
+- **Why it matters:** a reference is half of what Manage booking asks for; it should not come from a predictable generator, and a used one must be recognised where the unique rule actually lives.
+- **Observed:** 3,000 draws, all distinct, all 30 letters used evenly; rooms 58/58; verify unchanged.
+- **Not fixed, recorded:** a simultaneous draw of the same reference (~1 in 729 million per pair); not committed.

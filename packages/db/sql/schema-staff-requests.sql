@@ -29,6 +29,14 @@
 --    because that is where the backfill below runs, and such a session is
 --    already the master key. random() is fine: a reference grants nothing
 --    (customer-booking plan § 3).
+-- GUARDED (D-170, 2026-11-14): schema-booking-reference.sql replaces this
+-- with gen_random_bytes and a check of `stays` too, and marks it with a
+-- comment. Once that file has run, re-running THIS file must not put the
+-- random() body back (CLAUDE.md trap 20).
+do $guard$
+begin
+  if coalesce(obj_description(to_regprocedure('public.booking_reference(bigint)'), 'pg_proc'), '') not like 'schema-booking-reference.sql%' then
+    execute $ddl$
 create or replace function booking_reference(p_tenant_id bigint)
 returns text
 language plpgsql
@@ -62,6 +70,10 @@ begin
   return v_ref;
 end;
 $$;
+$ddl$;
+  end if;
+end;
+$guard$;
 
 -- 2. The fill trigger. BEFORE INSERT, for each row, as the CALLER (every
 --    door that inserts can read its tenant's bookings; request_booking()

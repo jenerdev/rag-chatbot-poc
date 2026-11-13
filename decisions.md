@@ -5670,3 +5670,32 @@ refused); on `pnpm dev` both routes answered 200 for a made-up address.
 **Owed (MANUAL):** the Supabase Redirect URLs allowlist stays exact.
 
 ---
+
+## D-170 · Booking references come from gen_random_bytes and are checked against stays too · **Added 2026-11-14** (amends D-100)
+
+**Asked:** the audit's S-14: the booking reference uses `random()`, and a
+collision gives a 500.
+
+**Found:** `booking_reference()` (D-100) drew six letters with `random()`
+and checked only `bookings` for a reference in use, while the UNIQUE rule
+is `stays_reference_unique`. Orphan stays are already removed with their
+last booking (`bookings_drop_empty_stays`; 0 exist), so the collision left
+is two requests drawing the same new reference in the same instant.
+
+**Decided:** `schema-booking-reference.sql` (the 53rd file):
+- the letters from `extensions.gen_random_bytes()`, rejection-sampled (a
+  byte of 240 or more is drawn again, 240 = 8 × 30), so each of the 30
+  letters is exactly 1/30;
+- a reference is free only when no booking AND no stay of the tenant has it;
+- the shape, the alphabet, the caller check and the grants unchanged; the
+  older definition guarded on the new file's comment (trap 20).
+- **Accepted:** the simultaneous draw. With 30^6 = 729,000,000 bodies per
+  tenant it is about 1 in 729 million per pair of simultaneous requests,
+  and its result is a 500 the guest can retry; no retry machinery.
+
+**Measured:** 3,000 draws for villa, before commit and after applying: every
+one `VIL-` and six letters of the alphabet, all distinct, all 30 letters
+used, 529–638 times each against 600 expected; rooms 58/58; verify only
+check 27's dates.
+
+---

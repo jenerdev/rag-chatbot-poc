@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — Booking references from a cryptographic source (D-170; audit S-14)
+- **Did:** `schema-booking-reference.sql` (the 53rd, applied): `booking_reference()` draws its six letters from `extensions.gen_random_bytes()` with rejection sampling (bytes 240+ redrawn: every letter 1/30) and counts a reference as used when a booking OR a stay has it (the unique rule is on `stays`); the older definition in `schema-staff-requests.sql` is GUARDED on the new comment.
+- **Observed:** 3,000 draws for villa in the dry run and again after applying: shape `VIL-` + 6 of the alphabet, 3,000 distinct, all 30 letters, 529–638 each (600 expected); rooms 58/58; verify only check 27's dates. 0 orphan stays exist (`bookings_drop_empty_stays` already removes them).
+- **Recorded, not fixed:** two simultaneous requests drawing the same new reference (about 1 in 729 million per pair) still meet `stays_reference_unique` as a 500.
+- **Next:** S-15 (the postcss advisories under `next`), S-16 (uploads without Content-Length), S-17 (signups off: the dashboard).
+
 ### 2026-11-14 — Reset links point to a configured address (D-169; audit S-13)
 - **Did:** `apps/web/lib/app-origin.ts` (`appOrigin()`, 5 tests): `APP_URL` (https in production), else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, else in development the request origin, else refused in words. Both password-reset routes use it; `APP_URL` documented in `.env.example` and `env.ts` (the CLI invites already read it).
 - **Observed:** 5/5 tests, typecheck clean; on `pnpm dev` both reset routes still answer 200 (a made-up @example.com address, no email sent).
