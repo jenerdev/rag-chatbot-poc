@@ -61,7 +61,7 @@
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
 3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
 4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
-5. a generic 500 body;
+5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
 6. OpenAI timeouts, abort and `max_tokens`;
 7. CI;
 8. a new production Supabase project with a migration ledger;
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — A failure tells the visitor nothing internal (D-158; audit B-6 / S-3)
+- **Did:** `lib/error-body.ts` (`errorBody()`, pure, 7 tests): a request status (400/401/403/404/409/429) keeps its words; anything else is a fixed sentence + `(ref <8 hex>)` and `X-Request-Id`, the real message in the log beside the ref; every OpenAI failure is a 502 with its own sentence; outside production the detail is appended. `route.ts` and the chat stream's `error` event both use it; `chat-stream.ts` lost its OpenAI/.env advice to visitors.
+- **Observed:** web 275, typecheck clean; on `next start` with an invalid OpenAI key: JSON 502 "The assistant could not answer just now… (ref 63e78b68)", the stream's error event the same, and the log line `[error] 502 ref 63e78b68: OpenAI rejected the API key …`; 401, 400 and 404 bodies unchanged.
+- **Next:** item 6, OpenAI timeouts, abort and `max_tokens` (B-5); item 1 (`guest.test.ts`) still owed.
 
 ### 2026-11-14 — Login and reset rate limits (D-157; audit B-4 / S-2)
 - **Did:** `allowAuth()` (lib/rate-limit.ts) on staff login and reset, per address then per account (email hashed), through `rate_allow()`; `schema-platform-rate-limit.sql` (the 47th, applied) with `platform_rate_allow()` on the publishable key for the platform's login and reset (`allowPlatformAuth()`); 429 "Too many attempts. Please wait a few minutes and try again."

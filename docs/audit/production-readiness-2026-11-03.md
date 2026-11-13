@@ -50,7 +50,7 @@
 **1. The edges are open.** Each item below was re-checked by hand.
 - ~~No security headers (clickjacking is possible on staff and platform screens).~~ **Fixed 2026-11-14** (D-156): `lib/security-headers.mjs`, `plan/security-headers-walk.mjs` 29/29.
 - ~~No rate limit on staff and super-user login or on password reset.~~ **Fixed 2026-11-14** (D-157): per address and per account, `plan/auth-rate-limit-walk.mjs` 5/5. Failed logins are still not in the audit log (no user to name); the Supabase-side limit is still MANUAL.
-- Internal Postgres and OpenAI error text is sent to anonymous visitors.
+- ~~Internal Postgres and OpenAI error text is sent to anonymous visitors.~~ **Fixed 2026-11-14** (D-158): a fixed sentence and a ref, the detail in the server log.
 - OpenAI calls have no timeout and no output cap.
 
 **2. A data-integrity bug.** Approving a guest's reschedule drops their free children and their promo discount, so the stay is silently re-priced upward. Verified at `schema-manage-booking.sql:1541`.
@@ -84,7 +84,7 @@ None of this is a sign of a weak codebase. Most of it is already listed honestly
 | B-3 | Approving a reschedule drops `free_guests` and `promo_id`; the stay is re-priced without its discount and the child disappears | High | VERIFIED | `packages/db/sql/schema-manage-booking.sql:1541-1546` (`decide_change()`) |
 | B-4 | ~~No rate limit on staff or platform login, nor on password reset.~~ Supabase's own limit counts the SERVER's IP, so one attacker can lock out every staff member or burn the email quota | High | **FIXED 2026-11-14** (code, D-157); Supabase side MANUAL | `app/api/t/[tenant]/admin/session/route.ts`, `app/api/platform/session/route.ts`, both `password-reset/route.ts` |
 | B-5 | OpenAI `embed`, `chat` and `chatStream` have no timeout; a closed tab does not abort generation; answers have no `max_tokens` | High | VERIFIED | `packages/openai/src/index.ts:256,310,441`; `chat/route.ts:98-101` |
-| B-6 | Internal error text (Postgres, PostgREST, OpenAI) returned to clients on every 500, including the open guest routes and the chat stream | Medium-High | VERIFIED | `apps/web/lib/route.ts:64-66`; `chat/route.ts:120-122` |
+| B-6 | ~~Internal error text (Postgres, PostgREST, OpenAI) returned to clients on every 500, including the open guest routes and the chat stream~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `apps/web/lib/route.ts:64-66`; `chat/route.ts:120-122` |
 | B-7 | No CI: no typecheck, tests, service-import check or audit on push; no branch protection; no release tags, so the documented rollback is on paper only | High | VERIFIED | no `.github/` |
 | B-8 | One Supabase project serves dev, test data and "production"; no migration ledger or runner; 46 files pasted by hand, some unsafe to re-run (traps 20, 25) | High | VERIFIED (process); prod state MANUAL | `release-process.md`; no `schema_migrations` |
 | B-9 | No scheduled jobs: retention (the privacy policy's promised periods), payment-proof expiry and `expire_due_stays` run by hand or only when staff load a list | High | VERIFIED | no `vercel.json`/cron; `deadlines.ts:10` |
@@ -129,7 +129,7 @@ Already present and complete (for credit): booking lookup and management by the 
 |---|---|---|---|---|---|---|
 | S-1 | ~~No security headers / CSP~~ | High | **FIXED 2026-11-14** (D-156) | `next.config.mjs` | Staff and platform screens can be framed: clickjacking on Confirm, Verify payment, Archive tenant. Any future XSS has no second wall | `headers()`: `frame-ancestors 'none'`, a measured CSP, HSTS, nosniff, `Referrer-Policy`, `Permissions-Policy: microphone=(self)`; `poweredByHeader: false` |
 | S-2 | ~~Login and reset not rate limited~~ | High | **FIXED 2026-11-14** (D-157; failed logins not audited) | session and password-reset routes | Password guessing; locking out all staff via Supabase's server-IP bucket; email-quota exhaustion | `allow()` per IP and per email-hash before sign-in and reset; audit failed logins |
-| S-3 | Error messages leak internals | Medium-High | VERIFIED | `lib/route.ts:64`; chat stream | Schema mapping (constraint, function and column names); OpenAI key fragments in a 401 body | 500/502 → a fixed sentence plus a request id; log the detail on the server; map OpenAI 401 → 502 |
+| S-3 | ~~Error messages leak internals~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `lib/route.ts:64`; chat stream | Schema mapping (constraint, function and column names); OpenAI key fragments in a 401 body | 500/502 → a fixed sentence plus a request id; log the detail on the server; map OpenAI 401 → 502 |
 | S-4 | Change-request door never counts toward the lockout | Medium | VERIFIED | `schema-manage-booking.sql:1363-1365, 1461-1463, 849-851` | Unlimited email/phone guesses against a known reference through `/manage/change` (per-IP limit only) | Have the route call `guest_stay()` first (as the proof door does), or record the miss outside the raising transaction |
 | S-5 | `book/quote` has no rate limit | Medium | VERIFIED | `app/api/t/[tenant]/book/quote/route.ts` | Promo-code discovery by dictionary; up to 70 `unit_quote()` calls per request | `allow()` with its own key and a per-tenant ceiling |
 | S-6 | Sessions cannot be revoked (12 h HMAC cookies, no server state) | Medium | VERIFIED | `lib/admin-auth.ts:50`, `lib/platform-auth.ts:31` | A copied cookie works for up to 12 h after logout or a password change. The platform cookie is cross-tenant | A per-user `session_epoch` checked on each request; shorter platform sessions |
@@ -203,7 +203,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 - [ ] Fix `guest.test.ts` so `pnpm test` is green (B-1).
 - [ ] GitHub Actions on every push and PR: `pnpm install --frozen-lockfile`, `pnpm typecheck` (includes the service-import check), `pnpm test`, `pnpm audit --prod --audit-level=critical`. Protect `master` (B-7).
 - [ ] Release tags (`v1.0.0`) and a written rollback: Vercel "promote previous deployment" plus the additive-SQL rule.
-- [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); a generic 500 body (S-3).
+- [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
 - [ ] Rate limits: ~~login, password reset~~ (S-2, done 2026-11-14, D-157), `book/quote`; the change-door lockout (S-4, S-5).
 - [ ] OpenAI: request timeouts, abort on disconnect, `max_tokens` on answers (B-5).
 - [ ] Fix `decide_change()` (B-3), with a rooms check for a rescheduled stay carrying a free child and a promo.
@@ -247,7 +247,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 | 1 | Fix the failing `guest.test.ts` (B-1) | S |
 | 2 | ~~Security headers + `poweredByHeader: false` (S-1)~~ done 2026-11-14 | S |
 | 3 | ~~Rate limits on staff and platform login and on password reset~~ done 2026-11-14; audit failed logins (S-2) still open | S–M |
-| 4 | Generic 500/502 body in production; keep the detail in server logs (S-3) | S |
+| 4 | ~~Generic 500/502 body in production; keep the detail in server logs (S-3)~~ done 2026-11-14 | S |
 | 5 | OpenAI timeouts, abort on disconnect, `max_tokens`; OpenAI spend cap (B-5) | S |
 | 6 | `decide_change()` keeps `free_guests` and `promo_id`, with a test (B-3) | S |
 | 7 | Change-door lockout and `book/quote` rate limit (S-4, S-5) | S |

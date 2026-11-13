@@ -10281,3 +10281,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 5/5 (staff 401×10 → 429 from one address; platform 401×10 → 429 for one account across eleven addresses; reset 200×3 → 429; rate_windows count 11; no clear text in the platform table); verify's new 4 pass (245/247 overall, check 27's dates as before); the security-headers walk's real login still passes.
 - **Trap avoided:** the platform function is callable by anyone holding the publishable key, so it takes only hashed keys of one shape and bounded numbers; a direct call can only count, exactly as the route would.
 - **Not done:** failed logins in the audit log; Supabase's own limit (dashboard); not committed.
+
+## 2026-11-14 · A failure tells the visitor nothing internal (D-158; audit B-6 / S-3)
+- **Asked:** the next audit finding: Postgres and OpenAI error text reached anonymous visitors.
+- **What:** `apps/web/lib/error-body.ts` (`errorBody()`, `newRequestId()`, 7 tests); `lib/route.ts`'s `errorResponse()` and the chat stream's `error` event call it; `lib/chat-stream.ts` shows the server's words without OpenAI/.env advice.
+- **Why it matters:** every 500 used to carry the thrown message: constraint, function and column names from Postgres, and from OpenAI a 401 body with a fragment of our key, on routes anyone can call.
+- **Observed:** with an invalid key on `next start`, JSON 502 "…(ref 63e78b68)" + `x-request-id`, the stream's error event the same, the log `[error] 502 ref 63e78b68: OpenAI rejected the API key …`; 401/400/404 bodies unchanged; web 275.
+- **Trap avoided:** OpenAI's 401 and 429 used to pass through as themselves, so the browser was told IT was unauthenticated or rate limited; the chat client then blamed OpenAI for our own chat limit's 429.
+- **Not done:** Postgres words in 4xx from `fromPostgrest()` (staff and platform only); not committed.

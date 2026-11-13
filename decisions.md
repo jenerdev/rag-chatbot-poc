@@ -5226,3 +5226,46 @@ then 429 for one account from eleven addresses, staff reset 200×3 then 429,
 the address key at count 11, no email or address in clear.
 
 ---
+
+## D-158 · A server failure says one fixed sentence and a ref; the detail stays in the log · **Added 2026-11-14** (amends architecture.md § 9)
+
+**Asked:** the next audit finding, "Internal Postgres and OpenAI error text
+is sent to anonymous visitors" (B-6 / S-3).
+
+**Decided:**
+- **ONE function, `errorBody()`** (`apps/web/lib/error-body.ts`, pure,
+  tested), used by the route map (`lib/route.ts`) and the chat stream's
+  `error` event, so both say the same.
+- **A request status passes through with its words** (400, 401, 403, 404,
+  409, 429): our own code wrote them for a person ("taken on <date>…").
+- **Anything else is the server's failure:** "Something went wrong on our
+  side. Please try again in a moment. (ref 3f9a1c2e)", `requestId` in the
+  body and `X-Request-Id`; the log line is `[error] 500 ref 3f9a1c2e:
+  <the real message>`.
+- **Every OpenAI failure is a 502**, "The assistant could not answer just
+  now…": a bad key is our `.env`, no credit our account, a 400 our request.
+  Its 401 and 429 no longer pass through: they told the browser it was not
+  logged in, or had sent too much, and the 401 body echoed a key fragment.
+- **Outside production the real message is appended** (`[dev: …]`): this
+  project is built to be understood, and `pnpm dev` should show why. This
+  amends architecture.md § 9 ("the real message always reaches the
+  client"), which was written before there were strangers on the routes.
+- **The chat client** (`lib/chat-stream.ts`) shows the server's words as
+  they are; its "OpenAI rejected the API key — check .env" and "out of
+  credits" prefixes are gone (a visitor read them, and our own chat limit's
+  429 was being called OpenAI's).
+
+**Measured:** web 275 (7 new), typecheck clean; on `next start` with an
+invalid OpenAI key, the chat's JSON answer was 502 "The assistant could not
+answer just now. Please try again in a moment. (ref 63e78b68)" with
+`x-request-id: 63e78b68`, the stream's `error` event the same words with
+its own ref, and the server log `[error] 502 ref 63e78b68: OpenAI rejected
+the API key … Incorrect API key provided: sk-proj-*****`. A wrong login
+(401), an empty chat message (400) and an unknown tenant (404) kept their
+words.
+
+**Not changed:** a 4xx carried from Postgres through `fromPostgrest()` (staff
+and platform routes) still says Postgres's words; the staff login's "Is
+`pnpm dev` running?" when the server is unreachable.
+
+---

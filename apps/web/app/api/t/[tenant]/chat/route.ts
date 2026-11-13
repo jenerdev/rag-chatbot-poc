@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta, ToolCallRecord } from '@rag/pipeline';
+import { OpenAIError } from '@rag/openai';
 import { sessionCan } from '@/lib/admin-auth';
+import { errorBody, newRequestId } from '@/lib/error-body';
 import { allowSpend, CHAT_REQUESTS_PER_WINDOW, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
@@ -117,9 +119,15 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
         // to travel down the stream as data. This is the cost of streaming,
         // and it is why the client must treat an `error` event as seriously as
         // a bad status.
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[error]', message);
-        send('error', { error: message });
+        // The same words the error map would give (lib/error-body.ts, D-158):
+        // a fixed sentence and a ref for the visitor, the detail in the log.
+        const mapped = errorBody(error, {
+          openai: error instanceof OpenAIError,
+          expose: process.env.NODE_ENV !== 'production',
+          requestId: newRequestId(),
+        });
+        console.error(mapped.log);
+        send('error', mapped.body);
       } finally {
         request.signal.removeEventListener('abort', onAbort);
         closed = true;

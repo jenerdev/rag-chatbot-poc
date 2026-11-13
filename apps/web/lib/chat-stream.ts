@@ -64,15 +64,12 @@ export async function describeFailure(error: Error, response: Response | null): 
     } catch {
       // Not JSON — keep the status line.
     }
-    if (response.status === 401) return `OpenAI rejected the API key — check .env. (${detail})`;
-    if (response.status === 429)
-      return `OpenAI request failed: out of credits or rate limited. (${detail})`;
+    // D-158: the server's words are for the visitor already (the limit's
+    // sentence on a 429, a fixed sentence and a ref on a 5xx). No OpenAI or
+    // .env advice here any more: a visitor reads this, and OpenAI's own
+    // failures now arrive as a 502, never as a 401 or 429.
     return detail;
   }
-  // fetch itself rejected: nothing answered on localhost:3000.
-  //
-  // The command named here is the one thing in this file that HAD to change:
-  // the POC said `node server.js`, which no longer exists. A message telling
-  // someone to run a command that is gone is worse than no message.
-  return `Cannot reach the server. Is \`pnpm dev\` running? (${error.message})`;
+  // fetch itself rejected: nothing answered, or the connection dropped.
+  return `Cannot reach the server. Check your connection and try again. (${error.message})`;
 }
