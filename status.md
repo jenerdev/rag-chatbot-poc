@@ -63,7 +63,7 @@
 4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
 5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
 6. ~~OpenAI timeouts, abort and `max_tokens`~~ done 2026-11-14 (D-159, seen live);
-7. CI;
+7. ~~CI~~ done 2026-11-14 (D-160, `.github/workflows/ci.yml`, not pushed; branch protection is yours, on GitHub);
 8. a new production Supabase project with a migration ledger;
 9. the legal texts (a lawyer).
 
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — CI (D-160; audit B-7)
+- **Did:** `.github/workflows/ci.yml`: on every push and PR, install `--frozen-lockfile`, `pnpm typecheck` (the service-import check first), `pnpm turbo test --continue`, `pnpm build` with no .env, Rule 2's bundle grep, `pnpm audit --prod --audit-level=critical`. Node 22, pnpm from `packageManager`.
+- **Observed** in a clean worktree outside the repo (no .env), the same commands: install frozen OK; typecheck 13/13; tests 12/13 (only `@rag/bookings`, `guest.test.ts`, item 1); build 7/7; the grep found nothing; audit exit 0 (no critical; 3 high + 2 moderate in postcss and source-map-js, build-time only).
+- **Next:** item 1, `guest.test.ts`, which is what CI's first run will fail on; push the branch to see CI run; protect `master` on GitHub (the user's); bump postcss / source-map-js (follow-up).
 
 ### 2026-11-14 — OpenAI calls have time limits, stop with the tab, and answers have a cap (D-159; audit B-5)
 - **Did:** `@rag/openai`: `embed` 20 s, `chat` 60 s, `chatStream` 90 s (one signal, headers to [DONE]), each combined with the caller's `signal` (`AbortSignal.any`); a timeout is 504 and a closed tab 499, both carrying what streamed as `partial`; `maxTokens` + `failOnLength` on chat and chatStream. `@rag/pipeline`: `ANSWER_MAX_TOKENS = 1000` on every answer call (`answerLimits()`), `signal` on `answerQuestion` / `answerQuestionStream`; the chat route passes `request.signal`.

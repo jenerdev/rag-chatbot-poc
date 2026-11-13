@@ -5318,3 +5318,36 @@ with the connection closed after its first delta was stored as `Yes,
 the read and the model call stopped with the tab.
 
 ---
+
+## D-160 · CI runs every check that needs no secret and no database · **Added 2026-11-14**
+
+**Asked:** the next audit finding, CI (B-7).
+
+**Decided:**
+- **`.github/workflows/ci.yml`, one job, on every push and pull request:**
+  `pnpm install --frozen-lockfile`; `pnpm typecheck` (which runs
+  `scripts/check-service-imports.mjs` first); `pnpm turbo test --continue`
+  (every package reported even when one fails: without `--continue` turbo
+  stopped after the first red package and ran 9 of 13); `pnpm build` with no
+  `.env` (Rule 2: the web app needs no key to build); Rule 2's grep of
+  `apps/web/.next/static` for the secret names; `pnpm audit --prod
+  --audit-level=critical`.
+- **Node 22** (Vercel's runtime; `engines` asks >= 20.9); pnpm from
+  `packageManager`; `contents: read` only; one run per ref at a time.
+- **Not in CI, on purpose:** verify, rooms, isolation, every walk and
+  `pnpm eval`. They need the live database (eval also OpenAI money and the
+  deleted test tenants). They stay manual until a staging project exists
+  (audit P1). The office tests have a known flake and stay out.
+- **The audit gate is `critical`**, as the audit wrote it. Today: no
+  critical; 3 high and 2 moderate, all in `postcss` and `source-map-js`
+  (build-time, not served). A follow-up, not a gate.
+- **Not done here (GitHub settings, the user's):** protect `master`
+  (require this check), release tags.
+
+**Measured** in a clean worktree outside the repo, with no `.env`, the same
+commands: install OK; typecheck 13/13; tests 12/13 (the one failure is
+`packages/bookings/src/guest.test.ts`, audit B-1, known); build 7/7; the
+grep found nothing; the audit exited 0. The workflow has not run on GitHub
+yet: nothing is pushed.
+
+---

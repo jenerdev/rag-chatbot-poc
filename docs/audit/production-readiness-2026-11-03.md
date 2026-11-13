@@ -56,7 +56,7 @@
 **2. A data-integrity bug.** Approving a guest's reschedule drops their free children and their promo discount, so the stay is silently re-priced upward. Verified at `schema-manage-booking.sql:1541`.
 
 **3. No operational layer.** None of these exist:
-- CI, scheduled jobs, error monitoring, a health check.
+- ~~CI~~ (done 2026-11-14, D-160: `.github/workflows/ci.yml`; branch protection and tags still open), scheduled jobs, error monitoring, a health check.
 - A migration runner or a record of which SQL files have run.
 - A separate production database (dev, test and "prod" are one Supabase project).
 
@@ -85,7 +85,7 @@ None of this is a sign of a weak codebase. Most of it is already listed honestly
 | B-4 | ~~No rate limit on staff or platform login, nor on password reset.~~ Supabase's own limit counts the SERVER's IP, so one attacker can lock out every staff member or burn the email quota | High | **FIXED 2026-11-14** (code, D-157); Supabase side MANUAL | `app/api/t/[tenant]/admin/session/route.ts`, `app/api/platform/session/route.ts`, both `password-reset/route.ts` |
 | B-5 | ~~OpenAI `embed`, `chat` and `chatStream` have no timeout; a closed tab does not abort generation; answers have no `max_tokens`~~ | High | **FIXED 2026-11-14** (D-159) | `packages/openai/src/index.ts:256,310,441`; `chat/route.ts:98-101` |
 | B-6 | ~~Internal error text (Postgres, PostgREST, OpenAI) returned to clients on every 500, including the open guest routes and the chat stream~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `apps/web/lib/route.ts:64-66`; `chat/route.ts:120-122` |
-| B-7 | No CI: no typecheck, tests, service-import check or audit on push; no branch protection; no release tags, so the documented rollback is on paper only | High | VERIFIED | no `.github/` |
+| B-7 | ~~No CI: no typecheck, tests, service-import check or audit on push;~~ no branch protection; no release tags, so the documented rollback is on paper only | High | **CI FIXED 2026-11-14** (D-160); protection and tags open | no `.github/` |
 | B-8 | One Supabase project serves dev, test data and "production"; no migration ledger or runner; 46 files pasted by hand, some unsafe to re-run (traps 20, 25) | High | VERIFIED (process); prod state MANUAL | `release-process.md`; no `schema_migrations` |
 | B-9 | No scheduled jobs: retention (the privacy policy's promised periods), payment-proof expiry and `expire_due_stays` run by hand or only when staff load a list | High | VERIFIED | no `vercel.json`/cron; `deadlines.ts:10` |
 | B-10 | No guest notifications of any kind (no email or SMS); the reference is shown once with no recovery | High (business) | VERIFIED | no mail code in `apps/` or `packages/` |
@@ -201,7 +201,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 
 **Code and repository**
 - [ ] Fix `guest.test.ts` so `pnpm test` is green (B-1).
-- [ ] GitHub Actions on every push and PR: `pnpm install --frozen-lockfile`, `pnpm typecheck` (includes the service-import check), `pnpm test`, `pnpm audit --prod --audit-level=critical`. Protect `master` (B-7).
+- [ ] ~~GitHub Actions on every push and PR: `pnpm install --frozen-lockfile`, `pnpm typecheck` (includes the service-import check), `pnpm test`, `pnpm audit --prod --audit-level=critical`.~~ Done 2026-11-14 (D-160), plus the build and Rule 2's bundle grep. Protect `master` (B-7): still open, a GitHub setting.
 - [ ] Release tags (`v1.0.0`) and a written rollback: Vercel "promote previous deployment" plus the additive-SQL rule.
 - [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
 - [ ] Rate limits: ~~login, password reset~~ (S-2, done 2026-11-14, D-157), `book/quote`; the change-door lockout (S-4, S-5).
@@ -251,7 +251,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 | 5 | ~~OpenAI timeouts, abort on disconnect, `max_tokens`~~ done 2026-11-14; OpenAI spend cap (B-5) still MANUAL | S |
 | 6 | `decide_change()` keeps `free_guests` and `promo_id`, with a test (B-3) | S |
 | 7 | Change-door lockout and `book/quote` rate limit (S-4, S-5) | S |
-| 8 | CI with branch protection (B-7) | S–M |
+| 8 | ~~CI~~ done 2026-11-14 (D-160); branch protection (B-7) still open | S–M |
 | 9 | A new production Supabase project with backups, the migration ledger and an in-order apply script, rehearsed on an empty project (B-8, B-14) | M |
 | 10 | Lawyer-reviewed privacy notice and terms; cross-border disclosure (B-11) | L (external) |
 

@@ -10299,3 +10299,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Trap hit:** `next build` while the user's `pnpm dev` ran (trap 16): /t/villa answered 500 until they restarted it. Check port 3000 before building.
 - **Seen live** after a new OpenAI key (the old one had expired, 401): live on 2026-11-14 (new key, villa, `pnpm dev`): a documents answer (cook, deposit, extension) streamed 116 deltas to `done` under the cap; the same question with the connection closed after the first delta saved `Yes, […answer interrupted]` (26 chars, the whole reply ~600).
 - **Not done:** the OpenAI spend cap (dashboard); not committed.
+
+## 2026-11-14 · CI (D-160; audit B-7)
+- **Asked:** the next audit finding: no CI.
+- **What:** `.github/workflows/ci.yml`: frozen install, typecheck (with the service-import check), every package's tests (`--continue`), the build with no `.env`, Rule 2's secret-name grep on the browser bundle, `pnpm audit --prod --audit-level=critical`.
+- **Why it matters:** `master` went red on 2026-11-03 (`guest.test.ts`) and nothing said so; every rule this repo enforces by a command was enforced only when someone remembered to run it.
+- **Observed:** the same commands in a clean worktree with no `.env`: typecheck 13/13, tests 12/13 (only `guest.test.ts`, B-1), build 7/7, grep clean, audit exit 0 (3 high, 2 moderate, build-time postcss / source-map-js).
+- **Trap avoided:** without `--continue`, turbo stopped at the first failing package and 4 packages' tests never ran.
+- **Not done:** the first run on GitHub (not pushed); branch protection and tags (GitHub settings); the postcss bump; not committed.
