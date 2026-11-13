@@ -5351,3 +5351,38 @@ grep found nothing; the audit exited 0. The workflow has not run on GitHub
 yet: nothing is pushed.
 
 ---
+
+## D-161 · A rescheduled stay keeps its free children; it still carries no promo · **Added 2026-11-14** (amends D-108's code, confirms its promo rule)
+
+**Asked:** the audit's B-3: "Approving a reschedule drops `free_guests` and
+`promo_id`".
+
+**Found:** two different things under one finding.
+- `free_guests` was a BUG. `decide_change()` (D-108, 2026-10-10) re-inserts
+  the moved nights with a named column list written before D-147 (free
+  guests, 2026-10-26) existed. The column defaults to 0, so the insert did
+  not fail: the child silently left the stay on approval, though D-108 says
+  a reschedule "keeps the rooms, slot, nights and guests".
+- `promo_id` was a DECISION. D-108: "no promo is carried", and
+  `request_change()` quotes the move without the discount; that quote is
+  what the guest saw and is stored on the request. The user was first asked
+  what to do when a promo does not cover the new dates (they chose "refuse,
+  staff decide"), then shown D-108 and the quote, and chose to KEEP D-108.
+
+**Decided:**
+- **`schema-reschedule-free-guests.sql`, the 48th file:** `decide_change()`
+  with the same body and `free_guests` in the copied columns. No price moves
+  (the price never reads it, D-147); no promo is carried (D-108);
+  `walk_in` stays on the stay (D-111).
+- **The marker is a comment on the function**, and the older definition in
+  `schema-manage-booking.sql` is guarded on it (trap 20): that file adds no
+  column this one could key on.
+
+**Measured:** the live body before: no `b.free_guests`; after: present, the
+comment set, grants unchanged (anon none, authenticated execute), definer
+with `search_path=""`. The guard alone, in a rolled-back transaction: with
+the marker the new body survives, without it the old body returns. verify
+154b: "moved 2027-07-10:free 1:promo null"; 154 unchanged (the weekend price
+1,500.00, 500.00 owed).
+
+---

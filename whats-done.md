@@ -10314,3 +10314,12 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** a red suite hides the next real failure behind a known one; with CI (D-160) it would have failed every push.
 - **Observed:** bookings 138/138; every package's tests 13/13.
 - **Trap avoided:** the fix was in the TEST, not the parser: an absent count from an older `guest_stay()` must stay null ("not known"), and changing the parser to 0 would have made the test pass by printing "0 extra guests" where nobody knows.
+
+## 2026-11-14 · A rescheduled stay keeps its free child (D-161; audit B-3)
+- **Asked:** the audit's B-3: approving a reschedule drops `free_guests` and `promo_id`.
+- **What:** `packages/db/sql/schema-reschedule-free-guests.sql` (the 48th, applied): `decide_change()` copies `free_guests`; a comment marks it, and `schema-manage-booking.sql`'s older definition is guarded on that comment. verify 154b.
+- **Why it matters:** a stay of "4 guests + 1 child (free)" became "4 guests" the moment staff approved a date change, on every screen and in the guest's own Manage booking, with no error anywhere.
+- **Observed:** live body before/after (no `b.free_guests` → present), grants unchanged; the guard proven both ways in a rolled-back transaction; verify 154b PASS, 154 PASS.
+- **Not a bug:** the promo. D-108 decided a move carries no promo, and the guest's quote is priced that way; the user kept it. Changing it would have meant changing the quote too, or charging a price the guest was never shown.
+- **Trap avoided:** trap 23's cousin: a column WITH a default is the one an old named-column insert forgets silently. Trap 20: the old definition is guarded, or re-running the older file puts the bug back.
+- **Not done:** not committed.

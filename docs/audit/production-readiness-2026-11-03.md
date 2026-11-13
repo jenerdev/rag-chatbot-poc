@@ -81,7 +81,7 @@ None of this is a sign of a weak codebase. Most of it is already listed honestly
 |---|---|---|---|---|
 | B-1 | ~~`master` is red: `guest.test.ts` fails after D-154 (`extraGuestCount` added, test not updated); `pnpm test` exits 1~~ | High | **FIXED 2026-11-14** (the test updated; 13/13) | `packages/bookings/src/guest.test.ts:44` (introduced by `8215020`) |
 | B-2 | ~~No security headers: no CSP, `frame-ancestors`/X-Frame-Options, HSTS, nosniff or Referrer-Policy; `X-Powered-By` sent~~ | High | **FIXED 2026-11-14** (D-156) | `apps/web/next.config.mjs` (no `headers()`), no `middleware.ts` |
-| B-3 | Approving a reschedule drops `free_guests` and `promo_id`; the stay is re-priced without its discount and the child disappears | High | VERIFIED | `packages/db/sql/schema-manage-booking.sql:1541-1546` (`decide_change()`) |
+| B-3 | ~~Approving a reschedule drops `free_guests`~~ and `promo_id`; ~~the child disappears~~. The promo half is BY DESIGN (D-108, re-confirmed by the user in D-161): a move is quoted and priced without it | High | **FIXED 2026-11-14** (free guests, D-161); promo by design | `packages/db/sql/schema-manage-booking.sql:1541-1546` (`decide_change()`) |
 | B-4 | ~~No rate limit on staff or platform login, nor on password reset.~~ Supabase's own limit counts the SERVER's IP, so one attacker can lock out every staff member or burn the email quota | High | **FIXED 2026-11-14** (code, D-157); Supabase side MANUAL | `app/api/t/[tenant]/admin/session/route.ts`, `app/api/platform/session/route.ts`, both `password-reset/route.ts` |
 | B-5 | ~~OpenAI `embed`, `chat` and `chatStream` have no timeout; a closed tab does not abort generation; answers have no `max_tokens`~~ | High | **FIXED 2026-11-14** (D-159) | `packages/openai/src/index.ts:256,310,441`; `chat/route.ts:98-101` |
 | B-6 | ~~Internal error text (Postgres, PostgREST, OpenAI) returned to clients on every 500, including the open guest routes and the chat stream~~ | Medium-High | **FIXED 2026-11-14** (D-158) | `apps/web/lib/route.ts:64-66`; `chat/route.ts:120-122` |
@@ -206,7 +206,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 - [ ] ~~Security headers~~ (S-1, done 2026-11-14, D-156) and the Origin check (S-7); ~~a generic 500 body~~ (S-3, done 2026-11-14, D-158).
 - [ ] Rate limits: ~~login, password reset~~ (S-2, done 2026-11-14, D-157), `book/quote`; the change-door lockout (S-4, S-5).
 - [ ] ~~OpenAI: request timeouts, abort on disconnect, `max_tokens` on answers (B-5).~~ Done 2026-11-14 (D-159).
-- [ ] Fix `decide_change()` (B-3), with a rooms check for a rescheduled stay carrying a free child and a promo.
+- [x] ~~Fix `decide_change()` (B-3), with a rooms check for a rescheduled stay carrying a free child and a promo.~~ Done 2026-11-14 (D-161): the free child is kept (verify 154b); the promo is not carried, by design (D-108).
 - [ ] Redact the visitor's question in the `[rewrite]` log line (`packages/rag/src/retrieve.ts:87`).
 - [ ] `.playwright-mcp/` in `.gitignore`; a `.vercelignore` for `plan/`, `office/` and `docs/`.
 - [ ] Check GitHub repo visibility, and the screenshots in `plan/`, for guest data before it is ever public.
@@ -249,7 +249,7 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 | 3 | ~~Rate limits on staff and platform login and on password reset~~ done 2026-11-14; audit failed logins (S-2) still open | S–M |
 | 4 | ~~Generic 500/502 body in production; keep the detail in server logs (S-3)~~ done 2026-11-14 | S |
 | 5 | ~~OpenAI timeouts, abort on disconnect, `max_tokens`~~ done 2026-11-14; OpenAI spend cap (B-5) still MANUAL | S |
-| 6 | `decide_change()` keeps `free_guests` and `promo_id`, with a test (B-3) | S |
+| 6 | ~~`decide_change()` keeps `free_guests`~~ done 2026-11-14 (D-161, verify 154b); `promo_id` by design (D-108) | S |
 | 7 | Change-door lockout and `book/quote` rate limit (S-4, S-5) | S |
 | 8 | ~~CI~~ done 2026-11-14 (D-160); branch protection (B-7) still open | S–M |
 | 9 | A new production Supabase project with backups, the migration ledger and an in-order apply script, rehearsed on an empty project (B-8, B-14) | M |

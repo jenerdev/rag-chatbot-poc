@@ -2955,11 +2955,14 @@ async function manageBookingChecks() {
     //      approves the move to Saturday: old nights cancelled, new ones
     //      confirmed in the SAME stay, the balance 500.00 owed.
     {
+      // 154b's setup (D-161): the stay has a free child before it moves.
+      const freed = await supabase.from('bookings').update({ free_guests: 1 }).eq('tenant_id', probe.id).eq('group_id', moving.group).in('status', ['pending', 'confirmed']).select('id');
+      if (freed.error || !freed.data?.length) throw new Error(`free child: ${freed.error?.message ?? '0 rows'}`);
       const req = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-10', p_reason: 'probe: weekend instead' });
       const staffTry = await staff.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
       const noNote = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'reject', p_note: ' ' });
       const ok = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
-      const rows = (await supabase.from('bookings').select('booked_date, status, reference, decision_note').eq('tenant_id', probe.id).eq('group_id', moving.group).order('id')).data ?? [];
+      const rows = (await supabase.from('bookings').select('booked_date, status, reference, decision_note, free_guests, promo_id').eq('tenant_id', probe.id).eq('group_id', moving.group).order('id')).data ?? [];
       const money = ok.data?.payment;
       const guest = (await lookup(moving.ref, moving.email)).data;
       check(
@@ -2970,6 +2973,18 @@ async function manageBookingChecks() {
           && guest?.check_in === '2027-07-10' && guest.status === 'confirmed',
         'manage: staff cannot decide (42501); a reject needs a note; approving moves the stay in one go (same reference), 500.00 now owed',
         `staff ${staffTry.error?.code} · no note ${noNote.error?.code} · ${ok.error?.message ?? ok.data?.status} · rows ${rows.map((r) => `${r.booked_date}:${r.status}`).join(',')} · ${JSON.stringify(money)} · guest ${guest?.check_in}/${guest?.status}`,
+      );
+
+      // 154b. D-161 (audit B-3): the moved nights keep the stay's free child.
+      //       Before schema-reschedule-free-guests.sql the insert named no
+      //       free_guests and the column's default, 0, took the child away.
+      //       The promo is NOT carried (D-108), and the price above (1,500.00
+      //       on the weekend) is the paying guests' alone (D-147).
+      const moved = rows.filter((r) => r.booked_date === '2027-07-10' && r.status === 'confirmed');
+      check(
+        moved.length >= 1 && moved.every((r) => r.free_guests === 1 && r.promo_id === null),
+        'manage: an approved reschedule keeps the free child of the stay on every moved night (D-161), and carries no promo (D-108)',
+        `moved ${moved.map((r) => `${r.booked_date}:free ${r.free_guests}:promo ${r.promo_id}`).join(',') || 'none'}`,
       );
     }
 

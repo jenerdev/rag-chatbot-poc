@@ -59,7 +59,7 @@
 **Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
 1. ~~fix `packages/bookings/src/guest.test.ts:44`~~ done 2026-11-14 (tests 13/13);
 2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
-3. `decide_change()` keeps `free_guests` and `promo_id` (`schema-manage-booking.sql:1541`);
+3. ~~`decide_change()` keeps `free_guests`~~ done 2026-11-14 (D-161, the 48th file applied, verify 154b); `promo_id` stays dropped by design (D-108, re-confirmed);
 4. rate limits on ~~login, password reset~~ (done 2026-11-14, D-157) and `book/quote`, and the change-door lockout;
 5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
 6. ~~OpenAI timeouts, abort and `max_tokens`~~ done 2026-11-14 (D-159, seen live);
@@ -1907,6 +1907,11 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — A rescheduled stay keeps its free child (D-161; audit B-3)
+- **Did:** `schema-reschedule-free-guests.sql` (the 48th, applied): `decide_change()` copies `free_guests` into the moved nights; the comment on the function is the marker, and `schema-manage-booking.sql`'s old definition is GUARDED on it (trap 20). The promo is still not carried: the user kept D-108 after being shown that the guest's move quote is priced without it.
+- **Observed:** before, the live function's body had no `b.free_guests`; after, it does, with the marker, the same grants (anon no, authenticated yes) and `search_path=""`. The guard, run alone in a rolled-back transaction: marker present → the new body stays; marker removed → the old body goes back. verify 154b PASS ("moved 2027-07-10:free 1:promo null"); 154 still PASS (price 1,500.00, 500.00 owed); the only fails are check 27's dates, as before.
+- **Next:** the remaining P0 items are the user's: item 8 (a production Supabase project with a migration ledger) and item 9 (the legal texts, a lawyer); then P1.
 
 ### 2026-11-14 — `pnpm test` is green again (audit B-1)
 - **Did:** `packages/bookings/src/guest.test.ts`: the expected price now carries `extraGuestCount: null` (the fixture's `guest_stay()` sends no count, which the parser reads as "not known", never 0), and a new case reads a sent count (2). The parser (`guest.ts`) was right; only the test predated D-154.

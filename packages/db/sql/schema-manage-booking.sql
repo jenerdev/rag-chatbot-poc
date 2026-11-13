@@ -1486,6 +1486,14 @@ grant execute on function withdraw_change(bigint, text, text) to authenticated, 
 --                  insert trigger's (unit_quote()); the difference becomes
 --                  the stay's outstanding balance by itself (stay_payment()
 --                  sums the live rows), § 9 q5.
+-- GUARDED (D-161, 2026-11-14): schema-reschedule-free-guests.sql replaces this
+-- with a body that copies free_guests, and marks the function with a comment.
+-- Once that file has run, re-running THIS file must not put back a body
+-- that drops a stay's free children on a move (CLAUDE.md trap 20).
+do $guard$
+begin
+  if coalesce(obj_description(to_regprocedure('public.decide_change(bigint,bigint,text,text)'), 'pg_proc'), '') not like 'schema-reschedule-free-guests.sql%' then
+    execute $ddl$
 create or replace function decide_change(p_tenant_id bigint, p_id bigint, p_action text, p_note text)
 returns jsonb
 language plpgsql
@@ -1552,6 +1560,10 @@ begin
   return jsonb_build_object('status', 'approved', 'payment', public.stay_payment(p_tenant_id, v_req.group_id));
 end;
 $$;
+$ddl$;
+  end if;
+end;
+$guard$;
 revoke all on function decide_change(bigint, bigint, text, text) from public, anon;
 grant execute on function decide_change(bigint, bigint, text, text) to authenticated, service_role;
 
