@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — Reset links point to a configured address (D-169; audit S-13)
+- **Did:** `apps/web/lib/app-origin.ts` (`appOrigin()`, 5 tests): `APP_URL` (https in production), else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, else in development the request origin, else refused in words. Both password-reset routes use it; `APP_URL` documented in `.env.example` and `env.ts` (the CLI invites already read it).
+- **Observed:** 5/5 tests, typecheck clean; on `pnpm dev` both reset routes still answer 200 (a made-up @example.com address, no email sent).
+- **Owed (MANUAL):** keep Supabase's Auth → Redirect URLs exact (no broad wildcard); set `APP_URL` if a custom domain is added on Vercel.
+- **Next:** S-14 (the booking reference's randomness and a collision).
+
 ### 2026-11-14 — A web booking always carries consent (D-168; audit S-12)
 - **Did:** `schema-consent-only.sql` (the 52nd, applied): `request_booking()` revoked from `authenticated` (and public, anon), kept for `service_role`, marked by a comment; its grant in `schema-free-guests.sql` is GUARDED on that marker. `requestBooking()` always calls `request_booking_with_consent()`, `consentVersion` now required. rooms and the isolation suite request with the tenant's version; verify's helpers use the wrapper, 202 now expects the plain call refused.
 - **Observed:** execute for `authenticated` true → false, the wrapper still true, service_role true. First verify run after applying: 18 FAILS of my own making: the wrapper's `p_promo_code` has no default and PostgREST matches functions by the argument NAMES sent, so helpers that left it out found no function (PGRST202); plus one direct call missed. Fixed; then verify: only check 27's dates; 202 "plain … refused (42501)"; "the only way in: chat insert 42501 · anon 42501"; rooms 58/58; tests and typecheck 13/13.

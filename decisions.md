@@ -5643,3 +5643,30 @@ picks a function by the NAMES of the arguments sent, so a call without it
 matched no function (PGRST202). Every helper now sends it.
 
 ---
+
+## D-169 · A reset link's address is configuration, never the request's Host · **Added 2026-11-14**
+
+**Asked:** the audit's S-13: the password-reset `redirectTo` is built from
+the request Host.
+
+**Found:** both reset routes (staff and platform) used `new URL(request.url).origin`,
+i.e. the Host header, which the caller writes. Supabase's Redirect URLs
+allowlist refused a foreign one; a broad wildcard there would have let a
+recovery link (its token in the fragment) be emailed pointing elsewhere.
+
+**Decided:** `appOrigin()` (`apps/web/lib/app-origin.ts`, pure, tested):
+1. `APP_URL` when set (https in production, localhost excepted): the same
+   setting the CLI invites (`member:add`, `super:add`) already read;
+2. on Vercel without it, `VERCEL_PROJECT_PRODUCTION_URL`, set by Vercel
+   itself (a preview's reset link goes to production);
+3. in development, the request origin (localhost), as before;
+4. self-hosted in production with neither: refused in words ("Set APP_URL
+   …"), a 500 with a ref (D-158), never the Host.
+
+**Measured:** tests 5/5 (APP_URL beats a forged request; http refused in
+production; Vercel's domain; development unchanged; nothing configured
+refused); on `pnpm dev` both routes answered 200 for a made-up address.
+
+**Owed (MANUAL):** the Supabase Redirect URLs allowlist stays exact.
+
+---

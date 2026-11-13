@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requestPasswordReset } from '@rag/db';
+import { appOrigin } from '@/lib/app-origin';
 import { allowPlatformAuth } from '@/lib/platform-auth';
 import { AUTH_LIMITED, clientIp } from '@/lib/rate-limit';
 import { badRequest, withRoute } from '@/lib/route';
@@ -21,6 +22,7 @@ export const POST = withRoute(async (request: Request) => {
   if (!(await allowPlatformAuth('reset', clientIp(request), parsed.data.email))) {
     return NextResponse.json({ error: AUTH_LIMITED }, { status: 429 });
   }
-  await requestPasswordReset(parsed.data.email, `${new URL(request.url).origin}/platform/reset`);
+  // D-169 (audit S-13): the link's origin is configuration, never the request's Host.
+  await requestPasswordReset(parsed.data.email, `${appOrigin(process.env, request.url)}/platform/reset`);
   return NextResponse.json({ message: 'If that email has a platform account, a reset link is on its way. It expires in an hour.' });
 });

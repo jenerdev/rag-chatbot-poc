@@ -10379,3 +10379,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** execute revoked from tokens, kept for the wrapper and service_role; verify (only check 27's dates) and rooms 58/58 after the fix below.
 - **Trap hit:** PostgREST matches a function by the argument names sent; the wrapper's `p_promo_code` has no default, so 18 checks that left it out hit PGRST202 until every caller sent it.
 - **Not done:** not committed.
+
+## 2026-11-14 · Reset links point to a configured address (D-169; audit S-13)
+- **Asked:** the audit's S-13: the reset email's link was built from the request's Host header.
+- **What:** `apps/web/lib/app-origin.ts` and its tests; both password-reset routes; `APP_URL` documented.
+- **Why it matters:** the link carries the recovery token; it must only ever point at this site. Before, only Supabase's allowlist stood in the way.
+- **Observed:** tests 5/5; both routes 200 on `pnpm dev`.
+- **Not done:** the allowlist check in the Supabase dashboard (the user's); not committed.
