@@ -5750,3 +5750,30 @@ its tokens and the security-headers walk 29/29 in Chrome (21 pages, the 12
 staff screens signed in).
 
 ---
+
+## D-173 · On a phone, the booking page keeps the total and the step's action in a bar at the bottom · **Added 2026-11-14**
+
+**Asked:** the audit's E-1 (on a phone the Review step's Send sits below the
+whole form, in the summary card) and E-2 (on a per-room tenant the price is
+about 1,500 px below the controls).
+
+**Decided:** one bar for both, below 860 px (where the summary card stacks
+under the form):
+- the total ("Total ₱16,000.00") and ONE action: "See price" before the
+  Review step (scrolls the summary card into view), "Send request" on it
+  (a submit: the same `send()` and D-155 gate as the card's button, so a gap
+  says itself and focuses its field, the consent box included);
+- shown only once there is a price, or on the Review step: on step 1 with no
+  price it said nothing and covered the step's Continue (seen in the first
+  screenshot, removed);
+- shown only while the summary card is off screen (IntersectionObserver),
+  so there are never two Send buttons in view;
+- fixed to the bottom with the safe-area inset, the page padded so nothing
+  hides under it; colours and sizes from tokens.css.
+
+**Measured** on `pnpm dev`, villa: `plan/booking-bar-walk.mjs` 7/7, nothing
+sent (see status.md); web tests 294; typecheck clean.
+
+**Owed:** the axe pass at the end of the E batch; a real phone.
+
+---

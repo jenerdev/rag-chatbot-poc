@@ -10407,3 +10407,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** the build ran a CSS tool with known path-traversal and denial-of-service advisories; CI's audit can now be raised from "critical" to "high" with nothing failing.
 - **Observed:** audit clean, tests, typecheck and build green, 29/29 pages and screens in a browser, all on a scratch build.
 - **Owed by the user:** `pnpm install` and a dev restart. Not committed.
+
+## 2026-11-14 · The booking page's bar on a phone (D-173; audit E-1, E-2)
+- **Asked:** the audit's first two UX items: on a phone the Send button and the price were far below where the guest was looking.
+- **What:** a bar pinned to the bottom of the booking page below 860 px: the total and "See price", then "Send request" on the Review step; it steps aside when the summary card is on screen. `plan/booking-bar-walk.mjs`.
+- **Why it matters:** the audit ordered these by bookings completed: a guest who cannot find Send, or the price, leaves.
+- **Observed:** walk 7/7 in Chrome at 390 px (and 390×560), screenshots in `plan/booking-bar/`; the gate still refuses a missing consent and sends nothing.
+- **Caught by looking:** the first version showed an empty bar on step 1 over the Continue button; the screenshot showed it, and the bar now waits for a price.
+- **Not done:** axe and a real phone (end of the batch); not committed.

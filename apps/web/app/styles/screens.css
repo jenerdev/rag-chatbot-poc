@@ -384,6 +384,7 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .book-summary .quote.error { background: var(--danger-soft); padding: 10px var(--space-3); }
 .book-summary .quote-total { font-size: var(--text-lg); padding-top: var(--space-2); margin-top: var(--space-2); }
 .book-send { width: 100%; min-height: 44px; font-size: var(--text-base); }
+.book-bar { display: none; }
 .summary-note { margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--muted); text-align: center; }
 
 /* While a price is asked: three shimmering bars, never the last price. */
@@ -413,6 +414,19 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 @media (max-width: 860px) {
   .book-layout { grid-template-columns: minmax(0, 1fr); }
   .book-summary { position: static; }
+  /* D-173 (audit E-1/E-2): the total and the step's action, pinned to the
+     bottom while the summary card is off screen. The page keeps room for it. */
+  .book-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 1px solid var(--line); box-shadow: var(--shadow-2);
+  }
+  .book-bar button { min-height: 44px; flex: 0 0 auto; }
+  .book-bar-total { min-width: 0; }
+  .book-bar-total strong { font-size: var(--text-lg); }
+  .book-bar-label { color: var(--muted); font-size: var(--text-sm); }
+  .book-main { padding-bottom: calc(var(--space-8) * 2); }
 }
 
 /* The room list on S-6 and the staff form: a checkbox card per room. */

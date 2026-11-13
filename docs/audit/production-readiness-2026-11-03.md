@@ -164,8 +164,8 @@ Already present and complete (for credit): booking lookup and management by the 
 
 From viewing the guest pages at 390 px and 1280 px, and reading the staff screens' code. Ordered by impact on bookings completed.
 
-1. **Phone, Review step: the Send button is out of sight.** The step's footer has only Back; consent and "Send request" sit in the summary card, below the whole form on a phone (`booking-page.tsx:1015` vs `:1020,1080`). Show them inside the review step on narrow screens, or use a sticky bottom bar "Total ₱X · Send request".
-2. **Phone: the price is ~1,500 px below the controls** on a per-room tenant (alteza, step 2). Add a sticky one-line total on screens under 900 px that opens the summary.
+1. ~~**Phone, Review step: the Send button is out of sight.**~~ **Fixed 2026-11-14** (D-173: a bar pinned to the bottom with the total and "Send request"). The step's footer has only Back; consent and "Send request" sit in the summary card, below the whole form on a phone (`booking-page.tsx:1015` vs `:1020,1080`). Show them inside the review step on narrow screens, or use a sticky bottom bar "Total ₱X · Send request".
+2. ~~**Phone: the price is ~1,500 px below the controls**~~ **Fixed 2026-11-14** (D-173: the same bar shows the total and "See price" once there is one). on a per-room tenant (alteza, step 2). Add a sticky one-line total on screens under 900 px that opens the summary.
 3. **Room cards carry no price.** Show "from ₱X / night" (from `unit_quote()`) and "N left" for the chosen date.
 4. **Terms after the fact.** Show the deposit, the pay-by window, what happens if unpaid, and the refund policy on the Review step, before Send.
 5. **After sending, nothing reaches the guest** (C, Essential). At least say on the receipt, in large type: "Save this reference: you will need it."

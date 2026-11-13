@@ -302,6 +302,22 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     if (stepper && stepper.getBoundingClientRect().top < 0) stepper.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [step]);
 
+  // Audit E-1/E-2 (D-173): below 860 px the summary card (the price, the
+  // consent box, Send) stacks under the whole form, so a bar pinned to the
+  // bottom of the screen carries the total and the one action that matters
+  // on this step. It steps aside while the card itself is on screen, so
+  // there are never two Send buttons in view.
+  const summaryRef = useRef<HTMLElement | null>(null);
+  const [summaryInView, setSummaryInView] = useState(false);
+  useEffect(() => {
+    const card = summaryRef.current;
+    if (!card || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setSummaryInView(!!entry?.isIntersecting), { threshold: 0.15 });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [sent]);
+  const showSummary = () => summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   const end = slotEnd(slot.startTime, slot.duration);
   const checkOut = checkIn && end && nightsValid ? addDays(checkIn, nightCount - 1 + end.days) : null;
 
@@ -1017,7 +1033,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
           </div>
 
           {/* The summary: what is asked for and the SERVER's price, beside the form on a desktop. */}
-          <aside className="card book-summary" aria-labelledby="summary-title">
+          <aside className="card book-summary" aria-labelledby="summary-title" ref={summaryRef}>
             <h2 id="summary-title">Your request</h2>
             {stayWords ? (
               <div className="summary-stay">
@@ -1086,6 +1102,36 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
               A request holds nothing until {businessName} confirms it. Times are in {page.timezone}.
             </p>
           </aside>
+
+          {/* D-173: the phone's bar; CSS shows it below 860 px only. Only once
+              there is a price (or on the Review step): before that it would say
+              nothing and cover the step's own Continue. */}
+          {!summaryInView && (!!quote.quote || step === STEPS.length - 1) && (
+            <div className="book-bar" role="region" aria-label="Your total">
+              <div className="book-bar-total" aria-live="polite">
+                {quote.quote ? (
+                  <>
+                    <span className="book-bar-label">Total</span>{' '}
+                    <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>
+                  </>
+                ) : (
+                  <span className="book-bar-label">{quotePending ? 'Getting the price…' : 'Choose your stay to see the price'}</span>
+                )}
+              </div>
+              {step === STEPS.length - 1 ? (
+                // A submit: the same send() and gate as the card's button. With a
+                // gap (the consent box), the gate says it and focuses the field,
+                // which scrolls the card into view and this bar away.
+                <button type="submit" className="primary" aria-busy={sending || undefined} disabled={sending} onClick={() => sendMissing && !sendMissing.field && showSummary()}>
+                  {sending ? 'Sending…' : 'Send request'}
+                </button>
+              ) : (
+                <button type="button" onClick={showSummary}>
+                  See price
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </main>
       <PublicFooter slug={slug} businessName={businessName} manage={nav.manage} />

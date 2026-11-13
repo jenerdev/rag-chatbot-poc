@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The booking page's bar on a phone (D-173; audit E-1, E-2)
+- **Did:** `components/booking-page.tsx` + `screens.css`: below 860 px, a bar pinned to the bottom with the total and the step's action: "See price" (scrolls to the summary) before the Review step, "Send request" (the same submit and D-155 gate) on it. Shown only once there is a price or on Review, and only while the summary card is off screen (IntersectionObserver), so it never covers the step's Continue for nothing and never doubles the card's Send. `plan/booking-bar-walk.mjs`, shots in `plan/booking-bar/`.
+- **Observed** on `pnpm dev`, villa: walk 7/7 (no bar before a price; at 390×560 the bar with "Total ₱16,000.00 · See price", pinned 0 px from the bottom; See price brings the card in and the bar away; back at the top it returns; Review at 390×812 "Total ₱16,000.00 · Send request"; the bar's Send with the box unticked focused `#book-consent`, said "Tick the box…", and sent nothing; no bar at 1280). Web tests 294, typecheck clean. The first design showed the bar on step 1 with no price, over Continue: removed after the screenshot.
+- **Owed at the end of the E batch:** `plan/ui-refresh-a11y.mjs` (axe) and a look on a real phone.
+- **Next:** E-3 (room cards carry no price).
+
 ### 2026-11-14 — No known vulnerabilities in production dependencies (D-172; audit S-15)
 - **Did:** `pnpm-workspace.yaml` overrides: `next>postcss: 8.5.23` and `postcss>source-map-js: 1.2.2`; the lockfile changes those two packages only. Next stays 15.5.28 (no 15.x ships the fix; 16.4.6 does).
 - **Observed** in a scratch worktree (the user's `pnpm dev` untouched): `pnpm audit --prod` 5 → "No known vulnerabilities found"; typecheck 13/13; tests 13/13; build 7/7; on that build (port 3100) the built CSS 52 KB with the theme tokens, and the security-headers walk 29/29 (21 pages, the 12 staff screens signed in).
