@@ -5840,3 +5840,29 @@ reschedule cutoff, so their guests are now told, correctly, that a
 cancellation refunds nothing.
 
 ---
+
+## D-176 · The receipt says first, in large type, to save the reference; a phone can share it · **Added 2026-11-14**
+
+**Asked:** the audit's E-5: after sending nothing reaches the guest (the
+guest email, section C, is its own work); at least say on the receipt, in
+large type, "Save this reference: you will need it."
+
+**Decided:**
+- Under "Request sent": **"Save this reference: you will need it** to see,
+  pay for or change this booking, with your email or mobile number." The
+  bold half at `--text-xl` (22 px against the body's 15); the small lede
+  above it no longer says the same thing.
+- **Share**, beside Copy, only where the browser has `navigator.share` (a
+  phone; decided after mount, so the server's render and the first client
+  render agree): the title, "My booking request at <business>: reference
+  <REF>." and the Manage booking link with `?ref=`. A refused or cancelled
+  share is silent. A `share` icon on D-101's 20 px grid.
+- **Not this:** the guest email, still open (audit C, Essential).
+
+**Measured:** `plan/receipt-walk.mjs` 3/3 on a throwaway tenant, deleted at
+the end (the line under the title at 22 px with the reference; Share's data
+from a stand-in share sheet: the reference and `/t/<slug>/manage?ref=<REF>`).
+Its check 3 shows only that the stand-in can be removed; the no-Share case
+rests on the component's `canShare &&`.
+
+---

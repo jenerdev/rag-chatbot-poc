@@ -460,6 +460,9 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .confirm-head { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: var(--space-5); }
 .confirm-head .auth-done { margin-bottom: var(--space-3); }
 .confirm-lede { margin: var(--space-2) 0 0; max-width: 46ch; color: var(--muted); font-size: var(--text-sm); }
+/* D-176 (audit E-5): the reference is the guest's only key: said first, large. */
+.receipt-save { margin: var(--space-4) 0 var(--space-3); font-size: var(--text-lg); text-align: center; }
+.receipt-save strong { display: block; font-size: var(--text-xl); }
 .confirm .receipt-reference { justify-content: center; }
 .confirm .receipt-reference .reference { flex: 0 1 auto; }
 .confirm-section { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }

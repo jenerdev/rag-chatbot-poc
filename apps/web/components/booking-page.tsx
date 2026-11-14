@@ -339,6 +339,9 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   // bottom of the screen carries the total and the one action that matters
   // on this step. It steps aside while the card itself is on screen, so
   // there are never two Send buttons in view.
+  // D-176 (audit E-5): the phone's share sheet for the reference, where there is one.
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function'), []);
   const summaryRef = useRef<HTMLElement | null>(null);
   const [summaryInView, setSummaryInView] = useState(false);
   useEffect(() => {
@@ -463,14 +466,36 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                 Request sent
               </h1>
               <p className="confirm-lede">
-                {businessName} has your request. Keep your reference: with your email or mobile number, it opens this booking
-                later.
+                {businessName} has your request.
               </p>
             </div>
 
+            {/* D-176 (audit E-5): nothing is emailed to the guest yet (audit C), so the
+                reference is the one key to this booking: said first, in large type. */}
+            <p className="receipt-save">
+              <strong>Save this reference: you will need it</strong> to see, pay for or change this booking, with your email or
+              mobile number.
+            </p>
             <div className="receipt-reference">
               <span className="small muted">Your reference</span>
               <strong className="reference">{r.reference}</strong>
+              {canShare && (
+                <button
+                  type="button"
+                  className="sm"
+                  onClick={() => {
+                    void navigator
+                      .share({
+                        title: `${businessName} booking request`,
+                        text: `My booking request at ${businessName}: reference ${r.reference}.`,
+                        url: `${window.location.origin}${manageHref}`,
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <Icon name="share" size={14} /> Share
+                </button>
+              )}
               <button
                 type="button"
                 className="sm"

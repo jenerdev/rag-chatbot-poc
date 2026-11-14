@@ -10430,3 +10430,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** the five lines on villa's Review step in Chrome; tests 13/13.
 - **Surfaced:** both tenants have no refund tiers configured, so the page now says plainly that nothing is refunded; the user should set their real policy.
 - **Not done:** not committed.
+
+## 2026-11-14 · The receipt says to save the reference (D-176; audit E-5, the stopgap)
+- **Asked:** the audit's E-5, its "at least" half: nothing reaches the guest after a request, so the receipt must make the reference unmissable.
+- **What:** `components/booking-page.tsx` (the line, the Share button), a `share` icon, `screens.css`; `plan/receipt-walk.mjs`.
+- **Why it matters:** the reference plus the guest's contact is the ONLY way back to a booking; a guest who closes the tab without it can neither pay nor see their stay.
+- **Observed:** walk 3/3 on a throwaway tenant; Share hands over the reference and the Manage booking link; the screenshot showed the old lede repeating the line, which was trimmed.
+- **Found:** `plan/legal-walk.mjs` check 3 is stale since D-155 (expects Send disabled).
+- **Not done:** the guest email (audit C); not committed.

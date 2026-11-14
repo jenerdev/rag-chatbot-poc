@@ -1923,6 +1923,13 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The receipt says to save the reference (D-176; audit E-5, the stopgap)
+- **Did:** the receipt opens with "Save this reference: you will need it to see, pay for or change this booking, with your email or mobile number." (22 px against the body's 15), and where the browser can share (`navigator.share`, a phone), a Share button beside Copy hands over the reference and the Manage booking link; a `share` icon (D-101's grid); the lede no longer repeats it. `plan/receipt-walk.mjs`, shot in `plan/receipt/`.
+- **Observed** on `pnpm dev`, a throwaway tenant (deleted): walk 3/3 (the line first under the title at 22 px with `REC-XRA65K`; Share with a stand-in share sheet gave the reference and `/t/<slug>/manage?ref=…`; check 3 only confirms the stand-in can be removed: the no-Share case rests on the `canShare &&` condition, not on a second request). Typecheck clean; icon tests 3/3.
+- **Still open (audit C, Essential):** the guest email after a request.
+- **Found, not fixed:** `plan/legal-walk.mjs` check 3 still expects Send disabled before consent; D-155 made it never disabled, so that walk fails at 3 until updated.
+- **Next:** E-6 (full and closed nights in the date picker).
+
 ### 2026-11-14 — The terms before Send (D-175; audit E-4)
 - **Did:** `paymentFlow()` (`@rag/bookings`) also returns the fee RULE (full, fixed centavos, percent in hundredths), the refund tiers (most days first) and the reschedule cutoff; `apps/web/lib/booking-terms.ts` (`bookingTerms()`, `cancellationWords()`, 7 tests) turns them into words; the Review step shows "Before you send" (Paying, If it is not paid, Your dates, Cancelling, Changing dates) above the promo, the consent box and Send.
 - **Observed** on `pnpm dev`, villa: booking-bar walk 8/8 with 5b: "Paying: The full price within 24 hours of sending this request… · If it is not paid: … the request expires and the dates go to others · Your dates: Nothing is held until … confirms · Cancelling: Cancelling does not refund what you paid · Changing dates: Contact Villa Amihan Private Resort"; bookings tests 33 (1 new), web tests, typecheck 13/13.
