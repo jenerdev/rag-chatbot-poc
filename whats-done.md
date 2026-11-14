@@ -10438,3 +10438,10 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 3/3 on a throwaway tenant; Share hands over the reference and the Manage booking link; the screenshot showed the old lede repeating the line, which was trimmed.
 - **Found:** `plan/legal-walk.mjs` check 3 is stale since D-155 (expects Send disabled).
 - **Not done:** the guest email (audit C); not committed.
+
+## 2026-11-14 · The date picker shades fully booked nights (D-177; audit E-6)
+- **Asked:** the audit's E-6: a guest learned a night was taken only after choosing it.
+- **What:** `fullNights()` and the open route `book/nights`; a `full` reason in the date field; the booking page passes the list; `plan/full-nights-walk.mjs`.
+- **Why it matters:** picking a date, filling three steps, and only then hearing "already booked" loses the guest.
+- **Observed:** walk 3/3, screenshot in `plan/full-nights/`: the full night struck through and shaded, named for a screen reader, not choosable.
+- **Not done:** weekend/holiday marks in the picker; not committed.

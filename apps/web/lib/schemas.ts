@@ -247,6 +247,11 @@ export const bookRoomsSchema = z.object({
   nights: z.number(typeError(undefined, 'Nights must be a number')).optional(),
 });
 
+/** D-177: the date picker's full nights for a slot. */
+export const bookNightsSchema = z.object({
+  slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
+});
+
 export const bookQuoteSchema = z.object({
   slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
   // The cap (GHSA-mrhx-c7xc-m3w5: zod 4 refuses an over-long list before it

@@ -1630,6 +1630,8 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 .date-day.off { color: var(--faint); cursor: not-allowed; }
 /* Closed: the staff calendar's hatch, and a strike, so the reason is not colour alone. */
 .date-day.off.closed { background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, var(--surface-3) 4px 8px); color: var(--muted); text-decoration: line-through; }
+/* D-177: fully booked: a solid shade and a strike (not the closed hatch), so the two reasons look different, not by colour alone. */
+.date-day.off.full { background: var(--surface-3); color: var(--muted); text-decoration: line-through; }
 .date-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
 .date-note { margin: 0; min-height: 1.4em; font-size: var(--text-xs); color: var(--muted); }
 .date-actions { display: flex; gap: var(--space-1); flex: none; }

@@ -255,6 +255,25 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   // Closed dates (D-080), from the calendar the page already has. Said up
   // front, and again when the stay touches one; the server refuses it anyway.
   const closedDays = useMemo(() => page.calendar.filter((c) => c.kind === 'closed'), [page.calendar]);
+  // D-177 (audit E-6): the nights of the window on which nothing of this slot
+  // is free (book/nights), so the picker shades them before a guest picks one.
+  // A pending request holds nothing (D-070), so it does not make a night full.
+  const [fullDays, setFullDays] = useState<string[]>([]);
+  useEffect(() => {
+    let stale = false;
+    void (async () => {
+      try {
+        const response = await fetch(`${api}/book/nights`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slotId }) });
+        const body = (await response.json().catch(() => null)) as { full?: string[] } | null;
+        if (!stale) setFullDays(response.ok && body?.full ? body.full : []);
+      } catch {
+        if (!stale) setFullDays([]);
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [api, slotId]);
   const closedInStay =
     checkIn && nightsValid
       ? closedDays.find((c) => c.day >= checkIn && c.day <= addDays(checkIn, nightCount - 1)) ?? null
@@ -749,6 +768,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                     max={page.lastDate}
                     today={page.today}
                     closed={closedDays}
+                    full={fullDays}
                     value={checkIn}
                     aria-invalid={checkIn > page.lastDate || closedInStay !== null || undefined}
                     onChange={setCheckIn}

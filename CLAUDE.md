@@ -679,6 +679,7 @@ pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/booking-bar-walk.mjs)   # 7 checks (D-173): the booking page's bar on a phone; nothing sent; shots in plan/booking-bar/
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/room-cards-price-walk.mjs [slug])   # 4 checks (D-174): the room cards' price and rooms left, the price = the quote's; alteza; nothing sent
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/receipt-walk.mjs)   # 3 checks (D-176): the receipt's "Save this reference" and Share; a throwaway tenant, deleted
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/full-nights-walk.mjs)   # 3 checks (D-177): a confirmed night shaded "fully booked" in the picker; a throwaway tenant, deleted
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6

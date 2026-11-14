@@ -42,6 +42,8 @@ export type DateFieldProps = {
   today?: string;
   /** Dates that cannot be chosen, each with its reason (a closed date's label). */
   closed?: ReadonlyArray<{ day: string; label: string }>;
+  /** D-177: nights on which nothing is free; shown and named "fully booked", not choosable. */
+  full?: ReadonlyArray<string>;
   placeholder?: string;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
@@ -53,7 +55,7 @@ function deviceToday(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-export function DateField({ id, value, onChange, min, max, required, disabled, today, closed, placeholder = 'Choose a date', ...aria }: DateFieldProps) {
+export function DateField({ id, value, onChange, min, max, required, disabled, today, closed, full, placeholder = 'Choose a date', ...aria }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const [focusDate, setFocusDate] = useState(value || today || min || '');
   const [missing, setMissing] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function DateField({ id, value, onChange, min, max, required, disabled, t
   const errorId = `${uid}-error`;
 
   const closedMap = new Map((closed ?? []).map((c) => [c.day, c.label]));
-  const bounds = { min, max, closed: closedMap };
+  const bounds = { min, max, closed: closedMap, full: new Set(full ?? []) };
   const month = monthOf(focusDate || openAt(value, today, bounds, deviceToday()));
 
   // The field's own message clears the moment a date is chosen.

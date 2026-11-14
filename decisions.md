@@ -5866,3 +5866,33 @@ Its check 3 shows only that the stand-in can be removed; the no-Share case
 rests on the component's `canShare &&`.
 
 ---
+
+## D-177 · The date picker shades a night on which nothing is free, before it is picked · **Added 2026-11-14**
+
+**Asked:** the audit's E-6: the date picker does not show full or closed
+nights; a guest learns a night is taken only after picking it.
+
+**Found:** closed nights were already shaded and unchoosable (D-080, D-143);
+full ones were not.
+
+**Decided:**
+- **`fullNights()`** (`@rag/bookings`): for a slot, the nights from today to
+  the tenant's last bookable date on which every type's `rooms_free` is 0
+  (the whole property taken, for a whole-resort tenant): one
+  `check_room_availability()` read. A pending request holds nothing (D-070),
+  so it never makes a night full.
+- **`POST /api/t/<slug>/book/nights`**, open like `book/quote`, read-only, on
+  the same allowance (D-162).
+- **The picker:** a `full` reason in `dayState()` ("fully booked" in the
+  day's name and the note), a `full` list on `DateField`, shown as a solid
+  shade with a strike, distinct from the closed hatch, so the reason is not
+  colour alone. The booking page fetches the list when the slot changes.
+- **Not done:** marking weekend and holiday rates in the picker (optional in
+  the audit; the room cards, D-174, and the Review step say the price).
+
+**Measured:** `plan/full-nights-walk.mjs` 3/3 on a throwaway tenant (deleted):
+the route returned only the confirmed night; the picker named it "Thursday
+19 November 2026, fully booked", aria-disabled, and a click chose nothing;
+the next night choosable. Date-field tests 17.
+
+---

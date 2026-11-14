@@ -107,6 +107,14 @@ describe('bounds and reasons', () => {
     expect(reasonWords(dayState('2026-12-24', bounds), bounds)).toBe('');
   });
 
+  it('D-177: a night with nothing free is not choosable, "fully booked"; a closed date keeps its own reason', () => {
+    const withFull = { ...bounds, full: new Set(['2026-12-24', '2026-12-25']) };
+    expect(dayState('2026-12-24', withFull)).toEqual({ selectable: false, reason: 'full' });
+    expect(reasonWords(dayState('2026-12-24', withFull), withFull)).toBe('fully booked');
+    expect(dayState('2026-12-25', withFull).reason).toBe('closed');
+    expect(dayState('2026-12-26', withFull)).toEqual({ selectable: true, reason: null });
+  });
+
   it('names a day with today and its reason', () => {
     expect(dayName('2026-10-21', '2026-10-21', dayState('2026-10-21', bounds), bounds)).toBe('Wednesday 21 October 2026, today');
     expect(dayName('2026-12-25', '2026-10-21', dayState('2026-12-25', bounds), bounds)).toBe('Friday 25 December 2026, closed (Christmas)');

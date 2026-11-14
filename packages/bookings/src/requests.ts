@@ -230,6 +230,34 @@ export async function roomChoices(
   return choices;
 }
 
+/**
+ * D-177 (audit E-6): the nights of the booking window on which NOTHING of a
+ * slot is free (every type's rooms_free is 0, or the whole property is
+ * taken), so the date picker can say so before a guest picks one. One
+ * check_room_availability() read over today .. the tenant's last bookable
+ * date. Closed dates are not here: the page already has them (D-080). A
+ * pending request holds nothing (D-070), so it does not make a night full.
+ */
+export async function fullNights(tenant: BookingTenant, input: { slotId?: unknown }): Promise<string[]> {
+  const config = await requireConfig(tenant);
+  const slotId = typeof input.slotId === 'number' && Number.isInteger(input.slotId) && input.slotId > 0 ? input.slotId : null;
+  if (slotId === null) throw new BookingInputError('Choose a booking slot');
+  const slot = await tenant.db.from('slots').select('id, name, active').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle();
+  if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
+  if (!slot.data) throw new BookingInputError('No such unit or slot.');
+  if (!slot.data.active) throw new BookingInputError(RETIRED);
+  const today = localDate(config.timezone);
+  const availability = await tenant.db.rpc('check_room_availability', {
+    p_tenant_id: tenant.id, p_from: today, p_to: lastBookingDate(today, config.maxAdvanceDays), p_slot: slot.data.name, p_unit: null, p_guests: null,
+  });
+  if (availability.error) throw new Error(`Could not check availability: ${availability.error.message}`);
+  const anyFree = new Map<string, boolean>();
+  for (const r of availability.data) {
+    anyFree.set(r.booked_date, (anyFree.get(r.booked_date) ?? false) || (r.rooms_free ?? 0) > 0);
+  }
+  return [...anyFree.entries()].filter(([, free]) => !free).map(([day]) => day).sort();
+}
+
 /** A checked stay, priced night by night before any promo, and whether every night is still free. */
 export interface PricedStay {
   slot: string;

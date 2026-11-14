@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The date picker shades fully booked nights (D-177; audit E-6)
+- **Did:** `fullNights()` (`@rag/bookings`): the window's nights on which no room of the slot is free, one `check_room_availability()` read (a pending request holds nothing, D-070); open route `POST book/nights` on the quote's allowance; `lib/date-field.ts` a `full` reason ("fully booked", tested); `DateField` a `full` list; the booking page fetches it per slot; `.date-day.off.full` a solid shade and a strike (closed keeps its hatch). `plan/full-nights-walk.mjs`, shot in `plan/full-nights/`.
+- **Observed** on `pnpm dev`, a throwaway tenant with one confirmed night (deleted after): walk 3/3 (book/nights `["2026-11-19"]` only; in the picker at 390 "date-day off full", "Thursday 19 November 2026, fully booked", aria-disabled, a click chose nothing; the 20th choosable). Date-field tests 17 (1 new); tests and typecheck 13/13.
+- **Not done:** the audit's optional weekend/holiday rate marks in the picker (the cards and the Review step say the price).
+- **Next:** E-7 (the chat is silent to screen readers).
+
 ### 2026-11-14 — The receipt says to save the reference (D-176; audit E-5, the stopgap)
 - **Did:** the receipt opens with "Save this reference: you will need it to see, pay for or change this booking, with your email or mobile number." (22 px against the body's 15), and where the browser can share (`navigator.share`, a phone), a Share button beside Copy hands over the reference and the Manage booking link; a `share` icon (D-101's grid); the lede no longer repeats it. `plan/receipt-walk.mjs`, shot in `plan/receipt/`.
 - **Observed** on `pnpm dev`, a throwaway tenant (deleted): walk 3/3 (the line first under the title at 22 px with `REC-XRA65K`; Share with a stand-in share sheet gave the reference and `/t/<slug>/manage?ref=…`; check 3 only confirms the stand-in can be removed: the no-Share case rests on the `canShare &&` condition, not on a second request). Typecheck clean; icon tests 3/3.
