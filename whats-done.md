@@ -10453,3 +10453,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Observed:** walk 3/3, a real streamed answer said once and whole.
 - **Trap hit:** the walk first read the region while the answer was still streaming (it waited on the textarea, never disabled); fixed in the walk, the code was right.
 - **Not done:** not committed.
+
+## 2026-11-14 · The guest pages' smaller UX items (D-179, D-180; audit E-8 to E-14)
+- **Asked:** the rest of the audit's UX list, items 8 to 14.
+- **What:** touch targets, composer focus, a chat kept on reload, room checkbox names, one h1 per page, the slot's label, a quieter footer, a favicon, a silent separator; `plan/guest-ux-walk.mjs`; the axe pass made runnable without the deleted tenants.
+- **Why it matters:** each is small; together they are the difference between a page that works on a phone and with a screen reader and one that merely renders there.
+- **Observed:** the walk 15/15 in Chrome, touch emulated and with a mouse.
+- **Caught by measuring:** a 37 px select (rule order), a 32 px stepper, a too-faint footer colour, and a focus rule that would have skipped keyboard-only users.
+- **Not done:** E-11 (a feature); alteza's placeholder text (tenant data); not committed.

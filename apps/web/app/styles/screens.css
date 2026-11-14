@@ -89,8 +89,9 @@ button.doc-title {
 .tenant-preview { min-height: 0; padding: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--line); }
 .tenant-preview .card { margin-bottom: 0; }
 
-h1.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The brand is an h1, or (D-179) a p when the page has its own h1: it looks the same either way. */
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand-subtitle { white-space: nowrap; }
 .brand-logo { height: 28px; width: auto; border-radius: var(--radius-sm); }
 .brand-subtitle { color: var(--muted); font-weight: 400; }
@@ -1575,6 +1576,13 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 /* The booking page's consent box (D-129), above Send. */
 .consent-check { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-3) 0; font-size: var(--text-sm); font-weight: 400; line-height: 1.5; cursor: pointer; }
 .consent-check input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent-fill); }
+/* D-179: on a touch screen the whole row is the target (it is one <label>), at least 44 px. */
+@media (pointer: coarse) {
+  .consent-check { align-items: center; min-height: 44px; padding: var(--space-1) 0; }
+  .consent-check input { width: 22px; height: 22px; margin: 0; }
+  .date-trigger { min-height: 44px; }
+  .stepper button { min-height: 44px; }
+}
 .dpa-needed { margin: 0 var(--space-6) var(--space-4); }
 
 /* --- S-18 Activity and the platform's Activity tab (activity-list.tsx, D-138) ---

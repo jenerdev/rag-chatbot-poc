@@ -681,6 +681,7 @@ pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/receipt-walk.mjs)   # 3 checks (D-176): the receipt's "Save this reference" and Share; a throwaway tenant, deleted
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/full-nights-walk.mjs)   # 3 checks (D-177): a confirmed night shaded "fully booked" in the picker; a throwaway tenant, deleted
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/chat-announce-walk.mjs)   # 3 checks (D-178): a finished answer said once to a screen reader; ONE small OpenAI call (check 3)
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-ux-walk.mjs)   # 15 checks (D-179, D-180): touch targets, composer focus, the chat kept on reload, room checkbox names, one h1, the small items; no OpenAI call
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6

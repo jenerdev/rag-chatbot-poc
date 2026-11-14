@@ -171,18 +171,18 @@ From viewing the guest pages at 390 px and 1280 px, and reading the staff screen
 5. **After sending, nothing reaches the guest** (C, Essential: the guest email is STILL OPEN). ~~At least say on the receipt, in large type: "Save this reference: you will need it."~~ **Done 2026-11-14** (D-176, with Share on phones).
 6. ~~**The date picker does not show full or closed nights;**~~ **Fixed 2026-11-14** (D-177: full nights shaded and named "fully booked"; closed nights already were, D-080; the weekend/holiday rate marks not done). a guest learns a night is taken only after picking it. Shade full and closed days; optionally mark weekend and holiday rates.
 7. ~~**The chat is silent to screen readers.**~~ **Fixed 2026-11-14** (D-178: each finished answer said once, whole; the conversation a silent `role="log"`). Add `role="log" aria-live="polite"` on the turns, announcing the finished answer rather than every token.
-8. **Touch targets.** Buttons are 36–40 px, fields ~37 px, the consent checkbox 16 px, footer links 20 px. Use 44 px under `pointer: coarse` and make the whole consent row tappable.
-9. **The chat composer autofocuses,** which likely opens the phone keyboard over the welcome and suggested questions (MANUAL on a device). Autofocus only on fine pointers.
-10. **A chat is lost on Back or reload** (the id lives in memory). Keep the conversation id in `sessionStorage`.
-11. **No human hand-off from the chat** (C, Strongly recommended).
-12. **Each room checkbox's accessible name includes the whole description.** Use `aria-labelledby` for the name and `aria-describedby` for the description.
-13. **Two `<h1>`s on guest pages** (the brand and the page title). Make the brand an H2 or a paragraph on inner pages.
+8. ~~**Touch targets.**~~ **Fixed 2026-11-14** (D-179: 44 px buttons, fields, links and the consent row on a touch screen; the checkbox 22 px). Buttons are 36–40 px, fields ~37 px, the consent checkbox 16 px, footer links 20 px. Use 44 px under `pointer: coarse` and make the whole consent row tappable.
+9. ~~**The chat composer autofocuses,**~~ **Fixed 2026-11-14** (D-179: never on a touch screen; on arrival, after an answer, after New chat or the mic). which likely opens the phone keyboard over the welcome and suggested questions (MANUAL on a device). Autofocus only on fine pointers.
+10. ~~**A chat is lost on Back or reload**~~ **Fixed 2026-11-14** (D-179: the id and the turns in sessionStorage). (the id lives in memory). Keep the conversation id in `sessionStorage`.
+11. **No human hand-off from the chat** (C, Strongly recommended). Left to section C (a feature, not a UI fix).
+12. ~~**Each room checkbox's accessible name includes the whole description.**~~ **Fixed 2026-11-14** (D-179). Use `aria-labelledby` for the name and `aria-describedby` for the description.
+13. ~~**Two `<h1>`s on guest pages**~~ **Fixed 2026-11-14** (D-179: the brand is a paragraph where the page has its own h1). (the brand and the page title). Make the brand an H2 or a paragraph on inner pages.
 14. **Smaller items:**
-    - The slot field is labelled "What": use "Day use or overnight".
-    - The build tag and "Staff login" sit in guest footers: tone them down.
-    - `/favicon.ico` returns 404.
-    - Separators "·" are read aloud in the chat's links.
-    - alteza's "Casa Uno" description is placeholder text (data, staff to fix).
+    - ~~The slot field is labelled "What"~~: "Type of stay" (D-180; a tenant's slots include day tours and 22-hour days, so not "Day use or overnight").
+    - ~~The build tag and "Staff login" sit in guest footers: tone them down.~~ (D-180: smaller, muted.)
+    - ~~`/favicon.ico` returns 404.~~ (D-180: `app/icon.svg`, and `/favicon.ico` 308s to it.)
+    - ~~Separators "·" are read aloud in the chat's links.~~ (D-180: `content: "·" / ""`.)
+    - alteza's "Casa Uno" description is placeholder text (data, staff to fix). Left: tenant content.
 
 **Strong already:**
 - "A request is not a booking" is said consistently.

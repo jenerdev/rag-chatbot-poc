@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- D-180 (audit E-14): the site's own icon (a speech bubble); /favicon.ico points here. -->
+  <rect width="32" height="32" rx="7" fill="#1f2937"/>
+  <path d="M9 10.5A2.5 2.5 0 0 1 11.5 8h9A2.5 2.5 0 0 1 23 10.5v6a2.5 2.5 0 0 1-2.5 2.5H15l-4 3.5V19h0.5A2.5 2.5 0 0 1 9 16.5z" fill="#fff"/>
+</svg>

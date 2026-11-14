@@ -748,7 +748,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
               <div className="field-row">
                 {page.slots.length > 1 && (
                   <div className="field">
-                    <label htmlFor="slot">What</label>
+                    {/* D-180 (audit E-14): "What" said nothing; a tenant's slots are day tours, overnights, 22-hour days. */}
+                  <label htmlFor="slot">Type of stay</label>
                     <select id="slot" value={slotId} onChange={(e) => setSlotId(Number(e.target.value))}>
                       {page.slots.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -908,6 +909,20 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                           <label>
                             <input
                               type="checkbox"
+                              // D-179 (audit E-12): named by the room's name alone; the facts,
+                              // the price, what is left and the description are its description
+                              // (inside the label they were all read as one long name).
+                              aria-labelledby={`room-${u.id}-name`}
+                              aria-describedby={
+                                [
+                                  `room-${u.id}-facts`,
+                                  choice?.fromPrice != null ? `room-${u.id}-price` : null,
+                                  free === 0 || (u.rooms > 1 && free !== null) ? `room-${u.id}-left` : null,
+                                  u.description ? `room-${u.id}-description` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')
+                              }
                               checked={picked}
                               onChange={(e) =>
                                 setChosen((current) => {
@@ -919,8 +934,10 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                               }
                             />
                             <span className="room-pick-text">
-                              <span className="room-pick-name">{u.name}</span>
-                              <span className="room-pick-meta">
+                              <span className="room-pick-name" id={`room-${u.id}-name`}>
+                                {u.name}
+                              </span>
+                              <span className="room-pick-meta" id={`room-${u.id}-facts`}>
                                 {u.capacity !== null && <>Up to {u.capacity}</>}
                                 {u.standardCapacity !== null && u.extraPersonRate ? (
                                   <>
@@ -930,7 +947,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                 ) : null}
                               </span>
                               {choice?.fromPrice != null && (
-                                <span className="room-pick-price">
+                                <span className="room-pick-price" id={`room-${u.id}-price`}>
                                   {/* One night is exact; several may differ (a weekend, a holiday), so the lowest is "From". */}
                                   {nightCount > 1 ? 'From ' : ''}
                                   <strong>{formatMoney(choice.fromPrice, page.currency)}</strong>
@@ -938,11 +955,17 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                 </span>
                               )}
                               {free === 0 ? (
-                                <span className="room-pick-meta room-pick-taken">Taken on these dates</span>
+                                <span className="room-pick-meta room-pick-taken" id={`room-${u.id}-left`}>
+                                  Taken on these dates
+                                </span>
                               ) : u.rooms > 1 && free !== null ? (
-                                <span className="room-pick-meta">{`${free} of ${u.rooms} left`}</span>
+                                <span className="room-pick-meta" id={`room-${u.id}-left`}>{`${free} of ${u.rooms} left`}</span>
                               ) : null}
-                              {u.description && <span className="room-description">{u.description}</span>}
+                              {u.description && (
+                                <span className="room-description" id={`room-${u.id}-description`}>
+                                  {u.description}
+                                </span>
+                              )}
                             </span>
                           </label>
                           {picked && (

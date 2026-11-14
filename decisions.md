@@ -5923,3 +5923,59 @@ characters, after the stream ended; a MutationObserver on the region saw
 exactly one non-empty change each time.
 
 ---
+
+## D-179 · Touch targets, focus on a phone, a chat kept on reload, room checkbox names, one h1 · **Added 2026-11-14**
+
+**Asked:** the audit's E-8, E-9, E-10, E-12 and E-13.
+
+**Decided:**
+- **E-8 touch targets:** under `@media (pointer: coarse)` every button,
+  field (input, select, textarea, the date trigger, the stepper's steps) and
+  guest link (the footer, the chat's fine print) is at least 44 px tall, the
+  chat's Send 44 px square; checkboxes and radios 22 px, and the consent
+  row, already one `<label>`, 44 px tall. The field rule sits AFTER the
+  base field rule (equal specificity; the later wins), beside the iOS font
+  rule for the same reason.
+- **E-9 focus:** `focusComposer()` focuses the field unless the primary
+  pointer is coarse: on arrival (in place of `autoFocus`), after an answer,
+  after New chat and after the mic. A phone's keyboard no longer covers the
+  welcome, or each answer as it lands; a mouse, a pen or a keyboard-only
+  setup still gets focus ("fine only" would have left the last out).
+- **E-10 a chat kept:** the conversation id AND the turns this tab showed in
+  `sessionStorage` (`rag-chat:<slug>`, the last 40, a turn still pending
+  dropped), restored on load, cleared by New chat. Per tab, never sent
+  anywhere; there is no guest route that reads a transcript back (D-115), so
+  the tab keeps its own copy. Storage off: the chat starts empty, as before.
+- **E-12:** each room checkbox is `aria-labelledby` its name and
+  `aria-describedby` its facts, price, rooms left and description (only the
+  ids that exist; a dangling id is an axe error).
+- **E-13:** `BrandHeader` draws the brand as a `<p>` when the page has its
+  own `<h1>` (`titled`, true by default with a hero band: the booking page
+  and Manage booking; the privacy and terms pages pass it). It looks the
+  same: the brand's rules now match `.brand`, not `h1.brand`.
+
+**Measured:** `plan/guest-ux-walk.mjs` 15/15 (with D-180's checks; see
+status.md).
+
+---
+
+## D-180 · The small guest items: the slot's label, a quieter footer, a favicon, a silent separator · **Added 2026-11-14**
+
+**Asked:** the audit's E-14.
+
+**Decided:**
+- The slot field is "Type of stay", not "What". The audit's "Day use or
+  overnight" does not fit tenants whose slots include "Day Tour" and
+  "22-Hour Whole Day".
+- In a guest's footer the build tag and "Staff login" are smaller
+  (`--text-xs`) and muted; not `--faint`, which would fail text contrast.
+- `app/icon.svg` is the site's icon (Next links it on every page), and
+  `/favicon.ico`, which answered 404, redirects there (308).
+- The "·" between the chat's links is `content: "·" / ""`: decoration, with
+  empty alt text, so a screen reader does not read "middle dot".
+- **Left:** alteza's placeholder "Casa Uno" description is tenant data for
+  its staff to rewrite; E-11, a human hand-off, is a feature (audit C).
+
+**Measured:** the guest UX walk's 14a–14d.
+
+---

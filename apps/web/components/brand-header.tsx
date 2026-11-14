@@ -28,6 +28,7 @@ export function BrandHeader({
   bannerUrl,
   subtitle,
   hero,
+  titled,
   children,
 }: {
   businessName: string;
@@ -36,15 +37,22 @@ export function BrandHeader({
   subtitle?: string;
   /** The band's line above the name, e.g. "Online booking". Set, the header is drawn inside the band. */
   hero?: string;
+  /**
+   * D-179 (audit E-13): the page has an <h1> of its own ("Request a booking",
+   * a legal page's title), so the brand is not a second one: a paragraph.
+   * Default: true with a hero band (the booking page, Manage booking).
+   */
+  titled?: boolean;
   children: ReactNode;
 }) {
+  const Brand = (titled ?? !!hero) ? 'p' : 'h1';
   const header = (
     <header className={hero ? 'public-header on-hero' : 'public-header'}>
-      <h1 className="brand">
+      <Brand className="brand">
         <BrandMark businessName={businessName} logoUrl={logoUrl} />
         <span className={hero ? 'brand-name visually-hidden' : 'brand-name'}>{businessName}</span>
         {subtitle && <span className="brand-subtitle">{subtitle}</span>}
-      </h1>
+      </Brand>
       <nav>{children}</nav>
     </header>
   );
