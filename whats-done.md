@@ -10445,3 +10445,11 @@ steps since an earlier redesign. It learned to tick the consent box anyway.
 - **Why it matters:** picking a date, filling three steps, and only then hearing "already booked" loses the guest.
 - **Observed:** walk 3/3, screenshot in `plan/full-nights/`: the full night struck through and shaded, named for a screen reader, not choosable.
 - **Not done:** weekend/holiday marks in the picker; not committed.
+
+## 2026-11-14 · The chat speaks to screen readers (D-178; audit E-7)
+- **Asked:** the audit's E-7: answers were never announced to a screen reader.
+- **What:** an announcement region and a silent `role="log"` in `components/chat-screen.tsx`; `plan/chat-announce-walk.mjs`.
+- **Why it matters:** a blind guest heard "Thinking" and then nothing; the answer was on screen but never said.
+- **Observed:** walk 3/3, a real streamed answer said once and whole.
+- **Trap hit:** the walk first read the region while the answer was still streaming (it waited on the textarea, never disabled); fixed in the walk, the code was right.
+- **Not done:** not committed.

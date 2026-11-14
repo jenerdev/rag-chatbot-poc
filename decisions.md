@@ -5896,3 +5896,30 @@ the route returned only the confirmed night; the picker named it "Thursday
 the next night choosable. Date-field tests 17.
 
 ---
+
+## D-178 · The chat says each finished answer to a screen reader once, whole · **Added 2026-11-14**
+
+**Asked:** the audit's E-7: the chat is silent to screen readers; add
+`role="log" aria-live="polite"`, announcing the finished answer rather than
+every token.
+
+**Decided:**
+- **A separate, visually hidden status region** (`role="status"`,
+  `aria-live="polite"`, `aria-atomic="true"`), filled ONCE per finished
+  answer, after the stream's `done`: "<assistant>: " and the reply made
+  sayable by `speakable()` (D-134: a table read as sentences, the length
+  capped). A failure says its own words. It is cleared first, so the same
+  words twice are said twice.
+- **The conversation is `role="log"` with `aria-live="off"`**, labelled
+  "Conversation": a screen reader can move through it, but the streamed
+  tokens are not read out one by one (a polite log would have said every
+  delta as it landed).
+- The "Thinking" bubble keeps its own status.
+
+**Measured** on `pnpm dev`, villa: `plan/chat-announce-walk.mjs` 3/3: the
+silent log and one status region; "Hello" (answered in code) said once; a
+real answer (the cook question, one small OpenAI call) said once, whole, 596
+characters, after the stream ended; a MutationObserver on the region saw
+exactly one non-empty change each time.
+
+---

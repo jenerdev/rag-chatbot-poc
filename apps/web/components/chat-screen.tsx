@@ -39,6 +39,7 @@ import { Icon } from '@/components/icons';
 import { MicButton, ReadAloudToggle, useVoice, VoiceStatus } from '@/components/voice';
 import type { NavFeatures } from '@/lib/nav-items';
 import { welcomeTextOf } from '@/lib/welcome-text';
+import { speakable } from '@/lib/speakable';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
 export interface ChatScreenProps {
@@ -140,6 +141,15 @@ export function ChatScreen({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
+  // D-178 (audit E-7): what a screen reader hears, ONCE per finished answer
+  // (or failure), never token by token: the reply made sayable (speakable(),
+  // the tables read as sentences, D-134). Cleared first, so the same words
+  // twice are announced twice.
+  const [announcement, setAnnouncement] = useState('');
+  const announce = useCallback((text: string) => {
+    setAnnouncement('');
+    window.setTimeout(() => setAnnouncement(text), 50);
+  }, []);
   // An empty knowledge base makes every question return the refusal, which
   // looks broken if you do not know why. Better to say so up front. The count
   // comes from the server, so there is no request to wait for.
@@ -294,6 +304,7 @@ export function ChatScreen({
 
         if (streamError) throw new Error(streamError);
         if (!sawDone) throw new Error('The connection closed before the answer finished.');
+        if (answered !== '') announce(`${assistantName}: ${speakable(answered)}`);
         // Read aloud once the reply is whole and stored (Rule 2): always after
         // a spoken question, after a typed one when the guest asked for it.
         if (voiceOn && (spoken || voice.readAloud) && conversationId.current && answered !== '') {
@@ -301,6 +312,7 @@ export function ChatScreen({
         }
       } catch (caught) {
         const message = await describeFailure(caught as Error, response);
+        announce(message);
         // If the answer had already started, keep what arrived and put the
         // error underneath it rather than discarding a partial answer.
         if (started && answered !== '') {
@@ -321,7 +333,7 @@ export function ChatScreen({
         inputRef.current?.focus();
       }
     },
-    [api, voice, voiceOn],
+    [api, voice, voiceOn, announce, assistantName],
   );
 
   /**
@@ -389,7 +401,13 @@ export function ChatScreen({
             <span className="narrow-hidden">New chat</span>
           </button>
         )}
-        <div className="messages-inner">
+        {/* D-178: the finished answer, said once (see `announce`). */}
+        <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </p>
+        {/* A log a screen reader can move through, but silent itself: the
+            tokens of a streamed answer are not read out one by one. */}
+        <div className="messages-inner" role="log" aria-live="off" aria-label="Conversation">
           {/* The welcome (plan/public-brand.md): the tenant's banner, or a
               gradient of its accent, as a cover; its mark; the assistant
               introducing itself in a guest's words; the suggested questions;

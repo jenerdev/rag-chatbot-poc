@@ -1923,6 +1923,12 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 
 ## 🗒️ Session log
 
+### 2026-11-14 — The chat speaks to screen readers (D-178; audit E-7)
+- **Did:** `components/chat-screen.tsx`: a visually hidden `role="status"` `aria-live="polite"` `aria-atomic` region that `announce()` fills ONCE per finished answer ("<assistant>: " + `speakable(answer)`, the tables as sentences, D-134) or per failure (the error's words), cleared first so a repeat is said again; the conversation is `role="log"` `aria-live="off"` `aria-label="Conversation"`, navigable but silent while it streams. `plan/chat-announce-walk.mjs`.
+- **Observed** on `pnpm dev`, villa at 390: walk 3/3 (the silent log and one status region; "Hello", answered in code, said once: "Lia: Hi! I'm Lia…"; a real streamed answer, the cook question, said once, whole, 596 characters, after the stream ended). Typecheck clean. Two test conversations were added to villa by the walk.
+- **Trap hit (in the walk):** its first "finished" test waited for the textarea to be enabled, which it always is; it read mid-stream and looked like a missed announcement. Now it waits for Send to be enabled.
+- **Next:** E-8 (touch targets).
+
 ### 2026-11-14 — The date picker shades fully booked nights (D-177; audit E-6)
 - **Did:** `fullNights()` (`@rag/bookings`): the window's nights on which no room of the slot is free, one `check_room_availability()` read (a pending request holds nothing, D-070); open route `POST book/nights` on the quote's allowance; `lib/date-field.ts` a `full` reason ("fully booked", tested); `DateField` a `full` list; the booking page fetches it per slot; `.date-day.off.full` a solid shade and a strike (closed keeps its hatch). `plan/full-nights-walk.mjs`, shot in `plan/full-nights/`.
 - **Observed** on `pnpm dev`, a throwaway tenant with one confirmed night (deleted after): walk 3/3 (book/nights `["2026-11-19"]` only; in the picker at 390 "date-day off full", "Thursday 19 November 2026, fully booked", aria-disabled, a click chose nothing; the 20th choosable). Date-field tests 17 (1 new); tests and typecheck 13/13.
