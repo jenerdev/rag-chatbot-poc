@@ -378,7 +378,17 @@ begin
 end;
 $$;
 revoke all on function public.request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, int[]) from public, anon, authenticated;
-grant execute on function public.request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, int[]) to authenticated, service_role;
+grant execute on function public.request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, int[]) to service_role;
+-- GUARDED (D-168, 2026-11-14): schema-consent-only.sql takes this from
+-- `authenticated` (only the consent wrapper may call it) and marks the
+-- function with a comment; a re-run of this file must not give it back.
+do $guard$
+begin
+  if coalesce(obj_description(to_regprocedure('public.request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, int[])'), 'pg_proc'), '') not like 'schema-consent-only.sql%' then
+    execute $ddl$ grant execute on function public.request_booking(bigint, bigint, bigint[], int[], date, int, text, text, text, text, text, int[]) to authenticated $ddl$;
+  end if;
+end;
+$guard$;
 
 -- 4. The consent wrapper (D-129), with p_free passed through. Its own
 --    12-parameter signature is dropped first, for the same reason.

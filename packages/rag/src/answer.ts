@@ -4,7 +4,7 @@ import { assistantToolCallMessage, chat, chatStream, toolResultMessage } from '@
 import { embedQuery } from './embed-cache.js';
 import type { ChatMessage, ChatTurn, ToolCall } from '@rag/openai';
 import { roomPhotos } from '@rag/bookings';
-import { LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
+import { ANSWER_MAX_TOKENS, LANGUAGE_SCAN_MESSAGES, MAX_HISTORY, MAX_TOOL_ROUNDS, NO_ANSWER } from './constants.js';
 import { asksExtraGuest, asksHorizon, asksRoomList, asksUndatedPrice, planDates, PRICE_NEEDS_DATE, ROOM_LIST_LINES, roomListReply, WHOLE_PROPERTY_ROOM_LINES } from './dates.js';
 import { classifySmallTalk, smallTalkLanguage, smallTalkReply, thanksPrefix } from './greeting.js';
 import { languageInstructions, replyLanguage, requestReply } from './language.js';
@@ -448,10 +448,13 @@ export async function answerQuestion({
   tenant,
   conversationId,
   message,
+  signal,
 }: {
   tenant: TenantContext;
   conversationId: string | null;
   message: string;
+  /** D-159: the request's signal; the browser leaving stops the model. */
+  signal?: AbortSignal;
 }): Promise<Answer> {
   // Small talk (greetings, thanks, "okay", goodbyes), answered before anything
   // is retrieved or embedded: there is nothing to look up, so the pipeline
@@ -485,7 +488,7 @@ export async function answerQuestion({
       return { conversationId: id, reply: prefix + friendly, refused: true, sources: [], searchQuery, toolCalls: [] };
     }
 
-    const reply = await chat(buildPrompt(tenant, matches, history, message, null, language));
+    const reply = await chat(buildPrompt(tenant, matches, history, message, null, language), answerLimits(signal));
     await saveMessages(tenant, id, message, storedReply(reply));
 
     // searchQuery is returned so the UI can show what was actually searched for
@@ -501,7 +504,7 @@ export async function answerQuestion({
   const { text, records } = await toolLoop(
     tenant,
     buildPrompt(tenant, matches, history, message, promptTools, language),
-    (messages) => chat(messages, { tools: tools.definitions }),
+    (messages) => chat(messages, { tools: tools.definitions, ...answerLimits(signal) }),
     undefined,
     precheck,
   );
@@ -547,10 +550,13 @@ export async function answerQuestionStream({
   onMeta,
   onDelta,
   onTool,
+  signal,
 }: {
   tenant: TenantContext;
   conversationId: string | null;
   message: string;
+  /** D-159: the request's signal; the browser leaving stops the model, and what streamed is saved as interrupted. */
+  signal?: AbortSignal;
   onMeta: (meta: StreamMeta) => void;
   onDelta: (text: string) => void;
   /** Fires as each tool call completes, before the answer that uses it is written. */
@@ -603,7 +609,7 @@ export async function answerQuestionStream({
 
   try {
     if (tools.definitions.length === 0) {
-      const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), filter.push);
+      const reply = await chatStream(buildPrompt(tenant, matches, history, message, null, language), filter.push, answerLimits(signal));
       filter.finish();
       await saveMessages(tenant, id, message, storedReply(reply));
       return prefix + displayReply(reply, friendly);
@@ -624,7 +630,7 @@ export async function answerQuestionStream({
     const { text, records } = await toolLoop(
       tenant,
       buildPrompt(tenant, matches, history, message, promptTools, language),
-      (messages) => chatStream(messages, filter.push, { tools: tools.definitions, holdContent: hold }),
+      (messages) => chatStream(messages, filter.push, { tools: tools.definitions, holdContent: hold, ...answerLimits(signal) }),
       onTool,
       precheck,
     );
@@ -659,6 +665,15 @@ export async function answerQuestionStream({
     );
     throw error;
   }
+}
+
+/**
+ * D-159: what every ANSWER call to the model carries: the output cap (a cut
+ * reply is an error with its text, never a whole answer) and the request's
+ * signal. The rewriter's call is not an answer and keeps its own cap.
+ */
+function answerLimits(signal: AbortSignal | undefined): { maxTokens: number; failOnLength: true; signal?: AbortSignal } {
+  return { maxTokens: ANSWER_MAX_TOKENS, failOnLength: true, ...(signal ? { signal } : {}) };
 }
 
 /**

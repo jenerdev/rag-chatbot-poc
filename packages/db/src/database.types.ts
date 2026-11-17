@@ -1239,6 +1239,31 @@ export interface Database {
         Args: { p_tenant_id: number; p_key: string; p_max: number; p_window_seconds: number };
         Returns: boolean;
       };
+      /** schema-sessions.sql (D-163): a login's row for the token's user (staff: the token's tenant, a member; platform: a super user); its id goes in the cookie */
+      session_open: {
+        Args: { p_kind: string; p_seconds: number };
+        Returns: string;
+      };
+      /** schema-sessions.sql (D-163): this id is the token user's, live, and of this token's kind and tenant */
+      session_valid: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
+      /** schema-sessions.sql (D-163): logout, this device; true if it was live */
+      session_close: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
+      /** schema-sessions.sql (D-163): every live session of the token's user, everywhere; the count */
+      session_close_all: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      /** schema-platform-rate-limit.sql (D-157): the platform login's and reset's count, no tenant, callable with the publishable key; the key must be 'platform-(login|reset)|<sha256 hex>' */
+      platform_rate_allow: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number };
+        Returns: boolean;
+      };
       /** schema-audit-log.sql (D-138): a login, logout or proof_opened row for the token's user; refuses a token with no user */
       audit_note: {
         Args: { p_tenant_id: number | null; p_action: string; p_subject?: string | null };

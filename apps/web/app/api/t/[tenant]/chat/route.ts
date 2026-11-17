@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { answerQuestion, answerQuestionStream } from '@rag/pipeline';
 import type { StreamMeta, ToolCallRecord } from '@rag/pipeline';
+import { OpenAIError } from '@rag/openai';
 import { sessionCan } from '@/lib/admin-auth';
+import { errorBody, newRequestId } from '@/lib/error-body';
 import { allowSpend, CHAT_REQUESTS_PER_WINDOW, clientIp } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { chatSchema, firstError } from '@/lib/schemas';
@@ -58,6 +60,10 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
     tenant,
     conversationId: parsed.data.conversationId,
     message: parsed.data.message.trim(),
+    // D-159 (audit B-5): the browser leaving aborts the model call, in both
+    // deliveries. Before, `closed` only stopped OUR writes; OpenAI went on
+    // generating, and we paid for tokens nobody read.
+    signal: request.signal,
   };
 
   // D-140: the chunks a reply was built from reach a signed-in member with
@@ -93,8 +99,8 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
-      // The browser closing the tab should stop the pipeline. Without this we
-      // keep paying OpenAI for tokens nobody will ever read.
+      // The browser closing the tab: stop writing here. The model call itself
+      // is stopped by the same signal, passed in `args` (D-159).
       const onAbort = (): void => {
         closed = true;
       };
@@ -117,9 +123,15 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
         // to travel down the stream as data. This is the cost of streaming,
         // and it is why the client must treat an `error` event as seriously as
         // a bad status.
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[error]', message);
-        send('error', { error: message });
+        // The same words the error map would give (lib/error-body.ts, D-158):
+        // a fixed sentence and a ref for the visitor, the detail in the log.
+        const mapped = errorBody(error, {
+          openai: error instanceof OpenAIError,
+          expose: process.env.NODE_ENV !== 'production',
+          requestId: newRequestId(),
+        });
+        console.error(mapped.log);
+        send('error', mapped.body);
       } finally {
         request.signal.removeEventListener('abort', onAbort);
         closed = true;

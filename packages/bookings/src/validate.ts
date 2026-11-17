@@ -428,12 +428,29 @@ export function paymentFlow(raw: unknown): PaymentFlow | null {
   const pay = ((raw ?? {}) as Record<string, unknown>).payments as Record<string, unknown> | undefined;
   if (!pay || typeof pay !== 'object') return null;
   const hours = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 168 ? v : null);
-  const fee = pay.fee as { kind?: unknown } | undefined;
+  const fee = pay.fee as { kind?: unknown; value?: unknown } | undefined;
+  const whole = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : null);
+  // D-175: the rules as the tenant set them, checked as tenant_applications_validate() checks them.
+  const value = whole(fee?.value, 10_000_000_000);
+  const feeRule: PaymentFlow['fee'] =
+    fee?.kind === 'fixed' && value !== null && value >= 1
+      ? { kind: 'fixed', amount: value }
+      : fee?.kind === 'percent' && value !== null && value >= 1 && value <= 10000
+        ? { kind: 'percent', hundredths: value }
+        : { kind: 'full' };
+  const tiers = Array.isArray(pay.cancellation) ? (pay.cancellation as unknown[]) : [];
+  const cancellation = tiers
+    .map((t) => ({ daysBefore: whole((t as Record<string, unknown>)?.days_before, 365), refundPercent: whole((t as Record<string, unknown>)?.refund_percent, 100) }))
+    .filter((t): t is { daysBefore: number; refundPercent: number } => t.daysBefore !== null && t.refundPercent !== null)
+    .sort((a, b) => b.daysBefore - a.daysBefore);
   return {
-    deposit: fee?.kind === 'fixed' || fee?.kind === 'percent',
+    deposit: feeRule.kind !== 'full',
     payWithinHours: hours(pay.pay_within_hours),
     reviewWithinHours: hours(pay.review_within_hours),
     hold: pay.hold === 'on_proof' || pay.hold === 'on_request' ? pay.hold : 'none',
+    fee: feeRule,
+    cancellation,
+    rescheduleUntilDaysBefore: whole(pay.reschedule_until_days_before, 365),
   };
 }
 

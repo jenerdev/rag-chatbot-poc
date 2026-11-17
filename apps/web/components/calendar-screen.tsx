@@ -519,7 +519,10 @@ function WeekView({ data, perRoom, onPick }: { data: CalendarData; perRoom: bool
                         <button
                           type="button"
                           className={`wk-cell ${cell.state}`}
-                          aria-label={`${name}, ${slotName}, ${short(day.day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${SLOT_WORD[cell.state].toLowerCase()}${cell.roomsTotal > 1 && cell.state !== 'closed' ? `, ${cell.roomsTaken} of ${cell.roomsTotal} rooms booked` : ''}${cell.pending > 0 ? `, ${pendingWords(cell.pending)}` : ''}. Open the day.`}
+                          // WCAG 2.5.3 (axe label-content-name-mismatch): the name STARTS with
+                          // what the cell shows ("Open 1 of 2 3"), so a voice user can say it;
+                          // the details follow.
+                          aria-label={`${[SLOT_WORD[cell.state], cell.roomsTotal > 1 && cell.state !== 'closed' ? `${cell.roomsTaken} of ${cell.roomsTotal}` : null, cell.pending > 0 ? String(cell.pending) : null].filter(Boolean).join(' ')}: ${name}, ${slotName}, ${short(day.day, { weekday: 'long', day: 'numeric', month: 'long' })}${cell.roomsTotal > 1 && cell.state !== 'closed' ? `, ${cell.roomsTaken} of ${cell.roomsTotal} rooms booked` : ''}${cell.pending > 0 ? `, ${pendingWords(cell.pending)}` : ''}. Open the day.`}
                           onClick={() => onPick(day.day)}
                         >
                           <span aria-hidden="true">{SLOT_WORD[cell.state]}</span>

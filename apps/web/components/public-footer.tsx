@@ -22,7 +22,10 @@ export function PublicFooter({ slug, businessName, manage, book = false }: { slu
         {/* D-129: the resort's own privacy policy and terms, on every guest page with a footer. */}
         <Link href={`/t/${slug}/privacy`}>Privacy</Link>
         <Link href={`/t/${slug}/terms`}>Terms</Link>
-        <Link href={`/t/${slug}/admin`}>Staff login</Link>
+        {/* D-180 (audit E-14): for staff, not guests: quieter than the guest links. */}
+        <Link href={`/t/${slug}/admin`} className="footer-staff">
+          Staff login
+        </Link>
       </nav>
     </footer>
   );

@@ -21,6 +21,13 @@ const PATHS = {
   plus: <path d="M10 4v12M4 10h12" />,
   edit: <path d="M13.5 3.5l3 3L7 16H4v-3z" />,
   trash: <path d="M3.5 6h13M8 6V4h4v2M5.5 6l.8 10.5h7.4L14.5 6" />,
+  // D-176: share, an arrow up out of an open box (the receipt's Share).
+  share: (
+    <>
+      <path d="M10 3v10M6.5 6.5L10 3l3.5 3.5" />
+      <path d="M5.5 10.5v5A1.5 1.5 0 007 17h6a1.5 1.5 0 001.5-1.5v-5" />
+    </>
+  ),
   copy: (
     <>
       <rect x="7" y="7" width="9.5" height="9.5" rx="1.5" />

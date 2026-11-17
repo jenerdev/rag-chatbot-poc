@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requestPasswordReset } from '@rag/db';
+import { AUTH_LIMITED, allowAuth, clientIp } from '@/lib/rate-limit';
+import { appOrigin } from '@/lib/app-origin';
 import { badRequest } from '@/lib/route';
 import { firstError, passwordResetSchema } from '@/lib/schemas';
 import { withTenantRoute } from '@/lib/tenant';
@@ -21,8 +23,13 @@ export const dynamic = 'force-dynamic';
 export const POST = withTenantRoute(async (request, { tenant }) => {
   const parsed = passwordResetSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // Audit S-2 (D-157): every reset is an email on a capped sender (R-21).
+  if (!(await allowAuth(tenant, 'reset', clientIp(request), parsed.data.email))) {
+    return NextResponse.json({ error: AUTH_LIMITED }, { status: 429 });
+  }
 
-  const redirectTo = `${new URL(request.url).origin}/t/${tenant.slug}/admin/reset`;
+  // D-169 (audit S-13): the link's origin is configuration, never the request's Host.
+  const redirectTo = `${appOrigin(process.env, request.url)}/t/${tenant.slug}/admin/reset`;
   await requestPasswordReset(parsed.data.email, redirectTo);
   return NextResponse.json({
     message: 'If that email has a staff account, a reset link is on its way. It expires in an hour.',

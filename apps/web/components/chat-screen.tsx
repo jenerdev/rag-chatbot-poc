@@ -29,7 +29,7 @@
 // offers the way back instead of yanking the view.
 
 import Link from 'next/link';
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RoomCard, Source, ToolCallRecord } from '@rag/pipeline';
 import { BuildTag } from '@/components/build-tag';
 import { SourcesPanel } from '@/components/sources-panel';
@@ -39,6 +39,7 @@ import { Icon } from '@/components/icons';
 import { MicButton, ReadAloudToggle, useVoice, VoiceStatus } from '@/components/voice';
 import type { NavFeatures } from '@/lib/nav-items';
 import { welcomeTextOf } from '@/lib/welcome-text';
+import { speakable } from '@/lib/speakable';
 
 /** Everything the server resolved about the tenant. No ids, no admin hash. */
 export interface ChatScreenProps {
@@ -140,6 +141,23 @@ export function ChatScreen({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
+  // D-178 (audit E-7): what a screen reader hears, ONCE per finished answer
+  // (or failure), never token by token: the reply made sayable (speakable(),
+  // the tables read as sentences, D-134). Cleared first, so the same words
+  // twice are announced twice.
+  const [announcement, setAnnouncement] = useState('');
+  // D-179 (audit E-9): the composer takes focus only where the pointer is
+  // fine (a mouse). On a touch screen focus opens the keyboard, which would
+  // cover the welcome and its suggested questions on arrival, and the answer
+  // itself after every reply; there the guest taps the field when ready.
+  const focusComposer = useCallback(() => {
+    // Unless the primary pointer is a finger: a mouse, a pen, or no pointer at all (a keyboard) still gets focus.
+    if (typeof window !== 'undefined' && !window.matchMedia?.('(pointer: coarse)').matches) inputRef.current?.focus();
+  }, []);
+  const announce = useCallback((text: string) => {
+    setAnnouncement('');
+    window.setTimeout(() => setAnnouncement(text), 50);
+  }, []);
   // An empty knowledge base makes every question return the refusal, which
   // looks broken if you do not know why. Better to say so up front. The count
   // comes from the server, so there is no request to wait for.
@@ -150,11 +168,41 @@ export function ChatScreen({
 
   const messagesRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // D-179: in place of autoFocus, on arrival, and only for a fine pointer.
+  useEffect(() => focusComposer(), [focusComposer]);
   // The conversation lives in the database; the browser only has to remember
   // its id — the server re-sends the last few messages to the model on every
-  // turn. Refreshing the page starts a new conversation, which is deliberate:
-  // listing past conversations is out of scope (mvp.md).
+  // turn. D-179 (audit E-10): the id AND the turns this tab showed are kept in
+  // sessionStorage, so Back, a reload or a trip to the booking page does not
+  // lose the chat. Per tab, gone when the tab closes, never sent anywhere;
+  // "New chat" clears it. There is no route that reads a transcript back to a
+  // guest (D-115 removed it), so the tab keeps its own copy of what it showed.
   const conversationId = useRef<string | null>(null);
+  const storageKey = `rag-chat:${slug}`;
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { conversationId?: unknown; turns?: unknown };
+      if (!Array.isArray(saved.turns)) return;
+      // A turn still waiting when the page went away is dropped: its answer never came to this tab.
+      const restored = (saved.turns as Turn[]).filter((t) => t && typeof t.id === 'number' && t.kind !== 'pending');
+      conversationId.current = typeof saved.conversationId === 'string' ? saved.conversationId : null;
+      nextId = Math.max(nextId, ...restored.map((t) => t.id + 1));
+      setTurns(restored);
+    } catch {
+      // Storage off (a private window), full or unreadable: the chat starts empty, as before.
+    }
+  }, [storageKey]);
+  useEffect(() => {
+    if (busy) return;
+    try {
+      if (turns.length === 0) window.sessionStorage.removeItem(storageKey);
+      else window.sessionStorage.setItem(storageKey, JSON.stringify({ conversationId: conversationId.current, turns: turns.slice(-40) }));
+    } catch {
+      // As above: the chat still works, it just is not kept.
+    }
+  }, [turns, busy, storageKey]);
   // True while the reader is at the bottom. Set false the moment they scroll up
   // to re-read something: yanking the viewport while someone is reading is
   // worse than making them scroll.
@@ -294,6 +342,7 @@ export function ChatScreen({
 
         if (streamError) throw new Error(streamError);
         if (!sawDone) throw new Error('The connection closed before the answer finished.');
+        if (answered !== '') announce(`${assistantName}: ${speakable(answered)}`);
         // Read aloud once the reply is whole and stored (Rule 2): always after
         // a spoken question, after a typed one when the guest asked for it.
         if (voiceOn && (spoken || voice.readAloud) && conversationId.current && answered !== '') {
@@ -301,6 +350,7 @@ export function ChatScreen({
         }
       } catch (caught) {
         const message = await describeFailure(caught as Error, response);
+        announce(message);
         // If the answer had already started, keep what arrived and put the
         // error underneath it rather than discarding a partial answer.
         if (started && answered !== '') {
@@ -318,10 +368,10 @@ export function ChatScreen({
         }
       } finally {
         setBusy(false);
-        inputRef.current?.focus();
+        focusComposer();
       }
     },
-    [api, voice, voiceOn],
+    [api, voice, voiceOn, announce, assistantName, focusComposer],
   );
 
   /**
@@ -360,16 +410,16 @@ export function ChatScreen({
     voice.stopSpeaking();
     setTurns([]);
     setUnseen(false);
-    inputRef.current?.focus();
-  }, [voice]);
+    focusComposer();
+  }, [voice, focusComposer]);
 
   // The microphone: the first press records, the second sends what was
   // heard, as the question, exactly as if it had been typed (§ 6 q1).
   const startListening = useCallback(async () => {
     const heard = await voice.listen();
     if (heard) void send(heard, true);
-    else inputRef.current?.focus();
-  }, [send, voice]);
+    else focusComposer();
+  }, [send, voice, focusComposer]);
 
   return (
     <div className="chat-layout">
@@ -389,7 +439,13 @@ export function ChatScreen({
             <span className="narrow-hidden">New chat</span>
           </button>
         )}
-        <div className="messages-inner">
+        {/* D-178: the finished answer, said once (see `announce`). */}
+        <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </p>
+        {/* A log a screen reader can move through, but silent itself: the
+            tokens of a streamed answer are not read out one by one. */}
+        <div className="messages-inner" role="log" aria-live="off" aria-label="Conversation">
           {/* The welcome (plan/public-brand.md): the tenant's banner, or a
               gradient of its accent, as a cover; its mark; the assistant
               introducing itself in a guest's words; the suggested questions;
@@ -549,7 +605,6 @@ export function ChatScreen({
             ref={inputRef}
             rows={1}
             placeholder="Ask a question…"
-            autoFocus
             value={input}
             onChange={(event) => {
               setInput(event.target.value);

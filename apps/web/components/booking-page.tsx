@@ -32,11 +32,12 @@ import { DateField } from './date-field';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BookingPage, RequestQuote, RequestReceipt } from '@rag/bookings';
+import type { BookingPage, RequestQuote, RequestReceipt, RoomChoice } from '@rag/bookings';
 import { BrandHeader } from '@/components/brand-header';
 import { PublicFooter } from '@/components/public-footer';
 import { TenantNav } from '@/components/tenant-nav';
 import type { NavFeatures } from '@/lib/nav-items';
+import { bookingTerms } from '@/lib/booking-terms';
 import { formatMoney } from '@/lib/money';
 import { MAX_FREE_GUESTS, freeFieldLabel, freeGuestsWords, partyWords } from '@/lib/party-words';
 import { Icon } from '@/components/icons';
@@ -254,6 +255,25 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
   // Closed dates (D-080), from the calendar the page already has. Said up
   // front, and again when the stay touches one; the server refuses it anyway.
   const closedDays = useMemo(() => page.calendar.filter((c) => c.kind === 'closed'), [page.calendar]);
+  // D-177 (audit E-6): the nights of the window on which nothing of this slot
+  // is free (book/nights), so the picker shades them before a guest picks one.
+  // A pending request holds nothing (D-070), so it does not make a night full.
+  const [fullDays, setFullDays] = useState<string[]>([]);
+  useEffect(() => {
+    let stale = false;
+    void (async () => {
+      try {
+        const response = await fetch(`${api}/book/nights`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slotId }) });
+        const body = (await response.json().catch(() => null)) as { full?: string[] } | null;
+        if (!stale) setFullDays(response.ok && body?.full ? body.full : []);
+      } catch {
+        if (!stale) setFullDays([]);
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [api, slotId]);
   const closedInStay =
     checkIn && nightsValid
       ? closedDays.find((c) => c.day >= checkIn && c.day <= addDays(checkIn, nightCount - 1)) ?? null
@@ -293,6 +313,37 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     };
   }, [api, checkIn, nightCount, nightsValid, promoCode, rooms, roomsComplete, slotId]);
 
+  // D-174 (audit E-3): each room type's price and free rooms for the chosen
+  // slot and dates, from the database (book/rooms), BEFORE a room is picked:
+  // the cards say "From ₱X a night" and "1 of 2 left". Per-room tenants only.
+  const [choices, setChoices] = useState<Map<number, RoomChoice> | null>(null);
+  useEffect(() => {
+    if (!perRoom || !checkIn || !nightsValid) {
+      setChoices(null);
+      return;
+    }
+    let stale = false;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${api}/book/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotId, checkIn, nights: nightCount }),
+        });
+        const body = (await response.json().catch(() => null)) as { rooms?: RoomChoice[] } | null;
+        if (stale) return;
+        // A refusal (a closed night, the window) is the quote's to say; the cards just go without.
+        setChoices(response.ok && body?.rooms ? new Map(body.rooms.map((c) => [c.unitId, c])) : null);
+      } catch {
+        if (!stale) setChoices(null);
+      }
+    }, 300);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [api, checkIn, nightCount, nightsValid, perRoom, slotId]);
+
   useEffect(() => {
     if (!moved.current) return;
     headings.current[step]?.focus();
@@ -301,6 +352,25 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
     const stepper = document.querySelector('.stepper');
     if (stepper && stepper.getBoundingClientRect().top < 0) stepper.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [step]);
+
+  // Audit E-1/E-2 (D-173): below 860 px the summary card (the price, the
+  // consent box, Send) stacks under the whole form, so a bar pinned to the
+  // bottom of the screen carries the total and the one action that matters
+  // on this step. It steps aside while the card itself is on screen, so
+  // there are never two Send buttons in view.
+  // D-176 (audit E-5): the phone's share sheet for the reference, where there is one.
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function'), []);
+  const summaryRef = useRef<HTMLElement | null>(null);
+  const [summaryInView, setSummaryInView] = useState(false);
+  useEffect(() => {
+    const card = summaryRef.current;
+    if (!card || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setSummaryInView(!!entry?.isIntersecting), { threshold: 0.15 });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [sent]);
+  const showSummary = () => summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const end = slotEnd(slot.startTime, slot.duration);
   const checkOut = checkIn && end && nightsValid ? addDays(checkIn, nightCount - 1 + end.days) : null;
@@ -415,14 +485,36 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                 Request sent
               </h1>
               <p className="confirm-lede">
-                {businessName} has your request. Keep your reference: with your email or mobile number, it opens this booking
-                later.
+                {businessName} has your request.
               </p>
             </div>
 
+            {/* D-176 (audit E-5): nothing is emailed to the guest yet (audit C), so the
+                reference is the one key to this booking: said first, in large type. */}
+            <p className="receipt-save">
+              <strong>Save this reference: you will need it</strong> to see, pay for or change this booking, with your email or
+              mobile number.
+            </p>
             <div className="receipt-reference">
               <span className="small muted">Your reference</span>
               <strong className="reference">{r.reference}</strong>
+              {canShare && (
+                <button
+                  type="button"
+                  className="sm"
+                  onClick={() => {
+                    void navigator
+                      .share({
+                        title: `${businessName} booking request`,
+                        text: `My booking request at ${businessName}: reference ${r.reference}.`,
+                        url: `${window.location.origin}${manageHref}`,
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <Icon name="share" size={14} /> Share
+                </button>
+              )}
               <button
                 type="button"
                 className="sm"
@@ -656,7 +748,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
               <div className="field-row">
                 {page.slots.length > 1 && (
                   <div className="field">
-                    <label htmlFor="slot">What</label>
+                    {/* D-180 (audit E-14): "What" said nothing; a tenant's slots are day tours, overnights, 22-hour days. */}
+                  <label htmlFor="slot">Type of stay</label>
                     <select id="slot" value={slotId} onChange={(e) => setSlotId(Number(e.target.value))}>
                       {page.slots.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -676,6 +769,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                     max={page.lastDate}
                     today={page.today}
                     closed={closedDays}
+                    full={fullDays}
                     value={checkIn}
                     aria-invalid={checkIn > page.lastDate || closedInStay !== null || undefined}
                     onChange={setCheckIn}
@@ -773,7 +867,8 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                       // D-133: up to the type's rooms, and, once the quote has
                       // counted them for these nights, up to the free ones. The
                       // server refuses more anyway (request_booking()).
-                      const free = quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
+                      const choice = choices?.get(u.id) ?? null;
+                      const free = choice?.free ?? quote.quote?.free.find((f) => f.unitId === u.id)?.rooms ?? null;
                       const cap = Math.max(1, free === null ? u.rooms : Math.min(u.rooms, free));
                       // How many of this type (count-field.tsx): drawn once, on the first row or on its own.
                       const roomsField = (
@@ -814,6 +909,20 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                           <label>
                             <input
                               type="checkbox"
+                              // D-179 (audit E-12): named by the room's name alone; the facts,
+                              // the price, what is left and the description are its description
+                              // (inside the label they were all read as one long name).
+                              aria-labelledby={`room-${u.id}-name`}
+                              aria-describedby={
+                                [
+                                  `room-${u.id}-facts`,
+                                  choice?.fromPrice != null ? `room-${u.id}-price` : null,
+                                  free === 0 || (u.rooms > 1 && free !== null) ? `room-${u.id}-left` : null,
+                                  u.description ? `room-${u.id}-description` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')
+                              }
                               checked={picked}
                               onChange={(e) =>
                                 setChosen((current) => {
@@ -825,8 +934,10 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                               }
                             />
                             <span className="room-pick-text">
-                              <span className="room-pick-name">{u.name}</span>
-                              <span className="room-pick-meta">
+                              <span className="room-pick-name" id={`room-${u.id}-name`}>
+                                {u.name}
+                              </span>
+                              <span className="room-pick-meta" id={`room-${u.id}-facts`}>
                                 {u.capacity !== null && <>Up to {u.capacity}</>}
                                 {u.standardCapacity !== null && u.extraPersonRate ? (
                                   <>
@@ -835,10 +946,26 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                                   </>
                                 ) : null}
                               </span>
-                              {u.rooms > 1 && free !== null && (
-                                <span className="room-pick-meta">{free === 0 ? `None of ${u.rooms} left` : `${free} of ${u.rooms} left`}</span>
+                              {choice?.fromPrice != null && (
+                                <span className="room-pick-price" id={`room-${u.id}-price`}>
+                                  {/* One night is exact; several may differ (a weekend, a holiday), so the lowest is "From". */}
+                                  {nightCount > 1 ? 'From ' : ''}
+                                  <strong>{formatMoney(choice.fromPrice, page.currency)}</strong>
+                                  {slot.nightly ? ' a night' : ` for the ${slot.name}`}
+                                </span>
                               )}
-                              {u.description && <span className="room-description">{u.description}</span>}
+                              {free === 0 ? (
+                                <span className="room-pick-meta room-pick-taken" id={`room-${u.id}-left`}>
+                                  Taken on these dates
+                                </span>
+                              ) : u.rooms > 1 && free !== null ? (
+                                <span className="room-pick-meta" id={`room-${u.id}-left`}>{`${free} of ${u.rooms} left`}</span>
+                              ) : null}
+                              {u.description && (
+                                <span className="room-description" id={`room-${u.id}-description`}>
+                                  {u.description}
+                                </span>
+                              )}
                             </span>
                           </label>
                           {picked && (
@@ -984,6 +1111,19 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
                   </button>
                 </div>
               </div>
+              {/* D-175 (audit E-4): the terms this request is sent on, BEFORE Send:
+                  paying, an unpaid request, the dates, cancelling, changing dates. */}
+              <section className="review-terms" aria-labelledby="terms-title">
+                <h3 id="terms-title">Before you send</h3>
+                <dl className="terms-list">
+                  {bookingTerms(page.payment, businessName, page.currency).map((t) => (
+                    <div key={t.title}>
+                      <dt>{t.title}</dt>
+                      <dd>{t.text}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
               {promoOpen ? (
                 <div className="field promo-field">
                   <label htmlFor="promo-code">
@@ -1017,7 +1157,7 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
           </div>
 
           {/* The summary: what is asked for and the SERVER's price, beside the form on a desktop. */}
-          <aside className="card book-summary" aria-labelledby="summary-title">
+          <aside className="card book-summary" aria-labelledby="summary-title" ref={summaryRef}>
             <h2 id="summary-title">Your request</h2>
             {stayWords ? (
               <div className="summary-stay">
@@ -1086,6 +1226,36 @@ export function BookingPageScreen({ slug, businessName, assistantName, logoUrl, 
               A request holds nothing until {businessName} confirms it. Times are in {page.timezone}.
             </p>
           </aside>
+
+          {/* D-173: the phone's bar; CSS shows it below 860 px only. Only once
+              there is a price (or on the Review step): before that it would say
+              nothing and cover the step's own Continue. */}
+          {!summaryInView && (!!quote.quote || step === STEPS.length - 1) && (
+            <div className="book-bar" role="region" aria-label="Your total">
+              <div className="book-bar-total" aria-live="polite">
+                {quote.quote ? (
+                  <>
+                    <span className="book-bar-label">Total</span>{' '}
+                    <strong>{formatMoney(quote.quote.total, quote.quote.currency)}</strong>
+                  </>
+                ) : (
+                  <span className="book-bar-label">{quotePending ? 'Getting the price…' : 'Choose your stay to see the price'}</span>
+                )}
+              </div>
+              {step === STEPS.length - 1 ? (
+                // A submit: the same send() and gate as the card's button. With a
+                // gap (the consent box), the gate says it and focuses the field,
+                // which scrolls the card into view and this bar away.
+                <button type="submit" className="primary" aria-busy={sending || undefined} disabled={sending} onClick={() => sendMissing && !sendMissing.field && showSummary()}>
+                  {sending ? 'Sending…' : 'Send request'}
+                </button>
+              ) : (
+                <button type="button" onClick={showSummary}>
+                  See price
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </main>
       <PublicFooter slug={slug} businessName={businessName} manage={nav.manage} />

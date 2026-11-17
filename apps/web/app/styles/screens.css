@@ -89,8 +89,9 @@ button.doc-title {
 .tenant-preview { min-height: 0; padding: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--line); }
 .tenant-preview .card { margin-bottom: 0; }
 
-h1.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-h1.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The brand is an h1, or (D-179) a p when the page has its own h1: it looks the same either way. */
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand > span:not(.brand-subtitle) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand-subtitle { white-space: nowrap; }
 .brand-logo { height: 28px; width: auto; border-radius: var(--radius-sm); }
 .brand-subtitle { color: var(--muted); font-weight: 400; }
@@ -384,6 +385,17 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .book-summary .quote.error { background: var(--danger-soft); padding: 10px var(--space-3); }
 .book-summary .quote-total { font-size: var(--text-lg); padding-top: var(--space-2); margin-top: var(--space-2); }
 .book-send { width: 100%; min-height: 44px; font-size: var(--text-base); }
+.book-bar { display: none; }
+/* D-174 (audit E-3): a room card's price for the chosen dates, and a type with none free. */
+.room-pick-price { display: block; margin-top: var(--space-1); font-size: var(--text-sm); }
+.room-pick-price strong { font-size: var(--text-base); }
+.room-pick-taken { color: var(--danger); }
+/* D-175 (audit E-4): the Review step's terms, before Send. */
+.review-terms { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.review-terms h3 { font-size: var(--text-base); margin: 0 0 var(--space-3); }
+.terms-list { display: grid; gap: var(--space-3); margin: 0; }
+.terms-list dt { font-size: var(--text-sm); font-weight: 600; }
+.terms-list dd { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--muted); }
 .summary-note { margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--muted); text-align: center; }
 
 /* While a price is asked: three shimmering bars, never the last price. */
@@ -413,6 +425,19 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 @media (max-width: 860px) {
   .book-layout { grid-template-columns: minmax(0, 1fr); }
   .book-summary { position: static; }
+  /* D-173 (audit E-1/E-2): the total and the step's action, pinned to the
+     bottom while the summary card is off screen. The page keeps room for it. */
+  .book-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 1px solid var(--line); box-shadow: var(--shadow-2);
+  }
+  .book-bar button { min-height: 44px; flex: 0 0 auto; }
+  .book-bar-total { min-width: 0; }
+  .book-bar-total strong { font-size: var(--text-lg); }
+  .book-bar-label { color: var(--muted); font-size: var(--text-sm); }
+  .book-main { padding-bottom: calc(var(--space-8) * 2); }
 }
 
 /* The room list on S-6 and the staff form: a checkbox card per room. */
@@ -436,6 +461,9 @@ button.room-toggle:hover:not(:disabled) { background: var(--surface-2); }
 .confirm-head { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: var(--space-5); }
 .confirm-head .auth-done { margin-bottom: var(--space-3); }
 .confirm-lede { margin: var(--space-2) 0 0; max-width: 46ch; color: var(--muted); font-size: var(--text-sm); }
+/* D-176 (audit E-5): the reference is the guest's only key: said first, large. */
+.receipt-save { margin: var(--space-4) 0 var(--space-3); font-size: var(--text-lg); text-align: center; }
+.receipt-save strong { display: block; font-size: var(--text-xl); }
 .confirm .receipt-reference { justify-content: center; }
 .confirm .receipt-reference .reference { flex: 0 1 auto; }
 .confirm-section { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }
@@ -1548,6 +1576,13 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 /* The booking page's consent box (D-129), above Send. */
 .consent-check { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-3) 0; font-size: var(--text-sm); font-weight: 400; line-height: 1.5; cursor: pointer; }
 .consent-check input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent-fill); }
+/* D-179: on a touch screen the whole row is the target (it is one <label>), at least 44 px. */
+@media (pointer: coarse) {
+  .consent-check { align-items: center; min-height: 44px; padding: var(--space-1) 0; }
+  .consent-check input { width: 22px; height: 22px; margin: 0; }
+  .date-trigger { min-height: 44px; }
+  .stepper button { min-height: 44px; }
+}
 .dpa-needed { margin: 0 var(--space-6) var(--space-4); }
 
 /* --- S-18 Activity and the platform's Activity tab (activity-list.tsx, D-138) ---
@@ -1603,6 +1638,8 @@ input[type="color"].colour-swatch.unset::-moz-color-swatch { opacity: 0; }
 .date-day.off { color: var(--faint); cursor: not-allowed; }
 /* Closed: the staff calendar's hatch, and a strike, so the reason is not colour alone. */
 .date-day.off.closed { background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, var(--surface-3) 4px 8px); color: var(--muted); text-decoration: line-through; }
+/* D-177: fully booked: a solid shade and a strike (not the closed hatch), so the two reasons look different, not by colour alone. */
+.date-day.off.full { background: var(--surface-3); color: var(--muted); text-decoration: line-through; }
 .date-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
 .date-note { margin: 0; min-height: 1.4em; font-size: var(--text-xs); color: var(--muted); }
 .date-actions { display: flex; gap: var(--space-1); flex: none; }

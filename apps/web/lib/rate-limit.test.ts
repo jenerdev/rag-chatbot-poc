@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { allow, allowSpend, CHAT_REQUESTS_PER_WINDOW, clientIp, MAX_REQUESTS_PER_WINDOW, TENANT_CEILING_PER_WINDOW, WINDOW_SECONDS } from './rate-limit';
+import {
+  allow,
+  allowAuth,
+  allowSpend,
+  CHAT_REQUESTS_PER_WINDOW,
+  clientIp,
+  clientIpFrom,
+  hashed,
+  LOGIN_PER_ACCOUNT,
+  LOGIN_PER_ADDRESS,
+  MAX_REQUESTS_PER_WINDOW,
+  platformAuthKeys,
+  RESET_PER_ACCOUNT,
+  RESET_PER_ADDRESS,
+  TENANT_CEILING_PER_WINDOW,
+  tenantAuthKeys,
+  WINDOW_SECONDS,
+} from './rate-limit';
 
 // allow() is a thin wrapper over rate_allow() (schema-rate-limit.sql); the
 // SQL is proved live by verify 225–229. What is tested here is the wrapper's
@@ -71,5 +88,80 @@ describe('allowSpend', () => {
   it('is false when the ceiling is met', async () => {
     const { tenant } = fakeTenant([true, false]);
     await expect(allowSpend(tenant, 'chat', '1.2.3.4', 30)).resolves.toBe(false);
+  });
+});
+
+// Audit S-2 (D-157): the sign-in and reset doors.
+describe('hashed', () => {
+  it('is one account for any case or surrounding space, and never the email itself', () => {
+    expect(hashed(' Ann@Example.com ')).toBe(hashed('ann@example.com'));
+    expect(hashed('ann@example.com')).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashed('ann@example.com')).not.toBe(hashed('bob@example.com'));
+  });
+});
+
+describe('tenantAuthKeys', () => {
+  it('is the address, then the hashed account, under the scope and tenant', () => {
+    const [address, account] = tenantAuthKeys(7, 'login', '1.2.3.4', 'Ann@x.com');
+    expect(address).toBe('login|7|ip|1.2.3.4');
+    expect(account).toBe(`login|7|acct|${hashed('ann@x.com')}`);
+    expect(account).not.toContain('@');
+    expect(tenantAuthKeys(7, 'reset', '1.2.3.4', 'a@x.com')[0]).toBe('reset|7|ip|1.2.3.4');
+  });
+});
+
+describe('platformAuthKeys', () => {
+  it('holds only hashes, in the one shape platform_rate_allow() accepts', () => {
+    const shape = /^platform-(login|reset)\|[0-9a-f]{64}$/;
+    const keys = [...platformAuthKeys('login', '1.2.3.4', 'a@x.com'), ...platformAuthKeys('reset', 'local', 'a@x.com')];
+    for (const key of keys) expect(key).toMatch(shape);
+    expect(keys.join()).not.toContain('1.2.3.4');
+    const [address, account] = platformAuthKeys('login', 'a@x.com', 'a@x.com');
+    expect(address).not.toBe(account); // an address and an account never share a count
+  });
+});
+
+describe('allowAuth', () => {
+  it("checks the address, then the account, with the scope's limits", async () => {
+    const { tenant, calls } = fakeTenant([true, true]);
+    await expect(allowAuth(tenant, 'login', '1.2.3.4', 'a@x.com')).resolves.toBe(true);
+    expect(calls.map((c) => [c.args.p_key, c.args.p_max])).toEqual([
+      ['login|7|ip|1.2.3.4', LOGIN_PER_ADDRESS],
+      [`login|7|acct|${hashed('a@x.com')}`, LOGIN_PER_ACCOUNT],
+    ]);
+    const reset = fakeTenant([true, true]);
+    await allowAuth(reset.tenant, 'reset', '1.2.3.4', 'a@x.com');
+    expect(reset.calls.map((c) => c.args.p_max)).toEqual([RESET_PER_ADDRESS, RESET_PER_ACCOUNT]);
+  });
+  it('does not spend the account for a refused address', async () => {
+    const { tenant, calls } = fakeTenant([false]);
+    await expect(allowAuth(tenant, 'login', '1.2.3.4', 'a@x.com')).resolves.toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+  it('is false when the account is over, and throws on a database error', async () => {
+    await expect(allowAuth(fakeTenant([true, false]).tenant, 'login', '1.2.3.4', 'a@x.com')).resolves.toBe(false);
+    await expect(allowAuth(fakeTenant([new Error('down')]).tenant, 'reset', '1.2.3.4', 'a@x.com')).rejects.toThrow(/down/);
+  });
+});
+
+// Audit S-8 (D-165): which header is believed, by where the app runs.
+describe('clientIpFrom', () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+  const forged = h({ 'x-forwarded-for': '6.6.6.6, 10.0.0.1', 'x-real-ip': '203.0.113.7' });
+
+  it('on Vercel, is the first X-Forwarded-For entry (Vercel writes it from the connection)', () => {
+    expect(clientIpFrom(h({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }), { onVercel: true, production: true })).toBe('203.0.113.9');
+  });
+  it('in development, trusts it as sent, for the walks; "local" with none', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: false })).toBe('6.6.6.6');
+    expect(clientIpFrom(h({}), { onVercel: false, production: false })).toBe('local');
+  });
+  it('self-hosted in production, believes ONLY the configured header, never X-Forwarded-For', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: true, trustedHeader: 'x-real-ip' })).toBe('203.0.113.7');
+    expect(clientIpFrom(h({ 'x-forwarded-for': '6.6.6.6' }), { onVercel: false, production: true, trustedHeader: 'x-real-ip' })).toBe('unknown');
+  });
+  it('self-hosted in production with nothing configured, is ONE shared "unknown" (fails closed)', () => {
+    expect(clientIpFrom(forged, { onVercel: false, production: true })).toBe('unknown');
+    expect(clientIpFrom(h({ 'x-forwarded-for': '1.1.1.1' }), { onVercel: false, production: true })).toBe('unknown');
   });
 });

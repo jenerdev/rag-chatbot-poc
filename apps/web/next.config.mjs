@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { securityHeaders } from './lib/security-headers.mjs';
 
 // Load the repo-root .env.
 //
@@ -37,6 +38,19 @@ function appVersion() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: { NEXT_PUBLIC_APP_VERSION: appVersion() },
+  // Audit S-1: no `X-Powered-By: Next.js`; it tells a stranger which
+  // advisories to try and does nothing for anyone else.
+  poweredByHeader: false,
+  // Audit S-1: the security headers on every page and route, written once
+  // in lib/security-headers.mjs (the why of each is there).
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders({ supabaseUrl: process.env.SUPABASE_URL, dev: process.env.NODE_ENV !== 'production' }),
+      },
+    ];
+  },
   // The workspace packages ship compiled JavaScript, so Next has nothing to
   // transpile. If a package is ever consumed straight from TypeScript source,
   // it goes in `transpilePackages` here.

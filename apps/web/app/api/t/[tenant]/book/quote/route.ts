@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { quoteRequest } from '@rag/bookings';
 import { requireApplication } from '@/lib/applications';
+import { allowSpend, clientIp, QUOTE_REQUESTS_PER_WINDOW } from '@/lib/rate-limit';
 import { badRequest } from '@/lib/route';
 import { bookQuoteSchema, firstError } from '@/lib/schemas';
 import { requireFeature } from '@/lib/feature-flags';
@@ -25,6 +26,12 @@ export const POST = withTenantRoute(async (request, { tenant }) => {
 
   const parsed = bookQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // Audit S-5 (D-162): this address's window, then the tenant's ceiling
+  // across addresses (a promo-code dictionary spread over many). A quote is
+  // up to 70 unit_quote() calls; nothing is written, so a refusal is cheap.
+  if (!(await allowSpend(tenant, 'quote', clientIp(request), QUOTE_REQUESTS_PER_WINDOW))) {
+    return NextResponse.json({ error: 'Too many price checks from here. Please wait a few minutes and try again.' }, { status: 429 });
+  }
 
   return NextResponse.json(await quoteRequest(tenant, parsed.data));
 });

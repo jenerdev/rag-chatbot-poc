@@ -1,4 +1,11 @@
 import { z } from 'zod';
+
+// Audit S-1: the CSP has no 'unsafe-eval' (lib/security-headers.mjs). Zod 4
+// probes `new Function` on first parse to decide whether to compile its
+// object parsers; the throw is caught, but Chrome still reports a
+// securitypolicyviolation (the platform tenant form imports this file).
+// jitless skips the probe and the compilation; our schemas are small.
+z.config({ jitless: true });
 import { MAX_WELCOME_TEXT_LENGTH } from './welcome-text';
 import { MAX_CONTENT_LENGTH, MAX_MESSAGE_LENGTH } from './limits';
 
@@ -233,6 +240,18 @@ const requestRoom = z.object({
 });
 
 /** A price for a stay, before sending it. */
+/** D-174: the room cards' read: a slot, a check-in, nights. The rules are roomChoices()'s (parseRequest()). */
+export const bookRoomsSchema = z.object({
+  slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
+  checkIn: z.string(typeError('Choose a date', 'Choose a date')),
+  nights: z.number(typeError(undefined, 'Nights must be a number')).optional(),
+});
+
+/** D-177: the date picker's full nights for a slot. */
+export const bookNightsSchema = z.object({
+  slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
+});
+
 export const bookQuoteSchema = z.object({
   slotId: z.number(typeError('Choose a booking slot', 'Choose a booking slot')),
   // The cap (GHSA-mrhx-c7xc-m3w5: zod 4 refuses an over-long list before it

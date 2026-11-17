@@ -17,10 +17,14 @@ import { loadRoleOverrides } from './role-access';
 // ---------
 // Logging in sets a cookie holding
 //
-//     <slug>.<user-id>.<expiry-ms>.<hmac-sha256(slug.user-id.expiry, ADMIN_COOKIE_SECRET)>
+//     <slug>.<user-id>.<expiry-ms>.<session-id>.<hmac-sha256(slug.user-id.expiry.session-id, ADMIN_COOKIE_SECRET)>
 //
-// There is no session table. The HMAC is what makes the cookie unforgeable,
-// and the expiry inside it is what makes it end. Slugs have no dots
+// The HMAC is what makes the cookie unforgeable. Since D-163 (audit S-6) the
+// session id inside it names an `app_sessions` row, and every guarded request
+// asks Postgres whether that row is still live (session_valid()): logging out
+// revokes the row, a new password revokes every row of the user, so a COPIED
+// cookie stops working at once instead of in up to 12 hours. Before, there
+// was no session table and the expiry was the only end. Slugs have no dots
 // (tenants_slug_shape) and a uuid has none, so `.` is a safe separator.
 //
 // A request that passes requireAdmin() gets a STAFF context back: a token
@@ -79,9 +83,29 @@ export function verifySessionPayload(payload: string, mac: string): boolean {
 const sign = signSessionPayload;
 
 /** The cookie value for a fresh session. */
-export function signSession(slug: string, userId: string, expiresAt: number): string {
-  const payload = `${slug}.${userId}.${expiresAt}`;
+export function signSession(slug: string, userId: string, expiresAt: number, sessionId: string): string {
+  const payload = `${slug}.${userId}.${expiresAt}.${sessionId}`;
   return `${payload}.${sign(payload)}`;
+}
+
+/** The user and session in this request's cookie for THIS tenant: genuine, this tenant's and unexpired; null otherwise. */
+export function readSessionCookie(request: Request, tenant: TenantContext): { userId: string; sessionId: string } | null {
+  const cookie = request.headers.get('cookie') ?? '';
+  const raw = cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${ADMIN_COOKIE}=`))
+    ?.slice(ADMIN_COOKIE.length + 1);
+  if (!raw) return null;
+
+  // A cookie from before D-163 has four parts, not five, and so is refused
+  // here: everyone logs in once more, and from then on has a session row.
+  const [slug, userId, expiry, sessionId, mac, ...extra] = decodeURIComponent(raw).split('.');
+  if (!slug || !userId || !expiry || !sessionId || !mac || extra.length > 0) return null;
+
+  if (!verifySessionPayload(`${slug}.${userId}.${expiry}.${sessionId}`, mac)) return null;
+
+  return slug === tenant.slug && Number(expiry) > Date.now() ? { userId, sessionId } : null;
 }
 
 /**
@@ -93,22 +117,7 @@ export function signSession(slug: string, userId: string, expiresAt: number): st
  * still a member is requireAdmin()'s question.
  */
 export function readSession(request: Request, tenant: TenantContext): string | null {
-  const cookie = request.headers.get('cookie') ?? '';
-  const raw = cookie
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${ADMIN_COOKIE}=`))
-    ?.slice(ADMIN_COOKIE.length + 1);
-  if (!raw) return null;
-
-  // A cookie from before auth-rls Phase 5 has three parts, not four, and so
-  // is refused here: everyone logs in again, with an email this time.
-  const [slug, userId, expiry, mac, ...extra] = decodeURIComponent(raw).split('.');
-  if (!slug || !userId || !expiry || !mac || extra.length > 0) return null;
-
-  if (!verifySessionPayload(`${slug}.${userId}.${expiry}`, mac)) return null;
-
-  return slug === tenant.slug && Number(expiry) > Date.now() ? userId : null;
+  return readSessionCookie(request, tenant)?.userId ?? null;
 }
 
 /** A 401 carrying the real reason, raised through withRoute's single error map. */
@@ -148,12 +157,16 @@ export interface StaffContext extends TenantContext {
  * membership row Postgres reads inside every policy (plan Rule 4).
  */
 export async function requireAdmin(request: Request, tenant: TenantContext, permission: Permission): Promise<StaffContext> {
-  const userId = readSession(request, tenant);
-  if (!userId) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
+  const session = readSessionCookie(request, tenant);
+  if (!session) throw new AdminAuthError(`Admin login required for "${tenant.slug}"`);
+  const { userId } = session;
   const staff = await staffClient(tenant.id, userId);
   if (!staff) throw new AdminAuthError(`This account is no longer a member of "${tenant.slug}". Log in again.`);
+  // D-163: the session row, and the tenant's overrides, in one round trip.
+  const [live, overrides] = await Promise.all([sessionLive(staff.db, session.sessionId), loadRoleOverrides(tenant)]);
+  if (!live) throw new AdminAuthError(`Your session for "${tenant.slug}" has ended. Log in again.`);
   // The tenant's own permissions (D-128): the default, as the platform has changed it. Postgres asks app_can() again.
-  if (!can(staff.role, permission, await loadRoleOverrides(tenant))) {
+  if (!can(staff.role, permission, overrides)) {
     throw new PermissionError(`Your role (${staff.role}) may not do this (${permission}) in "${tenant.slug}". An owner can change your role; what each role may do is set by the platform.`);
   }
   return { ...tenant, db: staff.db, role: staff.role, userId };
@@ -168,11 +181,40 @@ export async function requireAdmin(request: Request, tenant: TenantContext, perm
  * token, and only decides what the reply carries.
  */
 export async function sessionCan(request: Request, tenant: TenantContext, permission: Permission): Promise<boolean> {
-  const userId = readSession(request, tenant);
-  if (!userId) return false;
-  const staff = await staffClient(tenant.id, userId);
+  const session = readSessionCookie(request, tenant);
+  if (!session) return false;
+  const staff = await staffClient(tenant.id, session.userId);
   if (!staff) return false;
-  return can(staff.role, permission, await loadRoleOverrides(tenant));
+  const [live, overrides] = await Promise.all([sessionLive(staff.db, session.sessionId), loadRoleOverrides(tenant)]);
+  return live && can(staff.role, permission, overrides);
+}
+
+/**
+ * D-163: is this session row live, for the token's user, kind and tenant?
+ * Asked on the member's OWN token (session_valid() reads auth.uid()). A
+ * database error throws, like every other read here: never a guess.
+ */
+export async function sessionLive(db: TenantContext['db'], sessionId: string): Promise<boolean> {
+  const { data, error } = await db.rpc('session_valid', { p_id: sessionId });
+  if (error) throw new Error(`Could not check the session: ${error.message}`);
+  return data === true;
+}
+
+/** D-163: a login's session row, on the new member's own token; its id goes in the cookie. */
+export async function openStaffSession(tenant: TenantContext, userId: string): Promise<string> {
+  const staff = await staffClient(tenant.id, userId);
+  if (!staff) throw new AdminAuthError(`This account is not a member of "${tenant.slug}".`);
+  const { data, error } = await staff.db.rpc('session_open', { p_kind: 'staff', p_seconds: SESSION_MS / 1000 });
+  if (error) throw new Error(`Could not open the session: ${error.message}`);
+  return data;
+}
+
+/** D-163: logout revokes THIS device's row, so a copy of the cookie dies with it. A former member has no token to do it with; the missing membership refuses them already. */
+export async function closeStaffSession(tenant: TenantContext, userId: string, sessionId: string): Promise<void> {
+  const staff = await staffClient(tenant.id, userId);
+  if (!staff) return;
+  const { error } = await staff.db.rpc('session_close', { p_id: sessionId });
+  if (error) throw new Error(`Could not end the session: ${error.message}`);
 }
 
 /**
@@ -200,9 +242,9 @@ export async function noteSession(tenant: TenantContext, userId: string, action:
 }
 
 /** Attach the session cookie, scoped to this tenant's API path. */
-export function setSessionCookie(response: NextResponse, tenant: TenantContext, userId: string): NextResponse {
+export function setSessionCookie(response: NextResponse, tenant: TenantContext, userId: string, sessionId: string): NextResponse {
   const expiresAt = Date.now() + SESSION_MS;
-  response.cookies.set(ADMIN_COOKIE, signSession(tenant.slug, userId, expiresAt), {
+  response.cookies.set(ADMIN_COOKIE, signSession(tenant.slug, userId, expiresAt, sessionId), {
     httpOnly: true, // no script can read it, so an XSS cannot exfiltrate it
     sameSite: 'lax', // not sent on cross-site POSTs, which is the CSRF half
     secure: process.env.NODE_ENV !== 'development',

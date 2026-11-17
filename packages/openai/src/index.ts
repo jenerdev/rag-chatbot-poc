@@ -95,6 +95,16 @@ export interface ChatTurn {
 export interface ChatOptions {
   /** Only sent when set — see the comment at the call site. */
   maxTokens?: number;
+  /**
+   * D-159: a reply cut off by `maxTokens` (finish_reason "length") is an
+   * error carrying the text as `partial`, not a whole answer. The answer
+   * paths set it; the rewriter, whose one line may be cut, does not.
+   */
+  failOnLength?: boolean;
+  /** D-159: abort with the caller (the browser closed the tab). Combined with the timeout. */
+  signal?: AbortSignal;
+  /** D-159: the whole call's limit; CHAT_TIMEOUT_MS when unset. */
+  timeoutMs?: number;
   temperature?: number;
   /** Distinguishes the two kinds of call in the cost log. */
   label?: string;
@@ -173,6 +183,36 @@ export class OpenAIError extends Error {
   }
 }
 
+// D-159 (audit B-5): every call has a time limit. Before, embed, chat and
+// chatStream had none: a hung connection held a serverless function (and,
+// for the stream, a visitor's spinner) until the platform killed it, and a
+// closed tab went on paying for tokens nobody read. The voice calls had
+// theirs already (D-134). Policy, not measurements: well above a normal
+// call (an answer streams in a few seconds), well below a platform's limit.
+export const EMBED_TIMEOUT_MS = 20_000;
+export const CHAT_TIMEOUT_MS = 60_000;
+export const STREAM_TIMEOUT_MS = 90_000;
+
+/** The timeout, and the caller's signal when there is one: whichever fires first aborts the fetch. */
+function callSignal(timeoutMs: number, signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+/**
+ * What an abort becomes. The CALLER's signal wins the tie: a closed tab is
+ * 499 ("the client went away", nginx's code; nobody reads the reply), a
+ * timeout 504. Either carries what streamed so far as `partial`, so the
+ * pipeline saves it marked "[…answer interrupted]" (answer.ts). Any other
+ * error is returned unchanged.
+ */
+function abortedAs(error: unknown, what: string, timeoutMs: number, signal: AbortSignal | undefined, partial?: string): unknown {
+  if (signal?.aborted) return new OpenAIError(`OpenAI ${what} cancelled: the client went away`, 499, partial);
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === 'TimeoutError' || name === 'AbortError') return timedOut(what, timeoutMs, partial);
+  return error;
+}
+
 /**
  * Turn an HTTP failure into an error a human can act on.
  *
@@ -224,7 +264,7 @@ interface EmbeddingsResponse {
 }
 
 interface ChatResponse {
-  choices: { message: { content: string | null; tool_calls?: WireToolCall[] } }[];
+  choices: { message: { content: string | null; tool_calls?: WireToolCall[] }; finish_reason?: string | null }[];
   usage: { prompt_tokens: number; completion_tokens: number };
 }
 
@@ -249,22 +289,27 @@ interface ChatResponse {
  * not something the type system can promise. `vector(1536)` in the schema is
  * the other half of that coupling, and neither half is checked by a compiler.
  */
-export async function embed(texts: string[]): Promise<number[][]> {
+export async function embed(texts: string[], options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<number[][]> {
   if (!Array.isArray(texts)) throw new Error('embed: expected an array of strings');
   if (texts.length === 0) return [];
+  const { timeoutMs = EMBED_TIMEOUT_MS, signal } = options;
 
-  const res = await fetch(EMBEDDINGS_URL, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      model: process.env.OPENAI_EMBEDDING_MODEL,
-      input: texts,
-    }),
-  });
-
-  if (!res.ok) throw await toError(res);
-
-  const body = (await res.json()) as EmbeddingsResponse;
+  let body: EmbeddingsResponse;
+  try {
+    const res = await fetch(EMBEDDINGS_URL, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        model: process.env.OPENAI_EMBEDDING_MODEL,
+        input: texts,
+      }),
+      signal: callSignal(timeoutMs, signal),
+    });
+    if (!res.ok) throw await toError(res);
+    body = (await res.json()) as EmbeddingsResponse;
+  } catch (error) {
+    throw abortedAs(error, 'embedding', timeoutMs, signal);
+  }
 
   // The response is { data: [{ index, embedding }, ...] }. OpenAI documents
   // that `data` comes back in input order, but it also hands you an explicit
@@ -304,30 +349,38 @@ export async function chat(
   messages: ChatMessage[],
   options: ChatOptions | ToolChatOptions = {},
 ): Promise<string | ChatTurn> {
-  const { maxTokens, temperature = 0.2, label = 'chat' } = options;
+  const { maxTokens, failOnLength = false, temperature = 0.2, label = 'chat', signal, timeoutMs = CHAT_TIMEOUT_MS } = options;
   const tools = 'tools' in options ? options.tools : undefined;
 
-  const res = await fetch(CHAT_URL, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      model: process.env.OPENAI_CHAT_MODEL,
-      messages,
-      // Low temperature by default: the job is "read this context and report
-      // what it says", which wants faithfulness, not invention.
-      temperature,
-      // Only sent when asked for. Used by the query rewriter, whose output is
-      // one short line — capping it means a confused model cannot burn output
-      // tokens writing an essay where a question was wanted.
-      ...(maxTokens ? { max_tokens: maxTokens } : {}),
-      ...toolsField(tools),
-    }),
-  });
-
-  if (!res.ok) throw await toError(res);
-
-  const body = (await res.json()) as ChatResponse;
+  let body: ChatResponse;
+  try {
+    const res = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        model: process.env.OPENAI_CHAT_MODEL,
+        messages,
+        // Low temperature by default: the job is "read this context and report
+        // what it says", which wants faithfulness, not invention.
+        temperature,
+        // Only sent when asked for. The query rewriter's output is one short
+        // line, and the answer's cap (D-159) keeps a confused model from
+        // writing an essay on our account.
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
+        ...toolsField(tools),
+      }),
+      signal: callSignal(timeoutMs, signal),
+    });
+    if (!res.ok) throw await toError(res);
+    body = (await res.json()) as ChatResponse;
+  } catch (error) {
+    throw abortedAs(error, label, timeoutMs, signal);
+  }
   const message = body.choices[0]!.message;
+  // D-159: a reply the cap cut off is not an answer. Said, with its text.
+  if (failOnLength && body.choices[0]!.finish_reason === 'length') {
+    throw new OpenAIError(`OpenAI stopped at max_tokens (${maxTokens}): the answer is incomplete`, 502, message.content ?? '');
+  }
   const toolCalls = (message.tool_calls ?? []).map((call) => ({
     id: call.id,
     name: call.function.name,
@@ -357,11 +410,20 @@ interface StreamChunk {
       content?: string | null;
       tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
     };
+    finish_reason?: string | null;
   }[];
 }
 
 export interface StreamOptions {
   temperature?: number;
+  /** D-159: the answer's output cap (ANSWER_MAX_TOKENS in @rag/pipeline). */
+  maxTokens?: number;
+  /** D-159: see ChatOptions.failOnLength. */
+  failOnLength?: boolean;
+  /** D-159: abort with the caller; what streamed so far travels as `partial`. */
+  signal?: AbortSignal;
+  /** D-159: the whole stream's limit, headers to [DONE]; STREAM_TIMEOUT_MS when unset. */
+  timeoutMs?: number;
 }
 
 export interface ToolStreamOptions extends StreamOptions {
@@ -434,132 +496,154 @@ export async function chatStream(
   onDelta: (text: string) => void,
   options: StreamOptions | ToolStreamOptions = {},
 ): Promise<string | ChatTurn> {
-  const { temperature = 0.2 } = options;
+  const { temperature = 0.2, maxTokens, failOnLength = false, signal, timeoutMs = STREAM_TIMEOUT_MS } = options;
   const tools = 'tools' in options ? options.tools : undefined;
   const holdContent = 'holdContent' in options && options.holdContent === true;
 
-  const res = await fetch(CHAT_URL, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      model: process.env.OPENAI_CHAT_MODEL,
-      messages,
-      temperature,
-      stream: true,
-      stream_options: { include_usage: true },
-      ...toolsField(tools),
-    }),
-  });
-
-  if (!res.ok) throw await toError(res);
-
-  const decoder = new TextDecoder();
-  let buffer = '';
+  // D-159: ONE signal for the whole stream, headers to [DONE]: the timeout,
+  // or the browser leaving. Aborting it ends the fetch AND the body read
+  // below, so OpenAI stops generating; what had arrived travels as `partial`.
+  const aborter = callSignal(timeoutMs, signal);
   let answer = '';
-  let usage: StreamChunk['usage'] = undefined;
-  // One entry per tool-call index, filled in fragment by fragment. A Map, not
-  // an array, so an index that arrives out of order leaves no hole.
-  const calls = new Map<number, ToolCall>();
-  // OpenAI ends a healthy stream with the literal `data: [DONE]`. Without
-  // tracking it, ANY end of stream looks like success — including a dropped
-  // connection halfway through a sentence. The partial text would then be
-  // returned as if complete, saved to the database as the assistant's reply,
-  // and reported to the browser as a finished answer. Silent truncation, no
-  // error anywhere, and a corrupted transcript: precisely the failure shape
-  // this project keeps running into (risks.md R-3).
-  let sawDone = false;
+  try {
+    return await readStream();
+  } catch (error) {
+    throw abortedAs(error, 'stream', timeoutMs, signal, answer);
+  }
 
-  // Non-null, as in the JS: a streaming 200 always has a body, and if it
-  // somehow did not, failing here is the same failure the original had.
-  for await (const bytes of res.body!) {
-    // `stream: true` on decode() keeps a partial multi-byte character back
-    // until the rest of it arrives, rather than emitting a replacement char.
-    buffer += decoder.decode(bytes, { stream: true }).replace(/\r/g, '');
+  async function readStream(): Promise<string | ChatTurn> {
+    const res = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        model: process.env.OPENAI_CHAT_MODEL,
+        messages,
+        temperature,
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
+        stream: true,
+        stream_options: { include_usage: true },
+        ...toolsField(tools),
+      }),
+      signal: aborter,
+    });
 
-    // Events are separated by a blank line. Anything after the last blank
-    // line is an incomplete event and stays in the buffer for the next pass.
-    let boundary: number;
-    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-      const event = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
+    if (!res.ok) throw await toError(res);
 
-      for (const line of event.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (payload === '') continue;
-        if (payload === '[DONE]') {
-          sawDone = true;
-          continue;
-        }
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finishReason: string | null | undefined;
+    let usage: StreamChunk['usage'] = undefined;
+    // One entry per tool-call index, filled in fragment by fragment. A Map, not
+    // an array, so an index that arrives out of order leaves no hole.
+    const calls = new Map<number, ToolCall>();
+    // OpenAI ends a healthy stream with the literal `data: [DONE]`. Without
+    // tracking it, ANY end of stream looks like success — including a dropped
+    // connection halfway through a sentence. The partial text would then be
+    // returned as if complete, saved to the database as the assistant's reply,
+    // and reported to the browser as a finished answer. Silent truncation, no
+    // error anywhere, and a corrupted transcript: precisely the failure shape
+    // this project keeps running into (risks.md R-3).
+    let sawDone = false;
 
-        const parsed = JSON.parse(payload) as StreamChunk;
+    // Non-null, as in the JS: a streaming 200 always has a body, and if it
+    // somehow did not, failing here is the same failure the original had.
+    for await (const bytes of res.body!) {
+      // `stream: true` on decode() keeps a partial multi-byte character back
+      // until the rest of it arrives, rather than emitting a replacement char.
+      buffer += decoder.decode(bytes, { stream: true }).replace(/\r/g, '');
 
-        // OpenAI can report a failure INSIDE a 200 response, once streaming
-        // has started. Such a chunk has no `choices` and no `usage`, so
-        // without this it is skipped in silence: the caller gets an empty
-        // answer, an empty assistant row is written, and everything reports
-        // success.
-        if (parsed.error) {
-          throw new OpenAIError(
-            `OpenAI failed mid-stream: ${parsed.error.message ?? 'unknown error'}`,
-            502,
-          );
-        }
+      // Events are separated by a blank line. Anything after the last blank
+      // line is an incomplete event and stays in the buffer for the next pass.
+      let boundary: number;
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
 
-        if (parsed.usage) usage = parsed.usage;
+        for (const line of event.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const payload = line.slice(5).trim();
+          if (payload === '') continue;
+          if (payload === '[DONE]') {
+            sawDone = true;
+            continue;
+          }
 
-        const delta = parsed.choices?.[0]?.delta;
+          const parsed = JSON.parse(payload) as StreamChunk;
 
-        const text = delta?.content;
-        if (text) {
-          answer += text;
-          if (!holdContent) onDelta(text);
-        }
+          // OpenAI can report a failure INSIDE a 200 response, once streaming
+          // has started. Such a chunk has no `choices` and no `usage`, so
+          // without this it is skipped in silence: the caller gets an empty
+          // answer, an empty assistant row is written, and everything reports
+          // success.
+          if (parsed.error) {
+            throw new OpenAIError(
+              `OpenAI failed mid-stream: ${parsed.error.message ?? 'unknown error'}`,
+              502,
+            );
+          }
 
-        for (const fragment of delta?.tool_calls ?? []) {
-          const call = calls.get(fragment.index) ?? { id: '', name: '', arguments: '' };
-          if (fragment.id) call.id = fragment.id;
-          // The name normally arrives whole, in the first fragment. Appending
-          // costs nothing and is still right if it is ever split.
-          if (fragment.function?.name) call.name += fragment.function.name;
-          if (fragment.function?.arguments) call.arguments += fragment.function.arguments;
-          calls.set(fragment.index, call);
+          if (parsed.usage) usage = parsed.usage;
+
+          const delta = parsed.choices?.[0]?.delta;
+          finishReason = parsed.choices?.[0]?.finish_reason ?? finishReason;
+
+          const text = delta?.content;
+          if (text) {
+            answer += text;
+            if (!holdContent) onDelta(text);
+          }
+
+          for (const fragment of delta?.tool_calls ?? []) {
+            const call = calls.get(fragment.index) ?? { id: '', name: '', arguments: '' };
+            if (fragment.id) call.id = fragment.id;
+            // The name normally arrives whole, in the first fragment. Appending
+            // costs nothing and is still right if it is ever split.
+            if (fragment.function?.name) call.name += fragment.function.name;
+            if (fragment.function?.arguments) call.arguments += fragment.function.arguments;
+            calls.set(fragment.index, call);
+          }
         }
       }
     }
-  }
 
-  if (!sawDone) {
-    // The stream ended without its terminator. Whatever arrived is incomplete,
-    // and a half-answer presented as a whole one is worse than a visible
-    // failure — the caller can decide what to do, but it must be told.
-    throw new OpenAIError(
-      `OpenAI stream ended early after ${answer.length} characters — the answer is incomplete`,
-      502,
-      answer,
-    );
-  }
-
-  const toolCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
-
-  if (usage) {
-    console.log(
-      `[openai] stream: ${usage.prompt_tokens} in + ${usage.completion_tokens} out` +
-        (tools ? `, ${plural(toolCalls.length, 'tool call')}` : ''),
-    );
-  }
-
-  if (!tools) return answer;
-
-  // A call with no id or no name cannot be answered: a tool result has to name
-  // the id it answers. Refuse it here, loudly, rather than hand the executor
-  // something it will fail on less clearly.
-  for (const call of toolCalls) {
-    if (!call.id || !call.name) {
-      throw new OpenAIError(`OpenAI streamed a tool call with no ${call.id ? 'name' : 'id'}`, 502);
+    if (!sawDone) {
+      // The stream ended without its terminator. Whatever arrived is incomplete,
+      // and a half-answer presented as a whole one is worse than a visible
+      // failure — the caller can decide what to do, but it must be told.
+      throw new OpenAIError(
+        `OpenAI stream ended early after ${answer.length} characters — the answer is incomplete`,
+        502,
+        answer,
+      );
     }
+
+    // D-159: a stream the cap cut off ends with [DONE] like a whole one; only
+    // finish_reason says so. Not passed off as complete.
+    if (failOnLength && finishReason === 'length') {
+      throw new OpenAIError(`OpenAI stopped at max_tokens (${maxTokens}): the answer is incomplete`, 502, answer);
+    }
+
+    const toolCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
+
+    if (usage) {
+      console.log(
+        `[openai] stream: ${usage.prompt_tokens} in + ${usage.completion_tokens} out` +
+          (tools ? `, ${plural(toolCalls.length, 'tool call')}` : ''),
+      );
+    }
+
+    if (!tools) return answer;
+
+    // A call with no id or no name cannot be answered: a tool result has to name
+    // the id it answers. Refuse it here, loudly, rather than hand the executor
+    // something it will fail on less clearly.
+    for (const call of toolCalls) {
+      if (!call.id || !call.name) {
+        throw new OpenAIError(`OpenAI streamed a tool call with no ${call.id ? 'name' : 'id'}`, 502);
+      }
+    }
+    return { content: answer === '' ? null : answer, toolCalls };
   }
-  return { content: answer === '' ? null : answer, toolCalls };
 }
 
 // --- voice (plan/voice.md, D-134) ---------------------------------------------
@@ -569,8 +653,8 @@ export async function chatStream(
 // turn audio into text and text into audio, and nothing here answers.
 
 /** A timeout is an error with a status of its own, so the route can tell "too slow" from "refused". */
-function timedOut(what: string, ms: number): OpenAIError {
-  return new OpenAIError(`OpenAI ${what} took longer than ${Math.round(ms / 1000)} s`, 504);
+function timedOut(what: string, ms: number, partial?: string): OpenAIError {
+  return new OpenAIError(`OpenAI ${what} took longer than ${Math.round(ms / 1000)} s`, 504, partial);
 }
 
 /**

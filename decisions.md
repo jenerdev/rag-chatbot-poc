@@ -5138,3 +5138,844 @@ the unit's current standard and rate (18 with a fee, 7 without), none null.
 villa's booking page in a browser, Continue enabled, a click with the name
 empty said "Enter your name and mobile number." as an alert and focused
 `#name` with `aria-invalid="true"`.
+
+## D-156 · Every response carries the security headers, from ONE file · **Added 2026-11-14**
+
+**Asked:** fix the production-readiness audit one finding at a time, starting
+with "No security headers (clickjacking is possible on staff and platform
+screens)" (B-2 / S-1).
+
+**Decided:**
+- **ONE file**, `apps/web/lib/security-headers.mjs` (pure, tested; a `.mjs`
+  because `next.config.mjs` imports it), applied to `/:path*` by
+  `headers()`; `poweredByHeader: false`.
+- **The clickjacking wall:** `frame-ancestors 'none'` and
+  `X-Frame-Options: DENY`. Nothing of ours is meant to be embedded.
+- **The CSP, measured, not copied:** `script-src 'self' 'unsafe-inline'`
+  (Next's inline flight scripts; nonces would need a middleware and make
+  every static page dynamic), `style-src 'unsafe-inline'` (the theme's
+  `style` attribute, D-030), `img-src https:` (a tenant's logo may be any
+  https URL), `media-src blob:` (Read aloud), `connect-src 'self'` (the
+  browser talks to nothing else), `frame-src` the Supabase project's
+  origin (the proof PDF on S-14), `object-src 'none'`, `base-uri` and
+  `form-action 'self'`. `next dev` adds `'unsafe-eval'` and `ws:`.
+- **No `upgrade-insecure-requests`:** under `next start` on
+  http://localhost it rewrote our own scripts to https and the page died;
+  every allowed source is `'self'` or https already, and HSTS covers
+  navigation.
+- **HSTS** two years with subdomains, no `preload` (a list we would have to
+  leave by hand); **nosniff**; **Referrer-Policy**
+  `strict-origin-when-cross-origin` (Manage booking's `?ref=` never leaves
+  in a Referer); **Permissions-Policy** `microphone=(self)` (D-134), no
+  camera, location, payment or USB.
+- **Zod runs `jitless`** (`lib/schemas.ts`): its `new Function` probe is
+  caught, but Chrome still reported an `eval` violation on `/platform`.
+- **Vercel:** `headers()` is evaluated at BUILD, so `SUPABASE_URL` must be
+  set for the build, or the proof PDF cannot be framed (fails closed).
+
+**Measured:** web 263 (9 new), typecheck clean; `plan/security-headers-walk.mjs`
+29/29 against `next start`: the six headers and no `X-Powered-By` on a public
+page, a staff page, `/platform`, an API route and `sw.js`; no CSP violation on
+9 signed-out pages (villa, alteza with photos, the landing page, the platform)
+and 12 villa staff screens signed in as a throwaway admin; a page on another
+origin framing S-3 and `/platform` was refused ("violates … frame-ancestors
+'none'").
+
+**Not measured:** the proof PDF in its iframe (no proof on villa), Read aloud's
+blob audio, the platform signed in, a real push.
+
+---
+
+## D-157 · Sign-in and "Forgot password?" are limited per address AND per account · **Added 2026-11-14**
+
+**Asked:** the next audit finding, "No rate limit on staff and super-user
+login or on password reset" (B-4 / S-2).
+
+**Decided:**
+- **Two counts per call, before Supabase Auth sees the password:** this
+  address, then this account (the email, trimmed, lower-cased and sha256'd:
+  counted, never stored). The account is counted only when the address was
+  inside, so one noisy address does not spend a real person's allowance.
+  Login 10 + 10 per 10 minutes; reset 5 + 3 (each reset is an email on a
+  capped sender, R-21). Policy, one constant each in `lib/rate-limit.ts`.
+- **The cost, accepted:** the account count is a lockout an attacker can
+  cause, for one email and ten minutes at a time. Without it, a guesser
+  rotating addresses has no ceiling.
+- **Tenant doors** use `rate_allow()` (D-137) on the chat token, keys
+  `login|<tenant>|ip|<ip>` and `login|<tenant>|acct|<hash>` (and `reset|…`).
+- **Platform doors** have no tenant and no token before a login, so
+  `schema-platform-rate-limit.sql` (the 47th file) adds
+  `platform_rate_windows` (no grant to any role) and
+  `platform_rate_allow()`, a definer callable with the publishable key. It
+  accepts only `platform-(login|reset)|<sha256 hex>` and bounded numbers,
+  so a direct call can do nothing the route does not: the table holds
+  hashes alone (the address is hashed too), and it sweeps itself.
+- **One sentence** for every refusal, 429: "Too many attempts. Please wait a
+  few minutes and try again." It says nothing about whether the account
+  exists.
+- **Not done:** failed logins in the audit log (`audit_note()` needs a user
+  to name; Supabase's auth log records them); Supabase's own limit still
+  counts the server's address (MANUAL, the dashboard).
+
+**Measured:** web 269 (6 new), typecheck clean; verify 229b–229e (3 in and
+the 4th out with one row at count 4; a free-text key, another scope, a 10 s
+window and max 0 are 22023 and store nothing; anon and a chat token 42501
+on the table; the sweep); `plan/auth-rate-limit-walk.mjs` 5/5 on `next
+start`: staff login 401×10 then 429 from one address, platform login 401×10
+then 429 for one account from eleven addresses, staff reset 200×3 then 429,
+the address key at count 11, no email or address in clear.
+
+---
+
+## D-158 · A server failure says one fixed sentence and a ref; the detail stays in the log · **Added 2026-11-14** (amends architecture.md § 9)
+
+**Asked:** the next audit finding, "Internal Postgres and OpenAI error text
+is sent to anonymous visitors" (B-6 / S-3).
+
+**Decided:**
+- **ONE function, `errorBody()`** (`apps/web/lib/error-body.ts`, pure,
+  tested), used by the route map (`lib/route.ts`) and the chat stream's
+  `error` event, so both say the same.
+- **A request status passes through with its words** (400, 401, 403, 404,
+  409, 429): our own code wrote them for a person ("taken on <date>…").
+- **Anything else is the server's failure:** "Something went wrong on our
+  side. Please try again in a moment. (ref 3f9a1c2e)", `requestId` in the
+  body and `X-Request-Id`; the log line is `[error] 500 ref 3f9a1c2e:
+  <the real message>`.
+- **Every OpenAI failure is a 502**, "The assistant could not answer just
+  now…": a bad key is our `.env`, no credit our account, a 400 our request.
+  Its 401 and 429 no longer pass through: they told the browser it was not
+  logged in, or had sent too much, and the 401 body echoed a key fragment.
+- **Outside production the real message is appended** (`[dev: …]`): this
+  project is built to be understood, and `pnpm dev` should show why. This
+  amends architecture.md § 9 ("the real message always reaches the
+  client"), which was written before there were strangers on the routes.
+- **The chat client** (`lib/chat-stream.ts`) shows the server's words as
+  they are; its "OpenAI rejected the API key — check .env" and "out of
+  credits" prefixes are gone (a visitor read them, and our own chat limit's
+  429 was being called OpenAI's).
+
+**Measured:** web 275 (7 new), typecheck clean; on `next start` with an
+invalid OpenAI key, the chat's JSON answer was 502 "The assistant could not
+answer just now. Please try again in a moment. (ref 63e78b68)" with
+`x-request-id: 63e78b68`, the stream's `error` event the same words with
+its own ref, and the server log `[error] 502 ref 63e78b68: OpenAI rejected
+the API key … Incorrect API key provided: sk-proj-*****`. A wrong login
+(401), an empty chat message (400) and an unknown tenant (404) kept their
+words.
+
+**Not changed:** a 4xx carried from Postgres through `fromPostgrest()` (staff
+and platform routes) still says Postgres's words; the staff login's "Is
+`pnpm dev` running?" when the server is unreachable.
+
+---
+
+## D-159 · Every OpenAI call has a time limit, stops with the tab, and an answer has an output cap · **Added 2026-11-14**
+
+**Asked:** the next audit finding, "OpenAI calls have no timeout and no
+output cap" (B-5).
+
+**Decided:**
+- **Time limits** in `@rag/openai`, one constant each, overridable per call
+  (`timeoutMs`): `embed` 20 s, `chat` 60 s, `chatStream` 90 s for the WHOLE
+  stream, headers to `[DONE]`. Policy, not measurement: far above a normal
+  call, below a platform's function limit. The voice calls had theirs
+  (D-134).
+- **The caller's signal** (`signal`) is combined with the timeout
+  (`AbortSignal.any`), so the browser leaving ends the fetch AND the body
+  read: OpenAI stops generating. The chat route passes `request.signal` in
+  both deliveries; before, its `closed` flag only stopped our own writes.
+- **What an abort is:** the caller's signal wins the tie, 499 ("the client
+  went away"); a timeout is 504. Both carry what streamed as `partial`, so
+  the pipeline's existing catch saves it as "[…answer interrupted]" (D-115's
+  `interrupted` kind) and the route's map makes it a 502 (D-158).
+- **The answer's cap**, `ANSWER_MAX_TOKENS = 1000` in
+  `packages/rag/src/constants.ts`, MEASURED: the longest of 370 stored
+  replies was 1,303 characters (a Taglish week of availability, about
+  350-450 tokens), the median 192. Sent on every ANSWER call (the four in
+  `answer.ts`, through `answerLimits()`); the rewriter keeps
+  `REWRITE_MAX_TOKENS`.
+- **A reply the cap cut off is not an answer** (`failOnLength`): a stream
+  ends with `[DONE]` either way, and only `finish_reason: "length"` says it
+  was cut. It fails with its text as `partial`, like a dropped stream
+  (R-3's shape), rather than being saved as whole. The rewriter does not set
+  it: its one line may be cut and still be a query.
+- **No prompt or tool text changed:** the three baselines are untouched, so
+  rule 1's battery is not owed for this.
+
+**Measured:** openai tests 26 (6 new, on a fetch that honours the signal:
+an abort mid-stream is 499 with partial "Yes, "; a stalled stream is 504
+with its partial; chat and embed time out as 504; `max_tokens: 1000` is sent
+and a `length` reply refused with its text; a cut reply without
+`failOnLength` is kept and no `max_tokens` is sent unasked); pipeline 376;
+web 275; typecheck 13/13.
+
+**Seen live** (after OpenAI's 401 "Your API key has expired" and a new
+key, villa on `pnpm dev`): a documents answer (the cook, the deposit, an
+extension) streamed 116 deltas to `done` under the cap; the same question
+with the connection closed after its first delta was stored as `Yes,
+[…answer interrupted]` (26 characters; the whole reply was about 600), so
+the read and the model call stopped with the tab.
+
+---
+
+## D-160 · CI runs every check that needs no secret and no database · **Added 2026-11-14**
+
+**Asked:** the next audit finding, CI (B-7).
+
+**Decided:**
+- **`.github/workflows/ci.yml`, one job, on every push and pull request:**
+  `pnpm install --frozen-lockfile`; `pnpm typecheck` (which runs
+  `scripts/check-service-imports.mjs` first); `pnpm turbo test --continue`
+  (every package reported even when one fails: without `--continue` turbo
+  stopped after the first red package and ran 9 of 13); `pnpm build` with no
+  `.env` (Rule 2: the web app needs no key to build); Rule 2's grep of
+  `apps/web/.next/static` for the secret names; `pnpm audit --prod
+  --audit-level=critical`.
+- **Node 22** (Vercel's runtime; `engines` asks >= 20.9); pnpm from
+  `packageManager`; `contents: read` only; one run per ref at a time.
+- **Not in CI, on purpose:** verify, rooms, isolation, every walk and
+  `pnpm eval`. They need the live database (eval also OpenAI money and the
+  deleted test tenants). They stay manual until a staging project exists
+  (audit P1). The office tests have a known flake and stay out.
+- **The audit gate is `critical`**, as the audit wrote it. Today: no
+  critical; 3 high and 2 moderate, all in `postcss` and `source-map-js`
+  (build-time, not served). A follow-up, not a gate.
+- **Not done here (GitHub settings, the user's):** protect `master`
+  (require this check), release tags.
+
+**Measured** in a clean worktree outside the repo, with no `.env`, the same
+commands: install OK; typecheck 13/13; tests 12/13 (the one failure is
+`packages/bookings/src/guest.test.ts`, audit B-1, known); build 7/7; the
+grep found nothing; the audit exited 0. The workflow has not run on GitHub
+yet: nothing is pushed.
+
+---
+
+## D-161 · A rescheduled stay keeps its free children; it still carries no promo · **Added 2026-11-14** (amends D-108's code, confirms its promo rule)
+
+**Asked:** the audit's B-3: "Approving a reschedule drops `free_guests` and
+`promo_id`".
+
+**Found:** two different things under one finding.
+- `free_guests` was a BUG. `decide_change()` (D-108, 2026-10-10) re-inserts
+  the moved nights with a named column list written before D-147 (free
+  guests, 2026-10-26) existed. The column defaults to 0, so the insert did
+  not fail: the child silently left the stay on approval, though D-108 says
+  a reschedule "keeps the rooms, slot, nights and guests".
+- `promo_id` was a DECISION. D-108: "no promo is carried", and
+  `request_change()` quotes the move without the discount; that quote is
+  what the guest saw and is stored on the request. The user was first asked
+  what to do when a promo does not cover the new dates (they chose "refuse,
+  staff decide"), then shown D-108 and the quote, and chose to KEEP D-108.
+
+**Decided:**
+- **`schema-reschedule-free-guests.sql`, the 48th file:** `decide_change()`
+  with the same body and `free_guests` in the copied columns. No price moves
+  (the price never reads it, D-147); no promo is carried (D-108);
+  `walk_in` stays on the stay (D-111).
+- **The marker is a comment on the function**, and the older definition in
+  `schema-manage-booking.sql` is guarded on it (trap 20): that file adds no
+  column this one could key on.
+
+**Measured:** the live body before: no `b.free_guests`; after: present, the
+comment set, grants unchanged (anon none, authenticated execute), definer
+with `search_path=""`. The guard alone, in a rolled-back transaction: with
+the marker the new body survives, without it the old body returns. verify
+154b: "moved 2027-07-10:free 1:promo null"; 154 unchanged (the weekend price
+1,500.00, 500.00 owed).
+
+---
+
+## D-162 · The change doors count toward the lockout, and price quotes are rate limited · **Added 2026-11-14**
+
+**Asked:** the audit's S-4 and S-5, after the user's go-ahead.
+
+**Decided:**
+- **S-4, the change doors:** `requestChange()` and `withdrawChange()` call
+  `guestStay()` first and return the lookup's one 404 on a miss, as
+  `submitProof()` always did. `request_change()` and `withdraw_change()`
+  RAISE on a miss, and a raise rolls back the miss `guest_group()` had
+  recorded, so these two doors never counted toward the 5-misses-an-hour
+  lockout (D-104): a known reference could be guessed at here for ever,
+  slowed only by the per-IP window. `guest_stay()` returns null instead of
+  raising, so its miss is kept; a locked reference is a miss too. The SQL
+  is unchanged; the extra read is one definer call per change request.
+- **S-5, `book/quote`:** `allowSpend(tenant, 'quote', ip, 60)`: 60 per
+  address per 10 minutes, then the tenant's 600 across addresses, before
+  any `unit_quote()`. The page re-asks 300 ms after each change, so a guest
+  makes 20 to 40; the ceiling is what a promo-code dictionary spread over
+  many addresses meets. One sentence, 429: "Too many price checks from
+  here. Please wait a few minutes and try again."
+
+**Measured** on `pnpm dev`: `plan/guest-doors-limit-walk.mjs` 3/3: 60 quotes
+at 200 and the 61st 429 (the window at 61); three change requests and two
+withdrawals with a wrong contact on a made-up reference left 5 misses (the
+code before this change left none), and the sixth try was the same 404 with
+no new miss (locked). `manage-booking-phase6-walk.mjs` 4/4 on a throwaway
+tenant: the right guest still quotes, asks, withdraws, and is approved.
+Tests 13/13; typecheck 13/13.
+
+---
+
+## D-163 · A session is a row: logout and a new password end every copy of the cookie · **Added 2026-11-14** (amends D-028, D-040, D-076)
+
+**Asked:** the audit's S-6, "Sessions cannot be revoked".
+
+**Decided:**
+- **`app_sessions`** (`schema-sessions.sql`, the 49th file): one row per
+  login, its user, kind (`staff` with a tenant, `platform` without), end
+  and `revoked_at`. No policy, no grant: four definer functions only, and
+  each takes the USER from the token (`auth.uid()`), never an argument, so
+  no caller can open, test or end someone else's session. A chat token has
+  no `sub` and is refused or answered false.
+- **The cookie carries the session id inside the HMAC**
+  (`<slug>.<user>.<expiry>.<session>.<mac>`, `platform.<user>.<expiry>.<session>.<mac>`).
+  `requireAdmin()`, `sessionCan()` and `requirePlatform()` ask
+  `session_valid()` on the member's own token on every request: this id,
+  this user, live, this kind and THIS token's tenant. For staff it runs
+  beside `loadRoleOverrides()` (one round trip more in sequence, none for
+  the overrides).
+- **Logout** revokes this device's row (`session_close()`), so a copy of the
+  cookie dies with it; other devices stay signed in.
+- **A new password** revokes every row the person has, every tenant and the
+  platform (`session_close_all()`), called with the reset link's own
+  Supabase access token, whose `sub` is the user. If that call fails the
+  password is still set and the failure is logged; the route says how many
+  sessions it ended.
+- **The platform session is 4 hours** (was 12): its cookie reaches every
+  tenant. Staff stay at 12.
+- **Every older cookie is refused once** (it has one part fewer): everyone
+  logs in again, once.
+- **Not done:** an admin "sign this member out everywhere" button; the row
+  is swept a day after it ends, at that user's next login.
+
+**Measured:** verify 229f–229k (a staff session valid only on its own
+member's villa token, not a chat, another tenant's or a platform token;
+logout true then invalid then false; a chat token, a non-member, a staff
+token asking for a platform session refused 42501, 12 h + 1 s 22023; a
+platform session valid on its platform token only; `session_close_all()` =
+2; no token reads the table). `plan/sessions-walk.mjs` 3/3 on `pnpm dev`:
+two devices 200/200, after logout on A 401/200; a new password through the
+reset route, "One open session was signed out.", B 401; platform 200 then
+401 after logout, the cookie 4.00 h. The 12 staff screens of the
+security-headers walk still load signed in.
+
+---
+
+## D-164 · A request that changes something must come from this site, as JSON or multipart · **Added 2026-11-14**
+
+**Asked:** the audit's S-7: CSRF relied on SameSite=Lax alone, and JSON was
+parsed from any content type.
+
+**Decided:**
+- **ONE pure function, `crossOriginRefusal()`** (`apps/web/lib/same-origin.ts`,
+  tested), run FIRST in `withRoute()`, so every handler (tenant, platform,
+  open) has it and none can forget it (rule 3).
+- **Origin:** on any method but GET, HEAD and OPTIONS, an `Origin` header
+  whose host is not this request's `Host` is 403, "This request did not come
+  from this site, so it was refused."; `null` and an unparseable one too. A
+  sibling subdomain is a different host, which is exactly the case SameSite
+  missed (a sibling is the same SITE, so the cookie went along).
+- **No Origin is let through** to the route's own checks: browsers send one
+  on every state-changing request, so its absence means curl, a walk or a
+  server, with no victim's cookie jar to ride.
+- **Content type:** `text/plain` and `application/x-www-form-urlencoded`, the
+  two a plain HTML form sends without a CORS preflight, are 415 "Send this
+  request as JSON." Every page of ours sends JSON or `multipart/form-data`
+  (the uploads, voice; checked: no `sendBeacon`, no bare string body).
+- **No server actions exist** (`'use server'` appears nowhere), so route
+  handlers are the only way in.
+
+**Measured** on `pnpm dev`: `plan/same-origin-walk.mjs` 5/5: `Origin:
+https://evil.example` on book/quote 403 with the sentence; `http://staff.localhost:3000`
+on the staff login 403; text/plain with our own Origin 415, urlencoded 415;
+in Chrome, the booking page's own fetch of book/quote 200; a page on
+127.0.0.1 posting `no-cors` with credentials was sent and answered 403 (the
+network log, not only CORS). Tests 13/13 (7 new), typecheck 13/13.
+
+**Owed:** one browser POST on the deployment, to see the Host Vercel passes.
+
+---
+
+## D-165 · The visitor's IP is read only from a header that cannot be forged where the app runs · **Added 2026-11-14** (amends D-137)
+
+**Asked:** the audit's S-8: the client IP is the first `X-Forwarded-For`
+entry, which a client can write.
+
+**Found:** on Vercel that is right. Vercel's "Request headers" docs: it fills
+X-Forwarded-For from the TCP connection and drops what the client sent, when
+Vercel is the outermost edge (the deploy target, D-150). Anywhere else, a
+self-hosted `next start` in production believed a header the client chose,
+so every per-IP limit (the chat, booking, Manage booking, voice, login and
+reset, the quote) could be dodged by changing it per request.
+
+**Decided:** `clientIpFrom(headers, where)` (pure, tested) behind
+`clientIp()`:
+- **on Vercel** (`VERCEL=1`): the first X-Forwarded-For entry, as before;
+- **in development**: the same, trusted as sent, because the walks send a
+  fresh address per run (the counts outlive the process, D-137);
+- **self-hosted in production**: ONLY the header named by
+  `CLIENT_IP_HEADER` (what the proxy in front writes, e.g. x-real-ip);
+  unset, every visitor is ONE `unknown` count, with a one-time warning in
+  the log. It fails CLOSED: stricter limits, never bypassed ones.
+- A Cloudflare-in-front-of-Vercel setup would make the proxy's IP the
+  visitor's (Vercel's docs); not this deployment, recorded for later.
+
+**Measured** on a production build in a scratch worktree, port 3100: no
+setting, 61 quotes with 61 forged X-Forwarded-For counted as ONE key
+`quote|3|unknown` = 61, 60 answered and the 61st 429, the warning printed
+once; with `CLIENT_IP_HEADER=x-real-ip`, 61 different real IPs were 61 keys
+and all answered, and one real IP with 61 forged X-Forwarded-For was 60
+answered and the 61st 429, counted on the real IP alone. Tests 19/19.
+
+**Owed:** a forged X-Forwarded-For against the Vercel deployment itself.
+
+---
+
+## D-166 · The notification drain runs on a token of its own, and only it can drain · **Added 2026-11-14** (amends D-116, D-039)
+
+**Asked:** the audit's S-10: a chat token can drain the push outbox and
+delete push subscriptions.
+
+**Found:** the drain (D-116) runs on the server right after a guest's
+request, on that request's chat token, so `notify_claim()` and
+`notify_done()` accepted ANY token of the tenant. A leaked chat token (they
+never leave the server and live 5 minutes) could claim the queue so no
+staff phone rang (a claim is retried after 5 minutes, dropped after 5
+attempts) and report devices "gone", deleting staff subscriptions. It could
+read no guest data: the outbox carries none (D-116), and the device keys are
+useless without the VAPID private key.
+
+**Decided:**
+- **A third token shape, the notifier:** `mintTenantToken({ tenantId,
+  notifier: true })`: a tenant, NO `sub`, the claim `app_notifier`; never
+  with a user or `admin` (the minter refuses the mix). Still
+  `authenticated`, still 5 minutes, still no role parameter (D-039's
+  rules). Minted only by `notifierClient()` in `@rag/db`.
+- **`notifyAfter()` always drains on it**, whether a guest route or the
+  staff poll called it; `drainNotifications()` is unchanged (it uses the db
+  it is handed).
+- **`schema-notify-drain.sql`, the 50th file:** both functions with their
+  bodies unchanged plus one check, `app_notifier` or 42501 "only the
+  notification drain may call this"; a comment on each is the marker the
+  GUARD on their older definitions in `schema-notifications.sql` reads
+  (trap 20).
+- **What the notifier can otherwise do is a chat token's:** it reads what
+  any token of the tenant reads, and nothing more.
+
+**Measured:** verify 176–181 on the notifier token (the drain of another
+tenant refused 42501; the request to both devices; a proof to the owner
+only; gone deletes, retry releases; another tenant's drain changes nothing)
+and 181b (chat, staff and OWNER tokens: 42501 on both functions; the device
+and the unsent row stay). Live on `pnpm dev`: a re-queued villa outbox row
+was taken by the app's own drain after the staff attention poll (attempts 1,
+marked sent: villa has no device), then restored exactly. The bookings
+isolation suite's 31c–e were moved to notifier tokens but not run (it needs
+northwind; owed with the full eval).
+
+---
+
+## D-167 · A token may update only a booking's status and decision note · **Added 2026-11-14**
+
+**Asked:** the audit's S-11: staff updates to `guest_*`, `notes`, `held` and
+`source` leave no log (bookings are outside the audit log, D-138, and keep
+`booking_events`).
+
+**Found:** the app updates exactly two columns of `bookings` on a token:
+`status` and `decision_note` (confirm, decline, cancel; every one an event).
+Every other change runs in a SECURITY DEFINER function that writes its own
+event: the catalog lists eight functions that UPDATE bookings
+(`decide_change`, `move_room`, `hold_stay`, `release_stay`,
+`expire_due_stays`, `review_payment`, `remove_guest_details`, the
+hold-release trigger), all definers. Yet the row policy let a staff token
+write any of 30 columns directly, unlogged.
+
+**Decided:** `schema-booking-columns.sql` (the 51st file): `revoke update on
+bookings from anon, authenticated` and `grant update (status, decision_note)
+to authenticated`. Definers run as the owner and BEFORE triggers that change
+the row being written are not privilege-checked, so nothing that the app
+does changes. A future staff edit of another column needs a definer that
+logs it (CLAUDE.md, Conventions).
+
+**Measured:** column privileges for `authenticated`, 30 before, 2 after.
+verify 229l: an OWNER token updating guest_name, guest_phone, guest_email,
+notes, held, source, price or room_id is 42501 (the privilege is checked
+before rows are found), status with decision_note is not. rooms 58/58 (24c
+writes its trigger test through the service client now; 41 proves both
+walls: a token's raw room_id 42501, a direct one 23P01);
+manage-booking-phase6-walk 4/4 over HTTP.
+
+---
+
+## D-168 · A web booking reaches the database only through the consent wrapper · **Added 2026-11-14** (amends D-071, D-130)
+
+**Asked:** the audit's S-12: `request_booking()` is callable without the
+consent wrapper.
+
+**Found:** the booking page always used `request_booking_with_consent()`
+(D-130: the tenant's CURRENT policy version, recorded on the stay). But
+`request_booking()`, the function the wrapper calls, was still executable by
+`authenticated`, so a chat token could book with no consent recorded. Only
+the test suites (rooms, isolation, verify) called it so; `requestBooking()`
+did when no version was passed.
+
+**Decided:**
+- **`schema-consent-only.sql`, the 52nd file:** `request_booking()` revoked
+  from public, anon and authenticated; `service_role` keeps it for tools; a
+  comment marks it, and the grant to `authenticated` in
+  `schema-free-guests.sql` is guarded on that marker (trap 20). The wrapper
+  is a definer and runs as the owner, so it still calls it.
+- **`requestBooking()`** always calls the wrapper; `consentVersion` is
+  required by its type, so no caller can leave it out.
+- **The suites** request with the tenant's version (a fresh probe's is the
+  column default, '1'); check 202 now expects the plain call refused.
+
+**Measured:** execute for `authenticated`: true before, false after; the
+wrapper and `service_role` true. verify: 202 "plain request_booking() on a
+token is refused (42501)", "the only way in: chat insert 42501 · anon
+42501", and every request_booking check through the wrapper; rooms 58/58;
+tests and typecheck 13/13.
+
+**Learned:** the first run after applying failed 18 checks: the wrapper's
+`p_promo_code` has no default (`request_booking()`'s had one), and PostgREST
+picks a function by the NAMES of the arguments sent, so a call without it
+matched no function (PGRST202). Every helper now sends it.
+
+---
+
+## D-169 · A reset link's address is configuration, never the request's Host · **Added 2026-11-14**
+
+**Asked:** the audit's S-13: the password-reset `redirectTo` is built from
+the request Host.
+
+**Found:** both reset routes (staff and platform) used `new URL(request.url).origin`,
+i.e. the Host header, which the caller writes. Supabase's Redirect URLs
+allowlist refused a foreign one; a broad wildcard there would have let a
+recovery link (its token in the fragment) be emailed pointing elsewhere.
+
+**Decided:** `appOrigin()` (`apps/web/lib/app-origin.ts`, pure, tested):
+1. `APP_URL` when set (https in production, localhost excepted): the same
+   setting the CLI invites (`member:add`, `super:add`) already read;
+2. on Vercel without it, `VERCEL_PROJECT_PRODUCTION_URL`, set by Vercel
+   itself (a preview's reset link goes to production);
+3. in development, the request origin (localhost), as before;
+4. self-hosted in production with neither: refused in words ("Set APP_URL
+   …"), a 500 with a ref (D-158), never the Host.
+
+**Measured:** tests 5/5 (APP_URL beats a forged request; http refused in
+production; Vercel's domain; development unchanged; nothing configured
+refused); on `pnpm dev` both routes answered 200 for a made-up address.
+
+**Owed (MANUAL):** the Supabase Redirect URLs allowlist stays exact.
+
+---
+
+## D-170 · Booking references come from gen_random_bytes and are checked against stays too · **Added 2026-11-14** (amends D-100)
+
+**Asked:** the audit's S-14: the booking reference uses `random()`, and a
+collision gives a 500.
+
+**Found:** `booking_reference()` (D-100) drew six letters with `random()`
+and checked only `bookings` for a reference in use, while the UNIQUE rule
+is `stays_reference_unique`. Orphan stays are already removed with their
+last booking (`bookings_drop_empty_stays`; 0 exist), so the collision left
+is two requests drawing the same new reference in the same instant.
+
+**Decided:** `schema-booking-reference.sql` (the 53rd file):
+- the letters from `extensions.gen_random_bytes()`, rejection-sampled (a
+  byte of 240 or more is drawn again, 240 = 8 × 30), so each of the 30
+  letters is exactly 1/30;
+- a reference is free only when no booking AND no stay of the tenant has it;
+- the shape, the alphabet, the caller check and the grants unchanged; the
+  older definition guarded on the new file's comment (trap 20).
+- **Accepted:** the simultaneous draw. With 30^6 = 729,000,000 bodies per
+  tenant it is about 1 in 729 million per pair of simultaneous requests,
+  and its result is a 500 the guest can retry; no retry machinery.
+
+**Measured:** 3,000 draws for villa, before commit and after applying: every
+one `VIL-` and six letters of the alphabet, all distinct, all 30 letters
+used, 529–638 times each against 600 expected; rooms 58/58; verify only
+check 27's dates.
+
+---
+
+## D-171 · An upload is sized from its declared length before its body is read · **Added 2026-11-14**
+
+**Asked:** the audit's S-16: the upload size is checked after buffering
+when no Content-Length is sent.
+
+**Found:** the proof, room-photo and brand-image routes compared
+Content-Length with their limit but read a MISSING header as 0, and then
+buffered the whole body (`formData()`) before the file's own size was
+known; the voice route did not look at the header at all. A chunked body
+with no length could make the server hold far more than any limit (Vercel's
+4.5 MB request cap bounds it there; not on another host).
+
+**Decided:** `declaredSizeRefusal()` (`apps/web/lib/upload-size.ts`, pure,
+tested), called first by all four upload routes: a missing or unreadable
+length is 411 "Send the file with its size (a Content-Length header).", a
+declared one over the file limit plus a 64 KiB envelope is the route's own
+400 sentence, both before a byte of the body is read. A browser always sends
+the length of a FormData body, so no page of ours is refused; each file's
+real size and type are still checked after, as before.
+
+**Measured:** tests 3/3; on `pnpm dev`, the proof route answered a chunked
+upload with 411 and passed a normal multipart one through to its 404 for an
+unknown reference.
+
+---
+
+## D-172 · postcss and source-map-js are pinned to their fixed versions by pnpm overrides · **Added 2026-11-14**
+
+**Asked:** the audit's S-15: `pnpm audit --prod` reported 3 high and 2
+moderate advisories, all in `postcss` 8.4.31 (and its `source-map-js`
+1.2.1), pinned by `next` 15.
+
+**Found:** no Next 15 release moves it (15.5.29, 2026-11-03, still pins
+8.4.31); Next 16.4.6 ships 8.5.23. The packages are build-time only (CSS),
+not reachable from a request (R-64). The user chose an override over the
+Next 16 upgrade or waiting.
+
+**Decided:** `pnpm-workspace.yaml` (where pnpm 12 keeps its settings):
+`overrides: { 'next>postcss': 8.5.23, 'postcss>source-map-js': 1.2.2 }`.
+The second was needed because postcss 8.5.23's range still allows the
+vulnerable 1.2.1, which the lockfile kept. Remove both once `next` itself
+ships postcss >= 8.5.23 (or on the move to Next 16).
+
+**Measured** in a scratch worktree: the lockfile changes those two packages
+only; `pnpm audit --prod` "No known vulnerabilities found" (was 5);
+typecheck, tests 13/13, build 7/7; on that build, the built CSS 52 KB with
+its tokens and the security-headers walk 29/29 in Chrome (21 pages, the 12
+staff screens signed in).
+
+---
+
+## D-173 · On a phone, the booking page keeps the total and the step's action in a bar at the bottom · **Added 2026-11-14**
+
+**Asked:** the audit's E-1 (on a phone the Review step's Send sits below the
+whole form, in the summary card) and E-2 (on a per-room tenant the price is
+about 1,500 px below the controls).
+
+**Decided:** one bar for both, below 860 px (where the summary card stacks
+under the form):
+- the total ("Total ₱16,000.00") and ONE action: "See price" before the
+  Review step (scrolls the summary card into view), "Send request" on it
+  (a submit: the same `send()` and D-155 gate as the card's button, so a gap
+  says itself and focuses its field, the consent box included);
+- shown only once there is a price, or on the Review step: on step 1 with no
+  price it said nothing and covered the step's Continue (seen in the first
+  screenshot, removed);
+- shown only while the summary card is off screen (IntersectionObserver),
+  so there are never two Send buttons in view;
+- fixed to the bottom with the safe-area inset, the page padded so nothing
+  hides under it; colours and sizes from tokens.css.
+
+**Measured** on `pnpm dev`, villa: `plan/booking-bar-walk.mjs` 7/7, nothing
+sent (see status.md); web tests 294; typecheck clean.
+
+**Owed:** the axe pass at the end of the E batch; a real phone.
+
+---
+
+## D-174 · A room card says its price and what is left for the chosen dates, from the database · **Added 2026-11-14**
+
+**Asked:** the audit's E-3: room cards carry no price; show "from ₱X / night"
+and "N left" for the chosen date.
+
+**Decided:**
+- **`roomChoices()`** (`@rag/bookings`): for a slot, a check-in and nights,
+  each active type's `fromPrice`, the LOWEST night's `day_price` from
+  `check_room_availability()` (unit_quote()'s own price for the slot with a
+  holiday's surcharge in, D-083), and `free`, the fewest `rooms_free` over
+  the nights; the request's own rules (`parseRequest()`) check the slot, the
+  date window and the nights, and a closed night is refused as a quote is.
+  A screen adds nothing up (customer-booking Rule 3): it shows these
+  figures as they come.
+- **`POST /api/t/<slug>/book/rooms`**, open like `book/quote`, read-only,
+  spending from the SAME allowance (D-162).
+- **The cards** (per-room tenants): "₱4,800.00 a night" for one night, "From
+  ₱4,400.00 a night" for several (they may differ: a weekend, a holiday),
+  "₱X for the Day Use" for a day slot; "1 of 2 left" for a type of several
+  rooms; "Taken on these dates" at none. The Rooms count's cap uses the same
+  count, so it is right before the first quote too.
+
+**Measured** on `pnpm dev`, alteza at 390 px:
+`plan/room-cards-price-walk.mjs` 4/4: every card priced, Casa Uno "2 of 2
+left"; the card's ₱4,800.00 equal to the quote's line once Casa Uno was
+picked; two nights "From …"; nothing sent. The route refused a date past
+alteza's 20-day window in the request's own words. Tests and typecheck 13/13.
+
+---
+
+## D-175 · The Review step says the terms before Send, from the tenant's own policy · **Added 2026-11-14**
+
+**Asked:** the audit's E-4: the deposit, the pay-by window, what happens if
+unpaid and the refund policy were said only after sending.
+
+**Decided:**
+- **`paymentFlow()`** returns, beside the deposit flag, the windows and the
+  hold, the fee as its RULE (`full`, `fixed` in centavos, `percent` in
+  hundredths of a percent, checked as the validator checks it), the refund
+  tiers most days first, and the reschedule cutoff.
+- **`bookingTerms()`** (`apps/web/lib/booking-terms.ts`, pure, tested) says
+  them: "The full price within 24 hours of sending this request", "A deposit
+  of 30% of the price" (never an amount worked out on the screen: that is
+  `stay_required()`'s, on Manage booking), the expiry, the hold, each refund
+  tier ("7 days or more before check-in: everything you paid back. 2 to 6
+  days: 50%… Less than 2 days: nothing back"), and how to change dates.
+- **Every line is what the database does:** no tiers means `change_terms()`
+  refunds 0%, so the page says "Cancelling does not refund what you paid";
+  no cutoff means Manage booking takes no date change, so it says to
+  contact the resort.
+- **Where:** a "Before you send" list on the Review step, above the promo,
+  the consent box and Send.
+
+**Measured:** the booking-bar walk's 5b on villa reads the five lines
+(quoted in status.md); paymentFlow tests 33 (the tiers sorted, odd ones
+dropped, an invalid fee falls back to the full price); booking-terms 7.
+
+**Raised to the user:** villa and alteza have no refund tiers and no
+reschedule cutoff, so their guests are now told, correctly, that a
+cancellation refunds nothing.
+
+---
+
+## D-176 · The receipt says first, in large type, to save the reference; a phone can share it · **Added 2026-11-14**
+
+**Asked:** the audit's E-5: after sending nothing reaches the guest (the
+guest email, section C, is its own work); at least say on the receipt, in
+large type, "Save this reference: you will need it."
+
+**Decided:**
+- Under "Request sent": **"Save this reference: you will need it** to see,
+  pay for or change this booking, with your email or mobile number." The
+  bold half at `--text-xl` (22 px against the body's 15); the small lede
+  above it no longer says the same thing.
+- **Share**, beside Copy, only where the browser has `navigator.share` (a
+  phone; decided after mount, so the server's render and the first client
+  render agree): the title, "My booking request at <business>: reference
+  <REF>." and the Manage booking link with `?ref=`. A refused or cancelled
+  share is silent. A `share` icon on D-101's 20 px grid.
+- **Not this:** the guest email, still open (audit C, Essential).
+
+**Measured:** `plan/receipt-walk.mjs` 3/3 on a throwaway tenant, deleted at
+the end (the line under the title at 22 px with the reference; Share's data
+from a stand-in share sheet: the reference and `/t/<slug>/manage?ref=<REF>`).
+Its check 3 shows only that the stand-in can be removed; the no-Share case
+rests on the component's `canShare &&`.
+
+---
+
+## D-177 · The date picker shades a night on which nothing is free, before it is picked · **Added 2026-11-14**
+
+**Asked:** the audit's E-6: the date picker does not show full or closed
+nights; a guest learns a night is taken only after picking it.
+
+**Found:** closed nights were already shaded and unchoosable (D-080, D-143);
+full ones were not.
+
+**Decided:**
+- **`fullNights()`** (`@rag/bookings`): for a slot, the nights from today to
+  the tenant's last bookable date on which every type's `rooms_free` is 0
+  (the whole property taken, for a whole-resort tenant): one
+  `check_room_availability()` read. A pending request holds nothing (D-070),
+  so it never makes a night full.
+- **`POST /api/t/<slug>/book/nights`**, open like `book/quote`, read-only, on
+  the same allowance (D-162).
+- **The picker:** a `full` reason in `dayState()` ("fully booked" in the
+  day's name and the note), a `full` list on `DateField`, shown as a solid
+  shade with a strike, distinct from the closed hatch, so the reason is not
+  colour alone. The booking page fetches the list when the slot changes.
+- **Not done:** marking weekend and holiday rates in the picker (optional in
+  the audit; the room cards, D-174, and the Review step say the price).
+
+**Measured:** `plan/full-nights-walk.mjs` 3/3 on a throwaway tenant (deleted):
+the route returned only the confirmed night; the picker named it "Thursday
+19 November 2026, fully booked", aria-disabled, and a click chose nothing;
+the next night choosable. Date-field tests 17.
+
+---
+
+## D-178 · The chat says each finished answer to a screen reader once, whole · **Added 2026-11-14**
+
+**Asked:** the audit's E-7: the chat is silent to screen readers; add
+`role="log" aria-live="polite"`, announcing the finished answer rather than
+every token.
+
+**Decided:**
+- **A separate, visually hidden status region** (`role="status"`,
+  `aria-live="polite"`, `aria-atomic="true"`), filled ONCE per finished
+  answer, after the stream's `done`: "<assistant>: " and the reply made
+  sayable by `speakable()` (D-134: a table read as sentences, the length
+  capped). A failure says its own words. It is cleared first, so the same
+  words twice are said twice.
+- **The conversation is `role="log"` with `aria-live="off"`**, labelled
+  "Conversation": a screen reader can move through it, but the streamed
+  tokens are not read out one by one (a polite log would have said every
+  delta as it landed).
+- The "Thinking" bubble keeps its own status.
+
+**Measured** on `pnpm dev`, villa: `plan/chat-announce-walk.mjs` 3/3: the
+silent log and one status region; "Hello" (answered in code) said once; a
+real answer (the cook question, one small OpenAI call) said once, whole, 596
+characters, after the stream ended; a MutationObserver on the region saw
+exactly one non-empty change each time.
+
+---
+
+## D-179 · Touch targets, focus on a phone, a chat kept on reload, room checkbox names, one h1 · **Added 2026-11-14**
+
+**Asked:** the audit's E-8, E-9, E-10, E-12 and E-13.
+
+**Decided:**
+- **E-8 touch targets:** under `@media (pointer: coarse)` every button,
+  field (input, select, textarea, the date trigger, the stepper's steps) and
+  guest link (the footer, the chat's fine print) is at least 44 px tall, the
+  chat's Send 44 px square; checkboxes and radios 22 px, and the consent
+  row, already one `<label>`, 44 px tall. The field rule sits AFTER the
+  base field rule (equal specificity; the later wins), beside the iOS font
+  rule for the same reason.
+- **E-9 focus:** `focusComposer()` focuses the field unless the primary
+  pointer is coarse: on arrival (in place of `autoFocus`), after an answer,
+  after New chat and after the mic. A phone's keyboard no longer covers the
+  welcome, or each answer as it lands; a mouse, a pen or a keyboard-only
+  setup still gets focus ("fine only" would have left the last out).
+- **E-10 a chat kept:** the conversation id AND the turns this tab showed in
+  `sessionStorage` (`rag-chat:<slug>`, the last 40, a turn still pending
+  dropped), restored on load, cleared by New chat. Per tab, never sent
+  anywhere; there is no guest route that reads a transcript back (D-115), so
+  the tab keeps its own copy. Storage off: the chat starts empty, as before.
+- **E-12:** each room checkbox is `aria-labelledby` its name and
+  `aria-describedby` its facts, price, rooms left and description (only the
+  ids that exist; a dangling id is an axe error).
+- **E-13:** `BrandHeader` draws the brand as a `<p>` when the page has its
+  own `<h1>` (`titled`, true by default with a hero band: the booking page
+  and Manage booking; the privacy and terms pages pass it). It looks the
+  same: the brand's rules now match `.brand`, not `h1.brand`.
+
+**Measured:** `plan/guest-ux-walk.mjs` 15/15 (with D-180's checks; see
+status.md).
+
+---
+
+## D-180 · The small guest items: the slot's label, a quieter footer, a favicon, a silent separator · **Added 2026-11-14**
+
+**Asked:** the audit's E-14.
+
+**Decided:**
+- The slot field is "Type of stay", not "What". The audit's "Day use or
+  overnight" does not fit tenants whose slots include "Day Tour" and
+  "22-Hour Whole Day".
+- In a guest's footer the build tag and "Staff login" are smaller
+  (`--text-xs`) and muted; not `--faint`, which would fail text contrast.
+- `app/icon.svg` is the site's icon (Next links it on every page), and
+  `/favicon.ico`, which answered 404, redirects there (308).
+- The "·" between the chat's links is `content: "·" / ""`: decoration, with
+  empty alt text, so a screen reader does not read "middle dot".
+- **Left:** alteza's placeholder "Casa Uno" description is tenant data for
+  its staff to rewrite; E-11, a human hand-off, is a feature (audit C).
+
+**Measured:** the guest UX walk's 14a–14d.
+
+---

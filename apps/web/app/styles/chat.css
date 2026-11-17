@@ -417,7 +417,10 @@
 .composer-links { grid-area: links; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 2px 0; min-width: 0; }
 .composer-links a { color: inherit; text-underline-offset: 2px; }
 .composer-links a:hover { color: var(--ink); }
-.composer-links a + a::before { content: "·"; margin: 0 6px; color: var(--faint); text-decoration: none; display: inline-block; }
+/* D-180 (audit E-14): the dot is decoration: `/ ""` gives it empty alt text,
+   so a screen reader does not say "middle dot" between the links (the first
+   line is the fallback for a browser without the syntax). */
+.composer-links a + a::before { content: "·"; content: "·" / ""; margin: 0 6px; color: var(--faint); text-decoration: none; display: inline-block; }
 .composer-side { grid-area: side; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 .composer-hint { margin: 0; white-space: nowrap; }
 .composer-hint kbd {
@@ -447,7 +450,9 @@
   .composer-hint { display: none; }
 }
 @media (pointer: coarse) {
-  .composer-send { width: 40px; min-height: 40px; }
+  .composer-send { width: 44px; min-height: 44px; }
+  /* D-179: the fine-print links under the field, each a 44 px-tall target. */
+  .composer-links a { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* --- tool calls in the chat (plan/bookings.md Phase 7, D-037) ------------ */

@@ -39,7 +39,7 @@ header {
   z-index: 10;
 }
 
-header h1 { font-size: var(--text-base); margin: 0; font-weight: 600; min-width: 0; }
+header h1, header p.brand { font-size: var(--text-base); margin: 0; font-weight: 600; min-width: 0; }
 header nav { display: flex; gap: var(--space-1); align-items: center; flex: none; }
 /* The header's links are quiet; Book stays the one filled button. */
 header nav a.button:not(.primary) { border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); }
@@ -82,6 +82,11 @@ header nav a.button.primary[aria-current="page"] { box-shadow: 0 0 0 3px var(--r
    sidebar, beside the platform's name. Tabular digits so two builds line up. */
 .build-tag { font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .public-footer .build-tag, .landing-footer .build-tag { display: block; margin-top: 2px; }
+/* D-180 (audit E-14): the build and the staff door are not for guests: smaller,
+   and no louder than the muted footer text (--faint would fail text contrast). */
+.public-footer .build-tag { font-size: var(--text-xs); color: var(--muted); }
+.public-footer a.footer-staff { font-size: var(--text-xs); color: var(--muted); }
+.public-footer a.footer-staff:hover { color: var(--ink); }
 .sidebar-foot { margin-top: auto; padding: var(--space-3) var(--space-2) var(--space-1); }
 .platform-topbar .build-tag { margin-left: var(--space-2); }
 .sidebar-group { display: flex; flex-direction: column; gap: 2px; }
@@ -268,9 +273,13 @@ button[aria-busy="true"]::before {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* A finger needs more than a cursor (Rule 5). */
+/* A finger needs more than a cursor (Rule 5). D-179 (audit E-8): 44 px,
+   the WCAG 2.5.5 / Apple size, for every button, field and link a guest
+   taps; a checkbox at 22 px inside its 44 px label row. */
 @media (pointer: coarse) {
-  a.button, button:not(.link), span.button { min-height: 40px; }
+  a.button, button:not(.link), span.button { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  .public-footer nav a { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* A segmented control: one choice of a few, aria-pressed on the chosen one
@@ -322,6 +331,9 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
    the later one wins. */
 @media (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]), select, select.compact, textarea, button.date-trigger, input.time-field { font-size: var(--text-touch); }
+  /* D-179 (audit E-8): 44 px fields, here AFTER the field rule for the same
+     reason as the font size: `select` is the same specificity, the later wins. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { min-height: 44px; }
 }
 
 .field { margin-bottom: var(--space-4); }

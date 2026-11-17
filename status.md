@@ -56,6 +56,34 @@
 
 ## ▶ Next up (do this next)
 
+> **⚠ OWED, DO NOT FORGET (the user asked, 2026-11-14): the FULL `pnpm eval`.**
+> The battery has not run since northwind and harbor were hard-deleted
+> (2026-10-20). Audit **S-9** (documents marked as data in the prompt; strip
+> `--- END CONTEXT ---` from chunks; the unanswered pre-fill as a quote) was
+> SKIPPED because it edits `buildPrompt()`, and rule 1 says no prompt edit
+> without the full battery. Before S-9, or any prompt, `language.ts` or
+> `dates.ts` change:
+> 1. ask the user to rebuild the test tenants from `fixtures/`
+>    (northwind.json; harbor.json, harbor-units.json, harbor-bookings.json;
+>    `member:operator` for each) — they declined on 2026-10-20 and deferred
+>    again on 2026-11-14;
+> 2. run `pnpm eval` once BEFORE the change (today's baseline: 59/61 was the
+>    last expected, CLAUDE.md rule 1), then make S-9, then run it again;
+> 3. also the two isolation suites, which need the same tenants.
+
+**Production readiness audit (2026-11-03, read-only, [`docs/audit/production-readiness-2026-11-03.md`](./docs/audit/production-readiness-2026-11-03.md)): fix ALL its findings, starting 2026-11-04.** Verdict: partially ready, about 61/100. Work through § G in order, P0 first:
+1. ~~fix `packages/bookings/src/guest.test.ts:44`~~ done 2026-11-14 (tests 13/13);
+2. ~~security headers in `next.config.mjs`~~ done 2026-11-14 (D-156, `plan/security-headers-walk.mjs` 29/29, not committed);
+3. ~~`decide_change()` keeps `free_guests`~~ done 2026-11-14 (D-161, the 48th file applied, verify 154b); `promo_id` stays dropped by design (D-108, re-confirmed);
+4. ~~rate limits on login, password reset (D-157) and `book/quote`, and the change-door lockout~~ done 2026-11-14 (D-162);
+5. ~~a generic 500 body~~ done 2026-11-14 (D-158);
+6. ~~OpenAI timeouts, abort and `max_tokens`~~ done 2026-11-14 (D-159, seen live);
+7. ~~CI~~ done 2026-11-14 (D-160, `.github/workflows/ci.yml`, not pushed; branch protection is yours, on GitHub);
+8. a new production Supabase project with a migration ledger;
+9. the legal texts (a lawyer).
+
+Then P1 (guest email, lost-reference recovery, cron jobs, staging with the fixture tenants so the battery and isolation suites run, monitoring, the phone booking flow, villa's rate editor, revocable sessions). The "Not verified" list at the end of the report is the user's dashboards and devices.
+
 **No form button is disabled for a gap (2026-11-03, D-155, done, not committed, on `feat/extra-guest-count`):** every form's submit / Continue stays on; a click with something missing says the first gap in red beside the button and takes the person to the field (`components/missing-note.tsx`, `lib/missing.ts`). Seen working on villa's booking page; web 254, typecheck clean. **Owed:** a look at the staff forms (Holidays, Promos, Slots, Rooms, the staff booking form, a stay's note and move); the axe pass (`plan/ui-refresh-a11y.mjs`); your commit.
 
 **The extra-guest count (2026-11-03, D-154, done, not committed):** the price breakdown says "2 extra guests" on the booking page, the staff form and S-15, and "2 extra guests × 3 nights" on Manage booking; `bookings.extra_guests` is stored beside the fee by `bookings_compute_extra_guests` (`schema-extra-guest-count.sql`, the 46th file, APPLIED, 25 rows backfilled exactly). rooms 58/58, web 251, typecheck 13/13. Also today: pnpm installed, `dev` builds the packages first, Manage booking's room line stacked. **Owed:** a browser look at the three breakdowns; verify 241/243 because check 27's probe bookings (2026-10-01/02) are no longer live, a fixture to re-date; your commit.
@@ -1894,6 +1922,146 @@ touch no pipeline behaviour. Blocking from Phase 4 on. Commands in
 ---
 
 ## 🗒️ Session log
+
+### 2026-11-14 — The guest pages' smaller UX items (D-179, D-180; audit E-8 to E-14)
+- **Did:** E-8 44 px targets under `pointer: coarse` (buttons, fields, the stepper, the date trigger, footer and chat links, Send; checkboxes 22 px; the consent row 44 px); E-9 the composer focused only when the primary pointer is not coarse (`focusComposer()`, on arrival, after an answer, New chat, the mic); E-10 the conversation id and the turns in `sessionStorage` (`rag-chat:<slug>`, last 40, a pending turn dropped; New chat clears); E-12 room checkboxes `aria-labelledby` the name, `aria-describedby` facts, price, left, description; E-13 `BrandHeader` draws the brand as a `<p>` when the page has its own h1 (`titled`, default with a hero; privacy and terms pass it); E-14 "Type of stay", a quieter build tag and Staff login, `app/icon.svg` with `/favicon.ico` 308 to it, the chat links' "·" with empty alt text. E-11 (hand-off) left to audit C; alteza's placeholder text left (tenant data). `plan/guest-ux-walk.mjs`.
+- **Observed** on `pnpm dev`: walk 15/15 (touch: buttons, fields, footer 44; consent 22 in a 47 px row; chat Send and links 44; no focus on touch, TEXTAREA with a mouse; the chat 2 bubbles after a reload, 0 and the key gone after New chat; one h1 on book, manage, privacy, chat; alteza's six checkboxes named by the room alone; "Type of stay"; Staff login 12 px against 13; the dot `"·" / ""`; /favicon.ico 308 → /icon.svg). Typecheck clean.
+- **Caught on the way:** `select` stayed 37 px because the touch rule sat before the field rule of equal specificity (moved after it, beside the iOS font rule); the stepper had its own 32 px; `--faint` for the quieter footer would fail text contrast (muted kept); the first focus rule ("fine" only) left a keyboard-only setup unfocused (now "not coarse"). `plan/ui-refresh-a11y.mjs` gained `A11Y_SLUGS` / `A11Y_PER_ROOM` (northwind and harbor are gone) and waits for real platform rows, not the skeleton's.
+- **Next:** the axe pass, owed: one full run (144 states) found 3, the calendar's week cells (60 elements on alteza, label-content-name-mismatch since D-133; fixed, not re-run) and villa's dashboard @375 with no main and no h1 (one state; suspected the session check's moment, unconfirmed); two reruns did not finish (a race in the script, fixed; then `pnpm dev` down). Then E is done but E-11.
+
+### 2026-11-14 — The chat speaks to screen readers (D-178; audit E-7)
+- **Did:** `components/chat-screen.tsx`: a visually hidden `role="status"` `aria-live="polite"` `aria-atomic` region that `announce()` fills ONCE per finished answer ("<assistant>: " + `speakable(answer)`, the tables as sentences, D-134) or per failure (the error's words), cleared first so a repeat is said again; the conversation is `role="log"` `aria-live="off"` `aria-label="Conversation"`, navigable but silent while it streams. `plan/chat-announce-walk.mjs`.
+- **Observed** on `pnpm dev`, villa at 390: walk 3/3 (the silent log and one status region; "Hello", answered in code, said once: "Lia: Hi! I'm Lia…"; a real streamed answer, the cook question, said once, whole, 596 characters, after the stream ended). Typecheck clean. Two test conversations were added to villa by the walk.
+- **Trap hit (in the walk):** its first "finished" test waited for the textarea to be enabled, which it always is; it read mid-stream and looked like a missed announcement. Now it waits for Send to be enabled.
+- **Next:** E-8 (touch targets).
+
+### 2026-11-14 — The date picker shades fully booked nights (D-177; audit E-6)
+- **Did:** `fullNights()` (`@rag/bookings`): the window's nights on which no room of the slot is free, one `check_room_availability()` read (a pending request holds nothing, D-070); open route `POST book/nights` on the quote's allowance; `lib/date-field.ts` a `full` reason ("fully booked", tested); `DateField` a `full` list; the booking page fetches it per slot; `.date-day.off.full` a solid shade and a strike (closed keeps its hatch). `plan/full-nights-walk.mjs`, shot in `plan/full-nights/`.
+- **Observed** on `pnpm dev`, a throwaway tenant with one confirmed night (deleted after): walk 3/3 (book/nights `["2026-11-19"]` only; in the picker at 390 "date-day off full", "Thursday 19 November 2026, fully booked", aria-disabled, a click chose nothing; the 20th choosable). Date-field tests 17 (1 new); tests and typecheck 13/13.
+- **Not done:** the audit's optional weekend/holiday rate marks in the picker (the cards and the Review step say the price).
+- **Next:** E-7 (the chat is silent to screen readers).
+
+### 2026-11-14 — The receipt says to save the reference (D-176; audit E-5, the stopgap)
+- **Did:** the receipt opens with "Save this reference: you will need it to see, pay for or change this booking, with your email or mobile number." (22 px against the body's 15), and where the browser can share (`navigator.share`, a phone), a Share button beside Copy hands over the reference and the Manage booking link; a `share` icon (D-101's grid); the lede no longer repeats it. `plan/receipt-walk.mjs`, shot in `plan/receipt/`.
+- **Observed** on `pnpm dev`, a throwaway tenant (deleted): walk 3/3 (the line first under the title at 22 px with `REC-XRA65K`; Share with a stand-in share sheet gave the reference and `/t/<slug>/manage?ref=…`; check 3 only confirms the stand-in can be removed: the no-Share case rests on the `canShare &&` condition, not on a second request). Typecheck clean; icon tests 3/3.
+- **Still open (audit C, Essential):** the guest email after a request.
+- **Found, not fixed:** `plan/legal-walk.mjs` check 3 still expects Send disabled before consent; D-155 made it never disabled, so that walk fails at 3 until updated.
+- **Next:** E-6 (full and closed nights in the date picker).
+
+### 2026-11-14 — The terms before Send (D-175; audit E-4)
+- **Did:** `paymentFlow()` (`@rag/bookings`) also returns the fee RULE (full, fixed centavos, percent in hundredths), the refund tiers (most days first) and the reschedule cutoff; `apps/web/lib/booking-terms.ts` (`bookingTerms()`, `cancellationWords()`, 7 tests) turns them into words; the Review step shows "Before you send" (Paying, If it is not paid, Your dates, Cancelling, Changing dates) above the promo, the consent box and Send.
+- **Observed** on `pnpm dev`, villa: booking-bar walk 8/8 with 5b: "Paying: The full price within 24 hours of sending this request… · If it is not paid: … the request expires and the dates go to others · Your dates: Nothing is held until … confirms · Cancelling: Cancelling does not refund what you paid · Changing dates: Contact Villa Amihan Private Resort"; bookings tests 33 (1 new), web tests, typecheck 13/13.
+- **⚠ For the user:** villa and alteza have NO refund tiers and NO reschedule cutoff in their config, so the page now truthfully says a cancellation refunds nothing and dates are changed by contacting the resort. If that is not their policy, set `payments.cancellation` and `payments.reschedule_until_days_before`.
+- **Next:** E-5 (after sending, "Save this reference").
+
+### 2026-11-14 — Room cards say the price and what is left (D-174; audit E-3)
+- **Did:** `roomChoices()` (`@rag/bookings`, requests.ts) over ONE `check_room_availability()` read: each type's lowest night `day_price` (unit_quote()'s, a holiday in) and fewest `rooms_free`; the slot, date window and nights checked by `parseRequest()`, a closed night refused as in a quote. Open route `POST book/rooms`, on the quote's allowance (D-162). The booking page fetches it when the slot and dates change (per-room tenants) and each card says "₱4,800.00 a night" ("From …" over several nights, "for the Day Use" for a day slot), "1 of 2 left" for a type of several rooms, "Taken on these dates" at 0; the Rooms count's cap uses it too. `plan/room-cards-price-walk.mjs`, shots in `plan/room-cards-price/`.
+- **Observed** on `pnpm dev`, alteza at 390: walk 4/4 (six cards with "₱X a night", Casa Uno "2 of 2 left"; Casa Uno picked, the quote's line ₱4,800.00 = the card's; two nights "From ₱X a night"; nothing sent); the route refused a date past alteza's 20-day window in the request's words; tests and typecheck 13/13.
+- **Next:** E-4 (the terms on the Review step).
+
+### 2026-11-14 — The booking page's bar on a phone (D-173; audit E-1, E-2)
+- **Did:** `components/booking-page.tsx` + `screens.css`: below 860 px, a bar pinned to the bottom with the total and the step's action: "See price" (scrolls to the summary) before the Review step, "Send request" (the same submit and D-155 gate) on it. Shown only once there is a price or on Review, and only while the summary card is off screen (IntersectionObserver), so it never covers the step's Continue for nothing and never doubles the card's Send. `plan/booking-bar-walk.mjs`, shots in `plan/booking-bar/`.
+- **Observed** on `pnpm dev`, villa: walk 7/7 (no bar before a price; at 390×560 the bar with "Total ₱16,000.00 · See price", pinned 0 px from the bottom; See price brings the card in and the bar away; back at the top it returns; Review at 390×812 "Total ₱16,000.00 · Send request"; the bar's Send with the box unticked focused `#book-consent`, said "Tick the box…", and sent nothing; no bar at 1280). Web tests 294, typecheck clean. The first design showed the bar on step 1 with no price, over Continue: removed after the screenshot.
+- **Owed at the end of the E batch:** `plan/ui-refresh-a11y.mjs` (axe) and a look on a real phone.
+- **Next:** E-3 (room cards carry no price).
+
+### 2026-11-14 — No known vulnerabilities in production dependencies (D-172; audit S-15)
+- **Did:** `pnpm-workspace.yaml` overrides: `next>postcss: 8.5.23` and `postcss>source-map-js: 1.2.2`; the lockfile changes those two packages only. Next stays 15.5.28 (no 15.x ships the fix; 16.4.6 does).
+- **Observed** in a scratch worktree (the user's `pnpm dev` untouched): `pnpm audit --prod` 5 → "No known vulnerabilities found"; typecheck 13/13; tests 13/13; build 7/7; on that build (port 3100) the built CSS 52 KB with the theme tokens, and the security-headers walk 29/29 (21 pages, the 12 staff screens signed in).
+- **YOURS:** run `pnpm install` in the repo and restart `pnpm dev` when convenient (the lockfile changed; I did not swap packages under the running server).
+- **Next:** S-17 (signups off, the Supabase dashboard); S-9 with the eval.
+
+### 2026-11-14 — Uploads are sized before they are read (D-171; audit S-16)
+- **Did:** `apps/web/lib/upload-size.ts` (`declaredSizeRefusal()`, 3 tests): a missing or unreadable Content-Length is 411, a declared one over the limit + 64 KiB is refused in the route's own words (400, as the screens expect), both before `formData()`. Used by the four upload routes: voice (which had no declared check), the payment proof, room photos, brand images.
+- **Observed:** tests 3/3, typecheck clean; on `pnpm dev`, the proof route: a chunked upload with no Content-Length 411 "Send the file with its size…"; a normal multipart upload passed the size check and met the usual 404 for a made-up reference (its miss row removed).
+- **Next:** what is left of the security list is S-9 (deferred with the eval), S-15 (a `next` release with postcss ≥ 8.5.23) and S-17 (signups off, the dashboard).
+
+### 2026-11-14 — Booking references from a cryptographic source (D-170; audit S-14)
+- **Did:** `schema-booking-reference.sql` (the 53rd, applied): `booking_reference()` draws its six letters from `extensions.gen_random_bytes()` with rejection sampling (bytes 240+ redrawn: every letter 1/30) and counts a reference as used when a booking OR a stay has it (the unique rule is on `stays`); the older definition in `schema-staff-requests.sql` is GUARDED on the new comment.
+- **Observed:** 3,000 draws for villa in the dry run and again after applying: shape `VIL-` + 6 of the alphabet, 3,000 distinct, all 30 letters, 529–638 each (600 expected); rooms 58/58; verify only check 27's dates. 0 orphan stays exist (`bookings_drop_empty_stays` already removes them).
+- **Recorded, not fixed:** two simultaneous requests drawing the same new reference (about 1 in 729 million per pair) still meet `stays_reference_unique` as a 500.
+- **Next:** S-15 (the postcss advisories under `next`), S-16 (uploads without Content-Length), S-17 (signups off: the dashboard).
+
+### 2026-11-14 — Reset links point to a configured address (D-169; audit S-13)
+- **Did:** `apps/web/lib/app-origin.ts` (`appOrigin()`, 5 tests): `APP_URL` (https in production), else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, else in development the request origin, else refused in words. Both password-reset routes use it; `APP_URL` documented in `.env.example` and `env.ts` (the CLI invites already read it).
+- **Observed:** 5/5 tests, typecheck clean; on `pnpm dev` both reset routes still answer 200 (a made-up @example.com address, no email sent).
+- **Owed (MANUAL):** keep Supabase's Auth → Redirect URLs exact (no broad wildcard); set `APP_URL` if a custom domain is added on Vercel.
+- **Next:** S-14 (the booking reference's randomness and a collision).
+
+### 2026-11-14 — A web booking always carries consent (D-168; audit S-12)
+- **Did:** `schema-consent-only.sql` (the 52nd, applied): `request_booking()` revoked from `authenticated` (and public, anon), kept for `service_role`, marked by a comment; its grant in `schema-free-guests.sql` is GUARDED on that marker. `requestBooking()` always calls `request_booking_with_consent()`, `consentVersion` now required. rooms and the isolation suite request with the tenant's version; verify's helpers use the wrapper, 202 now expects the plain call refused.
+- **Observed:** execute for `authenticated` true → false, the wrapper still true, service_role true. First verify run after applying: 18 FAILS of my own making: the wrapper's `p_promo_code` has no default and PostgREST matches functions by the argument NAMES sent, so helpers that left it out found no function (PGRST202); plus one direct call missed. Fixed; then verify: only check 27's dates; 202 "plain … refused (42501)"; "the only way in: chat insert 42501 · anon 42501"; rooms 58/58; tests and typecheck 13/13.
+- **Next:** S-13 (the reset link's redirect built from the request Host).
+
+### 2026-11-14 — A token updates only a booking's status and decision note (D-167; audit S-11)
+- **Did:** `schema-booking-columns.sql` (the 51st, applied): `revoke update on bookings from anon, authenticated; grant update (status, decision_note) to authenticated`. Every other change to a booking already runs in a definer that logs it (checked in the catalog: all 8 functions that UPDATE bookings are definers). rooms 24c's trigger test now writes through the service client; rooms 41 proves both walls (token 42501, direct 23P01); verify 229l new.
+- **Observed:** before 30 columns writable by a token, after 2; verify 229l PASS (an OWNER token: guest_name, guest_phone, guest_email, notes, held, source, price, room_id all 42501; status + decision_note fine), the only fails check 27's dates; rooms 58/58; manage-booking-phase6-walk 4/4 over HTTP.
+- **Next:** S-12 (`request_booking()` callable without the consent wrapper).
+
+### 2026-11-14 — Only the drain can drain (D-166; audit S-10)
+- **Did:** a third token shape, the NOTIFIER (`mintTenantToken({ tenantId, notifier: true })`: a tenant, no user, `app_notifier`), minted only by `notifierClient()`; `notifyAfter()` drains on it whoever calls; `schema-notify-drain.sql` (the 50th, applied) makes `notify_claim()` and `notify_done()` refuse every other token; their older definitions in `schema-notifications.sql` are GUARDED on the new file's comment (trap 20). verify 176–181 moved to the notifier token, 181b new; bookings isolation 31c–e moved too (not run: needs northwind, see the eval block above).
+- **Observed:** verify: every notify check PASS, 181b "chat 42501/42501 · staff 42501/42501 · owner 42501/42501 · devices 1/1 · unsent true"; the only fails are check 27's dates. Live on `pnpm dev`: villa's latest sent outbox row re-queued, the staff attention poll's drain took it (attempts 1, marked sent: no device), row restored exactly. Tests and typecheck 13/13.
+- **Next:** S-11 (staff edits of guest details leave no log).
+
+### 2026-11-14 — The client IP is believed only where it can be (D-165; audit S-8)
+- **Did:** `clientIpFrom()` (pure, 4 new tests) behind `clientIp()` in `apps/web/lib/rate-limit.ts`: on Vercel the first X-Forwarded-For entry (Vercel writes it from the connection and drops the client's, per its Request headers docs); in development the same, as sent (the walks); self-hosted in production ONLY the header named by `CLIENT_IP_HEADER`, or one shared `unknown` count with a one-time warning. `.env.example` and `env.ts` document it.
+- **Observed** on a production build of a scratch worktree on port 3100 (the user's `pnpm dev` untouched): no setting, 61 quotes from 61 forged X-Forwarded-For → ONE key `quote|3|unknown` = 61, 60×200 then 429, and the warning once; `CLIENT_IP_HEADER=x-real-ip`: 61 different real IPs → 61 keys, all 200; one real IP with 61 forged X-Forwarded-For → 60×200 then 429, counted on the real IP, no forged key. (A first run crossed a 10-minute window boundary, 4 + 57; rerun inside one window.) Rows removed. Rate-limit tests 19/19, typecheck clean.
+- **Owed:** one forged X-Forwarded-For against the real Vercel deployment.
+- **Note:** walks against a LOCAL `next start` now need `CLIENT_IP_HEADER=x-forwarded-for`.
+- **Next:** S-9 (documents as data in the prompt; this one needs `pnpm eval`, which needs the deleted tenants).
+
+### 2026-11-14 — State changes only from our own pages (D-164; audit S-7)
+- **Did:** `apps/web/lib/same-origin.ts` (`crossOriginRefusal()`, `requestHost()`, 7 tests), run first in `withRoute()`: a POST/PUT/PATCH/DELETE whose `Origin` is not this host is 403; a `text/plain` or urlencoded body is 415. No Origin (curl, walks, servers) goes on to the route. `plan/same-origin-walk.mjs`.
+- **Observed** on `pnpm dev`: walk 5/5 (another site 403; a sibling subdomain on the staff login 403; text/plain and urlencoded 415; the booking page's own fetch in Chrome 200; a foreign page's credentialed post sent and answered 403 in the network log); tests and typecheck 13/13.
+- **Owed on the deploy:** one browser POST there (the Host header Vercel passes is the domain the page came from; check it once).
+- **Next:** S-8, the client IP behind Vercel.
+
+### 2026-11-14 — Sessions can be revoked (D-163; audit S-6)
+- **Did:** `schema-sessions.sql` (the 49th, applied): `app_sessions` and four definers (`session_open`, `session_valid`, `session_close`, `session_close_all`), each taking the user from `auth.uid()`. Staff and platform cookies carry the session id inside the HMAC; `requireAdmin()`, `sessionCan()` and `requirePlatform()` ask `session_valid()` on every request; logout revokes this device's row; a new password (`setPasswordWithToken()`) revokes every row with the link's own token. The platform session is 4 hours (was 12).
+- **Observed:** verify 229f–229k all PASS (valid only on its own user/kind/tenant; logout; refusals 42501 / 22023; platform; close_all = 2; no token reads the table); `plan/sessions-walk.mjs` 3/3 on `pnpm dev` (a copied cookie: 200 → 401 after logout, device B 200; a new password: B 401, "One open session was signed out."; platform 200 → 401, 4.00 h); security-headers walk: the 12 staff screens still load signed in; tests and typecheck 13/13.
+- **Note:** every cookie from before this change is refused once (one part fewer): everyone logs in again, once.
+- **Next:** the security list goes on: S-7 (Origin check and JSON content type).
+
+### 2026-11-14 — The change doors count toward the lockout; price quotes are limited (D-162; audit S-4, S-5)
+- **Did:** `requestChange()` and `withdrawChange()` (`packages/bookings/src/changes.ts`) match the guest through `guestStay()` first, as `submitProof()` does; `book/quote` meets `allowSpend()`: 60 per address (`QUOTE_REQUESTS_PER_WINDOW`) and the 600 tenant ceiling, per 10 minutes. `plan/guest-doors-limit-walk.mjs`.
+- **Observed** on the user's `pnpm dev`: walk 3/3 (60 real quotes at 200 then 429 "Too many price checks…", count 61; five wrong-contact change/withdraw tries = five misses; the sixth is 404 and adds none: locked); `manage-booking-phase6-walk.mjs` 4/4 (a right guest still quotes, asks, withdraws, is approved); tests 13/13, typecheck 13/13.
+- **Next:** the P0 items left are the user's (production Supabase + migration ledger; the lawyer); then P1.
+
+### 2026-11-14 — A rescheduled stay keeps its free child (D-161; audit B-3)
+- **Did:** `schema-reschedule-free-guests.sql` (the 48th, applied): `decide_change()` copies `free_guests` into the moved nights; the comment on the function is the marker, and `schema-manage-booking.sql`'s old definition is GUARDED on it (trap 20). The promo is still not carried: the user kept D-108 after being shown that the guest's move quote is priced without it.
+- **Observed:** before, the live function's body had no `b.free_guests`; after, it does, with the marker, the same grants (anon no, authenticated yes) and `search_path=""`. The guard, run alone in a rolled-back transaction: marker present → the new body stays; marker removed → the old body goes back. verify 154b PASS ("moved 2027-07-10:free 1:promo null"); 154 still PASS (price 1,500.00, 500.00 owed); the only fails are check 27's dates, as before.
+- **Next:** the remaining P0 items are the user's: item 8 (a production Supabase project with a migration ledger) and item 9 (the legal texts, a lawyer); then P1.
+
+### 2026-11-14 — `pnpm test` is green again (audit B-1)
+- **Did:** `packages/bookings/src/guest.test.ts`: the expected price now carries `extraGuestCount: null` (the fixture's `guest_stay()` sends no count, which the parser reads as "not known", never 0), and a new case reads a sent count (2). The parser (`guest.ts`) was right; only the test predated D-154.
+- **Observed:** bookings 138/138; `pnpm turbo test --continue` 13/13, so CI's test step (D-160) is green.
+- **Next:** push the branch so CI runs for the first time; protect `master` (GitHub settings); item 3, `decide_change()` keeps `free_guests` and `promo_id` (B-3).
+
+### 2026-11-14 — CI (D-160; audit B-7)
+- **Did:** `.github/workflows/ci.yml`: on every push and PR, install `--frozen-lockfile`, `pnpm typecheck` (the service-import check first), `pnpm turbo test --continue`, `pnpm build` with no .env, Rule 2's bundle grep, `pnpm audit --prod --audit-level=critical`. Node 22, pnpm from `packageManager`.
+- **Observed** in a clean worktree outside the repo (no .env), the same commands: install frozen OK; typecheck 13/13; tests 12/13 (only `@rag/bookings`, `guest.test.ts`, item 1); build 7/7; the grep found nothing; audit exit 0 (no critical; 3 high + 2 moderate in postcss and source-map-js, build-time only).
+- **Next:** item 1, `guest.test.ts`, which is what CI's first run will fail on; push the branch to see CI run; protect `master` on GitHub (the user's); bump postcss / source-map-js (follow-up).
+
+### 2026-11-14 — OpenAI calls have time limits, stop with the tab, and answers have a cap (D-159; audit B-5)
+- **Did:** `@rag/openai`: `embed` 20 s, `chat` 60 s, `chatStream` 90 s (one signal, headers to [DONE]), each combined with the caller's `signal` (`AbortSignal.any`); a timeout is 504 and a closed tab 499, both carrying what streamed as `partial`; `maxTokens` + `failOnLength` on chat and chatStream. `@rag/pipeline`: `ANSWER_MAX_TOKENS = 1000` on every answer call (`answerLimits()`), `signal` on `answerQuestion` / `answerQuestionStream`; the chat route passes `request.signal`.
+- **Observed:** openai 26 (6 new: abort 499 with partial, stream/chat/embed timeouts 504, the cap sent and a cut reply refused, no cap unasked), pipeline 376, web 275, typecheck 13/13. The cap was measured: longest of 370 stored replies 1,303 chars (~350-450 tokens), median 192.
+- **Live:** the first try met OpenAI 401 "Your API key has expired"; the user set a new key. Then live on 2026-11-14 (new key, villa, `pnpm dev`): a documents answer (cook, deposit, extension) streamed 116 deltas to `done` under the cap; the same question with the connection closed after the first delta saved `Yes, […answer interrupted]` (26 chars, the whole reply ~600). Also: my `next build` broke the user's running `pnpm dev` (trap 16); they restarted it.
+- **Next:** item 7, CI; item 1 (`guest.test.ts`) still owed.
+
+### 2026-11-14 — A failure tells the visitor nothing internal (D-158; audit B-6 / S-3)
+- **Did:** `lib/error-body.ts` (`errorBody()`, pure, 7 tests): a request status (400/401/403/404/409/429) keeps its words; anything else is a fixed sentence + `(ref <8 hex>)` and `X-Request-Id`, the real message in the log beside the ref; every OpenAI failure is a 502 with its own sentence; outside production the detail is appended. `route.ts` and the chat stream's `error` event both use it; `chat-stream.ts` lost its OpenAI/.env advice to visitors.
+- **Observed:** web 275, typecheck clean; on `next start` with an invalid OpenAI key: JSON 502 "The assistant could not answer just now… (ref 63e78b68)", the stream's error event the same, and the log line `[error] 502 ref 63e78b68: OpenAI rejected the API key …`; 401, 400 and 404 bodies unchanged.
+- **Next:** item 6, OpenAI timeouts, abort and `max_tokens` (B-5); item 1 (`guest.test.ts`) still owed.
+
+### 2026-11-14 — Login and reset rate limits (D-157; audit B-4 / S-2)
+- **Did:** `allowAuth()` (lib/rate-limit.ts) on staff login and reset, per address then per account (email hashed), through `rate_allow()`; `schema-platform-rate-limit.sql` (the 47th, applied) with `platform_rate_allow()` on the publishable key for the platform's login and reset (`allowPlatformAuth()`); 429 "Too many attempts. Please wait a few minutes and try again."
+- **Observed:** web 269 (6 new), typecheck 13/13; verify 245/247 (229b–e new, all pass; the two fails are check 27's passed fixture dates, as before); `plan/auth-rate-limit-walk.mjs` 5/5 on `next start`; security-headers walk 29/29 again (a real login still passes).
+- **Next:** item 5, a generic 500 body (S-3); item 1 (`guest.test.ts`) still owed; the Supabase-side limit (MANUAL); failed logins in the audit log (open).
+
+### 2026-11-14 — Security headers (D-156; audit B-2 / S-1)
+- **Did:** `apps/web/lib/security-headers.mjs` applied by `next.config.mjs` `headers()` (CSP with `frame-ancestors 'none'`, X-Frame-Options, HSTS, nosniff, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, zod `jitless`.
+- **Observed:** web 263 (9 new), typecheck clean; `plan/security-headers-walk.mjs` 29/29 on `next start` (headers on 6 paths, no CSP violation on 21 pages incl. 12 staff screens signed in, framing refused).
+- **Next:** item 3, `decide_change()` keeps `free_guests` and `promo_id`; item 1 (`guest.test.ts`) is still owed; commit.
 
 ### 2026-11-03 — No form button is disabled for a gap (D-155)
 - **Did:** `useMissingGate()` / `<MissingNote>` / `firstMissing()`; every submit and Continue button that was disabled while a field was empty now stays on and, clicked, says the first gap as an alert and focuses the field (booking page, staff form, Holidays, Promos, Slots, Knowledge base ×2, Rooms ×5, stay note and move, proof review, confirm dialogs, Members, login, password reset, Manage booking ×4).

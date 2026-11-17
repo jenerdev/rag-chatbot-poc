@@ -35,6 +35,7 @@ import type {
   RequestLine,
   RequestQuote,
   RequestReceipt,
+  RoomChoice,
 } from './types.js';
 import { closedDays, closedError, refuseClosedDays } from './closed.js';
 import { roomCounts } from './unit-rooms.js';
@@ -177,6 +178,84 @@ export async function quoteRequest(
   const found = await promoForStay(tenant, code, request.checkIn, stay.lastNight, subtotal);
   const applied = found !== null && found.reason === null ? found : null;
   return withDiscount(tenant, config.currency, request, stay, applied, promoMessage(code, found));
+}
+
+/**
+ * D-174 (audit E-3): each room type's lowest night price and fewest free
+ * rooms for a slot, a check-in and a number of nights, before any room is
+ * chosen. The slot, the date (within the booking window) and the nights are
+ * checked by parseRequest(), the request's own rules, with a placeholder
+ * room it only shape-checks; a closed night is refused in the same words as
+ * a quote (D-080). One read: check_room_availability() for every type.
+ */
+export async function roomChoices(
+  tenant: BookingTenant,
+  input: { slotId?: unknown; checkIn?: unknown; nights?: unknown },
+): Promise<RoomChoice[]> {
+  const config = await requireConfig(tenant);
+  const request = parseRequest(
+    { slotId: input.slotId, checkIn: input.checkIn, nights: input.nights, rooms: [{ unitId: 1, guests: 1 }], name: 'Rooms', phone: '09000000000', email: 'rooms@example.com' },
+    { today: localDate(config.timezone), bookingType: 'per_room', maxNights: config.maxStayNights, maxAdvanceDays: config.maxAdvanceDays },
+  );
+  const [units, slot] = await Promise.all([
+    tenant.db.from('units').select('id, name').eq('tenant_id', tenant.id).eq('active', true),
+    tenant.db.from('slots').select('id, name, nightly, active').eq('tenant_id', tenant.id).eq('id', request.slotId).maybeSingle(),
+  ]);
+  if (units.error) throw new Error(`Could not load units: ${units.error.message}`);
+  if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
+  if (!slot.data) throw new BookingInputError('No such unit or slot.');
+  if (!slot.data.active) throw new BookingInputError(RETIRED);
+  if (request.nights > 1 && !slot.data.nightly) throw new BookingInputError(`${slot.data.name} cannot be booked for several nights.`);
+
+  const dates = Array.from({ length: request.nights }, (_, n) => addDays(request.checkIn, n));
+  await refuseClosedDays(tenant, dates);
+  const availability = await tenant.db.rpc('check_room_availability', {
+    p_tenant_id: tenant.id, p_from: request.checkIn, p_to: dates[dates.length - 1]!, p_slot: slot.data.name, p_unit: null, p_guests: null,
+  });
+  if (availability.error) throw new Error(`Could not check availability: ${availability.error.message}`);
+
+  const choices: RoomChoice[] = [];
+  for (const unit of units.data) {
+    const rows = availability.data.filter((r) => r.unit === unit.name);
+    // A type with no row for a night has no rate for this slot: not offered.
+    if (rows.length !== dates.length) continue;
+    const prices = rows.map((r) => r.day_price);
+    choices.push({
+      unitId: unit.id,
+      fromPrice: prices.every((p): p is number => typeof p === 'number') ? Math.min(...prices) : null,
+      free: Math.min(...rows.map((r) => r.rooms_free ?? 0)),
+      roomsTotal: rows[0]!.rooms_total ?? 0,
+    });
+  }
+  return choices;
+}
+
+/**
+ * D-177 (audit E-6): the nights of the booking window on which NOTHING of a
+ * slot is free (every type's rooms_free is 0, or the whole property is
+ * taken), so the date picker can say so before a guest picks one. One
+ * check_room_availability() read over today .. the tenant's last bookable
+ * date. Closed dates are not here: the page already has them (D-080). A
+ * pending request holds nothing (D-070), so it does not make a night full.
+ */
+export async function fullNights(tenant: BookingTenant, input: { slotId?: unknown }): Promise<string[]> {
+  const config = await requireConfig(tenant);
+  const slotId = typeof input.slotId === 'number' && Number.isInteger(input.slotId) && input.slotId > 0 ? input.slotId : null;
+  if (slotId === null) throw new BookingInputError('Choose a booking slot');
+  const slot = await tenant.db.from('slots').select('id, name, active').eq('tenant_id', tenant.id).eq('id', slotId).maybeSingle();
+  if (slot.error) throw new Error(`Could not load the slot: ${slot.error.message}`);
+  if (!slot.data) throw new BookingInputError('No such unit or slot.');
+  if (!slot.data.active) throw new BookingInputError(RETIRED);
+  const today = localDate(config.timezone);
+  const availability = await tenant.db.rpc('check_room_availability', {
+    p_tenant_id: tenant.id, p_from: today, p_to: lastBookingDate(today, config.maxAdvanceDays), p_slot: slot.data.name, p_unit: null, p_guests: null,
+  });
+  if (availability.error) throw new Error(`Could not check availability: ${availability.error.message}`);
+  const anyFree = new Map<string, boolean>();
+  for (const r of availability.data) {
+    anyFree.set(r.booked_date, (anyFree.get(r.booked_date) ?? false) || (r.rooms_free ?? 0) > 0);
+  }
+  return [...anyFree.entries()].filter(([, free]) => !free).map(([day]) => day).sort();
 }
 
 /** A checked stay, priced night by night before any promo, and whether every night is still free. */
@@ -345,7 +424,8 @@ export async function requestBooking(
      * refuses a version that is not the tenant's current one and records the
      * consent on the stay. The booking page always gives it; the tools do not.
      */
-    consentVersion?: string;
+    /** The policy version the guest agreed to (D-130); request_booking_with_consent() refuses any other. */
+    consentVersion: string;
   },
 ): Promise<RequestReceipt> {
   const config = await requireConfig(tenant);
@@ -379,10 +459,10 @@ export async function requestBooking(
     p_notes: request.notes,
     p_promo_code: promoCode,
   };
-  const { data, error } =
-    input.consentVersion === undefined
-      ? await tenant.db.rpc('request_booking', args)
-      : await tenant.db.rpc('request_booking_with_consent', { ...args, p_consent_version: input.consentVersion });
+  // D-168 (audit S-12): always the consent wrapper. request_booking() is
+  // not callable by a token any more, so a request without the policy
+  // version the guest agreed to cannot be made at all.
+  const { data, error } = await tenant.db.rpc('request_booking_with_consent', { ...args, p_consent_version: input.consentVersion });
   if (error) throw requestError(error);
   if (!data || data.length === 0) throw new Error('The request was saved but nothing came back');
 

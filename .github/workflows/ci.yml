@@ -1,0 +1,73 @@
+# Audit B-7 (D-160): the checks that need no secret and no database, on
+# every push and pull request. Each step is a command this repo already
+# documents (CLAUDE.md "Commands" and Rule 2):
+#
+#   install --frozen-lockfile  the lockfile is the truth; a drifted one fails here
+#   typecheck                  scripts/check-service-imports.mjs first, then tsc everywhere
+#   test --continue            every package's unit tests, all of them reported
+#                              even when one fails (turbo stops at the first otherwise)
+#   build                      the packages and `next build`, with NO .env: the web app
+#                              must build without a key (Rule 2)
+#   the bundle grep            Rule 2: no secret's NAME in the browser bundle
+#   audit                      no critical advisory in a production dependency
+#
+# What CI does NOT run, on purpose: verify, rooms, isolation, the walks and
+# `pnpm eval`. They need the live database (and eval, OpenAI money and the
+# deleted northwind and harbor tenants); they stay manual until a staging
+# project exists (audit P1). The office tests are left out too: they have a
+# known flake (status.md, 2026-10-28).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # turbo's remote cache and telemetry are not used.
+      TURBO_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pnpm version comes from package.json's packageManager field.
+      - uses: pnpm/action-setup@v4
+
+      # Node 22: the Vercel runtime. package.json's engines asks >= 20.9.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (and the service-import check)
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm turbo test --continue
+
+      - name: Build, with no .env
+        run: pnpm build
+
+      - name: No secret name in the browser bundle (Rule 2)
+        run: |
+          if grep -rliE "service_role|SUPABASE_SECRET|TENANT_SIGNING_JWK|guest_phone|VAPID_PRIVATE" apps/web/.next/static/; then
+            echo "::error::a secret's name is in apps/web/.next/static (CLAUDE.md Rule 2)"
+            exit 1
+          fi
+
+      - name: No critical advisory in a production dependency
+        run: pnpm audit --prod --audit-level=critical

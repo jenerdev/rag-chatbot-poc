@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { TenantContext } from '@rag/pipeline';
 
 // The per-IP limit on the open routes: the booking request, the Manage
@@ -44,15 +45,124 @@ export const CHAT_REQUESTS_PER_WINDOW = 30;
 export const TENANT_CEILING_PER_WINDOW = 600;
 
 /**
- * The caller's IP: the first X-Forwarded-For entry, which Vercel sets, or
- * "local" when there is none (pnpm dev). A client can send its own
- * X-Forwarded-For; behind Vercel the platform's value comes first. Locally it
- * is trusted as sent, which only matters for testing this limit: a walk
- * sends a fresh address per run, because the count now outlives the process.
+ * Audit S-5 (D-162): price quotes per IP per tenant per 10 minutes on the
+ * booking page (`book/quote`). The page re-asks 300 ms after each change, so
+ * a guest choosing dates, rooms and typing a promo code letter by letter
+ * makes 20 to 40; 60 leaves room for a second try. It also caps guessing
+ * promo codes by dictionary, with TENANT_CEILING_PER_WINDOW across
+ * addresses (allowSpend()), and each quote is up to 70 unit_quote() calls.
+ * Policy.
  */
+export const QUOTE_REQUESTS_PER_WINDOW = 60;
+
+/**
+ * Audit S-2 (D-157): the sign-in and "Forgot password?" doors, staff and
+ * platform. Two counts per call, both in the same window: this ADDRESS, and
+ * this ACCOUNT (the email, hashed), so a guesser spread over many addresses
+ * still meets the account's ceiling. The account count is also a lockout an
+ * attacker can cause, for one email at a time and ten minutes at most; that
+ * is the price of the ceiling, and the person can still reset. Policy.
+ */
+export const LOGIN_PER_ADDRESS = 10;
+export const LOGIN_PER_ACCOUNT = 10;
+/** A reset sends an email: fewer, because each one spends the sender's quota (R-21). */
+export const RESET_PER_ADDRESS = 5;
+export const RESET_PER_ACCOUNT = 3;
+
+/** The one sentence a refused sign-in or reset gets. It says nothing about whether the account exists. */
+export const AUTH_LIMITED = 'Too many attempts. Please wait a few minutes and try again.';
+
+export type AuthScope = 'login' | 'reset';
+
+const AUTH_LIMITS: Record<AuthScope, { address: number; account: number }> = {
+  login: { address: LOGIN_PER_ADDRESS, account: LOGIN_PER_ACCOUNT },
+  reset: { address: RESET_PER_ADDRESS, account: RESET_PER_ACCOUNT },
+};
+
+/**
+ * sha256 hex of a value: an email (or, on the platform, an address) is
+ * counted, never stored. The email is trimmed and lower-cased first, so
+ * "Ann@x.com" and "ann@x.com " are one account, as Supabase Auth treats them.
+ */
+export function hashed(value: string): string {
+  return createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
+}
+
+/** The two keys of one tenant sign-in or reset: the address, then the account. */
+export function tenantAuthKeys(tenantId: number, scope: AuthScope, ip: string, email: string): [string, string] {
+  return [`${scope}|${tenantId}|ip|${ip}`, `${scope}|${tenantId}|acct|${hashed(email)}`];
+}
+
+/**
+ * The two keys of one platform sign-in or reset. Only hashes, in the shape
+ * platform_rate_allow() accepts (schema-platform-rate-limit.sql): that
+ * function is callable with the publishable key, so the table holds nothing
+ * a caller could read back as an address or an email.
+ */
+export function platformAuthKeys(scope: AuthScope, ip: string, email: string): [string, string] {
+  return [`platform-${scope}|${hashed(`ip|${ip}`)}`, `platform-${scope}|${hashed(`acct|${email}`)}`];
+}
+
+/** The limits of a scope, for both doors. */
+export function authLimits(scope: AuthScope): { address: number; account: number } {
+  return AUTH_LIMITS[scope];
+}
+
+/**
+ * A tenant's sign-in or reset: the address first, then the account, on the
+ * tenant's chat token (rate_allow(), wall 2 as everywhere). The account is
+ * counted only when the address was inside, so one noisy address does not
+ * spend a real person's allowance. Throws when the database does not answer.
+ */
+export async function allowAuth(tenant: Limited, scope: AuthScope, ip: string, email: string): Promise<boolean> {
+  const [address, account] = tenantAuthKeys(tenant.id, scope, ip, email);
+  const limits = authLimits(scope);
+  if (!(await allow(tenant, address, limits.address))) return false;
+  return allow(tenant, account, limits.account);
+}
+
+/**
+ * The caller's IP, for every per-IP limit (audit S-8, D-165). Which header
+ * may be believed depends on what stands in front of the app, because a
+ * client can send ANY header it likes:
+ *
+ *   - on Vercel (VERCEL=1): the first X-Forwarded-For entry. Vercel fills
+ *     that header from the TCP connection and drops what the client sent,
+ *     when Vercel is the outermost edge (its "Request headers" docs).
+ *   - in development (NODE_ENV not production): the same header, trusted as
+ *     sent, because the walks send a fresh address per run (the counts
+ *     outlive the process, D-137); "local" with none.
+ *   - anywhere else in production (a self-hosted `next start`): ONLY the
+ *     header named by CLIENT_IP_HEADER, which the proxy in front sets (e.g.
+ *     nginx's x-real-ip). Without it, every caller is "unknown": one shared
+ *     count. That fails CLOSED (the limits are stricter, never bypassed);
+ *     trusting X-Forwarded-For there would let anyone dodge every limit by
+ *     changing the header on each request.
+ */
+export function clientIpFrom(
+  headers: Headers,
+  where: { onVercel: boolean; production: boolean; trustedHeader?: string | undefined },
+): string {
+  const first = (value: string | null) => value?.split(',')[0]?.trim() || null;
+  if (where.onVercel || !where.production) return first(headers.get('x-forwarded-for')) ?? 'local';
+  if (where.trustedHeader) return first(headers.get(where.trustedHeader)) ?? 'unknown';
+  return 'unknown';
+}
+
+let warnedUntrusted = false;
+
+/** clientIpFrom() for this request, on this deployment's own environment. */
 export function clientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || 'local';
+  const where = {
+    onVercel: process.env.VERCEL === '1',
+    production: process.env.NODE_ENV === 'production',
+    trustedHeader: process.env.CLIENT_IP_HEADER?.trim().toLowerCase() || undefined,
+  };
+  if (where.production && !where.onVercel && !where.trustedHeader && !warnedUntrusted) {
+    warnedUntrusted = true;
+    console.warn('[rate-limit] not on Vercel and CLIENT_IP_HEADER is unset: every caller shares ONE per-IP count. Set it to the header your proxy writes (e.g. x-real-ip).');
+  }
+  return clientIpFrom(request.headers, where);
 }
 
 /** The one thing allow() needs from a tenant: its id (wall 1) and its token's client (wall 2). */
@@ -75,7 +185,8 @@ export async function allow(tenant: Limited, key: string, max: number = MAX_REQU
 }
 
 /**
- * The two limits on a route that spends OpenAI money: this address's window
+ * The two limits on a route that spends OpenAI money (or, since D-162, the
+ * booking page's price quote, which is expensive and probes promo codes): this address's window
  * under `scope`, then the tenant's ceiling across every address. The ceiling
  * is bumped only when the address was inside, so a refused address does not
  * eat the tenant's allowance. One sentence for both: the visitor is told to

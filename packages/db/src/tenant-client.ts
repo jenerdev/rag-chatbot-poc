@@ -66,21 +66,38 @@ const base64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toStrin
  * - **Staff** (`{ tenantId, userId, admin: true }`): the user's uuid, and
  *   `app_admin`. That alone writes nothing: app_is_admin() also requires a
  *   `memberships` row for this user and THIS tenant.
+ * - **Notifier** (`{ tenantId, notifier: true }`, D-166): no `sub`, and
+ *   `app_notifier`, the one claim notify_claim() and notify_done() accept.
+ *   It reads what a chat token reads and may also drain THIS tenant's
+ *   notification outbox; minted only by notifierClient(), for the drain.
  *
  * There is no `role` parameter. The role is always `authenticated`, which is
  * the refusal § 2.2 asks for: this function cannot mint `service_role`.
  */
-export function mintTenantToken(input: { tenantId: number; userId?: string; admin?: boolean }): string {
-  const { tenantId, userId, admin = false } = input;
+export function mintTenantToken(input: { tenantId: number; userId?: string; admin?: boolean; notifier?: boolean }): string {
+  const { tenantId, userId, admin = false, notifier = false } = input;
   if (!Number.isSafeInteger(tenantId) || tenantId <= 0) throw new Error(`mintTenantToken: bad tenantId ${tenantId}`);
   if (userId !== undefined && !UUID.test(userId)) throw new Error('mintTenantToken: userId must be a uuid');
   if (admin && userId === undefined) throw new Error('mintTenantToken: an admin token needs a userId');
+  // The drain's token is no one's: never a user's, never an admin's.
+  if (notifier && (userId !== undefined || admin)) throw new Error('mintTenantToken: a notifier token has no user and no admin');
 
   return signClaims({
     tenant_id: tenantId,
     ...(userId !== undefined ? { sub: userId } : {}),
     ...(admin ? { app_admin: true } : {}),
+    ...(notifier ? { app_notifier: true } : {}),
   });
+}
+
+/**
+ * D-166 (audit S-10): the notification drain's client for THIS tenant. The
+ * drain runs on the server after a guest's request; it used to run on that
+ * request's chat token, so any chat token could claim the queue or delete a
+ * staff device. Now notify_claim() and notify_done() accept only this.
+ */
+export function notifierClient(tenantId: number): DbClient {
+  return scopedClient(mintTenantToken({ tenantId, notifier: true }));
 }
 
 /**

@@ -27,7 +27,7 @@
 // Run:  pnpm --filter @rag/bookings isolation [-- --filters-only]
 
 import { randomUUID } from 'node:crypto';
-import { mintTenantToken, scopedClient, staffClient } from '@rag/db';
+import { mintTenantToken, notifierClient, scopedClient, staffClient } from '@rag/db';
 import { asOperator, operatorEmail, supabase, userIdByEmail } from '@rag/db/service';
 import {
   addImage,
@@ -82,12 +82,23 @@ import {
   removeAllDevices,
   removeDevice,
   removeImage,
-  requestBooking,
+  requestBooking as requestBookingWithConsent,
   setCalendarDay,
   setImageOrder,
   setRates,
   updateAccommodation,
 } from '../dist/index.js';
+
+// D-168: every request carries the tenant's current policy version, as the
+// booking page's does (request_booking() alone is not callable by a token).
+const policyVersions = new Map();
+const requestBooking = async (tenant, input) => {
+  if (!policyVersions.has(tenant.id)) {
+    const { data } = await supabase.from('tenants').select('policy_version').eq('id', tenant.id).single();
+    policyVersions.set(tenant.id, data?.policy_version ?? '1');
+  }
+  return requestBookingWithConsent(tenant, { consentVersion: policyVersions.get(tenant.id), ...input });
+};
 
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -720,7 +731,8 @@ try {
   //     in two tenants is told only by the tenant the event is in. Devices
   //     are seeded on the service client (not under test, as 30's proof);
   //     the package's device reads follow the mode. The drain's claim runs
-  //     on CHAT tokens in both modes, as book/request's does: inside
+  //     on each tenant's NOTIFIER token in both modes (D-166: the only token
+  //     notify_claim() accepts; it was the chat token before): inside
   //     notify_claim() the tenant filter is the code wall, its token check
   //     the database's. The claim is called directly, not drainNotifications(),
   //     which would POST to the fake endpoints.
@@ -769,8 +781,9 @@ try {
       `A ${aBox.map((r) => `${r.kind} ${r.reference}`).join(', ')} · B ${bBox.map((r) => `${r.kind} ${r.reference}`).join(', ')}`,
     );
 
-    // 31c. A's chat token cannot claim B's outbox (42501), and B's rows stay unclaimed.
-    const cross = await chat(a).db.rpc('notify_claim', { p_tenant_id: b.id });
+    // 31c. A's drain cannot claim B's outbox (42501), and B's rows stay unclaimed.
+    const drainOf = (t) => notifierClient(t.id); // D-166
+    const cross = await drainOf(a).rpc('notify_claim', { p_tenant_id: b.id });
     const bUntouched = (await outboxOf(b)).every((r) => r.claimed_at === null && r.sent_at === null);
     check(
       cross.error?.code === '42501' && (cross.data ?? []).length === 0 && bUntouched,
@@ -780,8 +793,8 @@ try {
 
     // 31d. A's drain tells A's device only; B's tells B's two, never A's,
     //      and a proof only B's admin (Rule 3), never the staff member.
-    const aClaim = (await chat(a).db.rpc('notify_claim', { p_tenant_id: a.id })).data ?? [];
-    const bClaim = (await chat(b).db.rpc('notify_claim', { p_tenant_id: b.id })).data ?? [];
+    const aClaim = (await drainOf(a).rpc('notify_claim', { p_tenant_id: a.id })).data ?? [];
+    const bClaim = (await drainOf(b).rpc('notify_claim', { p_tenant_id: b.id })).data ?? [];
     const bEndpoints = new Set([devices.b, devices.outsider]);
     const proofs = bClaim.filter((r) => r.kind === 'proof');
     check(
@@ -792,13 +805,13 @@ try {
       `A → ${aClaim.map((r) => `${r.kind}@${r.endpoint === devices.a ? 'A-operator' : 'ELSEWHERE'}`).join(', ')} · B → ${bClaim.map((r) => `${r.kind}@${r.endpoint === devices.b ? 'B-operator' : r.endpoint === devices.outsider ? 'B-staff' : 'ELSEWHERE'}`).join(', ')}`,
     );
 
-    // 31e. A's chat token cannot record B's results ("gone" would delete
+    // 31e. A's drain cannot record B's results ("gone" would delete
     //      B's devices); B's own "ok" is recorded. The twin.
     const results = bClaim.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'gone' }));
-    const crossDone = await chat(a).db.rpc('notify_done', { p_results: results });
+    const crossDone = await drainOf(a).rpc('notify_done', { p_results: results });
     const bAfterCross = await devicesOf(b);
     const bBoxAfterCross = await outboxOf(b);
-    const ownDone = await chat(b).db.rpc('notify_done', { p_results: results.map((r) => ({ ...r, result: 'ok' })) });
+    const ownDone = await drainOf(b).rpc('notify_done', { p_results: results.map((r) => ({ ...r, result: 'ok' })) });
     const bAfterOwn = await devicesOf(b);
     const bSent = (await outboxOf(b)).filter((r) => bClaim.some((c) => c.outbox_id === r.id)).every((r) => r.sent_at !== null);
     check(

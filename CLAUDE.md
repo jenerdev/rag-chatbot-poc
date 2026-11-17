@@ -671,6 +671,17 @@ pnpm --filter @rag/db verify    # 243 checks, no API key needed; sweeps its own 
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/welcome-text-walk.mjs)   # 4 checks of the welcome line (D-139): the platform route, tenant_public(), the card at 375, the audit row; a throwaway tenant and super user; needs pnpm dev
 pnpm --filter @rag/db retention [-- --remove]   # D-131: chats and guest details past each tenant's period, and (D-138) audit rows past audit_retention_days; a dry run unless --remove, counted
 (cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/audit-log-walk.mjs)   # 12 checks of S-18 and the platform's log on villa, HTTP and browser, shots in plan/audit-log/walk/; audit-log-a11y.mjs is axe over 16 states; needs pnpm dev
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/security-headers-walk.mjs)   # 29 checks of the security headers (D-156): the headers on 6 paths, no CSP violation on 21 pages (12 staff screens as a throwaway admin), framing refused; best on next start
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/auth-rate-limit-walk.mjs)   # 5 HTTP checks of the login and reset limits (D-157): per address, per account, the platform's hashed table; made-up accounts, no email sent
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-doors-limit-walk.mjs)   # 3 HTTP checks (D-162): book/quote 60 then 429; the change doors' misses count toward the lockout; a made-up reference, its rows removed
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/sessions-walk.mjs)   # 3 HTTP checks (D-163): a copied staff cookie dies on logout and on a new password, the platform's too, 4 h; throwaway users, no email
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/same-origin-walk.mjs)   # 5 checks (D-164): a foreign Origin 403, form content types 415, our own page's fetch 200 in Chrome, a foreign page's post refused; nothing written
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/booking-bar-walk.mjs)   # 7 checks (D-173): the booking page's bar on a phone; nothing sent; shots in plan/booking-bar/
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/room-cards-price-walk.mjs [slug])   # 4 checks (D-174): the room cards' price and rooms left, the price = the quote's; alteza; nothing sent
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/receipt-walk.mjs)   # 3 checks (D-176): the receipt's "Save this reference" and Share; a throwaway tenant, deleted
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/full-nights-walk.mjs)   # 3 checks (D-177): a confirmed night shaded "fully booked" in the picker; a throwaway tenant, deleted
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/chat-announce-walk.mjs)   # 3 checks (D-178): a finished answer said once to a screen reader; ONE small OpenAI call (check 3)
+(cd packages/db && node --conditions=react-server --env-file=../../.env ../../plan/guest-ux-walk.mjs)   # 15 checks (D-179, D-180): touch targets, composer focus, the chat kept on reload, room checkbox names, one h1, the small items; no OpenAI call
 pnpm eval                       # the prompt battery, 63 cases  ⚠ see below (needs northwind and harbor, deleted 2026-10-20)
 pnpm scores                     # real similarity scores for northwind, threshold off
 pnpm --filter @rag/pipeline isolation   # 24 cross-tenant checks, on chat tokens (+ one platform token)  ⚠ rule 6
@@ -820,7 +831,10 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    Rule 2). **A customer never supplies one either:** `request_booking()`
    takes `p_tenant_id` from the route (wall 1) and refuses one that is not
    the token's (wall 2); a chat token has no insert policy on `bookings`, so
-   that function is the only way in (D-071).
+   that function is the only way in (D-071), and since D-168 a token reaches
+   it ONLY through `request_booking_with_consent()` (the current policy
+   version, recorded on the stay); `request_booking()` itself is the
+   wrapper's and `service_role`'s alone.
 7. **A tool result carries nothing the chat user may not see.** It goes into a
    prompt, and a prompt-injected model can recite it. `check_availability`
    returns `date, unit, slot, status` and nothing else, and rows are mapped
@@ -839,6 +853,10 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    Chat tokens carry **no `sub`**. Staff tokens carry the user and
    `app_admin`, and Postgres's `app_role()` reads the `memberships` row for
    that tenant on every write: the ROLE is never a claim (D-075).
+   Notifier tokens (D-166, `mintTenantToken({ tenantId, notifier: true })`,
+   only through `notifierClient()`) carry a tenant, NO `sub` and
+   `app_notifier`: the notification drain's, and the only token
+   `notify_claim` and `notify_done` accept.
    **A second shape since tenant management (D-076):** `mintPlatformToken()`,
    in the same file, mints `{ sub, app_super }` with NO tenant, still
    `authenticated`, still five minutes, still no role parameter; with no
@@ -856,16 +874,21 @@ pnpm office:test                # 43 tests of the office and its app, on a fake 
    `record_refund`, `set_payment_settings`, `decide_change` (owners and
    admins, each asking `app_is_admin()`), `expire_due_stays` (staff or
    service_role); since D-116 two more, `notify_claim` and `notify_done`
-   (any token of the tenant, each checking the token's tenant; a claimed
+   (since D-166 the drain's NOTIFIER token only, each checking the token's tenant; a claimed
    row is consumed, so the claim cannot list devices twice); since D-137
    `rate_allow` (any token of the tenant, checking the token's tenant; the
-   ONE way to `rate_windows`, which no token reads); and
+   ONE way to `rate_windows`, which no token reads); since D-157
+   `platform_rate_allow` (callable with the publishable key, hashed keys of
+   one shape only); since D-163 `session_open`, `session_valid`,
+   `session_close`, `session_close_all` (any token WITH a user: each takes
+   the user from `auth.uid()`, never from an argument; `app_sessions` has
+   no policy); and
    trigger-only definers that no token can call (the stay row, the event
    log, the terms, the holds, `booking_events_notify`) (`booking_reference` also admits a direct session, `session_user
    = 'postgres'`, where the backfill ran). `tenant_dashboard()` is NOT one: it
    is `security invoker`, so it reads under the token's own RLS, and it
    refuses a caller that is not staff of that tenant on top. `request_booking` is still the only one that writes for a
-   stranger, and it can write `pending` rows only.
+   stranger, and it can write `pending` rows only, through its consent wrapper (D-168).
 
 ## Traps that will actually cost you time
 
@@ -1006,6 +1029,10 @@ All are expanded in `risks.md`.
   Booking limits live in `packages/bookings/src/constants.ts`, beside the code
   that enforces them. A limit the browser needs too (the photo limits) reaches
   the Client Component as a prop from its server page, never as a copy.
+- A token may UPDATE only `status` and `decision_note` of a booking (D-167,
+  `schema-booking-columns.sql`). Any other staff edit of a booking goes through
+  a definer function that writes its own `booking_events` row; never widen the
+  grant without a log.
 - Money is bigint **centavos** everywhere; it becomes text once, for a person
   (`lib/money.ts`, and `money()` in the tool result).
 - Validate at the route boundary, throw in the pipeline, map errors to status
@@ -1032,7 +1059,7 @@ All are expanded in `risks.md`.
   honeypot field, the per-IP window (ONE count in Postgres since D-137,
   `rate_allow()`; the chat, the Manage doors and the voice routes share it,
   and the OpenAI routes add a per-tenant ceiling), and the per-contact
-  limit in SQL. A probe of a limit sends a fresh `X-Forwarded-For` per run.
+  limit in SQL. A probe of a limit sends a fresh `X-Forwarded-For` per run. Which header is believed is `clientIpFrom()`'s (D-165): Vercel's X-Forwarded-For, the same as sent in development, and self-hosted in production only `CLIENT_IP_HEADER` (unset = one shared count), so a walk against a local `next start` sets `CLIENT_IP_HEADER=x-forwarded-for`.
 - Money is bigint **centavos**, and every price is `unit_quote()`'s: a
   quote before, the stored rows after. A screen never adds up a total; a
   receipt's total is the sum of what was STORED (customer-booking Rule 3).

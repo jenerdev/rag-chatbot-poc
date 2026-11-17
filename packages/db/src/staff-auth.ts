@@ -134,8 +134,14 @@ export async function requestPasswordReset(email: string, redirectTo: string): P
  * which needs a whole session object (refresh token included) set on a client
  * first. The access token IS the proof the user clicked the link, and it is
  * all this call needs.
+ *
+ * D-163 (audit S-6): a new password then ends every session the user has,
+ * staff of any tenant and the platform: session_close_all(), called with the
+ * SAME access token, whose `sub` is the user, so the function knows whose
+ * rows they are without being told. The count comes back (null when that
+ * call failed: the password is set either way, and the failure is logged).
  */
-export async function setPasswordWithToken(accessToken: string, password: string): Promise<void> {
+export async function setPasswordWithToken(accessToken: string, password: string): Promise<{ sessionsEnded: number | null }> {
   const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
     method: 'PUT',
     headers: {
@@ -145,7 +151,14 @@ export async function setPasswordWithToken(accessToken: string, password: string
     },
     body: JSON.stringify({ password }),
   });
-  if (response.ok) return;
+  if (response.ok) {
+    const { data, error } = await scopedClient(accessToken).rpc('session_close_all');
+    if (error) {
+      console.error(`[auth] password set, but the old sessions were NOT ended: ${error.message}`);
+      return { sessionsEnded: null };
+    }
+    return { sessionsEnded: data };
+  }
   const body = (await response.json().catch(() => ({}))) as { msg?: string; message?: string; error_description?: string };
   const reason = body.msg ?? body.message ?? body.error_description ?? `HTTP ${response.status}`;
   // 401/403: the link's token is expired or already used. 422: Supabase

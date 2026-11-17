@@ -68,6 +68,15 @@ export const LANGUAGE_SCAN_MESSAGES = 50;
 // and we fall back to the original rather than searching with prose.
 export const REWRITE_MAX_TOKENS = 60;
 
+// The answer's output cap (D-159, audit B-5). Before it, an answer had none: a
+// confused or injected model could write until the model's own limit, on our
+// account. MEASURED: the longest of 370 stored replies (2026-11-14) was 1,303
+// characters, a Taglish week of availability, about 350-450 tokens; the median
+// 192 characters. 1000 is roughly 2.5x the longest real one. A reply the cap
+// cuts off is not passed off as whole: it fails, and is saved with its text as
+// "[...answer interrupted]" (answer.ts).
+export const ANSWER_MAX_TOKENS = 1000;
+
 // --- tools (plan/bookings.md Phase 6) --------------------------------------
 
 // How many rounds of tool calls one answer may make. A round is one model

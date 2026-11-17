@@ -4,7 +4,7 @@
 // There is no client here that bypasses RLS. That one is `@rag/db/service`,
 // for tools only (plan/auth-rls.md Rule 2).
 
-export { anonClient, mintPlatformToken, mintTenantToken, scopedClient, TENANT_TOKEN_SECONDS } from './tenant-client.js';
+export { anonClient, mintPlatformToken, mintTenantToken, notifierClient, scopedClient, TENANT_TOKEN_SECONDS } from './tenant-client.js';
 export type { DbClient } from './tenant-client.js';
 export { platformClient, requestPasswordReset, setPasswordWithToken, signInStaff, staffClient, StaffAuthError } from './staff-auth.js';
 export type { StaffSession } from './staff-auth.js';

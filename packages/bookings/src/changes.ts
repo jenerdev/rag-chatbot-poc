@@ -17,7 +17,7 @@
 // Every amount is the database's (unit_quote(), change_terms()).
 
 import { BookingConflictError, BookingInputError } from './errors.js';
-import { MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE } from './guest.js';
+import { guestStay, MAX_GUEST_CONTACT, MAX_GUEST_REFERENCE } from './guest.js';
 import { expireDueStays } from './deadlines.js';
 import type { BookingTenant } from './types.js';
 import { isIsoDate } from './validate.js';
@@ -59,6 +59,13 @@ export async function requestChange(tenant: BookingTenant, input: ChangeInput): 
     throw new BookingInputError('That reference or contact is too long.');
   }
   if (input.kind === 'reschedule' && !isIsoDate(input.newCheckIn)) throw new BookingInputError('Choose the new check-in date.');
+  // Audit S-4 (D-162): match the guest through guest_stay() FIRST, as the
+  // proof door does. request_change() raises on a miss, and a raise rolls
+  // back the miss guest_group() recorded, so this door never counted toward
+  // the lockout (5 misses lock a reference for an hour): a known reference
+  // could be guessed at here without end. guest_stay() records the miss in
+  // a call that does not raise, and a locked reference is a miss too.
+  if (!(await guestStay(tenant, input.reference, input.contact))) return null;
   const { data, error } = await tenant.db.rpc('request_change', {
     p_tenant_id: tenant.id,
     p_reference: input.reference.trim(),
@@ -87,6 +94,8 @@ export async function requestChange(tenant: BookingTenant, input: ChangeInput): 
 
 /** Withdraw the open request. null = a miss; false = nothing was open. */
 export async function withdrawChange(tenant: BookingTenant, reference: string, contact: string): Promise<boolean | null> {
+  // Audit S-4 (D-162): the same first step as requestChange(), so a miss here counts too.
+  if (!(await guestStay(tenant, reference, contact))) return null;
   const { data, error } = await tenant.db.rpc('withdraw_change', { p_tenant_id: tenant.id, p_reference: reference.trim(), p_contact: contact.trim() });
   if (error) {
     const mapped = changeError(error);

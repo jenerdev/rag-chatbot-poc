@@ -22,7 +22,11 @@ import { openBrowser } from './ui-refresh-cdp.mjs';
 const BASE = process.argv[2] ?? 'http://localhost:3000';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AXE = readFileSync(join(HERE, 'ui-refresh', 'axe', 'axe.min.js'), 'utf8');
-const SLUGS = ['villa', 'harbor', 'northwind'];
+// The tenants, and the per-room one used for the transcript and the modal
+// states. Settable since northwind and harbor were deleted (2026-10-20):
+//   A11Y_SLUGS=villa,alteza A11Y_PER_ROOM=alteza
+const SLUGS = (process.env.A11Y_SLUGS ?? 'villa,harbor,northwind').split(',').map((s) => s.trim()).filter(Boolean);
+const PER_ROOM = process.env.A11Y_PER_ROOM ?? 'harbor';
 const STAFF = ['/admin/dashboard', '/admin/documents', '/admin/unanswered', '/admin/conversations', '/admin/bookings', '/admin/calendar', '/admin/calendar?view=week', '/admin/calendar?view=day', '/admin/accommodations', '/admin/holidays', '/admin/slots', '/admin/promos', '/admin/members'];
 
 const { data: tenants } = await supabase.from('tenants').select('id, slug').in('slug', SLUGS);
@@ -92,34 +96,40 @@ try {
         await page.send('Network.setCookie', { name: 'rag_admin', value: cookies[slug], url: `${BASE}/api/t/${slug}/`, path: `/api/t/${slug}` });
         for (const path of STAFF) await open(`${BASE}/t/${slug}${path}`, "!!document.querySelector('.staff-sidebar') || !!document.querySelector('main h1, main h2')", `${slug} ${path} @${width}`);
       }
-      // S-16a (D-115): one transcript, the newest of harbor's chats (90 days).
-      await page.send('Network.setCookie', { name: 'rag_admin', value: cookies.harbor, url: `${BASE}/api/t/harbor/`, path: '/api/t/harbor' });
-      await page.goto(`${BASE}/t/harbor/admin/conversations?days=90`);
+      // S-16a (D-115): one transcript, the newest of the per-room tenant's chats (90 days).
+      await page.send('Network.setCookie', { name: 'rag_admin', value: cookies[PER_ROOM], url: `${BASE}/api/t/${PER_ROOM}/`, path: `/api/t/${PER_ROOM}` });
+      await page.goto(`${BASE}/t/${PER_ROOM}/admin/conversations?days=90`);
       if (await page.until("!!document.querySelector('.conversation-row-link')", 30000)) {
         await page.click('.conversation-row-link');
         await page.until("!!document.querySelector('.transcript')", 30000);
         await new Promise((r) => setTimeout(r, 400));
-        await audit(`harbor transcript @${width}`);
+        await audit(`${PER_ROOM} transcript @${width}`);
       }
-      // The modal states: a drawer (New booking) and a dialog (Decline), as harbor's owner.
-      await page.send('Network.setCookie', { name: 'rag_admin', value: cookies.harbor, url: `${BASE}/api/t/harbor/`, path: '/api/t/harbor' });
-      await page.goto(`${BASE}/t/harbor/admin/bookings`);
-      await page.until("!!document.querySelector('.page-actions button')", 30000);
-      await page.click('.page-actions button');
-      await page.until("!!document.querySelector('dialog.drawer[open]')", 5000);
-      await new Promise((r) => setTimeout(r, 400));
-      await audit(`harbor bookings, drawer open @${width}`);
-      await page.key('Escape', 'Escape', 27);
+      // The modal states: a drawer (New booking) and a dialog (Decline), as the per-room tenant's owner.
+      await page.send('Network.setCookie', { name: 'rag_admin', value: cookies[PER_ROOM], url: `${BASE}/api/t/${PER_ROOM}/`, path: `/api/t/${PER_ROOM}` });
+      await page.goto(`${BASE}/t/${PER_ROOM}/admin/bookings`);
+      // until() returns false on a timeout, it does not throw: a slow page is
+      // reported and skipped, not a crash that loses every result so far.
+      if (await page.until("!!document.querySelector('.page-actions button')", 30000)) {
+        await page.click('.page-actions button');
+        await page.until("!!document.querySelector('dialog.drawer[open]')", 5000);
+        await new Promise((r) => setTimeout(r, 400));
+        await audit(`${PER_ROOM} bookings, drawer open @${width}`);
+        await page.key('Escape', 'Escape', 27);
+      } else {
+        console.log(`SKIPPED  ${PER_ROOM} bookings, drawer open @${width}: no New booking button within 30 s`);
+      }
       await page.eval("[...document.querySelectorAll('.booking-actions button')].find(b => b.textContent === 'Decline' || b.textContent === 'Cancel')?.click()");
       if (await page.until("!!document.querySelector('dialog.dialog[open]')", 5000)) {
         await new Promise((r) => setTimeout(r, 400));
-        await audit(`harbor bookings, dialog open @${width}`);
+        await audit(`${PER_ROOM} bookings, dialog open @${width}`);
         await page.key('Escape', 'Escape', 27);
       }
       // The platform.
       await page.send('Network.setCookie', { name: 'rag_platform', value: platformCookie, url: `${BASE}/api/platform/`, path: '/api/platform' });
-      await open(`${BASE}/platform`, "!!document.querySelector('.tenant-row')", `platform list @${width}`);
-      await page.eval("[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/harbor')).querySelector('button').click()");
+      // A real row (its name button), not the loading skeleton's rows, which share the class.
+      await open(`${BASE}/platform`, "!!document.querySelector('.tenant-row .tenant-open')", `platform list @${width}`);
+      await page.eval(`[...document.querySelectorAll('.tenant-row')].find(r => r.textContent.includes('/t/${PER_ROOM}')).querySelector('button').click()`);
       await page.until("!!document.querySelector('#theme-accent')", 15000);
       await new Promise((r) => setTimeout(r, 600));
       await audit(`platform tenant form @${width}`);

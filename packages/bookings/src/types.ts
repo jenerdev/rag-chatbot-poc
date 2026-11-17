@@ -460,6 +460,17 @@ export interface PaymentFlow {
   reviewWithinHours: number | null;
   /** D-106: when the dates are held for the guest */
   hold: 'none' | 'on_proof' | 'on_request';
+  /**
+   * D-175 (audit E-4): what must be paid, as the RULE the tenant set, never an
+   * amount worked out on a screen: the full price, a fixed deposit in
+   * centavos, or a percentage in hundredths of a percent (3000 = 30%).
+   * stay_required() works out the amount; Manage booking shows it.
+   */
+  fee: { kind: 'full' } | { kind: 'fixed'; amount: number } | { kind: 'percent'; hundredths: number };
+  /** D-175: refund tiers, most days first; empty = a cancellation refunds nothing (change_terms()) */
+  cancellation: { daysBefore: number; refundPercent: number }[];
+  /** D-175: date changes may be asked for until this many days before check-in; null = not on Manage booking */
+  rescheduleUntilDaysBefore: number | null;
 }
 
 /** One unit on one night of a request or a quote. */
@@ -489,6 +500,23 @@ export interface RequestLine {
   price: number;
   /** a holiday or peak label for this date, or null */
   holiday: string | null;
+}
+
+/**
+ * D-174 (audit E-3): what each room type costs and how many are free for a
+ * stay, BEFORE the guest picks one: the booking page's room cards. Every
+ * figure is the database's: `fromPrice` is the lowest night's day_price
+ * (unit_quote()'s price for the slot, a holiday's surcharge in, D-083) and
+ * `free` the fewest free rooms over the nights. Read-only; nothing is held.
+ */
+export interface RoomChoice {
+  unitId: number;
+  /** the lowest night's price for the slot, in centavos; null when a night has none */
+  fromPrice: number | null;
+  /** the fewest rooms of this type free on any night of the stay */
+  free: number;
+  /** the type's active rooms */
+  roomsTotal: number;
 }
 
 /** A price for a stay before it is requested. Read-only; nothing is held. */

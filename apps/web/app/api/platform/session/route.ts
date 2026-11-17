@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PLATFORM_LOGIN_FAILED, checkPlatformLogin, clearPlatformCookie, notePlatformSession, readPlatformSession, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
+import { PLATFORM_LOGIN_FAILED, allowPlatformAuth, checkPlatformLogin, clearPlatformCookie, closePlatformSession, notePlatformSession, openPlatformSession, readPlatformSessionCookie, requirePlatform, setPlatformCookie } from '@/lib/platform-auth';
+import { AUTH_LIMITED, clientIp } from '@/lib/rate-limit';
 import { badRequest, withRoute } from '@/lib/route';
 import { adminLoginSchema, firstError } from '@/lib/schemas';
 
@@ -20,11 +21,16 @@ export const dynamic = 'force-dynamic';
 export const POST = withRoute(async (request: Request) => {
   const parsed = adminLoginSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(firstError(parsed.error));
+  // Audit S-2 (D-157): per address and per account, before Supabase Auth.
+  if (!(await allowPlatformAuth('login', clientIp(request), parsed.data.email))) {
+    return NextResponse.json({ error: AUTH_LIMITED }, { status: 429 });
+  }
 
   const userId = await checkPlatformLogin(parsed.data.email, parsed.data.password);
   if (!userId) return NextResponse.json({ error: PLATFORM_LOGIN_FAILED }, { status: 401 });
+  const sessionId = await openPlatformSession(userId); // D-163
   await notePlatformSession(userId, 'login'); // D-138
-  return setPlatformCookie(NextResponse.json({ platform: true }), userId);
+  return setPlatformCookie(NextResponse.json({ platform: true }), userId, sessionId);
 });
 
 /** Is this browser the platform? Re-reads the row, so a removed super user sees the login form on the next load. */
@@ -40,9 +46,12 @@ export const GET = withRoute(async (request: Request) => {
   }
 });
 
-/** Log out. Always succeeds. A genuine session is noted first (D-138). */
+/** Log out. Always succeeds. A genuine session is noted first (D-138) and its row revoked (D-163). */
 export const DELETE = withRoute(async (request: Request) => {
-  const userId = readPlatformSession(request);
-  if (userId) await notePlatformSession(userId, 'logout');
+  const session = readPlatformSessionCookie(request);
+  if (session) {
+    await notePlatformSession(session.userId, 'logout');
+    await closePlatformSession(session.userId, session.sessionId);
+  }
   return clearPlatformCookie(NextResponse.json({ platform: false }));
 });

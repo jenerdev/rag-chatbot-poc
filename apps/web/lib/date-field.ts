@@ -80,14 +80,18 @@ export function clampDate(date: string, min?: string, max?: string): string {
   return date;
 }
 
-export type DayState = { selectable: true; reason: null } | { selectable: false; reason: 'before' | 'after' | 'closed'; label?: string };
+export type DayState = { selectable: true; reason: null } | { selectable: false; reason: 'before' | 'after' | 'closed' | 'full'; label?: string };
 
-/** Whether a day can be chosen, and if not, why: before `min`, after `max`, or a closed date (with its label). */
-export function dayState(date: string, bounds: { min?: string; max?: string; closed?: ReadonlyMap<string, string> }): DayState {
+/**
+ * Whether a day can be chosen, and if not, why: before `min`, after `max`, a
+ * closed date (with its label), or (D-177) a night on which nothing is free.
+ */
+export function dayState(date: string, bounds: { min?: string; max?: string; closed?: ReadonlyMap<string, string>; full?: ReadonlySet<string> }): DayState {
   if (bounds.min && date < bounds.min) return { selectable: false, reason: 'before' };
   if (bounds.max && date > bounds.max) return { selectable: false, reason: 'after' };
   const label = bounds.closed?.get(date);
   if (label !== undefined) return { selectable: false, reason: 'closed', label };
+  if (bounds.full?.has(date)) return { selectable: false, reason: 'full' };
   return { selectable: true, reason: null };
 }
 
@@ -100,6 +104,8 @@ export function reasonWords(state: DayState, bounds: { min?: string; max?: strin
       return bounds.max ? `after the latest date, ${fieldDateLabel(bounds.max)}` : 'too late';
     case 'closed':
       return state.label ? `closed (${state.label})` : 'closed';
+    case 'full':
+      return 'fully booked';
     default:
       return '';
   }

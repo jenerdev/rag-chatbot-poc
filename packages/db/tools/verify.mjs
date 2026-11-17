@@ -1251,7 +1251,8 @@ async function customerBookingChecks() {
     const staff = asToken(staffToken(bookId, userId));
     const chat = asToken(chatToken(bookId));
     const request = (client, overrides = {}) =>
-      client.rpc('request_booking', {
+      client.rpc('request_booking_with_consent', {
+        p_consent_version: '1', // D-168: only the wrapper is callable; a fresh probe is '1'
         p_tenant_id: bookId,
         p_slot_id: slot.Overnight,
         p_unit_ids: [unit.id],
@@ -1262,6 +1263,7 @@ async function customerBookingChecks() {
         p_phone: '0917 123 4567',
         p_email: 'probe@example.com',
         p_notes: null,
+        p_promo_code: null, // the wrapper has no default for it (PostgREST matches by names)
         ...overrides,
       });
     const rowsOf = async () =>
@@ -1500,8 +1502,8 @@ async function customerBookingChecks() {
         const nights = ov?.nightly ? 2 : 1;
         const subtotal = (r) => (r.base_price ?? 0) + (r.extra_guest_price ?? 0) + (r.surcharge ?? 0);
         const request = (checkIn, n, code) =>
-          chat.rpc('request_booking', {
-            p_tenant_id: bookId, p_slot_id: slot.Overnight, p_unit_ids: [unit.id], p_guests: [2], p_check_in: checkIn, p_nights: nights,
+          chat.rpc('request_booking_with_consent', {
+            p_consent_version: '1', p_tenant_id: bookId, p_slot_id: slot.Overnight, p_unit_ids: [unit.id], p_guests: [2], p_check_in: checkIn, p_nights: nights,
             p_name: 'Promo Guest', p_phone: `0917000010${n}`, p_email: `promo${n}@example.com`, p_notes: null, p_promo_code: code,
           });
 
@@ -2955,11 +2957,14 @@ async function manageBookingChecks() {
     //      approves the move to Saturday: old nights cancelled, new ones
     //      confirmed in the SAME stay, the balance 500.00 owed.
     {
+      // 154b's setup (D-161): the stay has a free child before it moves.
+      const freed = await supabase.from('bookings').update({ free_guests: 1 }).eq('tenant_id', probe.id).eq('group_id', moving.group).in('status', ['pending', 'confirmed']).select('id');
+      if (freed.error || !freed.data?.length) throw new Error(`free child: ${freed.error?.message ?? '0 rows'}`);
       const req = await change({ p_kind: 'reschedule', p_new_check_in: '2027-07-10', p_reason: 'probe: weekend instead' });
       const staffTry = await staff.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
       const noNote = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'reject', p_note: ' ' });
       const ok = await admin.rpc('decide_change', { p_tenant_id: probe.id, p_id: req.data?.id, p_action: 'approve', p_note: null });
-      const rows = (await supabase.from('bookings').select('booked_date, status, reference, decision_note').eq('tenant_id', probe.id).eq('group_id', moving.group).order('id')).data ?? [];
+      const rows = (await supabase.from('bookings').select('booked_date, status, reference, decision_note, free_guests, promo_id').eq('tenant_id', probe.id).eq('group_id', moving.group).order('id')).data ?? [];
       const money = ok.data?.payment;
       const guest = (await lookup(moving.ref, moving.email)).data;
       check(
@@ -2970,6 +2975,18 @@ async function manageBookingChecks() {
           && guest?.check_in === '2027-07-10' && guest.status === 'confirmed',
         'manage: staff cannot decide (42501); a reject needs a note; approving moves the stay in one go (same reference), 500.00 now owed',
         `staff ${staffTry.error?.code} · no note ${noNote.error?.code} · ${ok.error?.message ?? ok.data?.status} · rows ${rows.map((r) => `${r.booked_date}:${r.status}`).join(',')} · ${JSON.stringify(money)} · guest ${guest?.check_in}/${guest?.status}`,
+      );
+
+      // 154b. D-161 (audit B-3): the moved nights keep the stay's free child.
+      //       Before schema-reschedule-free-guests.sql the insert named no
+      //       free_guests and the column's default, 0, took the child away.
+      //       The promo is NOT carried (D-108), and the price above (1,500.00
+      //       on the weekend) is the paying guests' alone (D-147).
+      const moved = rows.filter((r) => r.booked_date === '2027-07-10' && r.status === 'confirmed');
+      check(
+        moved.length >= 1 && moved.every((r) => r.free_guests === 1 && r.promo_id === null),
+        'manage: an approved reschedule keeps the free child of the stay on every moved night (D-161), and carries no promo (D-108)',
+        `moved ${moved.map((r) => `${r.booked_date}:free ${r.free_guests}:promo ${r.promo_id}`).join(',') || 'none'}`,
       );
     }
 
@@ -3411,12 +3428,15 @@ async function notificationChecks() {
     const owner = asToken(staffToken(probe.id, ownerId));
     const staff = asToken(staffToken(probe.id, staffId));
     const chat = asToken(chatToken(probe.id));
+    // D-166 (audit S-10): the drain's own token, the only one notify_claim()
+    // and notify_done() accept (tenant, no user, app_notifier).
+    const drain = asToken(mintTenantToken({ tenantId: probe.id, notifier: true }));
     const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
 
     const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
     const endpoint = (who) => `https://fcm.googleapis.com/fcm/send/verify-${who}-${randomUUID()}`;
     const outbox = async () => (await supabase.from('notification_outbox').select('id, kind, reference, first_night, nights, claimed_at, sent_at').eq('tenant_id', probe.id).order('id')).data ?? [];
-    const claim = async (client = owner, tenantId = probe.id) => client.rpc('notify_claim', { p_tenant_id: tenantId });
+    const claim = async (client = drain, tenantId = probe.id) => client.rpc('notify_claim', { p_tenant_id: tenantId });
 
     // 173. A member adds their own device (user_id filled from the token);
     //      naming another member, another tenant, or a bad endpoint is refused.
@@ -3458,9 +3478,9 @@ async function notificationChecks() {
     // 175. A web request, two rooms for two nights: ONE outbox row, the stay's
     //      reference, its first night, 2 nights. A staff stay: none.
     const request = async (day, email) => {
-      const { data, error } = await chat.rpc('request_booking', {
-        p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.A, unit.B], p_guests: [1, 1], p_check_in: day, p_nights: 2,
-        p_name: 'Notify Probe', p_phone: '0918 222 3333', p_email: email, p_notes: null,
+      const { data, error } = await chat.rpc('request_booking_with_consent', {
+        p_consent_version: '1', p_tenant_id: probe.id, p_slot_id: slot.id, p_unit_ids: [unit.A, unit.B], p_guests: [1, 1], p_check_in: day, p_nights: 2,
+        p_name: 'Notify Probe', p_phone: '0918 222 3333', p_email: email, p_notes: null, p_promo_code: null,
       });
       if (error) throw new Error(`request_booking: ${error.message}`);
       return data[0].reference;
@@ -3486,32 +3506,32 @@ async function notificationChecks() {
       const subs = await chat.from('push_subscriptions').select('id');
       const box = await chat.from('notification_outbox').select('id');
       const staffBox = await owner.from('notification_outbox').select('id');
-      const foreign = await claim(chat, villaRow.id);
+      const foreign = await claim(drain, villaRow.id);
       const serviceSubs = await supabase.from('push_subscriptions').select('id').eq('tenant_id', probe.id);
       check(
         (subs.data ?? []).length === 0 && (box.data ?? []).length === 0 && (staffBox.data ?? []).length === 1 && foreign.error?.code === '42501'
           && serviceSubs.data?.length === 2 && (await outbox()).length === 1,
-        "notify: a chat token reads 0 devices and 0 outbox rows, staff their 1 outbox row (service sees 2 and 1); notify_claim on another tenant is 42501",
+        "notify: a chat token reads 0 devices and 0 outbox rows, staff their 1 outbox row (service sees 2 and 1); notify_claim by the drain of another tenant is 42501",
         `chat subs ${subs.error?.code ?? (subs.data ?? []).length} · chat outbox ${box.error?.code ?? (box.data ?? []).length} · staff outbox ${staffBox.error?.code ?? (staffBox.data ?? []).length} · foreign ${foreign.error?.code}`,
       );
     }
 
-    // 177. The claim, on a CHAT token (the guest's request runs the drain):
+    // 177. The claim, on the DRAIN's token (D-166; it was the chat token):
     //      the request goes to both members' devices, with nothing but the
     //      named fields; a second claim returns nothing (claimed).
     {
-      const first = await claim(chat);
-      const second = await claim(chat);
+      const first = await claim(drain);
+      const second = await claim(drain);
       const rows = first.data ?? [];
       check(
         !first.error && rows.length === 2 && new Set(rows.map((r) => r.subscription_id)).size === 2 && rows.every((r) => r.kind === 'request' && r.reference === webRef)
           && Object.keys(rows[0]).sort().join() === 'auth,endpoint,first_night,kind,nights,outbox_id,p256dh,reference,subscription_id'
           && !second.error && (second.data ?? []).length === 0,
-        'notify: a chat token claims the request for both devices (named fields only); a second claim gets nothing',
+        'notify: the drain claims the request for both devices (named fields only); a second claim gets nothing',
         `first ${first.error?.message ?? rows.length} · second ${second.error?.message ?? (second.data ?? []).length}`,
       );
       // ok from both: sent.
-      const done = await chat.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const done = await drain.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
       const box = (await outbox())[0];
       const subs = await supabase.from('push_subscriptions').select('last_ok_at').eq('tenant_id', probe.id);
       check(
@@ -3532,33 +3552,33 @@ async function notificationChecks() {
         p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_proof_path: proofPath, p_method: 'GCash',
         p_claimed_amount: 100000, p_paid_on: PAID_TODAY, p_payer_reference: null, p_idempotency_key: randomUUID(),
       });
-      const rows = (await claim(staff)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const box = (await outbox()).filter((r) => r.kind === 'proof');
       check(
         !pay.error && box.length === 1 && rows.length === 1 && rows[0].kind === 'proof' && rows[0].subscription_id === ownerSub,
         "notify: a guest's proof is one outbox row, claimed for the owner's device only (staff has no payments:write)",
         `pay ${pay.error?.message ?? 'ok'} · proof rows ${box.length} · recipients ${rows.map((r) => (r.subscription_id === ownerSub ? 'owner' : 'staff')).join(',')}`,
       );
-      await staff.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      await drain.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
     }
 
     // 179. A change request reaches both; "gone" deletes that device, "retry"
     //      releases the row, which the next claim takes again (owner only now).
     {
       const asked = await chat.rpc('request_change', { p_tenant_id: probe.id, p_reference: webRef, p_contact: 'notify.web@example.com', p_kind: 'cancel', p_new_check_in: null, p_reason: 'Probe', p_dry_run: false });
-      const rows = (await claim(owner)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const results = rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: r.subscription_id === staffSub ? 'gone' : 'retry' }));
-      const done = await owner.rpc('notify_done', { p_results: results });
+      const done = await drain.rpc('notify_done', { p_results: results });
       const staffGone = (await supabase.from('push_subscriptions').select('id').eq('id', staffSub)).data?.length === 0;
       const box = (await outbox()).find((r) => r.kind === 'change');
-      const again = (await claim(owner)).data ?? [];
+      const again = (await claim(drain)).data ?? [];
       check(
         !asked.error && rows.length === 2 && rows.every((r) => r.kind === 'change') && !done.error && staffGone
           && box?.sent_at === null && box?.claimed_at === null && again.length === 1 && again[0].subscription_id === ownerSub,
         'notify: a change request reaches both; gone deletes that device, retry releases the row and the next claim takes it again',
         `asked ${asked.error?.message ?? 'ok'} · first ${rows.length} · staff device deleted ${staffGone} · released ${box?.claimed_at === null} · again ${again.length}`,
       );
-      await owner.rpc('notify_done', { p_results: again.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      await drain.rpc('notify_done', { p_results: again.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
     }
 
     // 180. A device that chose only proofs is not told of requests; a row
@@ -3567,7 +3587,7 @@ async function notificationChecks() {
       await supabase.from('push_subscriptions').delete().eq('id', ownerSub);
       const picky = await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('picky'), kinds: ['proof'], ...KEYS }).select('id').single();
       const ref = await request('2027-07-05', 'notify.second@example.com');
-      const rows = (await claim(owner)).data ?? [];
+      const rows = (await claim(drain)).data ?? [];
       const box = (await outbox()).find((r) => r.reference === ref);
       check(
         !picky.error && rows.length === 0 && box?.kind === 'request' && box.sent_at !== null,
@@ -3581,13 +3601,31 @@ async function notificationChecks() {
     {
       const ref = await request('2027-08-02', 'notify.third@example.com');
       await owner.from('push_subscriptions').insert({ tenant_id: probe.id, endpoint: endpoint('again'), ...KEYS });
-      const rows = (await claim(owner)).data ?? [];
-      const forged = await asToken(chatToken(villaRow.id)).rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
+      const rows = (await claim(drain)).data ?? [];
+      const forged = await asToken(mintTenantToken({ tenantId: villaRow.id, notifier: true })).rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'ok' })) });
       const box = (await outbox()).find((r) => r.reference === ref);
       check(
         rows.length === 1 && !forged.error && box?.sent_at === null,
-        "notify: another tenant's token calling notify_done changes nothing here (the row stays unsent)",
+        "notify: another tenant's drain calling notify_done changes nothing here (the row stays unsent)",
         `claimed ${rows.length} · forged ${forged.error?.code ?? 'no error'} · sent ${box?.sent_at !== null}`,
+      );
+
+      // 181b. D-166 (audit S-10): nobody but the drain. A chat token, a staff
+      //       token and an OWNER's token are refused by both functions
+      //       (42501), and the refused done leaves the row unsent and the
+      //       device in place.
+      const tries = [];
+      for (const [who, client] of [['chat', chat], ['staff', staff], ['owner', owner]]) {
+        const c = await client.rpc('notify_claim', { p_tenant_id: probe.id });
+        const d = await client.rpc('notify_done', { p_results: rows.map((r) => ({ outbox: r.outbox_id, subscription: r.subscription_id, result: 'gone' })) });
+        tries.push(`${who} ${c.error?.code ?? 'claimed'}/${d.error?.code ?? 'done'}`);
+      }
+      const stillThere = (await supabase.from('push_subscriptions').select('id').in('id', rows.map((r) => r.subscription_id))).data?.length ?? 0;
+      const stillUnsent = (await outbox()).find((r) => r.reference === ref)?.sent_at === null;
+      check(
+        tries.every((t) => t.endsWith('42501/42501')) && stillThere === rows.length && rows.length === 1 && stillUnsent,
+        'notify: a chat, staff or owner token is refused by notify_claim and notify_done (42501); the device and the unsent row stay',
+        `${tries.join(' · ')} · devices ${stillThere}/${rows.length} · unsent ${stillUnsent}`,
       );
     }
 
@@ -3831,9 +3869,9 @@ async function notificationChecks() {
       superDb.from('tenant_features').upsert({ tenant_id: probe, feature, enabled }, { onConflict: 'tenant_id,feature' }).select('feature');
     // On the chat token, the real door: the event log then names a guest, which is what queues a notice.
     const request = (day) =>
-      chatDb.rpc('request_booking', {
-        p_tenant_id: probe, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: day, p_nights: 1,
-        p_name: 'Feature Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `feat-${randomUUID()}@example.com`, p_notes: null,
+      chatDb.rpc('request_booking_with_consent', {
+        p_consent_version: '1', p_tenant_id: probe, p_slot_id: slot.id, p_unit_ids: [unit.id], p_guests: [1], p_check_in: day, p_nights: 1,
+        p_name: 'Feature Probe', p_phone: `09${String(Date.now()).slice(-9)}`, p_email: `feat-${randomUUID()}@example.com`, p_notes: null, p_promo_code: null,
       });
     const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
     const outbox = async () => (await supabase.from('notification_outbox').select('id', { count: 'exact', head: true }).eq('tenant_id', probe)).count;
@@ -4107,8 +4145,8 @@ async function notificationChecks() {
       const withConsent = webRef ? await stayOf(webRef) : null;
       const without = plain.data?.[0]?.reference ? await stayOf(plain.data[0].reference) : null;
       check(
-        !app.error && old.error?.code === '23514' && !current.error && withConsent?.consent_version === '3' && !!withConsent?.consented_at && !plain.error && without?.consent_version === null,
-        'legal: an old policy version is refused (23514); the current one books and the stay records "3" and when; plain request_booking() records none',
+        !app.error && old.error?.code === '23514' && !current.error && withConsent?.consent_version === '3' && !!withConsent?.consented_at && plain.error?.code === '42501' && without === null,
+        'legal: an old policy version is refused (23514); the current one books and the stay records "3" and when; plain request_booking() on a token is refused (42501, D-168)',
         `old ${old.error?.code ?? 'BOOKED'} · current ${current.error?.message ?? webRef} → ${JSON.stringify(withConsent)} · plain ${plain.error?.message ?? 'ok'} → ${without?.consent_version}`,
       );
     }
@@ -4536,8 +4574,8 @@ async function notificationChecks() {
       return `${plain.data?.[0]?.status ?? plain.error?.message}|${r ? `${r.status} ${r.rooms_free}/${r.rooms_total}` : priced.error?.message}`;
     };
     let phone = 0;
-    const request = (day, nights, units) => chat.rpc('request_booking', {
-      p_tenant_id: probe, p_slot_id: night, p_unit_ids: units, p_guests: units.map(() => 2), p_check_in: day, p_nights: nights,
+    const request = (day, nights, units) => chat.rpc('request_booking_with_consent', {
+      p_consent_version: '1', p_tenant_id: probe, p_slot_id: night, p_unit_ids: units, p_guests: units.map(() => 2), p_check_in: day, p_nights: nights,
       p_name: 'Counts Guest', p_phone: `0917${String(1000000 + ++phone)}`, p_email: `counts${phone}@example.com`, p_notes: null, p_promo_code: null,
     });
     const groupRows = (reference) => supabase.from('bookings').select('room_id, booked_date').eq('tenant_id', probe).eq('reference', reference).order('booked_date').order('room_id');
@@ -4740,6 +4778,250 @@ async function notificationChecks() {
       const { error } = await supabase.from('tenants').delete().eq('id', probe);
       if (error) check(false, 'rate limit: the probe tenant deletes', error.message);
     }
+  }
+}
+
+// 229f–229k. Revocable sessions (schema-sessions.sql, audit S-6, D-163):
+//            a session row per login, valid only for its own user, kind and
+//            tenant; logout and a new password revoke; no token reads it.
+{
+  const users = [];
+  let superRow = false;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const make = async (label) => {
+      const { data, error } = await supabase.auth.admin.createUser({ email: `verify-sessions-${label}-${randomBytes(4).toString('hex')}@example.com`, password: randomBytes(18).toString('base64url'), email_confirm: true });
+      if (error) throw new Error(`user: ${error.message}`);
+      users.push(data.user.id);
+      return data.user.id;
+    };
+    const member = await make('member');
+    const m = await supabase.from('memberships').insert({ user_id: member, tenant_id: villaRow.id, role: 'staff' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const villaStaff = asToken(staffToken(villaRow.id, member));
+
+    // 229f. A member opens a staff session; it is valid on the member's own
+    //       villa token, and on nothing else: not a chat token, not the same
+    //       user's token for another tenant, not a platform token.
+    {
+      const open = await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const id = open.data;
+      const own = await villaStaff.rpc('session_valid', { p_id: id });
+      const chat = await asToken(chatToken(villaRow.id)).rpc('session_valid', { p_id: id });
+      const elsewhere = await asToken(staffToken(villaRow.id + 100000, member)).rpc('session_valid', { p_id: id });
+      const asPlatform = await asToken(platformToken(member)).rpc('session_valid', { p_id: id });
+      const { data: row } = await supabase.from('app_sessions').select('user_id, kind, tenant_id, revoked_at').eq('id', id ?? '00000000-0000-0000-0000-000000000000').single();
+      check(
+        !open.error && own.data === true && chat.data === false && elsewhere.data === false && asPlatform.data === false
+          && row?.user_id === member && row.kind === 'staff' && String(row.tenant_id) === String(villaRow.id) && row.revoked_at === null,
+        'sessions: a staff session is valid on its own member\'s villa token only (not a chat, another tenant\'s or a platform token)',
+        `${open.error?.message ?? 'opened'} · own ${own.data} · chat ${chat.data} · elsewhere ${elsewhere.data} · platform ${asPlatform.data} · row ${row?.kind}/${row?.tenant_id}`,
+      );
+
+      // 229g. Logout: closed once (true), then invalid; closing again is false.
+      const closed = await villaStaff.rpc('session_close', { p_id: id });
+      const after = await villaStaff.rpc('session_valid', { p_id: id });
+      const again = await villaStaff.rpc('session_close', { p_id: id });
+      check(
+        closed.data === true && after.data === false && again.data === false,
+        'sessions: logout revokes the row (true), the session is then invalid, and a second close is false',
+        `close ${closed.data} · valid ${after.data} · again ${again.data}`,
+      );
+    }
+
+    // 229h. Nobody opens a session for someone else, or a kind they are not:
+    //       a chat token (no sub) is refused, a non-member's villa token is
+    //       refused, a staff token cannot open a platform session, and a
+    //       lifetime past 12 hours is refused.
+    {
+      const stranger = await make('stranger');
+      const chatOpen = await asToken(chatToken(villaRow.id)).rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const nonMember = await asToken(staffToken(villaRow.id, stranger)).rpc('session_open', { p_kind: 'staff', p_seconds: 600 });
+      const wrongKind = await villaStaff.rpc('session_open', { p_kind: 'platform', p_seconds: 600 });
+      const tooLong = await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 43201 });
+      check(
+        chatOpen.error?.code === '42501' && nonMember.error?.code === '42501' && wrongKind.error?.code === '42501' && tooLong.error?.code === '22023',
+        'sessions: a chat token, a non-member, a staff token asking for a platform session (42501) and a 12 h + 1 s lifetime (22023) are refused',
+        `${chatOpen.error?.code} · ${nonMember.error?.code} · ${wrongKind.error?.code} · ${tooLong.error?.code}`,
+      );
+    }
+
+    // 229i. A super user's platform session: valid on the platform token,
+    //       not on the same user's tenant token.
+    {
+      const superUser = await make('super');
+      const s = await supabase.from('platform_admins').insert({ user_id: superUser });
+      if (s.error) throw new Error(`super: ${s.error.message}`);
+      superRow = superUser;
+      const platform = asToken(platformToken(superUser));
+      const open = await platform.rpc('session_open', { p_kind: 'platform', p_seconds: 600 });
+      const own = await platform.rpc('session_valid', { p_id: open.data });
+      const onTenant = await asToken(staffToken(villaRow.id, superUser)).rpc('session_valid', { p_id: open.data });
+      check(
+        !open.error && own.data === true && onTenant.data === false,
+        'sessions: a platform session is valid on the super user\'s platform token, not on a tenant token of the same user',
+        `${open.error?.message ?? 'opened'} · own ${own.data} · tenant ${onTenant.data}`,
+      );
+    }
+
+    // 229j. A new password: session_close_all() ends every live session of the
+    //       token's user (here two), and the count says so.
+    {
+      const a = (await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 })).data;
+      const b = (await villaStaff.rpc('session_open', { p_kind: 'staff', p_seconds: 600 })).data;
+      const all = await villaStaff.rpc('session_close_all');
+      const va = await villaStaff.rpc('session_valid', { p_id: a });
+      const vb = await villaStaff.rpc('session_valid', { p_id: b });
+      const noUser = await asToken(chatToken(villaRow.id)).rpc('session_close_all');
+      check(
+        all.data === 2 && va.data === false && vb.data === false && noUser.error?.code === '42501',
+        'sessions: session_close_all() revokes both live sessions (2) and a token with no user is refused',
+        `count ${all.data} · a ${va.data} · b ${vb.data} · chat ${noUser.error?.code}`,
+      );
+    }
+
+    // 229k. No token reads the table; the service client sees the rows.
+    {
+      const viaStaff = await villaStaff.from('app_sessions').select('id');
+      const viaAnon = await anonClient().from('app_sessions').select('id');
+      const { count } = await supabase.from('app_sessions').select('id', { count: 'exact', head: true }).in('user_id', users);
+      check(
+        (!!viaStaff.error || (viaStaff.data ?? []).length === 0) && (!!viaAnon.error || (viaAnon.data ?? []).length === 0) && (count ?? 0) >= 4,
+        'sessions: a staff token and anon read nothing from app_sessions; the service client sees the rows',
+        `staff ${viaStaff.error?.code ?? viaStaff.data?.length} · anon ${viaAnon.error?.code ?? viaAnon.data?.length} · service ${count}`,
+      );
+    }
+  } catch (error) {
+    check(false, 'sessions: setup', error.message);
+  } finally {
+    if (superRow) await supabase.from('platform_admins').delete().eq('user_id', superRow);
+    for (const id of users) {
+      await supabase.from('memberships').delete().eq('user_id', id);
+      await supabase.auth.admin.deleteUser(id);
+      await supabase.from('audit_log').delete().eq('actor_user', id);
+      await supabase.from('audit_log').delete().eq('subject', id);
+    }
+  }
+}
+
+// 229l. A token updates only `status` and `decision_note` of a booking
+//       (schema-booking-columns.sql, audit S-11, D-167). The privilege is
+//       checked before any row is looked for, so a filter that matches no
+//       row still shows it: every other column is 42501 for a member of
+//       villa, the two allowed ones are not (their real use, confirm and
+//       cancel, is checked by 77-92, 154 and rooms).
+{
+  let member = null;
+  try {
+    const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+    const { data, error } = await supabase.auth.admin.createUser({ email: `verify-columns-${randomBytes(4).toString('hex')}@example.com`, password: randomBytes(18).toString('base64url'), email_confirm: true });
+    if (error) throw new Error(`user: ${error.message}`);
+    member = data.user.id;
+    const m = await supabase.from('memberships').insert({ user_id: member, tenant_id: villaRow.id, role: 'owner' });
+    if (m.error) throw new Error(`membership: ${m.error.message}`);
+    const owner = asToken(staffToken(villaRow.id, member));
+    const tryUpdate = (patch) => owner.from('bookings').update(patch).eq('tenant_id', villaRow.id).eq('id', -1);
+    const forbidden = [
+      { guest_name: 'x' }, { guest_phone: '09170000000' }, { guest_email: 'x@example.com' },
+      { notes: 'x' }, { held: true }, { source: 'web' }, { price: 1 }, { room_id: 1 },
+    ];
+    const refused = [];
+    for (const patch of forbidden) refused.push(`${Object.keys(patch)[0]} ${(await tryUpdate(patch)).error?.code ?? 'ALLOWED'}`);
+    const allowed = await tryUpdate({ status: 'cancelled', decision_note: 'probe' });
+    check(
+      refused.every((r) => r.endsWith('42501')) && !allowed.error,
+      'booking columns: even an OWNER token may update only status and decision_note; the guest details, notes, held, source, price and room are 42501',
+      `${refused.join(' · ')} · status+note ${allowed.error?.code ?? 'ok'}`,
+    );
+  } catch (error) {
+    check(false, 'booking columns: setup', error.message);
+  } finally {
+    if (member) {
+      await supabase.from('memberships').delete().eq('user_id', member);
+      await supabase.auth.admin.deleteUser(member);
+      await supabase.from('audit_log').delete().eq('actor_user', member);
+      await supabase.from('audit_log').delete().eq('subject', member);
+    }
+  }
+}
+
+// 229b–229e. The platform's sign-in and reset count (schema-platform-rate-limit.sql,
+//            audit S-2, D-157): platform_rate_allow() on the publishable key
+//            alone, no tenant, only hashed keys, and the table unreadable.
+{
+  const anon = anonClient();
+  const keys = [];
+  try {
+    const hex = () => randomBytes(32).toString('hex');
+    const call = (key, max = 3, window = 600) => anon.rpc('platform_rate_allow', { p_key: key, p_max: max, p_window_seconds: window });
+
+    // 229b. Three in, the fourth out, ONE row with count 4 (the positive twin: the count is real).
+    {
+      const key = `platform-login|${hex()}`;
+      keys.push(key);
+      const verdicts = [];
+      let firstError = null;
+      for (let i = 0; i < 4; i++) {
+        const { data, error } = await call(key);
+        firstError ??= error;
+        verdicts.push(data);
+      }
+      const { data: stored } = await supabase.from('platform_rate_windows').select('count').eq('key', key);
+      check(
+        !firstError && verdicts.join() === 'true,true,true,false' && stored?.length === 1 && stored[0].count === 4,
+        'platform rate limit: the publishable key alone is inside for 3 calls and refused on the 4th; one row, count 4',
+        firstError?.message ?? `verdicts ${verdicts.join()} · rows ${stored?.length} · count ${stored?.[0]?.count}`,
+      );
+    }
+
+    // 229c. Only the shape the server makes: an email in the key, another
+    //       scope, or an out-of-bounds window is refused, and leaves no row.
+    {
+      const bad = [
+        await call('platform-login|ann@example.com'),
+        await call(`chat|${hex()}`),
+        await call(`platform-reset|${hex()}`, 3, 10),
+        await call(`platform-reset|${hex()}`, 0),
+      ];
+      const { count } = await supabase.from('platform_rate_windows').select('key', { count: 'exact', head: true }).like('key', '%@%');
+      check(
+        bad.every((r) => r.error?.code === '22023' && r.data == null) && count === 0,
+        'platform rate limit: a free-text key, another scope, a 10 s window or max 0 is invalid_parameter_value and stores nothing',
+        bad.map((r) => r.error?.code ?? `data ${r.data}`).join(' · '),
+      );
+    }
+
+    // 229d. No role reads the table: anon and a chat token get an error or
+    //       nothing, while the service client sees 229b's row.
+    {
+      const viaAnon = await anon.from('platform_rate_windows').select('key');
+      const { data: villaRow } = await supabase.from('tenants').select('id').eq('slug', 'villa').single();
+      const viaChat = await asToken(chatToken(villaRow.id)).from('platform_rate_windows').select('key');
+      const { data: all } = await supabase.from('platform_rate_windows').select('key').in('key', keys);
+      check(
+        (!!viaAnon.error || (viaAnon.data ?? []).length === 0) && (!!viaChat.error || (viaChat.data ?? []).length === 0) && (all ?? []).length === 1,
+        'platform rate limit: anon and a chat token read nothing from platform_rate_windows; the service client sees the row',
+        `anon ${viaAnon.error?.code ?? viaAnon.data?.length} · chat ${viaChat.error?.code ?? viaChat.data?.length} · service ${all?.length}`,
+      );
+    }
+
+    // 229e. The sweep: a window aged three windows is gone after any call.
+    {
+      const key = `platform-reset|${hex()}`;
+      keys.push(key);
+      const old = new Date(Date.now() - 3 * 600 * 1000).toISOString();
+      const seeded = await supabase.from('platform_rate_windows').insert({ key, window_start: old, count: 99 });
+      if (seeded.error) throw new Error(`seed: ${seeded.error.message}`);
+      const fresh = `platform-reset|${hex()}`;
+      keys.push(fresh);
+      const { error } = await call(fresh);
+      const { data: after } = await supabase.from('platform_rate_windows').select('key').eq('key', key);
+      check(!error && (after ?? []).length === 0, 'platform rate limit: a window aged three windows is swept by the next call', error?.message ?? `rows ${after?.length}`);
+    }
+  } catch (error) {
+    check(false, 'platform rate limit: setup', error.message);
+  } finally {
+    if (keys.length) await supabase.from('platform_rate_windows').delete().in('key', keys);
   }
 }
 
